@@ -2,5 +2,5 @@ namespace EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 
 public interface IShardSuffixResolver {
     string Resolve(DateTimeOffset timestamp);
-    IReadOnlyList<string> ResolveBootstrapSuffixes(DateTimeOffset utcNow, int monthsAhead);
+    IReadOnlyList<string> ResolveBootstrapSuffixes(DateTimeOffset localNow, int monthsAhead);
 }

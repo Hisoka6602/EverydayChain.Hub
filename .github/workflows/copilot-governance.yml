@@ -65,9 +65,9 @@ jobs:
           python3 - <<'PY'
           import pathlib
           import re
+          import subprocess
           import sys
 
-          root = pathlib.Path(".")
           banned_patterns = [
               r"\bDateTime\.UtcNow\b",
               r"\bDateTimeOffset\.UtcNow\b",
@@ -84,11 +84,11 @@ jobs:
               ".github/copilot-instructions.md",
               ".github/workflows/copilot-governance.yml",
           }
+          git_tracked_files = subprocess.check_output(["git", "ls-files", "-z"], text=False)
+          candidate_files = [pathlib.Path(item) for item in git_tracked_files.decode("utf-8").split("\0") if item]
 
           utc_violations = []
-          for path in root.rglob("*"):
-              if not path.is_file():
-                  continue
+          for path in candidate_files:
               relative = path.as_posix()
               if relative in ignored_files:
                   continue
@@ -111,8 +111,10 @@ jobs:
               sys.exit(1)
 
           namespace_violations = []
-          for cs_file in root.rglob("*.cs"):
-              relative = cs_file.relative_to(root).as_posix()
+          for cs_file in candidate_files:
+              if cs_file.suffix != ".cs":
+                  continue
+              relative = cs_file.as_posix()
               if any(part in ignored_dirs for part in cs_file.parts):
                   continue
               text = cs_file.read_text(encoding="utf-8")
@@ -121,7 +123,7 @@ jobs:
                   continue
               actual_ns = match.group(1)
 
-              relative_parent = cs_file.relative_to(root).parent
+              relative_parent = cs_file.parent
               if relative_parent.as_posix() == ".":
                   continue
 

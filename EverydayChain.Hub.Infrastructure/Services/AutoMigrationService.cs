@@ -23,7 +23,8 @@ public class AutoMigrationService(
             logger.LogInformation("自动迁移: 基础迁移已执行完成。");
         }, cancellationToken);
 
-        var suffixes = resolver.ResolveBootstrapSuffixes(DateTimeOffset.Now, _options.AutoCreateMonthsAhead);
+        var localNow = DateTimeOffset.Now;
+        var suffixes = resolver.ResolveBootstrapSuffixes(localNow, _options.AutoCreateMonthsAhead);
         await shardTableManager.EnsureShardTablesAsync(suffixes, cancellationToken);
     }
 }
