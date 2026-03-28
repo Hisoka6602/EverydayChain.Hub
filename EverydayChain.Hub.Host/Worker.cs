@@ -31,7 +31,7 @@ namespace EverydayChain.Hub.Host
                 // 步骤2：在信息日志级别启用时输出当前本地时间。
                 if (_logger.IsEnabled(LogLevel.Information))
                 {
-                    _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+                    _logger.LogInformation("Worker running at: {time}", DateTime.Now);
                 }
 
                 // 步骤3：按固定间隔等待下一次执行。
