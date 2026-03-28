@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Infrastructure.Services;
 
 public class AutoMigrationService(
-    HubDbContext dbContext,
+    IDbContextFactory<HubDbContext> dbContextFactory,
     IShardSuffixResolver resolver,
     IShardTableManager shardTableManager,
     IOptions<ShardingOptions> shardingOptions,
@@ -18,6 +18,7 @@ public class AutoMigrationService(
 
     public async Task RunAsync(CancellationToken cancellationToken) {
         await dangerZoneExecutor.ExecuteAsync("auto-migrate-base", async token => {
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(token);
             await dbContext.Database.MigrateAsync(token);
             logger.LogInformation("自动迁移: 基础迁移已执行完成。");
         }, cancellationToken);

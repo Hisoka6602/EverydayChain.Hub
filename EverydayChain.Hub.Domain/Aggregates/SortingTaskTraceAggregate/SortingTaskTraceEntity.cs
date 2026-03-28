@@ -1,8 +1,9 @@
+using EverydayChain.Hub.Domain.Abstractions;
 using System.ComponentModel.DataAnnotations;
 
 namespace EverydayChain.Hub.Domain.Aggregates.SortingTaskTraceAggregate;
 
-public class SortingTaskTraceEntity {
+public class SortingTaskTraceEntity : IEntity<long> {
     [Key]
     public long Id { get; set; }
 

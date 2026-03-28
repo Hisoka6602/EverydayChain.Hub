@@ -15,11 +15,6 @@ public static class ServiceCollectionExtensions {
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
 
-        services.AddDbContext<HubDbContext>(options => {
-            options.UseSqlServer(shardingOptions.ConnectionString);
-            options.ReplaceService<IModelCacheKeyFactory, ShardModelCacheKeyFactory>();
-        });
-
         services.AddDbContextFactory<HubDbContext>(options => {
             options.UseSqlServer(shardingOptions.ConnectionString);
             options.ReplaceService<IModelCacheKeyFactory, ShardModelCacheKeyFactory>();

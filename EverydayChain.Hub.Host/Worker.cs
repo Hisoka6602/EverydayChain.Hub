@@ -17,8 +17,17 @@ public class Worker(ILogger<Worker> logger, ISortingTaskTraceWriter sortingTaskT
                 }
             };
 
-            await sortingTaskTraceWriter.WriteAsync(demoData, stoppingToken);
-            logger.LogInformation("后台任务写入成功，当前调谐批量窗口: {BatchSize}", tuner.CurrentBatchSize);
+            try {
+                await sortingTaskTraceWriter.WriteAsync(demoData, stoppingToken);
+                logger.LogInformation("后台任务写入成功，当前调谐批量窗口: {BatchSize}", tuner.CurrentBatchSize);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) {
+                return;
+            }
+            catch (Exception ex) {
+                logger.LogError(ex, "后台任务写入失败，将在下次循环重试。");
+            }
+
             await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
         }
     }

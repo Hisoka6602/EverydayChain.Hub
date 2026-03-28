@@ -9,6 +9,7 @@ public partial class InitialHubSchema : Migration {
     protected override void Up(MigrationBuilder migrationBuilder) {
         migrationBuilder.CreateTable(
             name: "sorting_task_trace",
+            schema: "dbo",
             columns: table => new {
                 Id = table.Column<long>(type: "bigint", nullable: false)
                     .Annotation("SqlServer:Identity", "1, 1"),
@@ -21,11 +22,11 @@ public partial class InitialHubSchema : Migration {
             },
             constraints: table => { table.PrimaryKey("PK_sorting_task_trace", x => x.Id); });
 
-        migrationBuilder.CreateIndex(name: "IX_sorting_task_trace_BusinessNo", table: "sorting_task_trace", column: "BusinessNo");
-        migrationBuilder.CreateIndex(name: "IX_sorting_task_trace_CreatedAt", table: "sorting_task_trace", column: "CreatedAt");
+        migrationBuilder.CreateIndex(name: "IX_sorting_task_trace_BusinessNo", table: "sorting_task_trace", schema: "dbo", column: "BusinessNo");
+        migrationBuilder.CreateIndex(name: "IX_sorting_task_trace_CreatedAt", table: "sorting_task_trace", schema: "dbo", column: "CreatedAt");
     }
 
     protected override void Down(MigrationBuilder migrationBuilder) {
-        migrationBuilder.DropTable(name: "sorting_task_trace");
+        migrationBuilder.DropTable(name: "sorting_task_trace", schema: "dbo");
     }
 }
