@@ -8,11 +8,11 @@ public class Worker(ILogger<Worker> logger, ISortingTaskTraceWriter sortingTaskT
         while (!stoppingToken.IsCancellationRequested) {
             var demoData = new List<SortingTaskTraceEntity> {
                 new() {
-                    BusinessNo = $"BIZ-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}",
+                    BusinessNo = $"BIZ-{DateTimeOffset.Now:yyyyMMddHHmmss}",
                     Channel = "WMS",
                     StationCode = "ST-01",
                     Status = "Created",
-                    CreatedAt = DateTimeOffset.UtcNow,
+                    CreatedAt = DateTimeOffset.Now,
                     Payload = "自动调谐与分表自治演示写入"
                 }
             };
