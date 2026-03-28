@@ -18,7 +18,7 @@
 ## 2. 结构与命名规则
 - 项目内所有代码文件的命名空间必须与物理目录层级严格一致。
 - 每个类必须独立文件，禁止多类同文件。
-- 所有枚举必须定义在 `Zeye.Sorting.Hub.Domain.Enums` 子目录下。
+- 所有枚举必须定义在 `EverydayChain.Hub.Domain.Enums` 子目录下。
 - 所有枚举必须包含 XML 注释与 `Description`。
 - 所有事件载荷必须定义在 `Events` 子目录下，并使用 `readonly record struct`。
 - 字段、类型、文件、项目命名必须符合专业领域术语。

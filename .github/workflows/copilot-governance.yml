@@ -91,6 +91,7 @@ jobs:
                   continue
               if any(part in ignored_dirs for part in path.parts):
                   continue
+              # Markdown 文档允许出现禁用 API 名称作为规则说明示例，因此不纳入扫描。
               if path.suffix not in {".cs", ".csproj", ".json", ".yml", ".yaml", ".xml", ".config"}:
                   continue
               try:
@@ -117,10 +118,18 @@ jobs:
                   continue
               actual_ns = match.group(1)
 
-              path_without_file = cs_file.relative_to(root).parent.as_posix().replace("/", ".")
-              if path_without_file == ".":
+              relative_parent = cs_file.relative_to(root).parent
+              if relative_parent.as_posix() == ".":
                   continue
-              expected_ns = path_without_file
+
+              parts = list(relative_parent.parts)
+              if not parts:
+                  continue
+
+              if parts[0] in {".github"}:
+                  continue
+
+              expected_ns = ".".join(parts)
               if actual_ns != expected_ns:
                   namespace_violations.append((relative, actual_ns, expected_ns))
 
