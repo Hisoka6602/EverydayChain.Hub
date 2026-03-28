@@ -4,34 +4,63 @@ using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Infrastructure.Services;
 
-public class SqlExecutionTuner : ISqlExecutionTuner {
+/// <summary>
+/// 批量写入性能自动调谐器实现，基于采样窗口内的失败率与耗时动态升降批量大小。
+/// </summary>
+public class SqlExecutionTuner : ISqlExecutionTuner
+{
+    /// <summary>批量大小读写同步根。</summary>
     private readonly object _syncRoot = new();
+
+    /// <summary>自动调谐配置快照。</summary>
     private readonly AutoTuneOptions _options;
+
+    /// <summary>日志记录器。</summary>
     private readonly ILogger<SqlExecutionTuner> _logger;
+
+    /// <summary>当前推荐批量大小，通过 <see cref="Volatile"/> 保证跨线程可见性。</summary>
     private int _batchSize;
+
+    /// <summary>当前采样窗口内失败次数。</summary>
     private int _failureCount;
+
+    /// <summary>当前采样窗口内总样本数。</summary>
     private int _sampleCount;
 
-    public SqlExecutionTuner(IOptions<AutoTuneOptions> options, ILogger<SqlExecutionTuner> logger) {
+    /// <summary>
+    /// 初始化调谐器，从配置中读取初始批量大小。
+    /// </summary>
+    /// <param name="options">自动调谐配置。</param>
+    /// <param name="logger">日志记录器。</param>
+    public SqlExecutionTuner(IOptions<AutoTuneOptions> options, ILogger<SqlExecutionTuner> logger)
+    {
         _options = options.Value;
         _logger = logger;
         _batchSize = _options.InitialBatchSize;
     }
 
+    /// <inheritdoc/>
     public int CurrentBatchSize => Volatile.Read(ref _batchSize);
 
-    public void Record(TimeSpan elapsed, bool success) {
-        if (!_options.Enabled) {
+    /// <inheritdoc/>
+    public void Record(TimeSpan elapsed, bool success)
+    {
+        if (!_options.Enabled)
+        {
             return;
         }
 
-        lock (_syncRoot) {
+        lock (_syncRoot)
+        {
             _sampleCount++;
-            if (!success) {
+            if (!success)
+            {
                 _failureCount++;
             }
 
-            if (_sampleCount < 10) {
+            // 采样窗口未满 10 次时不触发决策。
+            if (_sampleCount < 10)
+            {
                 return;
             }
 
@@ -39,16 +68,20 @@ public class SqlExecutionTuner : ISqlExecutionTuner {
             var isSlow = elapsed.TotalMilliseconds > _options.SlowThresholdMilliseconds;
             var old = _batchSize;
 
-            if (failureRate > 0.2 || isSlow) {
+            // 失败率超 20% 或耗时过长时降低批量大小；否则逐步提升。
+            if (failureRate > 0.2 || isSlow)
+            {
                 _batchSize = Math.Max(_options.MinBatchSize, _batchSize - _options.DecreaseStep);
             }
-            else {
+            else
+            {
                 _batchSize = Math.Min(_options.MaxBatchSize, _batchSize + _options.IncreaseStep);
             }
 
             _logger.LogInformation("自动调谐: 批量大小 {OldBatch} -> {NewBatch}, failureRate={FailureRate}, elapsedMs={ElapsedMs}",
                 old, _batchSize, failureRate, elapsed.TotalMilliseconds);
 
+            // 重置采样窗口。
             _sampleCount = 0;
             _failureCount = 0;
         }

@@ -199,3 +199,4 @@ namespace EverydayChain.Hub.Domain.Aggregates.WmsSplitPickToLightCartonAggregate
         [Column("SCANCOUNT")]
         public int? ScanCount { get; set; }
     }
+}
