@@ -24,6 +24,7 @@ public static class ServiceCollectionExtensions
     {
         services.Configure<ShardingOptions>(configuration.GetSection(ShardingOptions.SectionName));
         services.Configure<AutoTuneOptions>(configuration.GetSection(AutoTuneOptions.SectionName));
+        services.Configure<DangerZoneOptions>(configuration.GetSection(DangerZoneOptions.SectionName));
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
 

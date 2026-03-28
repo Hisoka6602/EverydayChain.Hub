@@ -4,8 +4,10 @@
 - 修复 `WmsSplitPickToLightCartonEntity.cs` 缺失命名空间闭合大括号导致的编译错误。
 - 将 `ShardTableManager` / `IShardTableManager` 重命名为 `ShardTableProvisioner` / `IShardTableProvisioner`（遵守禁用 `XxxManager` 命名规范）。
 - 引入 **NLog** 作为唯一日志实现（`NLog.Extensions.Logging` + `nlog.config`），并移除默认提供器。
+- 修复 `nlog.config` 落盘隐患：`Microsoft.*` 过滤器改为 `final="true"`、File target 补充 `keepFileOpen`/`autoFlush`、`Program.cs` 增加 `LogManager.Shutdown()`。
 - 为全部类、方法、字段、属性补充 XML 注释（满足"所有方法/字段必须有注释"规范）。
 - 补充 `Microsoft.Extensions.Hosting.Abstractions` 与 `Microsoft.EntityFrameworkCore.Infrastructure` 显式引用，修复隐藏的编译依赖缺失问题。
+- 新增 `DangerZoneOptions.cs`，将 `DangerZoneExecutor` 弹性策略参数（超时/重试/熔断）从硬编码迁移到可配置节点 `DangerZone`，补全配置覆盖面并为每个参数添加 XML 注释。
 
 ## 解决方案文件树与职责
 ```text
@@ -35,6 +37,7 @@
 │   ├── DependencyInjection/ServiceCollectionExtensions.cs
 │   ├── Options/ShardingOptions.cs
 │   ├── Options/AutoTuneOptions.cs
+│   ├── Options/DangerZoneOptions.cs
 │   ├── Persistence/HubDbContext.cs
 │   ├── Persistence/DesignTimeHubDbContextFactory.cs
 │   ├── Persistence/EntityConfigurations/SortingTaskTraceEntityTypeConfiguration.cs
@@ -75,7 +78,8 @@
 - `IShardTableProvisioner.cs` + `ShardTableProvisioner.cs`：在 SQL Server 中按需创建分表与索引（不存在才建），替代原 `ShardTableManager` 命名。
 - `AutoMigrationService.cs` + `AutoMigrationHostedService.cs`：应用启动时自动执行 `Migrate` 与分表预创建。
 - `SqlExecutionTuner.cs`：基于失败率和耗时进行批量窗口升降调谐。
-- `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断）。
+- `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断），弹性参数来自 `DangerZoneOptions`。
+- `DangerZoneOptions.cs`：`DangerZoneExecutor` 弹性策略配置类，绑定 `DangerZone` 节点，覆盖超时、重试、熔断全部参数，所有属性含 XML 注释。
 - `SortingTaskTraceWriter.cs`：按分表后缀分组写入，并将执行结果回传给调谐器。
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖。
 - `202603280001_InitialHubSchema.cs`：基础表结构迁移。
