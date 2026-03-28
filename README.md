@@ -1,50 +1,73 @@
 # EverydayChain.Hub
 
-## 各层级与各文件作用说明（逐项）
+## 本次更新内容（2026-03-28）
+- 已在本 PR 内完成 **分表自治**（按月分表自动路由 + 启动自建分表）。
+- 已在本 PR 内完成 **自动迁移**（应用启动执行 EF Core `Migrate`，并预创建未来分表）。
+- 已在本 PR 内完成 **自动调谐**（根据失败率与耗时动态调整批量写入窗口）。
+- 已补充 **危险代码隔离器**（重试 + 超时 + 熔断）用于迁移与分表 DDL 等高风险操作。
+- 已新增 **手动迁移文档**：`EFCore手动迁移操作指南.md`。
 
-### 根目录
-- `EverydayChain.Hub.sln`：解决方案入口，聚合所有项目。
-- `.gitattributes`：Git 属性配置。
-- `.gitignore`：Git 忽略规则。
-- `README.md`：仓库总览、结构职责说明与本次变更说明。
+## 仓库文件树（关键实现文件）
+```text
+.
+├── EverydayChain.Hub.sln
+├── README.md
+├── EFCore手动迁移操作指南.md
+├── EverydayChain.Hub.Domain
+│   ├── EverydayChain.Hub.Domain.csproj
+│   ├── Abstractions/IEntity.cs
+│   ├── Aggregates/SortingTaskTraceAggregate/SortingTaskTraceEntity.cs
+│   ├── Aggregates/WmsPickToWcsAggregate/WmsPickToWcsEntity.cs
+│   └── Aggregates/WmsSplitPickToLightCartonAggregate/WmsSplitPickToLightCartonEntity.cs
+├── EverydayChain.Hub.Infrastructure
+│   ├── EverydayChain.Hub.Infrastructure.csproj
+│   ├── DependencyInjection/ServiceCollectionExtensions.cs
+│   ├── Options/ShardingOptions.cs
+│   ├── Options/AutoTuneOptions.cs
+│   ├── Persistence/HubDbContext.cs
+│   ├── Persistence/DesignTimeHubDbContextFactory.cs
+│   ├── Persistence/EntityConfigurations/SortingTaskTraceEntityTypeConfiguration.cs
+│   ├── Persistence/Sharding/TableSuffixScope.cs
+│   ├── Persistence/Sharding/IShardSuffixResolver.cs
+│   ├── Persistence/Sharding/MonthShardSuffixResolver.cs
+│   ├── Persistence/Sharding/ShardModelCacheKeyFactory.cs
+│   ├── Migrations/202603280001_InitialHubSchema.cs
+│   ├── Migrations/HubDbContextModelSnapshot.cs
+│   └── Services
+│       ├── IDangerZoneExecutor.cs
+│       ├── DangerZoneExecutor.cs
+│       ├── IAutoMigrationService.cs
+│       ├── AutoMigrationService.cs
+│       ├── AutoMigrationHostedService.cs
+│       ├── IShardTableManager.cs
+│       ├── ShardTableManager.cs
+│       ├── ISqlExecutionTuner.cs
+│       ├── SqlExecutionTuner.cs
+│       ├── ISortingTaskTraceWriter.cs
+│       └── SortingTaskTraceWriter.cs
+└── EverydayChain.Hub.Host
+    ├── EverydayChain.Hub.Host.csproj
+    ├── Program.cs
+    ├── Worker.cs
+    └── appsettings.json
+```
 
-### `.github`
-- `.github/copilot-instructions.md`：Copilot 强制执行规范（时间语义、结构规范、注释规范、自检与门禁要求）。
-- `.github/workflows/copilot-guard.yml`：约束联动与基础静态门禁 CI（规则变更联动、UTC 禁用、配置时间样例检查）。
+## 每个关键文件实现说明
+- `SortingTaskTraceEntity.cs`：新增可分表的写入实体，用于承载中台追踪数据。
+- `HubDbContext.cs`：根据分表后缀动态映射表名。
+- `TableSuffixScope.cs` + `ShardModelCacheKeyFactory.cs`：保证不同后缀下 EF Model 能正确缓存隔离。
+- `MonthShardSuffixResolver.cs`：按月份生成分表后缀（如 `_202603`）。
+- `ShardTableManager.cs`：在 SQL Server 中自动创建分表与索引（不存在才建）。
+- `AutoMigrationService.cs` + `AutoMigrationHostedService.cs`：应用启动时自动执行 `Migrate` 与分表预创建。
+- `SqlExecutionTuner.cs`：基于失败率和耗时进行批量窗口升降调谐。
+- `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断）。
+- `SortingTaskTraceWriter.cs`：按分表后缀分组写入，并将执行结果回传给调谐器。
+- `ServiceCollectionExtensions.cs`：统一注册基础设施依赖。
+- `202603280001_InitialHubSchema.cs`：基础表结构迁移。
+- `EFCore手动迁移操作指南.md`：提供手工迁移、脚本导出、回滚、排障流程。
 
-### `EverydayChain.Hub.Host`
-- `Program.cs`：宿主启动入口，注册后台服务并启动 Host。
-- `Worker.cs`：后台轮询任务实现，输出运行状态日志。
-- `appsettings.json`：宿主通用配置。
-- `appsettings.Development.json`：开发环境配置。
-- `Properties/launchSettings.json`：本地启动配置。
-- `EverydayChain.Hub.Host.csproj`：宿主项目文件。
-
-### `EverydayChain.Hub.Domain`
-- `EverydayChain.Hub.Domain.csproj`：领域层项目文件。
-- `Abstractions/IEntity.cs`：实体抽象定义。
-- `Aggregates/WmsPickToWcsAggregate/WmsPickToWcsEntity.cs`：WMS 下发至 WCS 分拣任务实体映射。
-- `Aggregates/WmsSplitPickToLightCartonAggregate/WmsSplitPickToLightCartonEntity.cs`：WMS 下发至亮灯拆零箱任务实体映射。
-- `Class1.cs`：领域层占位类型（待后续替换为业务类型）。
-
-### `EverydayChain.Hub.Application`
-- `EverydayChain.Hub.Application.csproj`：应用层项目文件。
-- `Class1.cs`：应用层占位类型。
-
-### `EverydayChain.Hub.Infrastructure`
-- `EverydayChain.Hub.Infrastructure.csproj`：基础设施层项目文件。
-- `Class1.cs`：基础设施层占位类型。
-
-### `EverydayChain.Hub.SharedKernel`
-- `EverydayChain.Hub.SharedKernel.csproj`：共享内核项目文件。
-- `Class1.cs`：共享内核占位类型。
-
-## 本次更新内容
-- 新增 Copilot 规则文档 `.github/copilot-instructions.md`，将约束沉淀为仓库内可审计规范。
-- 新增 CI 工作流 `.github/workflows/copilot-guard.yml`，实现规则变动联动与时间语义基础校验。
-- 补充根目录 `README.md` 的逐文件职责说明。
-
-## 后续可完善点
-- 增加针对注释完整性、命名空间路径一致性的自动化校验脚本。
-- 增加重复代码扫描门禁（按目录白名单逐步收敛误报）。
-- 增加 NLog 专项门禁与性能基线检测。
+## 可继续完善内容
+- 将自动调谐状态持久化到 Redis 或配置中心，支持跨实例共享调谐窗口。
+- 将分表策略扩展为按租户 + 月份的复合维度。
+- 为 `SortingTaskTraceWriter` 增加幂等键（避免重复投递）。
+- 增加集成测试：覆盖真实 SQL Server 容器下的迁移、分表创建、调谐验证。

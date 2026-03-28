@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -7,15 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="DependencyInjection\" />
-    <Folder Include="EntityConfigurations\" />
-    <Folder Include="Persistence\" />
-    <Folder Include="Repositories\" />
-    <Folder Include="Messaging\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="EFCore.Sharding.SqlServer" Version="9.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.14" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.14">
       <PrivateAssets>all</PrivateAssets>
@@ -23,7 +14,12 @@
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.14" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.1" />
-    <PackageReference Include="NLog" Version="6.1.1" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
+    <PackageReference Include="Polly" Version="8.6.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EverydayChain.Hub.Domain\EverydayChain.Hub.Domain.csproj" />
   </ItemGroup>
 
 </Project>
