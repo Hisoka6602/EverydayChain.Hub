@@ -10,6 +10,9 @@ on:
       - '**/*.json'
       - 'README.md'
 
+permissions:
+  contents: read
+
 jobs:
   guard:
     runs-on: ubuntu-latest
