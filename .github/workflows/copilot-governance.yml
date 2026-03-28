@@ -1,0 +1,148 @@
+name: Copilot Governance Check
+
+on:
+  pull_request:
+    branches:
+      - "**"
+  push:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
+
+jobs:
+  governance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 计算变更范围
+        id: range
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "base=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
+              echo "base=$(git rev-list --max-parents=0 HEAD)" >> "$GITHUB_OUTPUT"
+            else
+              echo "base=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+            fi
+            echo "head=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 执行治理规则检查
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ steps.range.outputs.base }}"
+          HEAD_SHA="${{ steps.range.outputs.head }}"
+
+          CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          echo "本次变更文件："
+          echo "$CHANGED_FILES"
+
+          if echo "$CHANGED_FILES" | grep -qx ".github/copilot-instructions.md"; then
+            if ! echo "$CHANGED_FILES" | grep -qx ".github/workflows/copilot-governance.yml"; then
+              echo "错误：修改 .github/copilot-instructions.md 时必须同步修改 .github/workflows/copilot-governance.yml"
+              exit 1
+            fi
+          fi
+
+          if git diff --name-status "$BASE_SHA" "$HEAD_SHA" | awk '$1=="A" || $1=="D" {print $2}' | grep -q .; then
+            if ! echo "$CHANGED_FILES" | grep -qx "README.md"; then
+              echo "错误：检测到新增/删除文件，但 README.md 未同步更新。"
+              exit 1
+            fi
+          fi
+
+          python3 - <<'PY'
+          import pathlib
+          import re
+          import subprocess
+          import sys
+
+          banned_patterns = [
+              r"\bDateTime\.UtcNow\b",
+              r"\bDateTimeOffset\.UtcNow\b",
+              r"\bDateTimeKind\.Utc\b",
+              r"\bToUniversalTime\s*\(",
+              r"\bUtcDateTime\b",
+              r"\bDateTimeStyles\.AssumeUniversal\b",
+              r"\bDateTimeStyles\.AdjustToUniversal\b",
+          ]
+          banned_regex = re.compile("|".join(banned_patterns))
+
+          ignored_dirs = {"bin", "obj", ".git"}
+          ignored_files = {
+              ".github/copilot-instructions.md",
+              ".github/workflows/copilot-governance.yml",
+          }
+          git_tracked_files = subprocess.check_output(["git", "ls-files", "-z"], text=False)
+          candidate_files = [pathlib.Path(item) for item in git_tracked_files.decode("utf-8").split("\0") if item]
+
+          utc_violations = []
+          for path in candidate_files:
+              relative = path.as_posix()
+              if relative in ignored_files:
+                  continue
+              if any(part in ignored_dirs for part in path.parts):
+                  continue
+              # Markdown 文档允许出现禁用 API 名称作为规则说明示例，因此不纳入扫描。
+              if path.suffix not in {".cs", ".csproj", ".json", ".yml", ".yaml", ".xml", ".config"}:
+                  continue
+              try:
+                  content = path.read_text(encoding="utf-8")
+              except UnicodeDecodeError:
+                  continue
+              if banned_regex.search(content):
+                  utc_violations.append(relative)
+
+          if utc_violations:
+              print("错误：发现 UTC 相关禁用 API：")
+              for item in sorted(set(utc_violations)):
+                  print(f" - {item}")
+              sys.exit(1)
+
+          namespace_violations = []
+          for cs_file in candidate_files:
+              if cs_file.suffix != ".cs":
+                  continue
+              relative = cs_file.as_posix()
+              if any(part in ignored_dirs for part in cs_file.parts):
+                  continue
+              text = cs_file.read_text(encoding="utf-8")
+              match = re.search(r"^\s*namespace\s+([A-Za-z_][\w\.]*)\s*(?:;|\{)", text, re.MULTILINE)
+              if not match:
+                  continue
+              actual_ns = match.group(1)
+
+              relative_parent = cs_file.parent
+              if relative_parent.as_posix() == ".":
+                  continue
+
+              parts = list(relative_parent.parts)
+              if not parts:
+                  continue
+
+              if parts[0] in {".github"}:
+                  continue
+
+              expected_ns = ".".join(parts)
+              if actual_ns != expected_ns:
+                  namespace_violations.append((relative, actual_ns, expected_ns))
+
+          if namespace_violations:
+              print("错误：发现命名空间与物理目录不一致：")
+              for file_path, actual, expected in namespace_violations:
+                  print(f" - {file_path}: 实际={actual} 期望={expected}")
+              sys.exit(1)
+
+          print("治理规则检查通过。")
+          PY
