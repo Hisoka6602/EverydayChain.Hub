@@ -6,13 +6,19 @@
 - 已在本 PR 内完成 **自动调谐**（根据失败率与耗时动态调整批量写入窗口）。
 - 已补充 **危险代码隔离器**（重试 + 超时 + 熔断）用于迁移与分表 DDL 等高风险操作。
 - 已新增 **手动迁移文档**：`EFCore手动迁移操作指南.md`。
+- 已新增 **Copilot 规则文件**：`.github/copilot-instructions.md`。
+- 已新增 **治理 CI 工作流**：`.github/workflows/copilot-governance.yml`，用于规则变更联动与自动自检。
 
-## 仓库文件树（关键实现文件）
+## 解决方案文件树与职责
 ```text
 .
 ├── EverydayChain.Hub.sln
 ├── README.md
 ├── EFCore手动迁移操作指南.md
+├── .github
+│   ├── copilot-instructions.md
+│   └── workflows
+│       └── copilot-governance.yml
 ├── EverydayChain.Hub.Domain
 │   ├── EverydayChain.Hub.Domain.csproj
 │   ├── Abstractions/IEntity.cs
@@ -52,7 +58,9 @@
     └── appsettings.json
 ```
 
-## 每个关键文件实现说明
+## 各层级与各文件作用说明（逐项）
+- `.github/copilot-instructions.md`：定义仓库级 Copilot 强制约束，覆盖时间语义、结构规范、文档联动与交付门禁。
+- `.github/workflows/copilot-governance.yml`：执行规则自动校验，并强制规则文件与工作流联动修改。
 - `SortingTaskTraceEntity.cs`：新增可分表的写入实体，用于承载中台追踪数据。
 - `HubDbContext.cs`：根据分表后缀动态映射表名。
 - `TableSuffixScope.cs` + `ShardModelCacheKeyFactory.cs`：保证不同后缀下 EF Model 能正确缓存隔离。
@@ -71,3 +79,4 @@
 - 将分表策略扩展为按租户 + 月份的复合维度。
 - 为 `SortingTaskTraceWriter` 增加幂等键（避免重复投递）。
 - 增加集成测试：覆盖真实 SQL Server 容器下的迁移、分表创建、调谐验证。
+- 将治理 CI 扩展为“每三次 PR 强制一次全量约束巡检”并落地自动计数机制。
