@@ -5,20 +5,30 @@ using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Infrastructure.Services;
 
-public class ShardTableManager(IOptions<ShardingOptions> options, ILogger<ShardTableManager> logger, IDangerZoneExecutor dangerZoneExecutor) : IShardTableManager {
+/// <summary>
+/// 分表预置服务实现，在 SQL Server 中按需创建分表与索引。
+/// </summary>
+public class ShardTableProvisioner(IOptions<ShardingOptions> options, ILogger<ShardTableProvisioner> logger, IDangerZoneExecutor dangerZoneExecutor) : IShardTableProvisioner
+{
+    /// <summary>分表配置快照。</summary>
     private readonly ShardingOptions _options = options.Value;
 
-    public Task EnsureShardTablesAsync(IEnumerable<string> suffixes, CancellationToken cancellationToken) {
+    /// <inheritdoc/>
+    public Task EnsureShardTablesAsync(IEnumerable<string> suffixes, CancellationToken cancellationToken)
+    {
         var tasks = suffixes.Select(x => EnsureShardTableAsync(x, cancellationToken));
         return Task.WhenAll(tasks);
     }
 
+    /// <inheritdoc/>
     public Task EnsureShardTableAsync(string suffix, CancellationToken cancellationToken) => dangerZoneExecutor.ExecuteAsync(
         $"ensure-shard-table-{suffix}",
-        async token => {
+        async token =>
+        {
             var tableName = $"{_options.BaseTableName}{suffix}";
             var fullName = $"[{_options.Schema}].[{tableName}]";
 
+            // 生成幂等建表 DDL：仅在表不存在时创建表及索引。
             var sql = $@"
 IF OBJECT_ID(N'{_options.Schema}.{tableName}', N'U') IS NULL
 BEGIN

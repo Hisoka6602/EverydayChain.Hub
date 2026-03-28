@@ -4,16 +4,32 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace EverydayChain.Hub.Infrastructure.Persistence.EntityConfigurations;
 
-public class SortingTaskTraceEntityTypeConfiguration : IEntityTypeConfiguration<SortingTaskTraceEntity> {
+/// <summary>
+/// <see cref="SortingTaskTraceEntity"/> 的 EF Core Fluent API 类型配置，
+/// 支持运行时动态切换表名以实现分表路由。
+/// </summary>
+public class SortingTaskTraceEntityTypeConfiguration : IEntityTypeConfiguration<SortingTaskTraceEntity>
+{
+    /// <summary>目标表名（含分表后缀）。</summary>
     private readonly string _tableName;
+
+    /// <summary>目标 Schema 名称。</summary>
     private readonly string _schema;
 
-    public SortingTaskTraceEntityTypeConfiguration(string tableName, string schema) {
+    /// <summary>
+    /// 初始化配置实例。
+    /// </summary>
+    /// <param name="tableName">含后缀的完整表名，例如 <c>sorting_task_trace_202603</c>。</param>
+    /// <param name="schema">数据库 Schema，例如 <c>dbo</c>。</param>
+    public SortingTaskTraceEntityTypeConfiguration(string tableName, string schema)
+    {
         _tableName = tableName;
         _schema = schema;
     }
 
-    public void Configure(EntityTypeBuilder<SortingTaskTraceEntity> builder) {
+    /// <inheritdoc/>
+    public void Configure(EntityTypeBuilder<SortingTaskTraceEntity> builder)
+    {
         builder.ToTable(_tableName, _schema);
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).ValueGeneratedOnAdd();
