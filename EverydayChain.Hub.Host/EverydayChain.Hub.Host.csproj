@@ -12,10 +12,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Swagger\" />
-    <Folder Include="Middleware\" />
-    <Folder Include="QueryParameters\" />
-    <Folder Include="Routing\" />
-    <Folder Include="HostedServices\" />
+    <ProjectReference Include="..\EverydayChain.Hub.Infrastructure\EverydayChain.Hub.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

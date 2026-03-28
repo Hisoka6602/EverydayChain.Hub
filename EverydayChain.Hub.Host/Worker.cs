@@ -1,24 +1,34 @@
-namespace EverydayChain.Hub.Host
-{
-    public class Worker : BackgroundService
-    {
-        private readonly ILogger<Worker> _logger;
+using EverydayChain.Hub.Domain.Aggregates.SortingTaskTraceAggregate;
+using EverydayChain.Hub.Infrastructure.Services;
 
-        public Worker(ILogger<Worker> logger)
-        {
-            _logger = logger;
-        }
+namespace EverydayChain.Hub.Host;
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            while (!stoppingToken.IsCancellationRequested)
-            {
-                if (_logger.IsEnabled(LogLevel.Information))
-                {
-                    _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+public class Worker(ILogger<Worker> logger, ISortingTaskTraceWriter sortingTaskTraceWriter, ISqlExecutionTuner tuner) : BackgroundService {
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
+        while (!stoppingToken.IsCancellationRequested) {
+            var demoData = new List<SortingTaskTraceEntity> {
+                new() {
+                    BusinessNo = $"BIZ-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}",
+                    Channel = "WMS",
+                    StationCode = "ST-01",
+                    Status = "Created",
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    Payload = "自动调谐与分表自治演示写入"
                 }
-                await Task.Delay(1000, stoppingToken);
+            };
+
+            try {
+                await sortingTaskTraceWriter.WriteAsync(demoData, stoppingToken);
+                logger.LogInformation("后台任务写入成功，当前调谐批量窗口: {BatchSize}", tuner.CurrentBatchSize);
             }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) {
+                return;
+            }
+            catch (Exception ex) {
+                logger.LogError(ex, "后台任务写入失败，将在下次循环重试。");
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
         }
     }
 }
