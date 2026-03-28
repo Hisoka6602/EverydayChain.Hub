@@ -91,7 +91,7 @@ jobs:
                   continue
               if any(part in ignored_dirs for part in path.parts):
                   continue
-              if path.suffix not in {".cs", ".csproj", ".json"}:
+              if path.suffix not in {".cs", ".csproj", ".json", ".yml", ".yaml", ".xml", ".config"}:
                   continue
               try:
                   content = path.read_text(encoding="utf-8")
