@@ -15,10 +15,10 @@ namespace EverydayChain.Hub.Infrastructure.DependencyInjection;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// 注册基础设施层全部服务，包括 EF Core 工厂、分表服务、调谐器与自动迁移托管服务。
+    /// 注册基础设施层全部服务，包括 EF Core 工厂、分表服务、调谐器、危险操作执行器与自动迁移托管服务。
     /// </summary>
     /// <param name="services">服务集合。</param>
-    /// <param name="configuration">应用配置，用于绑定 Sharding/AutoTune 配置节。</param>
+    /// <param name="configuration">应用配置，用于绑定 Sharding/AutoTune/DangerZone 配置节。</param>
     /// <returns>原服务集合（链式调用）。</returns>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {

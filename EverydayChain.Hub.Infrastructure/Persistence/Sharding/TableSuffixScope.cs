@@ -26,7 +26,7 @@ public static class TableSuffixScope
     }
 
     /// <summary>
-    /// 轻量级作用域对象，析构时执行回调还原后缀。
+    /// 轻量级作用域对象，释放（Dispose）时执行回调还原后缀。
     /// </summary>
     private sealed class Scope(Action onDispose) : IDisposable
     {

@@ -72,5 +72,10 @@ public class DangerZoneExecutor : IDangerZoneExecutor
             _logger.LogError(ex, "危险操作隔离器触发超时，操作名: {OperationName}", operationName);
             throw;
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "危险操作隔离器执行出现未预期异常，操作名: {OperationName}", operationName);
+            throw;
+        }
     }
 }

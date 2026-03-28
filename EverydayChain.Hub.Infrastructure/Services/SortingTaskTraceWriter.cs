@@ -35,7 +35,8 @@ public class SortingTaskTraceWriter(
             var list = group.ToList();
             for (var i = 0; i < list.Count; i += batchSize)
             {
-                var chunk = list.Skip(i).Take(batchSize).ToList();
+                var count = Math.Min(batchSize, list.Count - i);
+                var chunk = list.GetRange(i, count);
                 var stopwatch = Stopwatch.StartNew();
                 var success = true;
                 try
