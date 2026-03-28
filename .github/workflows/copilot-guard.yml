@@ -1,0 +1,71 @@
+name: copilot-guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/copilot-instructions.md'
+      - '.github/workflows/copilot-guard.yml'
+      - '**/*.cs'
+      - '**/*.json'
+      - 'README.md'
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate copilot-instructions and CI linkage
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE_SHA='${{ github.event.pull_request.base.sha }}'
+          HEAD_SHA='${{ github.event.pull_request.head.sha }}'
+          CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          INSTRUCTIONS_CHANGED=false
+          WORKFLOW_CHANGED=false
+
+          if echo "$CHANGED_FILES" | grep -Fxq '.github/copilot-instructions.md'; then
+            INSTRUCTIONS_CHANGED=true
+          fi
+
+          if echo "$CHANGED_FILES" | grep -Fxq '.github/workflows/copilot-guard.yml'; then
+            WORKFLOW_CHANGED=true
+          fi
+
+          if [ "$INSTRUCTIONS_CHANGED" = true ] && [ "$WORKFLOW_CHANGED" = false ]; then
+            echo "当 .github/copilot-instructions.md 发生变化时，必须同步修改 .github/workflows/copilot-guard.yml" >&2
+            exit 1
+          fi
+
+      - name: Validate no UTC APIs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PATTERN='DateTime\.UtcNow|DateTimeOffset\.UtcNow|DateTimeKind\.Utc|ToUniversalTime\(|UtcDateTime|DateTimeStyles\.AssumeUniversal|DateTimeStyles\.AdjustToUniversal'
+
+          if rg -n "$PATTERN" --glob '!**/bin/**' --glob '!**/obj/**' --glob '!**/.git/**' .; then
+            echo "检测到禁止的 UTC 相关 API，请改为本地时间语义。" >&2
+            exit 1
+          fi
+
+      - name: Validate config time samples do not use Z/offset
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # 仅做轻量文本门禁：若 JSON 中出现典型 ISO8601 Z/offset 样式则失败。
+          if rg -n '"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(Z|[+-][0-9]{2}:[0-9]{2})"' --glob '**/*.json' .; then
+            echo "检测到配置示例包含 Z 或 offset 时间，请改为本地时间字符串语义。" >&2
+            exit 1
+          fi
