@@ -28,4 +28,10 @@ public class AutoTuneOptions
 
     /// <summary>触发降速的耗时阈值（毫秒），超出则判定为慢写入，默认 400ms。</summary>
     public double SlowThresholdMilliseconds { get; set; } = 400;
+
+    /// <summary>触发调谐决策所需的最小采样次数，窗口内样本未达此值时不做判断，默认 10 次。</summary>
+    public int SamplingWindowSize { get; set; } = 10;
+
+    /// <summary>触发降速的失败率阈值（0.0–1.0），超出则降低批量大小，默认 0.2（即 20%）。</summary>
+    public double FailureRateThreshold { get; set; } = 0.2;
 }

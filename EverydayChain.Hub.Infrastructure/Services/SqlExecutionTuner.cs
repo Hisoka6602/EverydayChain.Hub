@@ -58,8 +58,8 @@ public class SqlExecutionTuner : ISqlExecutionTuner
                 _failureCount++;
             }
 
-            // 采样窗口未满 10 次时不触发决策。
-            if (_sampleCount < 10)
+            // 采样窗口未满时不触发决策。
+            if (_sampleCount < _options.SamplingWindowSize)
             {
                 return;
             }
@@ -68,8 +68,8 @@ public class SqlExecutionTuner : ISqlExecutionTuner
             var isSlow = elapsed.TotalMilliseconds > _options.SlowThresholdMilliseconds;
             var old = _batchSize;
 
-            // 失败率超 20% 或耗时过长时降低批量大小；否则逐步提升。
-            if (failureRate > 0.2 || isSlow)
+            // 失败率超阈值或耗时过长时降低批量大小；否则逐步提升。
+            if (failureRate > _options.FailureRateThreshold || isSlow)
             {
                 _batchSize = Math.Max(_options.MinBatchSize, _batchSize - _options.DecreaseStep);
             }

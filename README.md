@@ -8,6 +8,8 @@
 - 为全部类、方法、字段、属性补充 XML 注释（满足"所有方法/字段必须有注释"规范）。
 - 补充 `Microsoft.Extensions.Hosting.Abstractions` 与 `Microsoft.EntityFrameworkCore.Infrastructure` 显式引用，修复隐藏的编译依赖缺失问题。
 - 新增 `DangerZoneOptions.cs`，将 `DangerZoneExecutor` 弹性策略参数（超时/重试/熔断）从硬编码迁移到可配置节点 `DangerZone`，补全配置覆盖面并为每个参数添加 XML 注释。
+- `AutoTuneOptions` 新增 `SamplingWindowSize`（采样窗口大小）与 `FailureRateThreshold`（失败率阈值）两个可配置属性，消除 `SqlExecutionTuner` 中的硬编码魔法数字（原 `10` 与 `0.2`）。
+- 新增 `WorkerOptions.cs`，将 `Worker` 后台轮询间隔从硬编码 `10` 秒迁移到 `appsettings.json` 的 `Worker.PollingIntervalSeconds` 节点；`Program.cs` 同步注册。
 
 ## 解决方案文件树与职责
 ```text
@@ -64,7 +66,8 @@
     ├── Program.cs
     ├── Worker.cs
     ├── nlog.config
-    └── appsettings.json
+    ├── appsettings.json
+    └── Options/WorkerOptions.cs
 ```
 
 ## 各层级与各文件作用说明（逐项）
@@ -77,13 +80,14 @@
 - `MonthShardSuffixResolver.cs`：按月份生成分表后缀（如 `_202603`）。
 - `IShardTableProvisioner.cs` + `ShardTableProvisioner.cs`：在 SQL Server 中按需创建分表与索引（不存在才建），替代原 `ShardTableManager` 命名。
 - `AutoMigrationService.cs` + `AutoMigrationHostedService.cs`：应用启动时自动执行 `Migrate` 与分表预创建。
-- `SqlExecutionTuner.cs`：基于失败率和耗时进行批量窗口升降调谐。
+- `SqlExecutionTuner.cs`：基于失败率和耗时进行批量窗口升降调谐；采样窗口大小与失败率阈值均来自 `AutoTuneOptions`。
 - `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断），弹性参数来自 `DangerZoneOptions`。
 - `DangerZoneOptions.cs`：`DangerZoneExecutor` 弹性策略配置类，绑定 `DangerZone` 节点，覆盖超时、重试、熔断全部参数，所有属性含 XML 注释。
 - `SortingTaskTraceWriter.cs`：按分表后缀分组写入，并将执行结果回传给调谐器。
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖。
 - `202603280001_InitialHubSchema.cs`：基础表结构迁移。
 - `nlog.config`：NLog 日志配置，输出至控制台与滚动日志文件（按日切割，保留 30 天）。
+- `WorkerOptions.cs`：后台工作服务配置类，绑定 `Worker` 节点，覆盖轮询间隔（`PollingIntervalSeconds`），含 XML 注释。
 - `EFCore手动迁移操作指南.md`：提供手工迁移、脚本导出、回滚、排障流程。
 
 ## 可继续完善内容

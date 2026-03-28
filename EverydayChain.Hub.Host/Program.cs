@@ -1,4 +1,5 @@
 using EverydayChain.Hub.Host;
+using EverydayChain.Hub.Host.Options;
 using EverydayChain.Hub.Infrastructure.DependencyInjection;
 using NLog;
 using NLog.Extensions.Logging;
@@ -6,6 +7,7 @@ using NLog.Extensions.Logging;
 var builder = Host.CreateApplicationBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddNLog();
+builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection(WorkerOptions.SectionName));
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<Worker>();
 
