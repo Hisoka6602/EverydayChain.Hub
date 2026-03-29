@@ -14,8 +14,6 @@
 
 ## PR-2：审计与批次治理（可恢复可追踪）
 
-- [ ] 补齐 `SyncChangeLog.OperationType` 细分（Insert / Update / Delete），替换当前 `Upsert` 聚合标记。
-
 ## PR-3：删除同步（识别 + 执行 + 记录）
 
 - [ ] 落地 `IDeletionExecutionService`、`ISyncDeletionRepository`、`ISyncDeletionLogRepository` 及实现。

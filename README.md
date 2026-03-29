@@ -144,7 +144,6 @@
 
 ## 可继续完善内容
 - 将 PR-1 剩余项从“基础实现”推进到“数据库落地实现”，包括真实 Oracle 读取、SQL Server 暂存表与 MERGE 语句对接。
-- 补齐 PR-2 收尾：将 `SyncChangeLog.OperationType` 从当前 `Upsert` 细分为 `Insert/Update/Delete`。
 - 实现 PR-3 删除同步：源端存在性差异识别、`DeletionPolicy` 执行、`SyncDeletionLog` 与 `SyncChangeLog` 联动写入。
 - 实现 PR-4 配置治理：`ExcludedColumns` 关键列冲突校验与高低优先级表差异化调度。
 - 实现 PR-5/PR-6：保留期治理危险动作门禁、并行优化、重试熔断与可观测性指标收口。

@@ -112,7 +112,7 @@ public class SyncExecutionService(
                 insertCount += mergeResult.InsertCount;
                 updateCount += mergeResult.UpdateCount;
                 skipCount += mergeResult.SkipCount;
-                AppendChangeLogs(context, pendingChanges, readResult.Rows);
+                AppendChangeLogs(context, pendingChanges, readResult.Rows, mergeResult.ChangedOperations);
                 if (mergeResult.LastSuccessCursorLocal.HasValue)
                 {
                     lastSuccessCursorLocal = mergeResult.LastSuccessCursorLocal;
@@ -193,7 +193,8 @@ public class SyncExecutionService(
     private static void AppendChangeLogs(
         SyncExecutionContext context,
         ICollection<SyncChangeLog> changes,
-        IReadOnlyList<IReadOnlyDictionary<string, object?>> rows)
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> rows,
+        IReadOnlyDictionary<string, SyncChangeOperationType> changedOperations)
     {
         foreach (var row in rows)
         {
@@ -203,12 +204,17 @@ public class SyncExecutionService(
                 continue;
             }
 
+            if (!changedOperations.TryGetValue(businessKey, out var operationType))
+            {
+                continue;
+            }
+
             changes.Add(new SyncChangeLog
             {
                 BatchId = context.BatchId,
                 ParentBatchId = context.ParentBatchId,
                 TableCode = context.Definition.TableCode,
-                OperationType = SyncChangeOperationType.Update,
+                OperationType = operationType,
                 BusinessKey = businessKey,
                 BeforeSnapshot = null,
                 AfterSnapshot = BuildSnapshot(row),

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
@@ -21,7 +22,11 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         }
 
         var targetTable = _targetTables.GetOrAdd(request.TableCode, _ => new ConcurrentDictionary<string, IReadOnlyDictionary<string, object?>>());
-        var result = new SyncMergeResult();
+        var changedOperations = new Dictionary<string, SyncChangeOperationType>(StringComparer.OrdinalIgnoreCase);
+        var result = new SyncMergeResult
+        {
+            ChangedOperations = changedOperations,
+        };
 
         foreach (var row in request.Rows)
         {
@@ -37,6 +42,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
             {
                 targetTable[rowKey] = CloneRow(row);
                 result.InsertCount++;
+                changedOperations[rowKey] = SyncChangeOperationType.Insert;
                 UpdateLastCursor(result, row, request.CursorColumn);
                 continue;
             }
@@ -50,6 +56,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
 
             targetTable[rowKey] = CloneRow(row);
             result.UpdateCount++;
+            changedOperations[rowKey] = SyncChangeOperationType.Update;
             UpdateLastCursor(result, row, request.CursorColumn);
         }
 
