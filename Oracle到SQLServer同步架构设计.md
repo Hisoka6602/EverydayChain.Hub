@@ -309,7 +309,7 @@
 - `UpdateCount`
 - `DeleteCount`
 - `SkipCount`
-- `Status`
+- `Status`（建议值：`Pending` / `InProgress` / `Completed` / `Failed`）
 - `StartedTimeLocal`
 - `CompletedTimeLocal`
 
