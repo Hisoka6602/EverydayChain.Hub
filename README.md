@@ -36,6 +36,7 @@
 │   ├── Sync/SyncBatch.cs
 │   ├── Sync/SyncChangeLog.cs
 │   ├── Sync/SyncDeletionLog.cs
+│   ├── Sync/SyncBusinessKeyBuilder.cs
 │   ├── Sync/SyncColumnFilter.cs
 │   ├── Aggregates/SortingTaskTraceAggregate/SortingTaskTraceEntity.cs
 │   ├── Aggregates/WmsPickToWcsAggregate/WmsPickToWcsEntity.cs
@@ -135,6 +136,7 @@
 - `.github/workflows/copilot-governance.yml`：执行规则自动校验，并强制规则文件与工作流联动修改。
 - `SyncTableDefinition.cs` / `SyncWindow.cs` / `SyncCheckpoint.cs` / `SyncBatchResult.cs`：定义同步链路执行、窗口与结果统计的核心领域模型。
 - `SyncBatch.cs` / `SyncChangeLog.cs` / `SyncDeletionLog.cs`：定义批次状态跟踪、变更审计与删除审计的数据模型。
+- `SyncBusinessKeyBuilder.cs`：同步业务键构建共享组件，按 `UniqueKeys` 配置将行数据拼接为 `|` 分隔的业务键文本，供 Upsert 与删除识别阶段统一调用。
 - `SyncColumnFilter.cs`：同步列过滤共享组件，提供 `ExcludedColumns` 规范化与行级过滤能力，并统一维护软删除关键列常量。
 - `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs` / `SyncTablePriority.cs`：同步模式、删除策略、滞后控制、批次状态、变更操作类型与调度优先级枚举，均含中文 XML 注释与 `Description`。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
