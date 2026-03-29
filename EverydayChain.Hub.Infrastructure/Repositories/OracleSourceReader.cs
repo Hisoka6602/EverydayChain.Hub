@@ -1,5 +1,6 @@
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Domain.Sync;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
@@ -29,7 +30,6 @@ public class OracleSourceReader : IOracleSourceReader
             return Task.FromResult(new SyncReadResult());
         }
 
-        var normalizedExcludedColumns = SyncColumnFilter.NormalizeColumns(request.ExcludedColumns);
         var filteredRows = rows
             .Where(row => row.TryGetValue(request.CursorColumn, out var value)
                           && value is DateTime cursorLocal
@@ -39,7 +39,7 @@ public class OracleSourceReader : IOracleSourceReader
             .ThenBy(row => BuildStableKey(row, request.UniqueKeys))
             .Skip((request.PageNo - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Select(row => SyncColumnFilter.FilterExcludedColumns(row, normalizedExcludedColumns))
+            .Select(row => SyncColumnFilter.FilterExcludedColumns(row, request.NormalizedExcludedColumns))
             .ToList();
 
         return Task.FromResult(new SyncReadResult

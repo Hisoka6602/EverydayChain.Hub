@@ -17,6 +17,6 @@ public class SyncMergeRequest
     /// <summary>待合并行。</summary>
     public IReadOnlyList<IReadOnlyDictionary<string, object?>> Rows { get; set; } = Array.Empty<IReadOnlyDictionary<string, object?>>();
 
-    /// <summary>排除列集合。</summary>
-    public IReadOnlyList<string> ExcludedColumns { get; set; } = Array.Empty<string>();
+    /// <summary>规范化后的排除列集合。</summary>
+    public IReadOnlySet<string> NormalizedExcludedColumns { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 }

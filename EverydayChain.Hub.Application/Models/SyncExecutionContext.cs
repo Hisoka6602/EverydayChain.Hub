@@ -21,4 +21,7 @@ public class SyncExecutionContext
 
     /// <summary>父批次编号（重试关联）。</summary>
     public string? ParentBatchId { get; set; }
+
+    /// <summary>规范化后的排除列集合。</summary>
+    public IReadOnlySet<string> NormalizedExcludedColumns { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 }

@@ -25,6 +25,6 @@ public class SyncReadRequest
     /// <summary>唯一键集合。</summary>
     public IReadOnlyList<string> UniqueKeys { get; set; } = Array.Empty<string>();
 
-    /// <summary>排除列集合。</summary>
-    public IReadOnlyList<string> ExcludedColumns { get; set; } = Array.Empty<string>();
+    /// <summary>规范化后的排除列集合。</summary>
+    public IReadOnlySet<string> NormalizedExcludedColumns { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 }

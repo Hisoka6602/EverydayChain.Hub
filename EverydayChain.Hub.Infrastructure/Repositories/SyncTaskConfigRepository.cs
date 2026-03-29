@@ -16,8 +16,6 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
 {
     /// <summary>时间偏移或 UTC 标记检测正则。</summary>
     private static readonly Regex UtcOrOffsetRegex = new(@"(?:Z|[+\-]\d{2}:\d{2}|[+\-]\d{4})\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    /// <summary>软删除关键列规范化集合。</summary>
-    private static readonly HashSet<string> NormalizedSoftDeleteColumns = SyncColumnFilter.NormalizeColumns(SyncColumnFilter.SoftDeleteColumns);
 
     /// <summary>同步配置快照。</summary>
     private readonly SyncJobOptions _options = syncJobOptions.Value;
@@ -102,7 +100,7 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             throw new InvalidOperationException($"表 {table.TableCode} 的 ExcludedColumns 禁止包含 CursorColumn：{table.CursorColumn}。");
         }
 
-        var conflictsWithSoftDeleteColumns = NormalizedSoftDeleteColumns.Where(excludedColumns.Contains).ToList();
+        var conflictsWithSoftDeleteColumns = SyncColumnFilter.NormalizedSoftDeleteColumns.Where(excludedColumns.Contains).ToList();
         if (conflictsWithSoftDeleteColumns.Count > 0)
         {
             throw new InvalidOperationException(

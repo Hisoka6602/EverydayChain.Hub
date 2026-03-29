@@ -32,6 +32,7 @@
 │   ├── Sync/SyncBatch.cs
 │   ├── Sync/SyncChangeLog.cs
 │   ├── Sync/SyncDeletionLog.cs
+│   ├── Sync/SyncColumnFilter.cs
 │   ├── Aggregates/SortingTaskTraceAggregate/SortingTaskTraceEntity.cs
 │   ├── Aggregates/WmsPickToWcsAggregate/WmsPickToWcsEntity.cs
 │   └── Aggregates/WmsSplitPickToLightCartonAggregate/WmsSplitPickToLightCartonEntity.cs
@@ -121,6 +122,7 @@
 - `.github/workflows/copilot-governance.yml`：执行规则自动校验，并强制规则文件与工作流联动修改。
 - `SyncTableDefinition.cs` / `SyncWindow.cs` / `SyncCheckpoint.cs` / `SyncBatchResult.cs`：定义同步链路执行、窗口与结果统计的核心领域模型。
 - `SyncBatch.cs` / `SyncChangeLog.cs` / `SyncDeletionLog.cs`：定义批次状态跟踪、变更审计与删除审计的数据模型。
+- `SyncColumnFilter.cs`：同步列过滤共享组件，提供 `ExcludedColumns` 规范化与行级过滤能力，并统一维护软删除关键列常量。
 - `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs`：同步模式、删除策略、滞后控制、批次状态与变更操作类型枚举，均含中文 XML 注释与 `Description`。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
 - `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs`：同步执行、删除识别与删除执行的数据契约模型。
@@ -140,7 +142,6 @@
 - `SortingTaskTraceWriter.cs`：按分表后缀分组写入，并将执行结果回传给调谐器。
 - `SyncJobOptions.cs` / `SyncTableOptions.cs` / `SyncDeleteOptions.cs`：同步任务全局、单表与删除配置绑定模型，统一约束本地时间配置、分页、滞后窗口、唯一键与删除策略参数。
 - `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，校验 `StartTimeLocal` 禁止 `Z` 与 offset，并校验 `ExcludedColumns` 不得与 `UniqueKeys`、`CursorColumn`、软删除关键列冲突。
-- `OracleSourceReader.cs`：源端读取器基础实现，支持按窗口分页读取与按窗口读取业务键集合。
 - `OracleSourceReader.cs`：源端读取器基础实现，支持按窗口分页读取与按窗口读取业务键集合，并在分页读取阶段过滤 `ExcludedColumns`。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
 - `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并在合并比较/写入阶段过滤 `ExcludedColumns`，同时提供目标键删除能力（软删/硬删）。

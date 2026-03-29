@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Domain.Sync;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
@@ -12,10 +13,9 @@ public class SyncStagingRepository : ISyncStagingRepository
     private readonly ConcurrentDictionary<string, IReadOnlyList<IReadOnlyDictionary<string, object?>>> _staging = new();
 
     /// <inheritdoc/>
-    public Task BulkInsertAsync(string batchId, int pageNo, IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, IReadOnlyList<string> excludedColumns, CancellationToken ct)
+    public Task BulkInsertAsync(string batchId, int pageNo, IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, IReadOnlySet<string> normalizedExcludedColumns, CancellationToken ct)
     {
         var storageKey = BuildStorageKey(batchId, pageNo);
-        var normalizedExcludedColumns = SyncColumnFilter.NormalizeColumns(excludedColumns);
         _staging[storageKey] = rows.Select(row => SyncColumnFilter.FilterExcludedColumns(row, normalizedExcludedColumns)).ToList();
         return Task.CompletedTask;
     }

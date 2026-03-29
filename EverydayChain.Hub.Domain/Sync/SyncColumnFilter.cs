@@ -1,4 +1,4 @@
-namespace EverydayChain.Hub.Infrastructure.Repositories;
+namespace EverydayChain.Hub.Domain.Sync;
 
 /// <summary>
 /// 同步列过滤组件，提供排除列过滤与列名规范化能力。
@@ -18,25 +18,16 @@ public static class SyncColumnFilter
     /// <summary>
     /// 软删除关键列集合。
     /// </summary>
-    public static readonly IReadOnlyList<string> SoftDeleteColumns =
-    [
+    public static readonly IReadOnlySet<string> SoftDeleteColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
         SoftDeleteFlagColumn,
         SoftDeleteTimeColumn,
-    ];
+    };
 
     /// <summary>
-    /// 过滤行中的排除列。
+    /// 规范化后的软删除关键列集合。
     /// </summary>
-    /// <param name="row">原始数据行。</param>
-    /// <param name="excludedColumns">排除列集合。</param>
-    /// <returns>过滤后的数据行。</returns>
-    public static IReadOnlyDictionary<string, object?> FilterExcludedColumns(
-        IReadOnlyDictionary<string, object?> row,
-        IReadOnlyList<string> excludedColumns)
-    {
-        var excludedColumnSet = NormalizeColumns(excludedColumns);
-        return FilterExcludedColumns(row, excludedColumnSet);
-    }
+    public static readonly IReadOnlySet<string> NormalizedSoftDeleteColumns = SoftDeleteColumns;
 
     /// <summary>
     /// 过滤行中的排除列（使用已规范化集合）。
@@ -46,18 +37,17 @@ public static class SyncColumnFilter
     /// <returns>过滤后的数据行。</returns>
     public static IReadOnlyDictionary<string, object?> FilterExcludedColumns(
         IReadOnlyDictionary<string, object?> row,
-        ISet<string> normalizedExcludedColumns)
+        IReadOnlySet<string> normalizedExcludedColumns)
     {
-        var excludedColumnSet = normalizedExcludedColumns;
-        if (excludedColumnSet.Count == 0)
+        if (normalizedExcludedColumns.Count == 0)
         {
-            return new Dictionary<string, object?>(row);
+            return row;
         }
 
         var filtered = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         foreach (var pair in row)
         {
-            if (!excludedColumnSet.Contains(pair.Key))
+            if (!normalizedExcludedColumns.Contains(pair.Key))
             {
                 filtered[pair.Key] = pair.Value;
             }
