@@ -228,13 +228,14 @@
 }
 ```
 
-`ExcludedColumns` 用途说明：可选配置，用于排除不需要同步到本地的列（例如大字段、无业务价值字段、外部冗余备注字段）。
+`ExcludedColumns` 用途说明：可选配置，用于排除不需要同步到本地的列（例如大字段、无业务价值字段、外部冗余备注字段），减少网络传输和本地存储开销。示例中的 `Remark`、`LargeBlobContent` 为占位字段名，落地时应替换为实际 Oracle 表列名。
 
 配置解释：
 
 1. `CursorColumn + StartTimeLocal`：定义从哪个字段、哪个本地时间开始同步。
 2. `Sync.ExcludedColumns`：定义同步排除列（读取、暂存、合并时均不处理这些列）。
    - 约束：`ExcludedColumns` 不允许包含 `UniqueKeys`、`CursorColumn`、软删除标记列等关键控制列。
+   - 验证机制：配置加载阶段进行校验；若包含关键控制列则抛出配置异常并拒绝启动同步任务。
 3. `UniqueKeys`：定义幂等覆盖键（可单键/复合键）。
 4. `MaxLagMinutes`：实时性控制，采用固定延迟窗口；建议默认值 10 分钟（未配置时使用 `SyncJobOptions.DefaultMaxLagMinutes` 全局配置）。
    - 全局配置位置：Host 层 `SyncJobOptions`（绑定 `appsettings.json:SyncJob` 节点）。
