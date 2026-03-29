@@ -87,6 +87,8 @@ public class SyncExecutionService(
                         {
                             throw;
                         }
+
+                        // 合并异常将向外抛出，此处不覆盖原始失败原因。
                     }
                 }
 
