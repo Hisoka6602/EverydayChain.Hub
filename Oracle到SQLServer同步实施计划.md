@@ -62,5 +62,5 @@
 
 ## 计划来源映射
 
-- 来源文档：`/home/runner/work/EverydayChain.Hub/EverydayChain.Hub/Oracle到SQLServer同步架构设计.md`
+- 来源文档：`./Oracle到SQLServer同步架构设计.md`
 - 对应章节：分层与命名、核心配置模型、同步流程、保留期清理、高效与实时性、分阶段落地建议、验收清单。
