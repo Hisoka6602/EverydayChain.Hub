@@ -16,6 +16,9 @@ public class SyncExecutionService(
     ISyncCheckpointRepository checkpointRepository,
     ILogger<SyncExecutionService> logger) : ISyncExecutionService
 {
+    /// <summary>失败检查点写入超时秒数。</summary>
+    private const int ErrorCheckpointSaveTimeoutSeconds = 3;
+
     /// <inheritdoc/>
     public async Task<SyncBatchResult> ExecuteBatchAsync(SyncExecutionContext context, CancellationToken ct)
     {
@@ -50,6 +53,7 @@ public class SyncExecutionService(
                 // 步骤2：写入暂存并执行幂等合并。
                 await stagingRepository.BulkInsertAsync(context.BatchId, pageNo, readResult.Rows, ct);
                 SyncMergeResult mergeResult;
+                Exception? mergeException = null;
                 try
                 {
                     var stagingRows = await stagingRepository.GetPageRowsAsync(context.BatchId, pageNo, ct);
@@ -60,6 +64,11 @@ public class SyncExecutionService(
                         UniqueKeys = context.Definition.UniqueKeys,
                         Rows = stagingRows,
                     }, ct);
+                }
+                catch (Exception ex)
+                {
+                    mergeException = ex;
+                    throw;
                 }
                 finally
                 {
@@ -74,7 +83,10 @@ public class SyncExecutionService(
                             context.Definition.TableCode,
                             context.BatchId,
                             pageNo);
-                        throw;
+                        if (mergeException is null)
+                        {
+                            throw;
+                        }
                     }
                 }
 
@@ -134,6 +146,7 @@ public class SyncExecutionService(
                 context.Window.WindowEndLocal,
                 context.Checkpoint.LastSuccessCursorLocal);
 
+            using var errorCheckpointCts = new CancellationTokenSource(TimeSpan.FromSeconds(ErrorCheckpointSaveTimeoutSeconds));
             await checkpointRepository.SaveAsync(new SyncCheckpoint
             {
                 TableCode = context.Definition.TableCode,
@@ -141,7 +154,7 @@ public class SyncExecutionService(
                 LastSuccessCursorLocal = context.Checkpoint.LastSuccessCursorLocal,
                 LastSuccessTimeLocal = context.Checkpoint.LastSuccessTimeLocal,
                 LastError = ex.Message,
-            }, CancellationToken.None);
+            }, errorCheckpointCts.Token);
             throw;
         }
     }

@@ -38,7 +38,7 @@ public class SyncCheckpointRepository(IOptions<SyncJobOptions> syncJobOptions, I
     /// <inheritdoc/>
     public async Task<SyncCheckpoint> GetAsync(string tableCode, CancellationToken ct)
     {
-        logger.LogInformation("读取同步检查点。Path={CheckpointFilePath}, TableCode={TableCode}", _checkpointFilePath, tableCode);
+        logger.LogDebug("读取同步检查点。Path={CheckpointFilePath}, TableCode={TableCode}", _checkpointFilePath, tableCode);
         var checkpoints = await LoadAllAsync(ct);
         if (checkpoints.TryGetValue(tableCode, out var checkpoint))
         {
@@ -54,6 +54,10 @@ public class SyncCheckpointRepository(IOptions<SyncJobOptions> syncJobOptions, I
     /// <inheritdoc/>
     public async Task SaveAsync(SyncCheckpoint checkpoint, CancellationToken ct)
     {
+        logger.LogDebug("开始写入同步检查点。Path={CheckpointFilePath}, TableCode={TableCode}, BatchId={BatchId}",
+            _checkpointFilePath,
+            checkpoint.TableCode,
+            checkpoint.LastBatchId);
         await FileLock.WaitAsync(ct);
         try
         {
@@ -70,7 +74,7 @@ public class SyncCheckpointRepository(IOptions<SyncJobOptions> syncJobOptions, I
                 WriteIndented = true,
             });
             await File.WriteAllTextAsync(_checkpointFilePath, json, ct);
-            logger.LogInformation("写入同步检查点成功。Path={CheckpointFilePath}, TableCode={TableCode}, BatchId={BatchId}",
+            logger.LogDebug("写入同步检查点成功。Path={CheckpointFilePath}, TableCode={TableCode}, BatchId={BatchId}",
                 _checkpointFilePath,
                 checkpoint.TableCode,
                 checkpoint.LastBatchId);
