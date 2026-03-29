@@ -73,6 +73,7 @@ SELECT
     i.fill_factor AS FillFactor,
     i.is_disabled AS IsDisabled,
     ic.key_ordinal AS KeyOrdinal,
+    ic.index_column_id AS IndexColumnId,
     ic.is_included_column AS IsIncludedColumn,
     ic.is_descending_key AS IsDescending,
     c.name AS ColumnName
@@ -85,7 +86,7 @@ WHERE s.name = @schemaName AND tb.name = @tableName
   AND i.is_primary_key = 0
   AND i.is_hypothetical = 0
   AND i.name IS NOT NULL
-ORDER BY i.name, ic.is_included_column, ic.key_ordinal, c.column_id;
+ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
 """;
 
             var columns = new List<ColumnMetadata>();
@@ -141,9 +142,10 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, c.column_id;
                         indexReader.GetByte(4),
                         indexReader.GetBoolean(5),
                         indexReader.GetInt32(6),
-                        indexReader.GetBoolean(7),
+                        indexReader.GetInt32(7),
                         indexReader.GetBoolean(8),
-                        indexReader.GetString(9)));
+                        indexReader.GetBoolean(9),
+                        indexReader.GetString(10)));
                 }
             }
 
@@ -203,6 +205,7 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, c.column_id;
 
                 var includeColumns = index
                     .Where(x => x.IsIncludedColumn)
+                    .OrderBy(x => x.IndexColumnId)
                     .Select(x => $"[{x.ColumnName}]")
                     .ToList();
                 var includeSql = includeColumns.Count > 0
@@ -362,6 +365,7 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, c.column_id;
     /// <param name="FillFactor">填充因子。</param>
     /// <param name="IsDisabled">是否禁用。</param>
     /// <param name="KeyOrdinal">键序号。</param>
+    /// <param name="IndexColumnId">索引列序号。</param>
     /// <param name="IsIncludedColumn">是否包含列。</param>
     /// <param name="IsDescending">是否倒序。</param>
     /// <param name="ColumnName">列名。</param>
@@ -373,6 +377,7 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, c.column_id;
         byte FillFactor,
         bool IsDisabled,
         int KeyOrdinal,
+        int IndexColumnId,
         bool IsIncludedColumn,
         bool IsDescending,
         string ColumnName);

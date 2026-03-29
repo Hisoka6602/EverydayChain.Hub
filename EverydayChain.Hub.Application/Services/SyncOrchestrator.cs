@@ -67,6 +67,12 @@ public class SyncOrchestrator(
         {
             results[item.index] = await RunTableSyncAsync(item.definition.TableCode, token);
         });
+
+        if (results.Any(x => x is null))
+        {
+            throw new InvalidOperationException("同步编排结果不完整，存在未写入的表结果。");
+        }
+
         return results;
     }
 }
