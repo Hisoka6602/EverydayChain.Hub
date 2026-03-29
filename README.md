@@ -1,10 +1,10 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 继续实施《Oracle到SQLServer同步实施计划.md》PR-2：新增批次状态枚举 `SyncBatchStatus`，以及 `SyncBatch`、`SyncChangeLog` 领域模型。
-- 新增批次与变更日志仓储契约：`ISyncBatchRepository`、`ISyncChangeLogRepository`，并提供基础设施内存实现 `SyncBatchRepository`、`SyncChangeLogRepository`。
-- 改造同步执行链路：新增批次状态流转（`Pending -> InProgress -> Completed/Failed`）与 `ParentBatchId` 重试关联，并在“读取+合并+日志写入”成功后再提交检查点。
-- 更新实施计划：移除已完全落地的 PR-1 条目与 PR-2 主体条目，并同步标注已落地 `SyncChangeOperationType` 与 Insert/Update 操作类型细分；Delete 细分随 PR-3 删除同步链路继续推进。
+- 继续实施《Oracle到SQLServer同步实施计划.md》PR-3：新增删除执行服务与删除仓储契约，打通删除识别、删除执行与日志审计链路。
+- 新增删除同步模型：`SyncDeletionLog`、`SyncDeletionDetectRequest`、`SyncDeletionApplyRequest`、`SyncDeletionExecutionResult`、`SyncDeletionCandidate`、`SyncKeyReadRequest`。
+- 改造同步执行链路：在“读取+合并”后接入删除流程，支持 `DeletionPolicy`（`Disabled`/`SoftDelete`/`HardDelete`）与 `DryRun`，并强制写入 `SyncDeletionLog` 和 `SyncChangeLog(Delete)` 后再提交检查点。
+- 更新实施计划：移除已完全落地的 PR-3 条目。
 
 ## 解决方案文件树与职责
 ```text
@@ -32,6 +32,7 @@
 │   ├── Sync/SyncBatchResult.cs
 │   ├── Sync/SyncBatch.cs
 │   ├── Sync/SyncChangeLog.cs
+│   ├── Sync/SyncDeletionLog.cs
 │   ├── Aggregates/SortingTaskTraceAggregate/SortingTaskTraceEntity.cs
 │   ├── Aggregates/WmsPickToWcsAggregate/WmsPickToWcsEntity.cs
 │   └── Aggregates/WmsSplitPickToLightCartonAggregate/WmsSplitPickToLightCartonEntity.cs
@@ -42,6 +43,11 @@
 │   ├── Models/SyncReadResult.cs
 │   ├── Models/SyncMergeRequest.cs
 │   ├── Models/SyncMergeResult.cs
+│   ├── Models/SyncDeletionDetectRequest.cs
+│   ├── Models/SyncDeletionApplyRequest.cs
+│   ├── Models/SyncDeletionExecutionResult.cs
+│   ├── Models/SyncDeletionCandidate.cs
+│   ├── Models/SyncKeyReadRequest.cs
 │   ├── Repositories/ISyncTaskConfigRepository.cs
 │   ├── Repositories/IOracleSourceReader.cs
 │   ├── Repositories/ISyncStagingRepository.cs
@@ -49,12 +55,16 @@
 │   ├── Repositories/ISyncCheckpointRepository.cs
 │   ├── Repositories/ISyncBatchRepository.cs
 │   ├── Repositories/ISyncChangeLogRepository.cs
+│   ├── Repositories/ISyncDeletionRepository.cs
+│   ├── Repositories/ISyncDeletionLogRepository.cs
 │   ├── Services/ISyncOrchestrator.cs
 │   ├── Services/ISyncWindowCalculator.cs
 │   ├── Services/ISyncExecutionService.cs
+│   ├── Services/IDeletionExecutionService.cs
 │   ├── Services/SyncOrchestrator.cs
 │   ├── Services/SyncWindowCalculator.cs
-│   └── Services/SyncExecutionService.cs
+│   ├── Services/SyncExecutionService.cs
+│   └── Services/DeletionExecutionService.cs
 ├── EverydayChain.Hub.SharedKernel
 │   ├── EverydayChain.Hub.SharedKernel.csproj
 │   └── Class1.cs
@@ -66,13 +76,16 @@
 │   ├── Options/DangerZoneOptions.cs
 │   ├── Options/SyncJobOptions.cs
 │   ├── Options/SyncTableOptions.cs
+│   ├── Options/SyncDeleteOptions.cs
 │   ├── Repositories/SyncTaskConfigRepository.cs
 │   ├── Repositories/OracleSourceReader.cs
 │   ├── Repositories/SyncStagingRepository.cs
 │   ├── Repositories/SyncUpsertRepository.cs
+│   ├── Repositories/SyncDeletionRepository.cs
 │   ├── Repositories/SyncCheckpointRepository.cs
 │   ├── Repositories/SyncBatchRepository.cs
 │   ├── Repositories/SyncChangeLogRepository.cs
+│   ├── Repositories/SyncDeletionLogRepository.cs
 │   ├── Persistence/HubDbContext.cs
 │   ├── Persistence/DesignTimeHubDbContextFactory.cs
 │   ├── Persistence/EntityConfigurations/SortingTaskTraceEntityTypeConfiguration.cs
@@ -108,14 +121,15 @@
 - `.github/copilot-instructions.md`：定义仓库级 Copilot 强制约束，覆盖时间语义、结构规范、文档联动与交付门禁。
 - `.github/workflows/copilot-governance.yml`：执行规则自动校验，并强制规则文件与工作流联动修改。
 - `SyncTableDefinition.cs` / `SyncWindow.cs` / `SyncCheckpoint.cs` / `SyncBatchResult.cs`：定义同步链路执行、窗口与结果统计的核心领域模型。
-- `SyncBatch.cs` / `SyncChangeLog.cs`：定义批次状态跟踪与变更审计的数据模型。
+- `SyncBatch.cs` / `SyncChangeLog.cs` / `SyncDeletionLog.cs`：定义批次状态跟踪、变更审计与删除审计的数据模型。
 - `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs`：同步模式、删除策略、滞后控制、批次状态与变更操作类型枚举，均含中文 XML 注释与 `Description`。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
-- `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs`：同步执行上下文、分页读取与幂等合并的数据契约模型。
-- `ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs`：定义批次状态持久化与变更日志写入契约。
+- `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs`：同步执行、删除识别与删除执行的数据契约模型。
+- `ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。
 - `ISyncOrchestrator.cs` / `SyncOrchestrator.cs`：同步任务编排入口，负责读取配置、加载检查点、计算窗口并触发批次执行。
 - `ISyncWindowCalculator.cs` / `SyncWindowCalculator.cs`：根据 `CursorColumn + StartTimeLocal` 与检查点计算本地增量窗口。
-- `ISyncExecutionService.cs` / `SyncExecutionService.cs`：执行分页读取、暂存、幂等合并、变更日志写入、检查点提交，并维护批次状态流转；异常场景输出 NLog 错误日志。
+- `IDeletionExecutionService.cs` / `DeletionExecutionService.cs`：执行删除识别、删除策略应用（含 DryRun）并生成删除审计与删除变更日志。
+- `ISyncExecutionService.cs` / `SyncExecutionService.cs`：执行分页读取、暂存、幂等合并、删除同步、日志写入、检查点提交，并维护批次状态流转；异常场景输出 NLog 错误日志。
 - `HubDbContext.cs`：根据分表后缀动态映射表名。
 - `TableSuffixScope.cs` + `ShardModelCacheKeyFactory.cs`：保证不同后缀下 EF Model 能正确缓存隔离。
 - `MonthShardSuffixResolver.cs`：按月份生成分表后缀（如 `_202603`）。
@@ -125,14 +139,16 @@
 - `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断），弹性参数来自 `DangerZoneOptions`。
 - `DangerZoneOptions.cs`：`DangerZoneExecutor` 弹性策略配置类，绑定 `DangerZone` 节点，覆盖超时、重试、熔断全部参数，所有属性含 XML 注释。
 - `SortingTaskTraceWriter.cs`：按分表后缀分组写入，并将执行结果回传给调谐器。
-- `SyncJobOptions.cs` / `SyncTableOptions.cs`：同步任务全局与单表配置绑定模型，统一约束本地时间配置、分页、滞后窗口与唯一键。
+- `SyncJobOptions.cs` / `SyncTableOptions.cs` / `SyncDeleteOptions.cs`：同步任务全局、单表与删除配置绑定模型，统一约束本地时间配置、分页、滞后窗口、唯一键与删除策略参数。
 - `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，并校验 `StartTimeLocal` 禁止 `Z` 与 offset。
-- `OracleSourceReader.cs`：源端分页读取器基础实现，当前用内存种子数据模拟按窗口和唯一键稳定排序读取。
+- `OracleSourceReader.cs`：源端读取器基础实现，支持按窗口分页读取与按窗口读取业务键集合。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存。
-- `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过。
+- `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并提供目标键删除能力（软删/硬删）。
+- `SyncDeletionRepository.cs`：删除同步仓储基础实现，支持窗口内源端键集合与目标键集合差异识别，并按策略执行删除。
 - `SyncCheckpointRepository.cs`：检查点文件持久化实现，支持失败后续跑。
 - `SyncBatchRepository.cs`：同步批次仓储基础实现，支持 `Pending/InProgress/Completed/Failed` 状态流转与最近失败批次查询。
 - `SyncChangeLogRepository.cs`：同步变更日志仓储基础实现，支持批量写入审计记录。
+- `SyncDeletionLogRepository.cs`：同步删除日志仓储基础实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖。
 - `202603280001_InitialHubSchema.cs`：基础表结构迁移。
 - `nlog.config`：NLog 日志配置，输出至控制台与滚动日志文件（按日切割，保留 30 天）。
@@ -144,6 +160,5 @@
 
 ## 可继续完善内容
 - 将 PR-1 剩余项从“基础实现”推进到“数据库落地实现”，包括真实 Oracle 读取、SQL Server 暂存表与 MERGE 语句对接。
-- 实现 PR-3 删除同步：源端存在性差异识别、`DeletionPolicy` 执行、`SyncDeletionLog` 与 `SyncChangeLog` 联动写入。
 - 实现 PR-4 配置治理：`ExcludedColumns` 关键列冲突校验与高低优先级表差异化调度。
 - 实现 PR-5/PR-6：保留期治理危险动作门禁、并行优化、重试熔断与可观测性指标收口。

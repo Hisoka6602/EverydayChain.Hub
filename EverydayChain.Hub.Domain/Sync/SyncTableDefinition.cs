@@ -45,4 +45,19 @@ public class SyncTableDefinition
 
     /// <summary>排除列集合。</summary>
     public IReadOnlyList<string> ExcludedColumns { get; set; } = Array.Empty<string>();
+
+    /// <summary>删除策略。</summary>
+    public DeletionPolicy DeletionPolicy { get; set; } = DeletionPolicy.Disabled;
+
+    /// <summary>是否启用删除同步。</summary>
+    public bool DeletionEnabled { get; set; }
+
+    /// <summary>删除预演模式（仅审计，不执行）。</summary>
+    public bool DeletionDryRun { get; set; }
+
+    /// <summary>删除差异比对分段大小。</summary>
+    public int DeletionCompareSegmentSize { get; set; } = 20000;
+
+    /// <summary>删除差异比对最大并行度。</summary>
+    public int DeletionCompareMaxParallelism { get; set; } = 4;
 }

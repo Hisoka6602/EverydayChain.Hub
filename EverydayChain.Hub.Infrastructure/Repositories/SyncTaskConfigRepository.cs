@@ -64,6 +64,11 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             PageSize = effectivePageSize,
             UniqueKeys = table.UniqueKeys,
             ExcludedColumns = table.ExcludedColumns,
+            DeletionPolicy = table.Delete.Policy,
+            DeletionEnabled = table.Delete.Enabled,
+            DeletionDryRun = table.Delete.DryRun,
+            DeletionCompareSegmentSize = table.Delete.CompareSegmentSize > 0 ? table.Delete.CompareSegmentSize : 20000,
+            DeletionCompareMaxParallelism = table.Delete.CompareMaxParallelism > 0 ? table.Delete.CompareMaxParallelism : 4,
         };
     }
 

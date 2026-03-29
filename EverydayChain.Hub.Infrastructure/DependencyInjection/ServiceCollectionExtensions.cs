@@ -51,7 +51,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISyncCheckpointRepository, SyncCheckpointRepository>();
         services.AddSingleton<ISyncBatchRepository, SyncBatchRepository>();
         services.AddSingleton<ISyncChangeLogRepository, SyncChangeLogRepository>();
+        services.AddSingleton<ISyncDeletionRepository, SyncDeletionRepository>();
+        services.AddSingleton<ISyncDeletionLogRepository, SyncDeletionLogRepository>();
         services.AddSingleton<ISyncWindowCalculator, SyncWindowCalculator>();
+        services.AddSingleton<IDeletionExecutionService, DeletionExecutionService>();
         services.AddSingleton<ISyncExecutionService, SyncExecutionService>();
         services.AddSingleton<ISyncOrchestrator, SyncOrchestrator>();
         services.AddHostedService<AutoMigrationHostedService>();
