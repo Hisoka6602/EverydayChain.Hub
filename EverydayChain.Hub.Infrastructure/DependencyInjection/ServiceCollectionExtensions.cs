@@ -49,6 +49,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISyncStagingRepository, SyncStagingRepository>();
         services.AddSingleton<ISyncUpsertRepository, SyncUpsertRepository>();
         services.AddSingleton<ISyncCheckpointRepository, SyncCheckpointRepository>();
+        services.AddSingleton<ISyncBatchRepository, SyncBatchRepository>();
+        services.AddSingleton<ISyncChangeLogRepository, SyncChangeLogRepository>();
         services.AddSingleton<ISyncWindowCalculator, SyncWindowCalculator>();
         services.AddSingleton<ISyncExecutionService, SyncExecutionService>();
         services.AddSingleton<ISyncOrchestrator, SyncOrchestrator>();
