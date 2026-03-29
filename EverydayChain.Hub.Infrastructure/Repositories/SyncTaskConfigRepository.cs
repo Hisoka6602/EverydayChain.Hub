@@ -47,6 +47,7 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
     private SyncTableDefinition MapDefinition(SyncTableOptions table)
     {
         var startTimeLocal = ParseLocalTime(table.StartTimeLocal, table.TableCode);
+        ValidateExcludedColumns(table);
         var globalPollingIntervalSeconds = _options.PollingIntervalSeconds > 0 ? _options.PollingIntervalSeconds : 60;
         var effectivePageSize = table.PageSize > 0 ? table.PageSize : 5000;
         return new SyncTableDefinition
@@ -70,6 +71,50 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             DeletionCompareSegmentSize = table.Delete.CompareSegmentSize > 0 ? table.Delete.CompareSegmentSize : 20000,
             DeletionCompareMaxParallelism = table.Delete.CompareMaxParallelism > 0 ? table.Delete.CompareMaxParallelism : 4,
         };
+    }
+
+    /// <summary>
+    /// 校验排除列关键约束。
+    /// </summary>
+    /// <param name="table">单表配置。</param>
+    private static void ValidateExcludedColumns(SyncTableOptions table)
+    {
+        var excludedColumns = table.ExcludedColumns
+            .Where(static x => !string.IsNullOrWhiteSpace(x))
+            .Select(static x => x.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (excludedColumns.Count == 0)
+        {
+            return;
+        }
+
+        var uniqueKeys = table.UniqueKeys
+            .Where(static x => !string.IsNullOrWhiteSpace(x))
+            .Select(static x => x.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var conflictsWithUniqueKeys = uniqueKeys.Where(excludedColumns.Contains).ToList();
+        if (conflictsWithUniqueKeys.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"表 {table.TableCode} 的 ExcludedColumns 与 UniqueKeys 冲突：{string.Join(", ", conflictsWithUniqueKeys)}。");
+        }
+
+        if (!string.IsNullOrWhiteSpace(table.CursorColumn) && excludedColumns.Contains(table.CursorColumn.Trim()))
+        {
+            throw new InvalidOperationException($"表 {table.TableCode} 的 ExcludedColumns 禁止包含 CursorColumn: {table.CursorColumn}。");
+        }
+
+        var softDeleteColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "IsDeleted",
+            "DeletedTimeLocal",
+        };
+        var conflictsWithSoftDeleteColumns = softDeleteColumns.Where(excludedColumns.Contains).ToList();
+        if (conflictsWithSoftDeleteColumns.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"表 {table.TableCode} 的 ExcludedColumns 禁止包含软删除标记列：{string.Join(", ", conflictsWithSoftDeleteColumns)}。");
+        }
     }
 
     /// <summary>

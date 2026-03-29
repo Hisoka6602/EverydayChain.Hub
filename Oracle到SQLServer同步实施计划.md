@@ -19,7 +19,6 @@
 - [ ] 完成 `SyncJobOptions`、`SyncTableOptions` 配置绑定与校验。
 - [ ] 支持 `PollingIntervalSeconds`、`MaxLagMinutes` 调度与窗口控制。
 - [ ] 支持 `Sync.ExcludedColumns` 并在读取 / 暂存 / 合并阶段统一生效。
-- [ ] 增加排除列关键约束校验（禁止包含 `UniqueKeys`、`CursorColumn`、软删除标记列等）。
 - [ ] 增加高优先级与低优先级表差异化调度参数。
 
 ## PR-5：分表保留期治理与危险动作门禁

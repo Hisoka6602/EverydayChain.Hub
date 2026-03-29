@@ -1,10 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 继续实施《Oracle到SQLServer同步实施计划.md》PR-3：新增删除执行服务与删除仓储契约，打通删除识别、删除执行与日志审计链路。
-- 新增删除同步模型：`SyncDeletionLog`、`SyncDeletionDetectRequest`、`SyncDeletionApplyRequest`、`SyncDeletionExecutionResult`、`SyncDeletionCandidate`、`SyncKeyReadRequest`。
-- 改造同步执行链路：在“读取+合并”后接入删除流程，支持 `DeletionPolicy`（`Disabled`/`SoftDelete`/`HardDelete`）与 `DryRun`，并强制写入 `SyncDeletionLog` 和 `SyncChangeLog(Delete)` 后再提交检查点。
-- 更新实施计划：移除已完全落地的 PR-3 条目。
+- 继续实施《Oracle到SQLServer同步实施计划.md》PR-4：在配置加载阶段新增 `ExcludedColumns` 关键约束校验。
+- 在 `SyncTaskConfigRepository` 增加校验规则：`ExcludedColumns` 禁止包含 `UniqueKeys`、`CursorColumn` 与软删除关键列（`IsDeleted`、`DeletedTimeLocal`）。
+- 更新实施计划：移除已完全落地的 PR-4 条目“增加排除列关键约束校验（禁止包含 `UniqueKeys`、`CursorColumn`、软删除标记列等）”。
 
 ## 解决方案文件树与职责
 ```text
@@ -140,7 +139,7 @@
 - `DangerZoneOptions.cs`：`DangerZoneExecutor` 弹性策略配置类，绑定 `DangerZone` 节点，覆盖超时、重试、熔断全部参数，所有属性含 XML 注释。
 - `SortingTaskTraceWriter.cs`：按分表后缀分组写入，并将执行结果回传给调谐器。
 - `SyncJobOptions.cs` / `SyncTableOptions.cs` / `SyncDeleteOptions.cs`：同步任务全局、单表与删除配置绑定模型，统一约束本地时间配置、分页、滞后窗口、唯一键与删除策略参数。
-- `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，并校验 `StartTimeLocal` 禁止 `Z` 与 offset。
+- `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，校验 `StartTimeLocal` 禁止 `Z` 与 offset，并校验 `ExcludedColumns` 不得与 `UniqueKeys`、`CursorColumn`、软删除关键列冲突。
 - `OracleSourceReader.cs`：源端读取器基础实现，支持按窗口分页读取与按窗口读取业务键集合。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存。
 - `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并提供目标键删除能力（软删/硬删）。
@@ -160,5 +159,5 @@
 
 ## 可继续完善内容
 - 将 PR-1 剩余项从“基础实现”推进到“数据库落地实现”，包括真实 Oracle 读取、SQL Server 暂存表与 MERGE 语句对接。
-- 实现 PR-4 配置治理：`ExcludedColumns` 关键列冲突校验与高低优先级表差异化调度。
+- 实现 PR-4 配置治理：高低优先级表差异化调度，以及 `ExcludedColumns` 在读取 / 暂存 / 合并阶段统一生效。
 - 实现 PR-5/PR-6：保留期治理危险动作门禁、并行优化、重试熔断与可观测性指标收口。
