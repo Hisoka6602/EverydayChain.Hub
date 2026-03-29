@@ -23,6 +23,12 @@ public class SyncExecutionService(
     /// <summary>失败检查点写入超时秒数。</summary>
     private const int ErrorCheckpointSaveTimeoutSeconds = 3;
 
+    /// <summary>快照序列化配置。</summary>
+    private static readonly JsonSerializerOptions SnapshotSerializerOptions = new()
+    {
+        WriteIndented = false,
+    };
+
     /// <inheritdoc/>
     public async Task<SyncBatchResult> ExecuteBatchAsync(SyncExecutionContext context, CancellationToken ct)
     {
@@ -190,6 +196,7 @@ public class SyncExecutionService(
     /// <param name="context">执行上下文。</param>
     /// <param name="changes">待写入日志集合。</param>
     /// <param name="rows">当前页行数据。</param>
+    /// <param name="changedOperations">业务键对应的变更操作类型映射（仅包含 Insert/Update 的变更键）。</param>
     private static void AppendChangeLogs(
         SyncExecutionContext context,
         ICollection<SyncChangeLog> changes,
@@ -236,8 +243,9 @@ public class SyncExecutionService(
             return string.Empty;
         }
 
-        return string.Join("|", uniqueKeys.Select(key =>
-            row.TryGetValue(key, out var value) ? value?.ToString() ?? string.Empty : string.Empty));
+        var keyValues = uniqueKeys.Select(key =>
+            row.TryGetValue(key, out var value) ? value?.ToString() ?? string.Empty : string.Empty);
+        return JsonSerializer.Serialize(keyValues, SnapshotSerializerOptions);
     }
 
     /// <summary>
@@ -247,6 +255,6 @@ public class SyncExecutionService(
     /// <returns>快照文本。</returns>
     private static string BuildSnapshot(IReadOnlyDictionary<string, object?> row)
     {
-        return JsonSerializer.Serialize(row);
+        return JsonSerializer.Serialize(row, SnapshotSerializerOptions);
     }
 }

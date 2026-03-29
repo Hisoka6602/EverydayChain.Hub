@@ -13,6 +13,9 @@ public class SyncBatchRepository : ISyncBatchRepository
     /// <summary>批次存储字典。</summary>
     private readonly ConcurrentDictionary<string, SyncBatch> _batches = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>各表最近失败批次索引。</summary>
+    private readonly ConcurrentDictionary<string, (string BatchId, DateTime CompletedTimeLocal)> _latestFailedBatchIndex = new(StringComparer.OrdinalIgnoreCase);
+
     /// <inheritdoc/>
     public Task CreateBatchAsync(SyncBatch batch, CancellationToken ct)
     {
@@ -68,6 +71,12 @@ public class SyncBatchRepository : ISyncBatchRepository
         batch.CompletedTimeLocal = failedTimeLocal;
         batch.ErrorMessage = errorMessage;
         _batches[batchId] = batch;
+        _latestFailedBatchIndex.AddOrUpdate(
+            batch.TableCode,
+            _ => (batch.BatchId, failedTimeLocal),
+            (_, current) => current.CompletedTimeLocal > failedTimeLocal
+                ? current
+                : (batch.BatchId, failedTimeLocal));
         return Task.CompletedTask;
     }
 
@@ -75,12 +84,12 @@ public class SyncBatchRepository : ISyncBatchRepository
     public Task<string?> GetLatestFailedBatchIdAsync(string tableCode, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var latestFailedBatch = _batches.Values
-            .Where(batch => string.Equals(batch.TableCode, tableCode, StringComparison.OrdinalIgnoreCase)
-                && batch.Status == SyncBatchStatus.Failed
-                && batch.CompletedTimeLocal.HasValue)
-            .MaxBy(batch => batch.CompletedTimeLocal!.Value);
-        return Task.FromResult(latestFailedBatch?.BatchId);
+        if (_latestFailedBatchIndex.TryGetValue(tableCode, out var latestFailedBatch))
+        {
+            return Task.FromResult<string?>(latestFailedBatch.BatchId);
+        }
+
+        return Task.FromResult<string?>(null);
     }
 
     /// <summary>
