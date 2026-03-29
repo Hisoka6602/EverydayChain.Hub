@@ -25,6 +25,11 @@ public class SyncBatchRepository : ISyncBatchRepository
             throw new InvalidOperationException("BatchId 不能为空。");
         }
 
+        if (string.IsNullOrWhiteSpace(batch.TableCode))
+        {
+            throw new InvalidOperationException("TableCode 不能为空。");
+        }
+
         batch.Status = SyncBatchStatus.Pending;
         if (!_batches.TryAdd(batch.BatchId, CloneBatch(batch)))
         {

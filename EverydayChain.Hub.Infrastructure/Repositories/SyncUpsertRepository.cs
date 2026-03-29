@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Repositories;
 using EverydayChain.Hub.Domain.Enums;
+using EverydayChain.Hub.Domain.Sync;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
@@ -32,7 +33,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         {
             ct.ThrowIfCancellationRequested();
 
-            var rowKey = BuildUniqueKey(row, request.UniqueKeys);
+            var rowKey = SyncBusinessKeyBuilder.Build(request.UniqueKeys, row);
             if (string.IsNullOrWhiteSpace(rowKey))
             {
                 continue;
@@ -61,22 +62,6 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         }
 
         return Task.FromResult(result);
-    }
-
-    /// <summary>
-    /// 计算唯一键字符串。
-    /// </summary>
-    /// <param name="row">数据行。</param>
-    /// <param name="uniqueKeys">唯一键集合。</param>
-    /// <returns>唯一键。</returns>
-    private static string BuildUniqueKey(IReadOnlyDictionary<string, object?> row, IReadOnlyList<string> uniqueKeys)
-    {
-        if (uniqueKeys.Count == 0)
-        {
-            return string.Empty;
-        }
-
-        return string.Join("|", uniqueKeys.Select(key => row.TryGetValue(key, out var value) ? value?.ToString() ?? string.Empty : string.Empty));
     }
 
     /// <summary>

@@ -33,6 +33,7 @@ public class SyncExecutionService(
     public async Task<SyncBatchResult> ExecuteBatchAsync(SyncExecutionContext context, CancellationToken ct)
     {
         var stopwatch = Stopwatch.StartNew();
+        var batchCreated = false;
         var readCount = 0;
         var insertCount = 0;
         var updateCount = 0;
@@ -50,6 +51,7 @@ public class SyncExecutionService(
                 WindowStartLocal = context.Window.WindowStartLocal,
                 WindowEndLocal = context.Window.WindowEndLocal,
             }, ct);
+            batchCreated = true;
             await batchRepository.MarkInProgressAsync(context.BatchId, DateTime.Now, ct);
 
             var pageNo = 1;
@@ -164,7 +166,11 @@ public class SyncExecutionService(
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             logger.LogInformation("同步批次已取消。TableCode={TableCode}, BatchId={BatchId}", context.Definition.TableCode, context.BatchId);
-            await batchRepository.FailBatchAsync(context.BatchId, "同步任务被取消。", DateTime.Now, CancellationToken.None);
+            await TryMarkBatchFailedAsync(
+                batchCreated,
+                context,
+                "同步任务被取消。",
+                "在处理同步批次取消时更新批次失败。TableCode={TableCode}, BatchId={BatchId}");
             throw;
         }
         catch (Exception ex)
@@ -177,7 +183,11 @@ public class SyncExecutionService(
                 context.Checkpoint.LastSuccessCursorLocal);
 
             using var errorCheckpointCts = new CancellationTokenSource(TimeSpan.FromSeconds(ErrorCheckpointSaveTimeoutSeconds));
-            await batchRepository.FailBatchAsync(context.BatchId, ex.Message, DateTime.Now, CancellationToken.None);
+            await TryMarkBatchFailedAsync(
+                batchCreated,
+                context,
+                ex.Message,
+                "更新同步失败批次状态异常。TableCode={TableCode}, BatchId={BatchId}");
             await checkpointRepository.SaveAsync(new SyncCheckpoint
             {
                 TableCode = context.Definition.TableCode,
@@ -205,7 +215,7 @@ public class SyncExecutionService(
     {
         foreach (var row in rows)
         {
-            var businessKey = BuildBusinessKey(context.Definition.UniqueKeys, row);
+            var businessKey = SyncBusinessKeyBuilder.Build(context.Definition.UniqueKeys, row);
             if (string.IsNullOrWhiteSpace(businessKey))
             {
                 continue;
@@ -231,24 +241,6 @@ public class SyncExecutionService(
     }
 
     /// <summary>
-    /// 构建业务键文本。
-    /// </summary>
-    /// <param name="uniqueKeys">唯一键集合。</param>
-    /// <param name="row">数据行。</param>
-    /// <returns>业务键。</returns>
-    private static string BuildBusinessKey(IReadOnlyList<string> uniqueKeys, IReadOnlyDictionary<string, object?> row)
-    {
-        if (uniqueKeys.Count == 0)
-        {
-            return string.Empty;
-        }
-
-        var keyValues = uniqueKeys.Select(key =>
-            row.TryGetValue(key, out var value) ? value?.ToString() ?? string.Empty : string.Empty).ToArray();
-        return JsonSerializer.Serialize(keyValues, SnapshotSerializerOptions);
-    }
-
-    /// <summary>
     /// 构建行快照文本。
     /// </summary>
     /// <param name="row">数据行。</param>
@@ -256,5 +248,29 @@ public class SyncExecutionService(
     private static string BuildSnapshot(IReadOnlyDictionary<string, object?> row)
     {
         return JsonSerializer.Serialize(row, SnapshotSerializerOptions);
+    }
+
+    /// <summary>
+    /// 尝试标记批次失败（失败时仅记录日志，不影响主流程异常传递）。
+    /// </summary>
+    /// <param name="batchCreated">是否已成功创建批次。</param>
+    /// <param name="context">执行上下文。</param>
+    /// <param name="errorMessage">错误信息。</param>
+    /// <param name="logTemplate">日志模板。</param>
+    private async Task TryMarkBatchFailedAsync(bool batchCreated, SyncExecutionContext context, string errorMessage, string logTemplate)
+    {
+        if (!batchCreated)
+        {
+            return;
+        }
+
+        try
+        {
+            await batchRepository.FailBatchAsync(context.BatchId, errorMessage, DateTime.Now, CancellationToken.None);
+        }
+        catch (Exception statusEx)
+        {
+            logger.LogError(statusEx, logTemplate, context.Definition.TableCode, context.BatchId);
+        }
     }
 }

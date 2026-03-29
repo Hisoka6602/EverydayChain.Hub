@@ -15,10 +15,11 @@ public class SyncChangeLogRepository : ISyncChangeLogRepository
     /// <inheritdoc/>
     public Task WriteChangesAsync(IReadOnlyList<SyncChangeLog> changes, CancellationToken ct)
     {
-        foreach (var change in changes)
+        ct.ThrowIfCancellationRequested();
+        var stagedChanges = changes.Select(CloneChange).ToList();
+        foreach (var change in stagedChanges)
         {
-            ct.ThrowIfCancellationRequested();
-            _changes.Enqueue(CloneChange(change));
+            _changes.Enqueue(change);
         }
 
         return Task.CompletedTask;

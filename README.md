@@ -4,7 +4,7 @@
 - 继续实施《Oracle到SQLServer同步实施计划.md》PR-2：新增批次状态枚举 `SyncBatchStatus`，以及 `SyncBatch`、`SyncChangeLog` 领域模型。
 - 新增批次与变更日志仓储契约：`ISyncBatchRepository`、`ISyncChangeLogRepository`，并提供基础设施内存实现 `SyncBatchRepository`、`SyncChangeLogRepository`。
 - 改造同步执行链路：新增批次状态流转（`Pending -> InProgress -> Completed/Failed`）与 `ParentBatchId` 重试关联，并在“读取+合并+日志写入”成功后再提交检查点。
-- 更新实施计划：移除已完全落地的 PR-1 条目与 PR-2 主体条目，保留 `OperationType` 细分待办。
+- 更新实施计划：移除已完全落地的 PR-1 条目与 PR-2 主体条目，并同步标注已落地 `SyncChangeOperationType` 与 Insert/Update 操作类型细分；Delete 细分随 PR-3 删除同步链路继续推进。
 
 ## 解决方案文件树与职责
 ```text
