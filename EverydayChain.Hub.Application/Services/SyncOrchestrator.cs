@@ -55,29 +55,31 @@ public class SyncOrchestrator(
             .ThenBy(x => x.TableCode, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var maxParallelTables = await configRepository.GetMaxParallelTablesAsync(ct);
-        var results = new SyncBatchResult[orderedDefinitions.Count];
         using var semaphore = new SemaphoreSlim(maxParallelTables, maxParallelTables);
-        var tasks = new List<Task>(orderedDefinitions.Count);
+        var tasks = new List<Task<SyncBatchResult>>(orderedDefinitions.Count);
         for (var index = 0; index < orderedDefinitions.Count; index++)
         {
             ct.ThrowIfCancellationRequested();
-            var currentIndex = index;
-            var tableCode = orderedDefinitions[currentIndex].TableCode;
+            var tableCode = orderedDefinitions[index].TableCode;
             tasks.Add(Task.Run(async () =>
             {
-                await semaphore.WaitAsync(ct);
+                var entered = false;
                 try
                 {
-                    results[currentIndex] = await RunTableSyncAsync(tableCode, ct);
+                    await semaphore.WaitAsync(ct);
+                    entered = true;
+                    return await RunTableSyncAsync(tableCode, ct);
                 }
                 finally
                 {
-                    semaphore.Release();
+                    if (entered)
+                    {
+                        semaphore.Release();
+                    }
                 }
             }, ct));
         }
 
-        await Task.WhenAll(tasks);
-        return results;
+        return await Task.WhenAll(tasks);
     }
 }
