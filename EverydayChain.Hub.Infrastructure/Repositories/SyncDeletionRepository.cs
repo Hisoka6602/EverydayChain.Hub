@@ -1,6 +1,7 @@
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Repositories;
 using EverydayChain.Hub.Domain.Enums;
+using EverydayChain.Hub.Domain.Sync;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
@@ -11,6 +12,10 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
 {
     /// <summary>源端缺失证据描述。</summary>
     private const string MissingSourceEvidenceMessage = "窗口内源端未检索到该业务键。";
+    /// <summary>删除差异比对默认分段大小。</summary>
+    private const int DefaultCompareSegmentSize = 20000;
+    /// <summary>删除差异比对默认并行度。</summary>
+    private const int DefaultCompareMaxParallelism = 1;
     /// <inheritdoc/>
     public async Task<IReadOnlyList<SyncDeletionCandidate>> DetectDeletedKeysAsync(SyncDeletionDetectRequest request, CancellationToken ct)
     {
@@ -24,8 +29,8 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
 
         var targetRows = await upsertRepository.ListTargetRowsAsync(request.TableCode, ct);
         var candidates = new List<SyncDeletionCandidate>();
-        var segmentSize = request.CompareSegmentSize > 0 ? request.CompareSegmentSize : 20000;
-        var maxParallelism = request.CompareMaxParallelism > 0 ? request.CompareMaxParallelism : 1;
+        var segmentSize = request.CompareSegmentSize > 0 ? request.CompareSegmentSize : DefaultCompareSegmentSize;
+        var maxParallelism = request.CompareMaxParallelism > 0 ? request.CompareMaxParallelism : DefaultCompareMaxParallelism;
         var parallelOptions = new ParallelOptions
         {
             CancellationToken = ct,
@@ -77,14 +82,9 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
     /// <param name="cursorColumn">游标列名。</param>
     /// <param name="window">同步窗口。</param>
     /// <returns>在窗口内返回 <c>true</c>。</returns>
-    private static bool IsRowWithinWindow(IReadOnlyDictionary<string, object?> row, string cursorColumn, Domain.Sync.SyncWindow window)
+    private static bool IsRowWithinWindow(IReadOnlyDictionary<string, object?> row, string cursorColumn, SyncWindow window)
     {
         if (!row.TryGetValue(cursorColumn, out var cursorValue) || cursorValue is not DateTime cursorLocal)
-        {
-            return false;
-        }
-
-        if (cursorLocal.Kind == DateTimeKind.Utc)
         {
             return false;
         }
@@ -92,6 +92,11 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
         if (cursorLocal.Kind == DateTimeKind.Unspecified)
         {
             cursorLocal = DateTime.SpecifyKind(cursorLocal, DateTimeKind.Local);
+        }
+
+        if (cursorLocal.Kind != DateTimeKind.Local)
+        {
+            return false;
         }
 
         return cursorLocal > window.WindowStartLocal && cursorLocal <= window.WindowEndLocal;
