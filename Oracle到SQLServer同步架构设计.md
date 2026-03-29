@@ -1,294 +1,451 @@
-# Oracle 到本地 SQL Server 同步架构设计（外部 DB First 场景）
+# Oracle 到本地 SQL Server 同步架构设计（外部 DB First + ORM）
 
-## 1. 背景与约束
+## 1. 文档目标
 
-你当前场景的核心约束如下：
+本文档用于指导后续开发“外部 Oracle → 本地 SQL Server”的同步系统，重点解决以下需求：
 
-1. 外部 Oracle 属于其他系统，且为 **DB First**，本系统不能对其做结构变更。
-2. 不能在外部 Oracle 上执行迁移、分表、触发器新增、调优侵入动作。
-3. 不能破坏外部系统数据（只读访问、零写入）。
-4. 需要将“相同结构表”的数据同步到本地 SQL Server，供本系统读写与业务处理。
-
-基于以上约束，架构目标应是：
-
-- 对外部 Oracle **只读、低侵入、可限流**；
-- 对本地 SQL Server **可追踪、可回放、可幂等**；
-- 同步链路 **可恢复、可审计、可灰度**。
+1. 使用 ORM 同步外部数据到本地 SQL Server。
+2. 支持按“指定字段 + 指定开始时间”启动增量同步。
+3. 支持为每张表配置唯一键，保证本地不重复；重复时覆盖更新。
+4. 外部已删除的数据需要同步删除到本地，并保留删除记录与变更记录。
+5. 支持本地按分表策略做数据保留期清理（例如仅保留 3 个月）。
+6. 在“减少外部往返”的前提下，保证可配置的准实时（例如误差控制在最近 10 分钟内）。
 
 ---
 
-## 2. 设计目标与非目标
+## 2. 约束与原则
 
-## 2.1 设计目标
+### 2.1 约束
 
-- 支持多表可配置同步（全量初始化 + 增量持续同步）。
-- 保证重复执行不会导致目标数据错误（幂等）。
-- 任意环节失败可从检查点恢复，不需要全量重跑。
-- 对外部 Oracle 压力可控（分页、批次、并发、时间窗）。
-- 所有危险写入动作具备隔离机制（开关、dry-run、审计、回滚）。
+1. 外部 Oracle 属于第三方系统，DB First，不允许结构改造。
+2. 外部 Oracle 仅允许只读访问（SELECT），禁止写入与 DDL。
+3. 本地 SQL Server 为可控库，且采用分表设计。
+4. 时间语义统一使用本地时间，配置解析按本地时间处理。
 
-## 2.2 非目标
+### 2.2 设计原则
 
-- 不提供跨库分布式事务强一致（2PC/XA）。
-- 不改造外部 Oracle 表结构与索引。
-- 不依赖外部系统为你新增 CDC/触发器。
-
----
-
-## 3. 总体架构（推荐）
-
-采用“**源端只读拉取 + 本地落地中间层 + 本地合并入正式表**”三段式：
-
-1. **源端读取层（Oracle Reader）**
-   - 仅使用只读账号。
-   - 按表配置分页读取。
-   - 支持全量/增量两种策略。
-
-2. **本地暂存层（SQL Server Staging）**
-   - 每张业务表对应一张暂存表（可一对一命名）。
-   - 每次同步批次写入 `BatchId`、抓取时间、本地校验信息。
-   - 暂存层只作为缓冲与对账，不直接给业务读。
-
-3. **本地合并层（Merge Upsert）**
-   - 从 Staging 合并到正式业务表（Insert/Update，必要时软删除标记）。
-   - 合并过程记录影响行数、耗时、错误详情。
-
-4. **控制与治理层（Sync Orchestrator）**
-   - 统一调度任务（按表/按优先级/按时间窗）。
-   - 维护同步检查点（checkpoint）。
-   - 管控重试、熔断、限流、告警。
+1. **外部只读、内部可控**：外部只拉取，本地完成幂等、合并、审计、清理。
+2. **配置驱动**：所有表同步行为（唯一键、起始时间、轮询周期、保留期）配置化。
+3. **高效增量优先**：优先按增量字段读取，避免频繁全表扫描。
+4. **可恢复**：使用检查点机制，失败后从上次成功位点续跑。
+5. **可审计**：任何插入、更新、删除都落变更记录；删除单独落删除记录。
 
 ---
 
-## 4. 分层职责设计（贴合当前仓库风格）
+## 3. 总体架构
 
-## 4.1 Domain 层
+采用 6 层流水线：
 
-定义“同步任务”的领域概念（不包含具体数据库访问代码）：
+1. **任务配置层（Sync Task Config）**
+2. **源端读取层（Oracle ORM Reader）**
+3. **本地暂存层（SQLServer Staging）**
+4. **本地合并层（Upsert + Delete）**
+5. **记录审计层（ChangeLog + DeletionLog + BatchLog）**
+6. **保留期治理层（分表清理）**
 
-- 同步任务定义（表名、主键、增量字段、批大小、并发策略）。
-- 同步状态模型（初始化中、运行中、失败、暂停）。
-- 同步批次结果模型（读取行数、写入行数、跳过行数、失败原因）。
+流程总览：
 
-## 4.2 Application 层
-
-编排流程用例：
-
-- 启动全量初始化。
-- 执行单表增量同步。
-- 执行批次重放（基于 BatchId）。
-- 执行对账任务（源/目标行数和哈希核验）。
-
-## 4.3 Infrastructure 层
-
-实现外部依赖：
-
-- `OracleReadRepository`：只读查询、分页读取。
-- `SqlServerStagingRepository`：写入暂存层。
-- `SqlServerMergeRepository`：执行本地合并。
-- `CheckpointRepository`：维护每张表的增量位点。
-- `SyncAuditRepository`：审计日志落库。
-
-## 4.4 Host 层
-
-- 后台 Worker 定时调度。
-- 支持任务开关、表级别开关、dry-run 开关。
-- 运行指标输出（NLog + 指标上报）。
+1. 调度器按表任务触发。
+2. 读取任务配置与检查点，计算本次同步窗口（开始/结束时间）。
+3. 从 Oracle 按增量窗口分页拉取到本地暂存。
+4. 基于唯一键从暂存合并到目标分表（插入/覆盖更新）。
+5. 基于“源端存在性对比”执行本地删除（可开关 + dry-run）。
+6. 写入批次日志、变更日志、删除日志，更新检查点。
+7. 定时执行保留期清理（按表删除过期分表）。
 
 ---
 
-## 5. 同步策略设计（重点）
+## 4. 分层与命名（接口 + 实现）
 
-## 5.1 初始化阶段：全量同步
+> 命名采用“接口 `I*` + 实现 `*`”风格，按职责拆分，避免单类过重。
 
-适用于首次接入或大版本切换。
+## 4.1 Domain（领域层）
 
-流程：
+### 4.1.1 聚合与值对象
 
-1. 读取配置，锁定目标表任务。
-2. Oracle 按主键顺序分页读取（例如每批 2k~10k 行）。
-3. 写入 SQL Server Staging。
-4. 从 Staging 合并入正式表。
-5. 写入 checkpoint（记录最后主键、批次号、成功时间）。
+- `SyncTableDefinition`：单表同步定义（源表、目标逻辑表、唯一键、增量字段等）。
+- `SyncWindow`：同步窗口（`WindowStartLocal`、`WindowEndLocal`）。
+- `SyncCheckpoint`：检查点（上次成功游标、上次批次号、上次成功时间）。
+- `SyncBatchResult`：单批次统计结果（读取/插入/更新/删除/跳过/耗时）。
 
-关键点：
+### 4.1.2 领域枚举（放在 `EverydayChain.Hub.Domain.Enums`）
 
-- 全量期间建议业务读仍走旧路径，完成后再切换。
-- 全量过程允许中断，重启后从 checkpoint 继续。
+- `SyncMode`：`InitialFull` / `Incremental`
+- `DeletionPolicy`：`Disabled` / `SoftDelete` / `HardDelete`
+- `LagControlMode`：`FixedDelayWindow` / `DynamicDelayWindow`
 
-## 5.2 持续阶段：增量同步
+## 4.2 Application（应用层）
 
-按能力分三档策略（从优到次优）：
+### 4.2.1 应用服务接口
 
-### 档位 A：有可靠更新时间字段（推荐）
+- `ISyncOrchestrator`
+  - `RunTableSyncAsync(string tableCode, CancellationToken ct)`
+  - `RunAllEnabledTableSyncAsync(CancellationToken ct)`
 
-- 以 `LastModifiedTime`（本地时间语义）作为高水位。
-- 条件：`LastModifiedTime > LastCheckpointTime` 且 `<= 本次截断时间`。
-- 读取完成后提交 checkpoint 为“本次截断时间”。
+- `ISyncWindowCalculator`
+  - `CalculateWindow(SyncTableDefinition definition, SyncCheckpoint checkpoint, DateTime nowLocal)`
 
-### 档位 B：无更新时间，但有单调主键
+- `ISyncExecutionService`
+  - `ExecuteBatchAsync(SyncExecutionContext context, CancellationToken ct)`
 
-- 基于主键区间推进（`Id > LastMaxId`）。
-- 配合周期性对账（抽样哈希或窗口全量比对）补偿漏改。
+- `IDeletionExecutionService`
+  - `ExecuteDeletionAsync(SyncExecutionContext context, CancellationToken ct)`
 
-### 档位 C：无更新时间且无单调键
+- `IRetentionExecutionService`
+  - `ExecuteRetentionCleanupAsync(CancellationToken ct)`
 
-- 只能做窗口全量 + 差异比对。
-- 建议缩小范围（按业务分区、按日期分区读取）降低成本。
+### 4.2.2 应用服务实现
 
-## 5.3 删除同步策略
+- `SyncOrchestrator`
+- `SyncWindowCalculator`
+- `SyncExecutionService`
+- `DeletionExecutionService`
+- `RetentionExecutionService`
 
-外部删除是否需要同步到本地，应显式定义：
+## 4.3 Infrastructure（基础设施层）
 
-- 若业务要求保留历史：本地采用软删除标记。
-- 若要求强一致镜像：通过“源快照差异对比”识别缺失并执行本地删除（危险动作，必须走隔离器）。
+### 4.3.1 配置仓储
 
----
+- `ISyncTaskConfigRepository`
+  - 读取每张表的同步配置。
+- 实现：`SyncTaskConfigRepository`
 
-## 6. 数据一致性与幂等设计
+### 4.3.2 源端读取（Oracle + ORM）
 
-## 6.1 幂等键
+- `IOracleSourceReader`
+  - `ReadIncrementalPageAsync(SyncReadRequest request, CancellationToken ct)`
+  - `ReadByKeysAsync(SyncKeyReadRequest request, CancellationToken ct)`
+- 实现：`OracleSourceReader`
 
-每行数据建议具备以下至少一种幂等依据：
+> ORM 实现建议：
+>
+> - 使用独立 `OracleReadDbContext`（只读连接字符串）。
+> - 实体使用 DB First 生成，禁止修改源表结构。
+> - 对多表通用读取采用表达式拼装 + 映射配置，避免硬编码 SQL 拼接。
 
-- 业务主键；
-- 业务主键 + 版本号；
-- 业务主键 + 行哈希（用于内容变化识别）。
+### 4.3.3 本地暂存
 
-## 6.2 合并规则（Upsert）
+- `ISyncStagingRepository`
+  - `BulkInsertAsync(...)`
+  - `ClearBatchAsync(...)`
+- 实现：`SyncStagingRepository`
 
-- 主键不存在：Insert。
-- 主键存在且内容有变化：Update。
-- 主键存在且内容无变化：Skip。
+### 4.3.4 本地合并（幂等 Upsert）
 
-## 6.3 检查点（Checkpoint）
+- `ISyncUpsertRepository`
+  - `MergeFromStagingAsync(SyncMergeRequest request, CancellationToken ct)`
+- 实现：`SyncUpsertRepository`
 
-每张表独立记录：
+### 4.3.5 删除同步
 
-- `LastSuccessCursor`（时间戳或主键）；
-- `LastBatchId`；
-- `LastSuccessTime`；
-- `LastError`（最近失败摘要）。
+- `ISyncDeletionRepository`
+  - `DetectDeletedKeysAsync(SyncDeletionDetectRequest request, CancellationToken ct)`
+  - `ApplyDeletionAsync(SyncDeletionApplyRequest request, CancellationToken ct)`
+- 实现：`SyncDeletionRepository`
 
-失败后从最后成功检查点续跑，不回退已成功批次。
+### 4.3.6 检查点与批次状态
 
----
+- `ISyncCheckpointRepository`
+  - `GetAsync(...)`
+  - `SaveAsync(...)`
+- 实现：`SyncCheckpointRepository`
 
-## 7. 性能与稳定性设计
+- `ISyncBatchRepository`
+  - `CreateBatchAsync(...)`
+  - `CompleteBatchAsync(...)`
+  - `FailBatchAsync(...)`
+- 实现：`SyncBatchRepository`
 
-## 7.1 限流与并发
+### 4.3.7 变更日志与删除日志
 
-- 表级并发限制（避免压垮 Oracle）。
-- 批大小自适应（失败率高则降批次）。
-- 夜间大窗口、白天小窗口策略。
+- `ISyncChangeLogRepository`
+  - `WriteChangesAsync(...)`
+- 实现：`SyncChangeLogRepository`
 
-## 7.2 重试与熔断
+- `ISyncDeletionLogRepository`
+  - `WriteDeletionsAsync(...)`
+- 实现：`SyncDeletionLogRepository`
 
-- 短暂故障（网络抖动、连接池波动）做有限次重试。
-- 连续失败达到阈值后熔断该表同步，避免雪崩。
-- 熔断期间仅告警，不持续打源端。
+### 4.3.8 分表与保留期治理
 
-## 7.3 长事务控制
+- `IShardTableResolver`
+  - `ResolvePhysicalTableName(string logicalTable, DateTime dataTimeLocal)`
+- 实现：`ShardTableResolver`
 
-- 每批次独立事务，不做超大事务。
-- 合并阶段按批提交，减少锁范围与日志压力。
+- `IShardRetentionRepository`
+  - `ListExpiredShardTablesAsync(...)`
+  - `DropShardTableAsync(...)`
+- 实现：`ShardRetentionRepository`
 
----
+## 4.4 Host（任务调度层）
 
-## 8. 安全与风险控制（必须项）
-
-针对你提出的“不能破坏外部系统数据”，推荐以下硬约束：
-
-1. Oracle 账号权限仅 `SELECT`（禁止 DDL/DML）。
-2. 所有外部 SQL 使用白名单表配置，不允许任意拼接表名。
-3. 本地危险动作（批量更新/删除）必须通过隔离器：
-   - 开关控制；
-   - dry-run；
-   - 审计记录；
-   - 回滚脚本。
-4. 所有异常必须记录 NLog，并带表名、批次号、checkpoint。
-
----
-
-## 9. 可观测性与运维
-
-每个同步任务至少输出以下指标：
-
-- 每批读取行数 / 写入行数 / 更新行数 / 跳过行数；
-- 每批耗时、QPS、失败率；
-- 最后成功时间、积压时长（当前时间 - checkpoint 时间）；
-- 熔断状态、重试次数。
-
-建议接入告警：
-
-- 连续 N 次失败；
-- 积压超过阈值；
-- 源/目标行数差异超过阈值。
-
----
-
-## 10. 配置模型建议
-
-按“任务级可配置”设计，而不是写死单表逻辑：
-
-- Oracle 连接配置（只读）。
-- SQL Server 本地连接配置。
-- 同步任务列表（每张表一项）：
-  - 源表名、目标表名；
-  - 主键列；
-  - 增量列（可空）；
-  - 批大小；
-  - 轮询间隔；
-  - 是否启用；
-  - 是否 dry-run。
-
-注意：时间参数统一按本地时间语义解释，不使用 UTC API 语义。
+- `SyncBackgroundWorker`：周期触发同步作业。
+- `RetentionBackgroundWorker`：周期触发分表保留期清理。
+- `SyncJobOptions`：全局调度配置。
+- `SyncTableOptions`：单表配置项。
 
 ---
 
-## 11. 推荐实施路径（分阶段）
+## 5. 核心配置模型（必须可配置）
 
-## 阶段一：最小可用链路
+每张表一份配置：
 
-- 先选 1 张关键表打通：Oracle 读取 → Staging → Merge → Checkpoint。
-- 支持失败恢复与幂等重跑。
-- 打通日志与告警。
+```json
+{
+  "TableCode": "Order",
+  "Enabled": true,
+  "Source": {
+    "Schema": "EXT",
+    "Table": "T_ORDER"
+  },
+  "Target": {
+    "LogicalTable": "Order"
+  },
+  "Sync": {
+    "Mode": "Incremental",
+    "CursorColumn": "LastModifiedTime",
+    "StartTimeLocal": "2026-03-01 00:00:00",
+    "PollingIntervalSeconds": 60,
+    "MaxLagMinutes": 10,
+    "PageSize": 5000,
+    "MaxParallelPages": 2
+  },
+  "Identity": {
+    "UniqueKeys": ["OrderId"]
+  },
+  "Delete": {
+    "Policy": "HardDelete",
+    "Enabled": true,
+    "DryRun": false
+  },
+  "Retention": {
+    "Enabled": true,
+    "KeepMonths": 3
+  }
+}
+```
 
-## 阶段二：扩展到多表
+配置解释：
 
-- 引入“表任务配置化”。
-- 增加任务并发调度与优先级。
-- 增加对账作业。
-
-## 阶段三：生产优化
-
-- 增量策略自动选择（A/B/C 档位）。
-- 批次自适应调优。
-- 细化审计报表与回滚预案。
+1. `CursorColumn + StartTimeLocal`：定义从哪个字段、哪个本地时间开始同步。
+2. `UniqueKeys`：定义幂等覆盖键（可单键/复合键）。
+3. `MaxLagMinutes`：实时性控制，默认固定延迟窗口（例如 10 分钟）。
+4. `Delete.Policy`：删除策略，支持关闭/软删/硬删。
+5. `Retention.KeepMonths`：本地分表保留期（月）。
 
 ---
 
-## 12. 验收清单（Checklist）
+## 6. 同步流程详细设计
 
-- [ ] Oracle 连接账号已验证仅具备只读权限。
-- [ ] 至少 1 张表完成全量 + 增量同步联调。
-- [ ] 同步任务失败后可从 checkpoint 自动恢复。
-- [ ] 同步重跑不会造成目标数据重复或污染。
-- [ ] 删除策略（软删/强删）已被明确并评审通过。
-- [ ] 危险动作隔离器（开关、dry-run、审计、回滚）已生效。
-- [ ] 告警规则已配置并完成演练。
-- [ ] 对外部 Oracle 无任何 DDL/DML 写入行为。
+## 6.1 增量窗口计算（满足“实时 + 低往返”）
+
+- `WindowStartLocal`：
+  - 首次：取配置 `StartTimeLocal`。
+  - 非首次：取检查点 `LastSuccessCursorLocal`。
+
+- `WindowEndLocal`：
+  - `NowLocal - MaxLagMinutes`。
+  - 目的：避免读取到仍在源端事务中的“未稳定数据”。
+
+- 查询条件：
+  - `CursorColumn > WindowStartLocal AND CursorColumn <= WindowEndLocal`
+
+该策略可在减少回查的同时，将误差限制在可配置窗口（如 10 分钟）。
+
+## 6.2 读取与暂存
+
+1. Oracle 按 `CursorColumn` + `UniqueKeys` 排序分页读取。
+2. 单次尽量批量（例如 5000 行），减少往返次数。
+3. 每页写入本地 `Staging`，记录 `BatchId`、`PageNo`、抓取时间。
+
+## 6.3 幂等合并（防重复 + 覆盖）
+
+按 `UniqueKeys` 合并规则：
+
+1. 目标不存在：插入。
+2. 目标存在且数据有差异：覆盖更新。
+3. 目标存在且数据一致：跳过。
+
+> 差异判定建议使用“字段比较 + 行摘要哈希”组合，减少不必要更新。
+
+## 6.4 删除同步（外部删，本地也删）
+
+删除同步分两步：
+
+1. **识别删除**：在同步窗口内，本地目标键集合与源端键集合做存在性差异比对。
+2. **执行删除**：
+   - `SoftDelete`：更新 `IsDeleted` 与删除时间。
+   - `HardDelete`：物理删除本地数据。
+
+无论软删或硬删，都必须写：
+
+1. `SyncDeletionLog`（删除记录）
+2. `SyncChangeLog`（变更记录）
+
+## 6.5 检查点提交
+
+仅在“读取、合并、删除、日志写入”全部成功后提交检查点，保证批次原子可恢复。
 
 ---
 
-## 13. 结论
+## 7. 数据模型建议（本地元数据表）
 
-在“外部 Oracle（DB First，且不可侵入）+ 本地 SQL Server 可控”的前提下，最稳妥方案是：
+## 7.1 `SyncCheckpoint`
 
-- 外部只读拉取，
-- 本地分层落地（Staging + Merge），
-- 用 checkpoint 保证可恢复，
-- 用幂等与对账保证正确性，
-- 用隔离器控制危险动作。
+- `TableCode`
+- `LastSuccessCursorLocal`
+- `LastBatchId`
+- `LastSuccessTimeLocal`
+- `LastError`
 
-该方案对外部系统影响最小，且能持续演进到多表、大数据量、长期稳定运行。
+## 7.2 `SyncBatch`
+
+- `BatchId`
+- `TableCode`
+- `WindowStartLocal`
+- `WindowEndLocal`
+- `ReadCount`
+- `InsertCount`
+- `UpdateCount`
+- `DeleteCount`
+- `SkipCount`
+- `Status`
+- `StartedTimeLocal`
+- `CompletedTimeLocal`
+
+## 7.3 `SyncChangeLog`
+
+- `BatchId`
+- `TableCode`
+- `OperationType`（Insert/Update/Delete）
+- `BusinessKey`
+- `BeforeSnapshot`
+- `AfterSnapshot`
+- `ChangedTimeLocal`
+
+## 7.4 `SyncDeletionLog`
+
+- `BatchId`
+- `TableCode`
+- `BusinessKey`
+- `DeletionPolicy`
+- `DeletedTimeLocal`
+- `SourceEvidence`
+
+---
+
+## 8. 分表保留期清理设计（按表删）
+
+场景：本地为分表（如按月分表），只保留最近 3 个月。
+
+策略：
+
+1. `RetentionBackgroundWorker` 每天/每小时执行。
+2. 通过 `IShardTableResolver` 获取逻辑表所有物理分表。
+3. 按命名规则解析分表时间（如 `Order_202512`）。
+4. 计算过期阈值（当前本地时间回溯 `KeepMonths`）。
+5. 对过期分表执行删除（drop/truncate 依据策略）。
+
+危险动作门禁（必须）：
+
+1. 开关控制（总开关 + 表级开关）
+2. dry-run 预演（仅记录不执行）
+3. 审计记录（谁在何时删除了哪些表）
+4. 回滚脚本（DDL 恢复预案）
+
+---
+
+## 9. 高效与实时性优化策略
+
+## 9.1 降低外部往返
+
+1. 按增量窗口拉取，避免频繁全量。
+2. 批量分页 + 流式处理，减少单行读取。
+3. 读字段最小化（仅同步字段 + 键字段 + 游标字段）。
+4. 合并在本地完成，避免回写源端。
+
+## 9.2 控制准实时
+
+1. `PollingIntervalSeconds` 可配置（如 30s/60s/120s）。
+2. `MaxLagMinutes` 可配置（如 10 分钟）。
+3. 对高优先级表使用更短轮询周期。
+4. 对低优先级表使用较长周期，减轻整体压力。
+
+## 9.3 稳定性
+
+1. 每表独立并发上限，避免拖垮 Oracle。
+2. 短暂故障重试（指数退避 + 上限）。
+3. 连续失败熔断，恢复后再自动重试。
+
+---
+
+## 10. 典型时序（单表一次增量）
+
+1. `SyncBackgroundWorker` 触发 `ISyncOrchestrator.RunTableSyncAsync`。
+2. `ISyncTaskConfigRepository` 读取 `SyncTableDefinition`。
+3. `ISyncCheckpointRepository` 读取检查点。
+4. `ISyncWindowCalculator` 计算本次窗口。
+5. `IOracleSourceReader` 分页读取并写入 `ISyncStagingRepository`。
+6. `ISyncUpsertRepository` 执行合并（插入/覆盖/跳过）。
+7. `IDeletionExecutionService` + `ISyncDeletionRepository` 执行删除同步。
+8. `ISyncChangeLogRepository`、`ISyncDeletionLogRepository` 写审计记录。
+9. `ISyncBatchRepository` 完成批次。
+10. `ISyncCheckpointRepository` 提交新检查点。
+
+---
+
+## 11. 异常与审计规范
+
+1. 所有异常必须记录 NLog，日志包含 `TableCode`、`BatchId`、`Window`、`Checkpoint`。
+2. 删除动作必须单独审计，且能回溯到批次。
+3. dry-run 模式下同样写审计日志，标记 `Executed = false`。
+
+---
+
+## 12. 分阶段落地建议
+
+## 阶段一（最小可用）
+
+1. 落地 1 张关键表。
+2. 打通“增量读取 + 幂等覆盖 + 检查点”。
+3. 打通批次日志与变更日志。
+
+## 阶段二（删除与治理）
+
+1. 增加删除识别与删除执行。
+2. 增加删除日志。
+3. 增加 dry-run、审计、回滚脚本机制。
+
+## 阶段三（多表与性能）
+
+1. 多表配置化并发调度。
+2. 增加分表保留期治理。
+3. 增加延迟、积压、错误率告警。
+
+---
+
+## 13. 验收清单（Checklist）
+
+- [ ] 已支持按 `CursorColumn + StartTimeLocal` 定义增量起点。
+- [ ] 已支持按表配置 `UniqueKeys`，并验证“重复覆盖不重复插入”。
+- [ ] 已实现外部删除到本地删除同步。
+- [ ] 已实现删除记录（`SyncDeletionLog`）与变更记录（`SyncChangeLog`）。
+- [ ] 已实现本地按分表保留期清理（例如仅保留 3 个月）。
+- [ ] 已支持 `MaxLagMinutes`，并验证可控制在近实时误差范围（如 10 分钟）。
+- [ ] 已实现检查点续跑，任务失败后可从上次成功位点恢复。
+- [ ] 已实现危险动作门禁：开关、dry-run、审计、回滚脚本。
+- [ ] 已确认外部 Oracle 全程只读，无 DDL/DML 写入。
+
+---
+
+## 14. 结论
+
+该设计在不改造外部 Oracle 的前提下，实现了：
+
+1. ORM 化同步能力（可持续扩展多表）。
+2. 可配置的起始位点与准实时窗口。
+3. 唯一键幂等覆盖、防重复写入。
+4. 删除同步与全量审计可追溯。
+5. 分表保留期治理与高效低往返读取。
+
+可直接作为后续开发实现蓝图与接口落地基线。
