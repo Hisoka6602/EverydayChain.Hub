@@ -13,6 +13,8 @@ public class SyncExecutionService(
     IOracleSourceReader oracleSourceReader,
     ISyncStagingRepository stagingRepository,
     ISyncUpsertRepository upsertRepository,
+    ISyncBatchRepository batchRepository,
+    ISyncChangeLogRepository changeLogRepository,
     ISyncCheckpointRepository checkpointRepository,
     ILogger<SyncExecutionService> logger) : ISyncExecutionService
 {
@@ -28,9 +30,20 @@ public class SyncExecutionService(
         var updateCount = 0;
         var skipCount = 0;
         DateTime? lastSuccessCursorLocal = context.Checkpoint.LastSuccessCursorLocal;
+        var pendingChanges = new List<SyncChangeLog>();
 
         try
         {
+            await batchRepository.CreateBatchAsync(new SyncBatch
+            {
+                BatchId = context.BatchId,
+                ParentBatchId = context.ParentBatchId,
+                TableCode = context.Definition.TableCode,
+                WindowStartLocal = context.Window.WindowStartLocal,
+                WindowEndLocal = context.Window.WindowEndLocal,
+            }, ct);
+            await batchRepository.MarkInProgressAsync(context.BatchId, DateTime.Now, ct);
+
             var pageNo = 1;
             while (!ct.IsCancellationRequested)
             {
@@ -97,6 +110,7 @@ public class SyncExecutionService(
                 insertCount += mergeResult.InsertCount;
                 updateCount += mergeResult.UpdateCount;
                 skipCount += mergeResult.SkipCount;
+                AppendChangeLogs(context, pendingChanges, readResult.Rows);
                 if (mergeResult.LastSuccessCursorLocal.HasValue)
                 {
                     lastSuccessCursorLocal = mergeResult.LastSuccessCursorLocal;
@@ -110,7 +124,10 @@ public class SyncExecutionService(
                 pageNo++;
             }
 
-            // 步骤4：仅在读取与合并完成后提交检查点。
+            // 步骤4：读取与合并成功后，先落变更日志。
+            await changeLogRepository.WriteChangesAsync(pendingChanges, ct);
+
+            // 步骤5：仅在读取、合并、日志写入全部完成后提交检查点。
             await checkpointRepository.SaveAsync(new SyncCheckpoint
             {
                 TableCode = context.Definition.TableCode,
@@ -120,7 +137,7 @@ public class SyncExecutionService(
                 LastError = null,
             }, ct);
 
-            return new SyncBatchResult
+            var batchResult = new SyncBatchResult
             {
                 BatchId = context.BatchId,
                 TableCode = context.Definition.TableCode,
@@ -133,10 +150,13 @@ public class SyncExecutionService(
                 SkipCount = skipCount,
                 Elapsed = stopwatch.Elapsed,
             };
+            await batchRepository.CompleteBatchAsync(batchResult, DateTime.Now, ct);
+            return batchResult;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             logger.LogInformation("同步批次已取消。TableCode={TableCode}, BatchId={BatchId}", context.Definition.TableCode, context.BatchId);
+            await batchRepository.FailBatchAsync(context.BatchId, "同步任务被取消。", DateTime.Now, CancellationToken.None);
             throw;
         }
         catch (Exception ex)
@@ -149,6 +169,7 @@ public class SyncExecutionService(
                 context.Checkpoint.LastSuccessCursorLocal);
 
             using var errorCheckpointCts = new CancellationTokenSource(TimeSpan.FromSeconds(ErrorCheckpointSaveTimeoutSeconds));
+            await batchRepository.FailBatchAsync(context.BatchId, ex.Message, DateTime.Now, CancellationToken.None);
             await checkpointRepository.SaveAsync(new SyncCheckpoint
             {
                 TableCode = context.Definition.TableCode,
@@ -159,5 +180,65 @@ public class SyncExecutionService(
             }, errorCheckpointCts.Token);
             throw;
         }
+    }
+
+    /// <summary>
+    /// 追加本页变更日志。
+    /// </summary>
+    /// <param name="context">执行上下文。</param>
+    /// <param name="changes">待写入日志集合。</param>
+    /// <param name="rows">当前页行数据。</param>
+    private static void AppendChangeLogs(
+        SyncExecutionContext context,
+        ICollection<SyncChangeLog> changes,
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> rows)
+    {
+        foreach (var row in rows)
+        {
+            var businessKey = BuildBusinessKey(context.Definition.UniqueKeys, row);
+            if (string.IsNullOrWhiteSpace(businessKey))
+            {
+                continue;
+            }
+
+            changes.Add(new SyncChangeLog
+            {
+                BatchId = context.BatchId,
+                ParentBatchId = context.ParentBatchId,
+                TableCode = context.Definition.TableCode,
+                OperationType = "Upsert",
+                BusinessKey = businessKey,
+                BeforeSnapshot = null,
+                AfterSnapshot = BuildSnapshot(row),
+                ChangedTimeLocal = DateTime.Now,
+            });
+        }
+    }
+
+    /// <summary>
+    /// 构建业务键文本。
+    /// </summary>
+    /// <param name="uniqueKeys">唯一键集合。</param>
+    /// <param name="row">数据行。</param>
+    /// <returns>业务键。</returns>
+    private static string BuildBusinessKey(IReadOnlyList<string> uniqueKeys, IReadOnlyDictionary<string, object?> row)
+    {
+        if (uniqueKeys.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Join("|", uniqueKeys.Select(key =>
+            row.TryGetValue(key, out var value) ? value?.ToString() ?? string.Empty : string.Empty));
+    }
+
+    /// <summary>
+    /// 构建行快照文本。
+    /// </summary>
+    /// <param name="row">数据行。</param>
+    /// <returns>快照文本。</returns>
+    private static string BuildSnapshot(IReadOnlyDictionary<string, object?> row)
+    {
+        return string.Join(", ", row.Select(pair => $"{pair.Key}={pair.Value}"));
     }
 }

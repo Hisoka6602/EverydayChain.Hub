@@ -11,6 +11,7 @@ namespace EverydayChain.Hub.Application.Services;
 public class SyncOrchestrator(
     ISyncTaskConfigRepository configRepository,
     ISyncCheckpointRepository checkpointRepository,
+    ISyncBatchRepository batchRepository,
     ISyncWindowCalculator windowCalculator,
     ISyncExecutionService executionService,
     ILogger<SyncOrchestrator> logger) : ISyncOrchestrator
@@ -23,12 +24,16 @@ public class SyncOrchestrator(
             var definition = await configRepository.GetByTableCodeAsync(tableCode, ct);
             var checkpoint = await checkpointRepository.GetAsync(tableCode, ct);
             var window = windowCalculator.CalculateWindow(definition, checkpoint, DateTime.Now);
+            var parentBatchId = !string.IsNullOrWhiteSpace(checkpoint.LastError)
+                ? await batchRepository.GetLatestFailedBatchIdAsync(tableCode, ct)
+                : null;
             var context = new SyncExecutionContext
             {
                 Definition = definition,
                 Checkpoint = checkpoint,
                 Window = window,
                 BatchId = Guid.NewGuid().ToString("N"),
+                ParentBatchId = parentBatchId,
             };
             return await executionService.ExecuteBatchAsync(context, ct);
         }
