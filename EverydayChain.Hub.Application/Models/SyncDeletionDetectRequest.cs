@@ -13,6 +13,12 @@ public class SyncDeletionDetectRequest
     /// <summary>游标列名。</summary>
     public string CursorColumn { get; set; } = string.Empty;
 
+    /// <summary>源端 Schema。</summary>
+    public string SourceSchema { get; set; } = string.Empty;
+
+    /// <summary>源端表名。</summary>
+    public string SourceTable { get; set; } = string.Empty;
+
     /// <summary>同步窗口。</summary>
     public SyncWindow Window { get; set; } = new();
 

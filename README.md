@@ -1,11 +1,12 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 继续实施《Oracle到SQLServer同步实施计划.md》PR-5：将保留期回滚脚本从占位模板升级为完整可回放 DDL。
-- 已在 `IShardRetentionRepository` 增加 `GenerateRollbackScriptAsync` 契约，并在 `RetentionExecutionService` 中统一接入（dry-run 与实际删除一致输出）。
-- 已在 `ShardRetentionRepository` 基于 SQL Server 元数据查询生成 `CREATE TABLE`、主键与二级索引语句，回滚脚本可直接回放恢复被删分表。
-- 已保留并延续危险动作门禁：总开关、表级开关、dry-run、审计日志。
-- 已更新实施计划：PR-5 待办条目已完成并移除。
+- 继续实施《Oracle到SQLServer同步实施计划.md》，补齐 PR-4 与 PR-6 剩余能力并完成全量收口。
+- 已新增高/低优先级差异化调度参数：`SyncTableOptions.Priority`（High/Low），并在多表同步编排中按优先级排序执行。
+- 已新增多表并发上限：`SyncJob.MaxParallelTables`，在编排层通过限流并发执行避免源端过载。
+- 已补齐同步指标与可观测性输出：延迟（Lag）、积压（Backlog）、吞吐（Rows/s）、失败率（FailureRate）并输出日志。
+- 已补齐外部 Oracle 只读强约束：在读取链路对 `SourceSchema/SourceTable` 执行安全标识符校验，阻断 DDL/DML 注入风险。
+- 已更新实施计划：当前条目已全部完成并清空待办列表（文件保留继续跟踪后续需求）。
 
 ## 解决方案文件树与职责
 ```text
@@ -27,6 +28,7 @@
 │   ├── Enums/LagControlMode.cs
 │   ├── Enums/SyncBatchStatus.cs
 │   ├── Enums/SyncChangeOperationType.cs
+│   ├── Enums/SyncTablePriority.cs
 │   ├── Sync/SyncTableDefinition.cs
 │   ├── Sync/SyncWindow.cs
 │   ├── Sync/SyncCheckpoint.cs
@@ -50,6 +52,7 @@
 │   ├── Models/SyncDeletionExecutionResult.cs
 │   ├── Models/SyncDeletionCandidate.cs
 │   ├── Models/SyncKeyReadRequest.cs
+│   ├── Models/SyncMetricsSnapshot.cs
 │   ├── Repositories/ISyncTaskConfigRepository.cs
 │   ├── Repositories/IOracleSourceReader.cs
 │   ├── Repositories/ISyncStagingRepository.cs
@@ -134,16 +137,16 @@
 - `SyncTableDefinition.cs` / `SyncWindow.cs` / `SyncCheckpoint.cs` / `SyncBatchResult.cs`：定义同步链路执行、窗口与结果统计的核心领域模型。
 - `SyncBatch.cs` / `SyncChangeLog.cs` / `SyncDeletionLog.cs`：定义批次状态跟踪、变更审计与删除审计的数据模型。
 - `SyncColumnFilter.cs`：同步列过滤共享组件，提供 `ExcludedColumns` 规范化与行级过滤能力，并统一维护软删除关键列常量。
-- `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs`：同步模式、删除策略、滞后控制、批次状态与变更操作类型枚举，均含中文 XML 注释与 `Description`。
+- `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs` / `SyncTablePriority.cs`：同步模式、删除策略、滞后控制、批次状态、变更操作类型与调度优先级枚举，均含中文 XML 注释与 `Description`。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
-- `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs`：同步执行、删除识别与删除执行的数据契约模型。
+- `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs` + `SyncMetricsSnapshot.cs`：同步执行、删除识别、指标计算与删除执行的数据契约模型。
 - `ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。
 - `IShardTableResolver.cs` / `IShardRetentionRepository.cs`：定义分表识别与分表清理执行契约（含分表完整回滚脚本生成）。
-- `ISyncOrchestrator.cs` / `SyncOrchestrator.cs`：同步任务编排入口，负责读取配置、加载检查点、计算窗口并触发批次执行。
+- `ISyncOrchestrator.cs` / `SyncOrchestrator.cs`：同步任务编排入口，负责读取配置、加载检查点、计算窗口，并基于优先级与并发上限执行多表同步。
 - `ISyncWindowCalculator.cs` / `SyncWindowCalculator.cs`：根据 `CursorColumn + StartTimeLocal` 与检查点计算本地增量窗口。
 - `IDeletionExecutionService.cs` / `DeletionExecutionService.cs`：执行删除识别、删除策略应用（含 DryRun）并生成删除审计与删除变更日志。
 - `IRetentionExecutionService.cs` / `RetentionExecutionService.cs`：执行分表保留期治理，完成过期分表识别、完整回滚脚本生成、dry-run 审计、删除执行、失败隔离与汇总。
-- `ISyncExecutionService.cs` / `SyncExecutionService.cs`：执行分页读取、暂存、幂等合并、删除同步、日志写入、检查点提交，并维护批次状态流转；异常场景输出 NLog 错误日志。
+- `ISyncExecutionService.cs` / `SyncExecutionService.cs`：执行分页读取、暂存、幂等合并、删除同步、日志写入、检查点提交，并输出延迟/积压/吞吐/失败率指标日志；异常场景输出 NLog 错误日志。
 - `HubDbContext.cs`：根据分表后缀动态映射表名。
 - `TableSuffixScope.cs` + `ShardModelCacheKeyFactory.cs`：保证不同后缀下 EF Model 能正确缓存隔离。
 - `MonthShardSuffixResolver.cs`：按月份生成分表后缀（如 `_202603`）。
@@ -153,9 +156,9 @@
 - `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断），弹性参数来自 `DangerZoneOptions`。
 - `DangerZoneOptions.cs`：`DangerZoneExecutor` 弹性策略配置类，绑定 `DangerZone` 节点，覆盖超时、重试、熔断全部参数，所有属性含 XML 注释。
 - `SortingTaskTraceWriter.cs`：按分表后缀分组写入，并将执行结果回传给调谐器。
-- `SyncJobOptions.cs` / `SyncTableOptions.cs` / `SyncDeleteOptions.cs` / `SyncRetentionOptions.cs` / `RetentionJobOptions.cs`：同步任务与保留期任务配置绑定模型，统一约束本地时间配置、分页、删除与保留期治理参数。
-- `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，校验 `StartTimeLocal` 禁止 `Z` 与 offset，并校验 `ExcludedColumns` 不得与 `UniqueKeys`、`CursorColumn`、软删除关键列冲突。
-- `OracleSourceReader.cs`：源端读取器基础实现，支持按窗口分页读取与按窗口读取业务键集合，并在分页读取阶段过滤 `ExcludedColumns`。
+- `SyncJobOptions.cs` / `SyncTableOptions.cs` / `SyncDeleteOptions.cs` / `SyncRetentionOptions.cs` / `RetentionJobOptions.cs`：同步任务与保留期任务配置绑定模型，统一约束本地时间配置、分页、删除、优先级、并发上限与保留期治理参数。
+- `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，校验 `StartTimeLocal` 禁止 `Z` 与 offset，校验 `ExcludedColumns` 不得与 `UniqueKeys`、`CursorColumn`、软删除关键列冲突，并解析优先级与多表并发上限。
+- `OracleSourceReader.cs`：源端读取器基础实现，支持按窗口分页读取与按窗口读取业务键集合，并在分页读取阶段过滤 `ExcludedColumns`；同时强制校验 `SourceSchema/SourceTable` 安全标识符，确保外部 Oracle 只读链路安全。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
 - `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并在合并比较/写入阶段过滤 `ExcludedColumns`，同时提供目标键删除能力（软删/硬删）。
 - `SyncDeletionRepository.cs`：删除同步仓储基础实现，支持窗口内源端键集合与目标键集合差异识别，并按策略执行删除。
@@ -176,7 +179,5 @@
 - `Oracle到SQLServer同步实施计划.md`：按 PR 拆分同步架构落地步骤（最多 6 个 PR）的进度跟踪文档，定义完成项删除前必须通读代码确认完全实现的维护规则，随实施进展动态更新。
 
 ## 可继续完善内容
-- 将 PR-1 剩余项从“基础实现”推进到“数据库落地实现”，包括真实 Oracle 读取、SQL Server 暂存表与 MERGE 语句对接。
-- 实现 PR-4 配置治理：高低优先级表差异化调度。
-- 完成 PR-4：增加高低优先级表差异化调度参数与执行策略。
-- 实现 PR-6：并行优化、重试熔断与可观测性指标收口。
+- 将 PR-1 基础实现继续推进到真实数据库落地实现（真实 Oracle 读取、SQL Server 暂存表与 MERGE 对接）。
+- 将同步指标从日志输出升级为可接入监控平台的统一指标管道（如 Prometheus/OpenTelemetry）。

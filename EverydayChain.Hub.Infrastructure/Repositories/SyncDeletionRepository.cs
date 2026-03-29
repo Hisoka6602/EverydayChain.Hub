@@ -22,6 +22,8 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
         var sourceKeys = await oracleSourceReader.ReadByKeysAsync(new SyncKeyReadRequest
         {
             TableCode = request.TableCode,
+            SourceSchema = request.SourceSchema,
+            SourceTable = request.SourceTable,
             CursorColumn = request.CursorColumn,
             Window = request.Window,
             UniqueKeys = request.UniqueKeys,
