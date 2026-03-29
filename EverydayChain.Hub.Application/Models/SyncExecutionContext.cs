@@ -18,4 +18,7 @@ public class SyncExecutionContext
 
     /// <summary>批次编号。</summary>
     public string BatchId { get; set; } = string.Empty;
+
+    /// <summary>父批次编号（重试关联）。</summary>
+    public string? ParentBatchId { get; set; }
 }

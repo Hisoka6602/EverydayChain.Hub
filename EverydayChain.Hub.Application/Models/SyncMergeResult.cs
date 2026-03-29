@@ -1,3 +1,5 @@
+using EverydayChain.Hub.Domain.Enums;
+
 namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
@@ -16,4 +18,7 @@ public class SyncMergeResult
 
     /// <summary>最大成功游标本地时间。</summary>
     public DateTime? LastSuccessCursorLocal { get; set; }
+
+    /// <summary>发生变更的业务键与操作类型映射。</summary>
+    public IReadOnlyDictionary<string, SyncChangeOperationType> ChangedOperations { get; set; } = new Dictionary<string, SyncChangeOperationType>();
 }

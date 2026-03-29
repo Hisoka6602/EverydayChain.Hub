@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Domain.Enums;
+using EverydayChain.Hub.Domain.Sync;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
@@ -21,13 +23,17 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         }
 
         var targetTable = _targetTables.GetOrAdd(request.TableCode, _ => new ConcurrentDictionary<string, IReadOnlyDictionary<string, object?>>());
-        var result = new SyncMergeResult();
+        var changedOperations = new Dictionary<string, SyncChangeOperationType>(StringComparer.OrdinalIgnoreCase);
+        var result = new SyncMergeResult
+        {
+            ChangedOperations = changedOperations,
+        };
 
         foreach (var row in request.Rows)
         {
             ct.ThrowIfCancellationRequested();
 
-            var rowKey = BuildUniqueKey(row, request.UniqueKeys);
+            var rowKey = SyncBusinessKeyBuilder.Build(row, request.UniqueKeys);
             if (string.IsNullOrWhiteSpace(rowKey))
             {
                 continue;
@@ -37,6 +43,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
             {
                 targetTable[rowKey] = CloneRow(row);
                 result.InsertCount++;
+                changedOperations[rowKey] = SyncChangeOperationType.Insert;
                 UpdateLastCursor(result, row, request.CursorColumn);
                 continue;
             }
@@ -50,26 +57,11 @@ public class SyncUpsertRepository : ISyncUpsertRepository
 
             targetTable[rowKey] = CloneRow(row);
             result.UpdateCount++;
+            changedOperations[rowKey] = SyncChangeOperationType.Update;
             UpdateLastCursor(result, row, request.CursorColumn);
         }
 
         return Task.FromResult(result);
-    }
-
-    /// <summary>
-    /// 计算唯一键字符串。
-    /// </summary>
-    /// <param name="row">数据行。</param>
-    /// <param name="uniqueKeys">唯一键集合。</param>
-    /// <returns>唯一键。</returns>
-    private static string BuildUniqueKey(IReadOnlyDictionary<string, object?> row, IReadOnlyList<string> uniqueKeys)
-    {
-        if (uniqueKeys.Count == 0)
-        {
-            return string.Empty;
-        }
-
-        return string.Join("|", uniqueKeys.Select(key => row.TryGetValue(key, out var value) ? value?.ToString() ?? string.Empty : string.Empty));
     }
 
     /// <summary>

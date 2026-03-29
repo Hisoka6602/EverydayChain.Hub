@@ -12,20 +12,7 @@
 
 ## PR-1：最小可用链路（单表增量 + 检查点）
 
-- [ ] 落地 `SyncTableDefinition`、`SyncWindow`、`SyncCheckpoint`、`SyncBatchResult` 等领域模型。
-- [ ] 落地 `ISyncOrchestrator`、`ISyncWindowCalculator`、`ISyncExecutionService` 及实现。
-- [ ] 落地 `ISyncTaskConfigRepository`、`IOracleSourceReader`、`ISyncStagingRepository`、`ISyncUpsertRepository` 基础实现。
-- [ ] 支持 `CursorColumn + StartTimeLocal` 增量窗口计算与分页读取。
-- [ ] 支持 `UniqueKeys` 幂等合并（插入 / 覆盖更新 / 一致跳过）。
-- [ ] 落地 `SyncCheckpoint` 持久化与失败后续跑。
-
 ## PR-2：审计与批次治理（可恢复可追踪）
-
-- [ ] 落地 `ISyncBatchRepository`、`ISyncChangeLogRepository` 及实现。
-- [ ] 打通批次状态流转：`Pending -> InProgress -> Completed/Failed`。
-- [ ] 补齐 `ParentBatchId` 重试链路与失败重试关联追踪。
-- [ ] 确保“读取、合并、日志写入全部成功后再提交检查点”的原子边界。
-- [ ] 全链路异常日志接入 NLog（含 `TableCode`、`BatchId`、`Window`、`Checkpoint` 关键字段）。
 
 ## PR-3：删除同步（识别 + 执行 + 记录）
 
