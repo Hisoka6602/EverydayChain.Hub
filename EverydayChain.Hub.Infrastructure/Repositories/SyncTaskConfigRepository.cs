@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using EverydayChain.Hub.Application.Repositories;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Sync;
@@ -13,6 +14,9 @@ namespace EverydayChain.Hub.Infrastructure.Repositories;
 /// </summary>
 public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, ILogger<SyncTaskConfigRepository> logger) : ISyncTaskConfigRepository
 {
+    /// <summary>时间偏移或 UTC 标记检测正则。</summary>
+    private static readonly Regex UtcOrOffsetRegex = new(@"(?:Z|[+\-]\d{2}:\d{2}|[+\-]\d{4})\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     /// <summary>同步配置快照。</summary>
     private readonly SyncJobOptions _options = syncJobOptions.Value;
 
@@ -74,7 +78,7 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             throw new InvalidOperationException($"表 {tableCode} 的 StartTimeLocal 不能为空。");
         }
 
-        if (localTimeText.Contains('Z', StringComparison.OrdinalIgnoreCase) || localTimeText.Contains('+'))
+        if (UtcOrOffsetRegex.IsMatch(localTimeText))
         {
             throw new InvalidOperationException($"表 {tableCode} 的 StartTimeLocal 仅允许本地时间字符串，禁止 Z 或 offset。");
         }

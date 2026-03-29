@@ -2,6 +2,7 @@ using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Repositories;
 using EverydayChain.Hub.Domain.Sync;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace EverydayChain.Hub.Application.Services;
 
@@ -18,7 +19,8 @@ public class SyncExecutionService(
     /// <inheritdoc/>
     public async Task<SyncBatchResult> ExecuteBatchAsync(SyncExecutionContext context, CancellationToken ct)
     {
-        var startedAt = DateTime.Now;
+        var startedAtLocal = DateTime.Now;
+        var stopwatch = Stopwatch.StartNew();
         var readCount = 0;
         var insertCount = 0;
         var updateCount = 0;
@@ -97,7 +99,7 @@ public class SyncExecutionService(
                 UpdateCount = updateCount,
                 DeleteCount = 0,
                 SkipCount = skipCount,
-                Elapsed = DateTime.Now - startedAt,
+                Elapsed = stopwatch.Elapsed,
             };
         }
         catch (Exception ex)
