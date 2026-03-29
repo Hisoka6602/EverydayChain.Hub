@@ -16,6 +16,8 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
 {
     /// <summary>时间偏移或 UTC 标记检测正则。</summary>
     private static readonly Regex UtcOrOffsetRegex = new(@"(?:Z|[+\-]\d{2}:\d{2}|[+\-]\d{4})\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    /// <summary>软删除关键列规范化集合。</summary>
+    private static readonly HashSet<string> NormalizedSoftDeleteColumns = SyncColumnFilter.NormalizeColumns(SyncColumnFilter.SoftDeleteColumns);
 
     /// <summary>同步配置快照。</summary>
     private readonly SyncJobOptions _options = syncJobOptions.Value;
@@ -80,13 +82,13 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
     /// <exception cref="InvalidOperationException">当排除列与关键控制列冲突时抛出。</exception>
     private static void ValidateExcludedColumns(SyncTableOptions table)
     {
-        var excludedColumns = NormalizeColumns(table.ExcludedColumns);
+        var excludedColumns = SyncColumnFilter.NormalizeColumns(table.ExcludedColumns);
         if (excludedColumns.Count == 0)
         {
             return;
         }
 
-        var uniqueKeys = NormalizeColumns(table.UniqueKeys);
+        var uniqueKeys = SyncColumnFilter.NormalizeColumns(table.UniqueKeys);
         var conflictsWithUniqueKeys = uniqueKeys.Where(excludedColumns.Contains).ToList();
         if (conflictsWithUniqueKeys.Count > 0)
         {
@@ -94,35 +96,19 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
                 $"表 {table.TableCode} 的 ExcludedColumns 与 UniqueKeys 冲突：{string.Join(", ", conflictsWithUniqueKeys)}。");
         }
 
-        if (!string.IsNullOrWhiteSpace(table.CursorColumn) && excludedColumns.Contains(table.CursorColumn.Trim()))
+        var normalizedCursorColumns = SyncColumnFilter.NormalizeColumns([table.CursorColumn]);
+        var normalizedCursorColumn = normalizedCursorColumns.FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(normalizedCursorColumn) && excludedColumns.Contains(normalizedCursorColumn))
         {
             throw new InvalidOperationException($"表 {table.TableCode} 的 ExcludedColumns 禁止包含 CursorColumn：{table.CursorColumn}。");
         }
 
-        var softDeleteColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "IsDeleted",
-            "DeletedTimeLocal",
-        };
-        var conflictsWithSoftDeleteColumns = softDeleteColumns.Where(excludedColumns.Contains).ToList();
+        var conflictsWithSoftDeleteColumns = NormalizedSoftDeleteColumns.Where(excludedColumns.Contains).ToList();
         if (conflictsWithSoftDeleteColumns.Count > 0)
         {
             throw new InvalidOperationException(
                 $"表 {table.TableCode} 的 ExcludedColumns 禁止包含软删除标记列：{string.Join(", ", conflictsWithSoftDeleteColumns)}。");
         }
-    }
-
-    /// <summary>
-    /// 规范化列名集合并按忽略大小写去重。
-    /// </summary>
-    /// <param name="columns">原始列名集合。</param>
-    /// <returns>规范化后的列名集合。</returns>
-    private static HashSet<string> NormalizeColumns(IEnumerable<string> columns)
-    {
-        return columns
-            .Where(static x => !string.IsNullOrWhiteSpace(x))
-            .Select(static x => x.Trim())
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>

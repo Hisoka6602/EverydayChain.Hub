@@ -32,7 +32,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         foreach (var row in request.Rows)
         {
             ct.ThrowIfCancellationRequested();
-            var filteredRow = FilterExcludedColumns(row, request.ExcludedColumns);
+            var filteredRow = SyncColumnFilter.FilterExcludedColumns(row, request.ExcludedColumns);
 
             var rowKey = SyncBusinessKeyBuilder.Build(filteredRow, request.UniqueKeys);
             if (string.IsNullOrWhiteSpace(rowKey))
@@ -100,8 +100,8 @@ public class SyncUpsertRepository : ISyncUpsertRepository
             {
                 var softDeletedRow = new Dictionary<string, object?>(row)
                 {
-                    ["IsDeleted"] = true,
-                    ["DeletedTimeLocal"] = DateTime.Now,
+                    [SyncColumnFilter.SoftDeleteFlagColumn] = true,
+                    [SyncColumnFilter.SoftDeleteTimeColumn] = DateTime.Now,
                 };
                 table[businessKey] = softDeletedRow;
                 deletedCount++;
@@ -181,37 +181,4 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         return new Dictionary<string, object?>(row);
     }
 
-    /// <summary>
-    /// 过滤行中的排除列。
-    /// </summary>
-    /// <param name="row">原始数据行。</param>
-    /// <param name="excludedColumns">排除列集合。</param>
-    /// <returns>过滤后的数据行。</returns>
-    private static IReadOnlyDictionary<string, object?> FilterExcludedColumns(IReadOnlyDictionary<string, object?> row, IReadOnlyList<string> excludedColumns)
-    {
-        if (excludedColumns.Count == 0)
-        {
-            return row;
-        }
-
-        var excludedColumnSet = excludedColumns
-            .Where(static x => !string.IsNullOrWhiteSpace(x))
-            .Select(static x => x.Trim())
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (excludedColumnSet.Count == 0)
-        {
-            return row;
-        }
-
-        var filtered = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        foreach (var pair in row)
-        {
-            if (!excludedColumnSet.Contains(pair.Key))
-            {
-                filtered[pair.Key] = pair.Value;
-            }
-        }
-
-        return filtered;
-    }
 }

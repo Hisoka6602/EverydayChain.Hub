@@ -38,7 +38,7 @@ public class OracleSourceReader : IOracleSourceReader
             .ThenBy(row => BuildStableKey(row, request.UniqueKeys))
             .Skip((request.PageNo - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Select(row => FilterExcludedColumns(row, request.ExcludedColumns))
+            .Select(row => SyncColumnFilter.FilterExcludedColumns(row, request.ExcludedColumns))
             .ToList();
 
         return Task.FromResult(new SyncReadResult
@@ -81,40 +81,6 @@ public class OracleSourceReader : IOracleSourceReader
         }
 
         return string.Join("|", uniqueKeys.Select(key => row.TryGetValue(key, out var value) ? value?.ToString() ?? string.Empty : string.Empty));
-    }
-
-    /// <summary>
-    /// 过滤行中的排除列。
-    /// </summary>
-    /// <param name="row">数据行。</param>
-    /// <param name="excludedColumns">排除列集合。</param>
-    /// <returns>过滤后的数据行。</returns>
-    private static IReadOnlyDictionary<string, object?> FilterExcludedColumns(IReadOnlyDictionary<string, object?> row, IReadOnlyList<string> excludedColumns)
-    {
-        if (excludedColumns.Count == 0)
-        {
-            return new Dictionary<string, object?>(row);
-        }
-
-        var excludedColumnSet = excludedColumns
-            .Where(static x => !string.IsNullOrWhiteSpace(x))
-            .Select(static x => x.Trim())
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (excludedColumnSet.Count == 0)
-        {
-            return new Dictionary<string, object?>(row);
-        }
-
-        var filtered = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        foreach (var pair in row)
-        {
-            if (!excludedColumnSet.Contains(pair.Key))
-            {
-                filtered[pair.Key] = pair.Value;
-            }
-        }
-
-        return filtered;
     }
 
     /// <summary>

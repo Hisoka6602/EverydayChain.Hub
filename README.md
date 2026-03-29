@@ -1,9 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 继续实施《Oracle到SQLServer同步实施计划.md》PR-4：完成 `ExcludedColumns` 在读取 / 暂存 / 合并阶段统一生效。
+- 继续实施《Oracle到SQLServer同步实施计划.md》PR-4：完成 `ExcludedColumns` 在读取/暂存/合并阶段统一生效。
 - 同步执行链路已将 `ExcludedColumns` 透传到读取请求、暂存写入与幂等合并请求，三阶段统一过滤排除列。
-- 更新实施计划：移除已完全落地的 PR-4 条目“支持 `Sync.ExcludedColumns` 并在读取 / 暂存 / 合并阶段统一生效”。
+- 更新实施计划：移除已完全落地的 PR-4 条目“支持 `Sync.ExcludedColumns` 并在读取/暂存/合并阶段统一生效”。
 
 ## 解决方案文件树与职责
 ```text

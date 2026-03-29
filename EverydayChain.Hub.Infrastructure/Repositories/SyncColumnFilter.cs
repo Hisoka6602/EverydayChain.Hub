@@ -1,0 +1,69 @@
+namespace EverydayChain.Hub.Infrastructure.Repositories;
+
+/// <summary>
+/// 同步列过滤组件，提供排除列过滤与列名规范化能力。
+/// </summary>
+public static class SyncColumnFilter
+{
+    /// <summary>
+    /// 软删除标记列名。
+    /// </summary>
+    public const string SoftDeleteFlagColumn = "IsDeleted";
+
+    /// <summary>
+    /// 软删除时间列名。
+    /// </summary>
+    public const string SoftDeleteTimeColumn = "DeletedTimeLocal";
+
+    /// <summary>
+    /// 软删除关键列集合。
+    /// </summary>
+    public static readonly IReadOnlyList<string> SoftDeleteColumns =
+    [
+        SoftDeleteFlagColumn,
+        SoftDeleteTimeColumn,
+    ];
+
+    /// <summary>
+    /// 过滤行中的排除列。
+    /// </summary>
+    /// <param name="row">原始数据行。</param>
+    /// <param name="excludedColumns">排除列集合。</param>
+    /// <returns>过滤后的数据行。</returns>
+    public static IReadOnlyDictionary<string, object?> FilterExcludedColumns(
+        IReadOnlyDictionary<string, object?> row,
+        IReadOnlyList<string> excludedColumns)
+    {
+        var excludedColumnSet = NormalizeColumns(excludedColumns);
+        if (excludedColumnSet.Count == 0)
+        {
+            return new Dictionary<string, object?>(row);
+        }
+
+        var filtered = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in row)
+        {
+            if (!excludedColumnSet.Contains(pair.Key))
+            {
+                filtered[pair.Key] = pair.Value;
+            }
+        }
+
+        return filtered;
+    }
+
+    /// <summary>
+    /// 规范化列名集合并按忽略大小写去重。
+    /// </summary>
+    /// <param name="columns">原始列名集合。</param>
+    /// <returns>规范化后的列名集合。</returns>
+    public static HashSet<string> NormalizeColumns(IEnumerable<string> columns)
+    {
+        columns ??= Array.Empty<string>();
+
+        return columns
+            .Where(static x => !string.IsNullOrWhiteSpace(x))
+            .Select(static x => x.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+}
