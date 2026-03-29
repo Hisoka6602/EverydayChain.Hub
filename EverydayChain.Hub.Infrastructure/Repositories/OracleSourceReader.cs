@@ -14,6 +14,16 @@ public class OracleSourceReader : IOracleSourceReader
     /// <inheritdoc/>
     public Task<SyncReadResult> ReadIncrementalPageAsync(SyncReadRequest request, CancellationToken ct)
     {
+        if (request.PageNo <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(request.PageNo), request.PageNo, "PageNo 必须大于 0。");
+        }
+
+        if (request.PageSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(request.PageSize), request.PageSize, "PageSize 必须大于 0。");
+        }
+
         if (!SourceData.TryGetValue(request.TableCode, out var rows))
         {
             return Task.FromResult(new SyncReadResult());

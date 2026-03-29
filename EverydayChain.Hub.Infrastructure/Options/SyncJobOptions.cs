@@ -14,6 +14,9 @@ public class SyncJobOptions
     /// <summary>全局默认最大滞后分钟数。</summary>
     public int DefaultMaxLagMinutes { get; set; } = 10;
 
+    /// <summary>检查点文件路径（为空时使用应用基目录下 sync-checkpoints.json）。</summary>
+    public string CheckpointFilePath { get; set; } = string.Empty;
+
     /// <summary>单表配置集合。</summary>
     public List<SyncTableOptions> Tables { get; set; } = [];
 }

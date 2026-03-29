@@ -15,11 +15,18 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     /// <inheritdoc/>
     public Task<SyncMergeResult> MergeFromStagingAsync(SyncMergeRequest request, CancellationToken ct)
     {
+        if (request.UniqueKeys.Count == 0)
+        {
+            throw new InvalidOperationException($"同步表 {request.TableCode} 未配置 UniqueKeys，无法执行幂等合并。");
+        }
+
         var targetTable = _targetTables.GetOrAdd(request.TableCode, _ => new ConcurrentDictionary<string, IReadOnlyDictionary<string, object?>>());
         var result = new SyncMergeResult();
 
         foreach (var row in request.Rows)
         {
+            ct.ThrowIfCancellationRequested();
+
             var rowKey = BuildUniqueKey(row, request.UniqueKeys);
             if (string.IsNullOrWhiteSpace(rowKey))
             {

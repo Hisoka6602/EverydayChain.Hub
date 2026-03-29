@@ -21,6 +21,7 @@ public class SyncBackgroundWorker(
     /// <param name="stoppingToken">取消令牌。</param>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var pollingIntervalSeconds = _syncJobOptions.PollingIntervalSeconds > 0 ? _syncJobOptions.PollingIntervalSeconds : 60;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -48,7 +49,7 @@ public class SyncBackgroundWorker(
                 logger.LogError(ex, "同步后台任务执行失败。");
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(_syncJobOptions.PollingIntervalSeconds), stoppingToken);
+            await Task.Delay(TimeSpan.FromSeconds(pollingIntervalSeconds), stoppingToken);
         }
     }
 }

@@ -47,6 +47,8 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
     private SyncTableDefinition MapDefinition(SyncTableOptions table)
     {
         var startTimeLocal = ParseLocalTime(table.StartTimeLocal, table.TableCode);
+        var globalPollingIntervalSeconds = _options.PollingIntervalSeconds > 0 ? _options.PollingIntervalSeconds : 60;
+        var effectivePageSize = table.PageSize > 0 ? table.PageSize : 5000;
         return new SyncTableDefinition
         {
             TableCode = table.TableCode,
@@ -57,9 +59,9 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             TargetLogicalTable = table.TargetLogicalTable,
             CursorColumn = table.CursorColumn,
             StartTimeLocal = startTimeLocal,
-            PollingIntervalSeconds = table.PollingIntervalSeconds > 0 ? table.PollingIntervalSeconds : _options.PollingIntervalSeconds,
+            PollingIntervalSeconds = table.PollingIntervalSeconds > 0 ? table.PollingIntervalSeconds : globalPollingIntervalSeconds,
             MaxLagMinutes = table.MaxLagMinutes > 0 ? table.MaxLagMinutes : _options.DefaultMaxLagMinutes,
-            PageSize = table.PageSize,
+            PageSize = effectivePageSize,
             UniqueKeys = table.UniqueKeys,
             ExcludedColumns = table.ExcludedColumns,
         };

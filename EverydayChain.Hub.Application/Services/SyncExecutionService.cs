@@ -19,7 +19,6 @@ public class SyncExecutionService(
     /// <inheritdoc/>
     public async Task<SyncBatchResult> ExecuteBatchAsync(SyncExecutionContext context, CancellationToken ct)
     {
-        var startedAtLocal = DateTime.Now;
         var stopwatch = Stopwatch.StartNew();
         var readCount = 0;
         var insertCount = 0;
@@ -50,15 +49,34 @@ public class SyncExecutionService(
 
                 // 步骤2：写入暂存并执行幂等合并。
                 await stagingRepository.BulkInsertAsync(context.BatchId, pageNo, readResult.Rows, ct);
-                var stagingRows = await stagingRepository.GetPageRowsAsync(context.BatchId, pageNo, ct);
-                var mergeResult = await upsertRepository.MergeFromStagingAsync(new SyncMergeRequest
+                SyncMergeResult mergeResult;
+                try
                 {
-                    TableCode = context.Definition.TableCode,
-                    CursorColumn = context.Definition.CursorColumn,
-                    UniqueKeys = context.Definition.UniqueKeys,
-                    Rows = stagingRows,
-                }, ct);
-                await stagingRepository.ClearPageAsync(context.BatchId, pageNo, ct);
+                    var stagingRows = await stagingRepository.GetPageRowsAsync(context.BatchId, pageNo, ct);
+                    mergeResult = await upsertRepository.MergeFromStagingAsync(new SyncMergeRequest
+                    {
+                        TableCode = context.Definition.TableCode,
+                        CursorColumn = context.Definition.CursorColumn,
+                        UniqueKeys = context.Definition.UniqueKeys,
+                        Rows = stagingRows,
+                    }, ct);
+                }
+                finally
+                {
+                    try
+                    {
+                        await stagingRepository.ClearPageAsync(context.BatchId, pageNo, ct);
+                    }
+                    catch (Exception clearEx)
+                    {
+                        logger.LogError(clearEx,
+                            "清理同步暂存页失败。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}",
+                            context.Definition.TableCode,
+                            context.BatchId,
+                            pageNo);
+                        throw;
+                    }
+                }
 
                 // 步骤3：累计统计并推进最大游标。
                 readCount += readResult.Rows.Count;
@@ -102,6 +120,11 @@ public class SyncExecutionService(
                 Elapsed = stopwatch.Elapsed,
             };
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            logger.LogInformation("同步批次已取消。TableCode={TableCode}, BatchId={BatchId}", context.Definition.TableCode, context.BatchId);
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "同步批次执行失败。TableCode={TableCode}, BatchId={BatchId}, Window=[{WindowStartLocal},{WindowEndLocal}], Checkpoint={Checkpoint}",
@@ -114,11 +137,11 @@ public class SyncExecutionService(
             await checkpointRepository.SaveAsync(new SyncCheckpoint
             {
                 TableCode = context.Definition.TableCode,
-                LastBatchId = context.Checkpoint.LastBatchId,
+                LastBatchId = context.BatchId,
                 LastSuccessCursorLocal = context.Checkpoint.LastSuccessCursorLocal,
                 LastSuccessTimeLocal = context.Checkpoint.LastSuccessTimeLocal,
                 LastError = ex.Message,
-            }, ct);
+            }, CancellationToken.None);
             throw;
         }
     }
