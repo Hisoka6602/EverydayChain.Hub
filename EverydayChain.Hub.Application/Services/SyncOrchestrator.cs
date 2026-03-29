@@ -1,5 +1,6 @@
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Sync;
 using Microsoft.Extensions.Logging;
 
@@ -49,16 +50,27 @@ public class SyncOrchestrator(
     public async Task<IReadOnlyList<SyncBatchResult>> RunAllEnabledTableSyncAsync(CancellationToken ct)
     {
         var definitions = await configRepository.ListEnabledAsync(ct);
-        var results = new List<SyncBatchResult>(definitions.Count);
-        foreach (var definition in definitions)
+        var orderedDefinitions = definitions
+            .OrderByDescending(x => x.Priority == SyncTablePriority.High)
+            .ThenBy(x => x.TableCode, StringComparer.OrdinalIgnoreCase)
+            .Select((definition, index) => (definition, index))
+            .ToList();
+        var maxParallelTables = await configRepository.GetMaxParallelTablesAsync(ct);
+        var results = new SyncBatchResult[orderedDefinitions.Count];
+        var parallelOptions = new ParallelOptions
         {
-            if (ct.IsCancellationRequested)
-            {
-                break;
-            }
+            CancellationToken = ct,
+            MaxDegreeOfParallelism = maxParallelTables,
+        };
 
-            var result = await RunTableSyncAsync(definition.TableCode, ct);
-            results.Add(result);
+        await Parallel.ForEachAsync(orderedDefinitions, parallelOptions, async (item, token) =>
+        {
+            results[item.index] = await RunTableSyncAsync(item.definition.TableCode, token);
+        });
+
+        if (results.Any(x => x is null))
+        {
+            throw new InvalidOperationException("同步编排结果不完整，存在未写入的表结果。");
         }
 
         return results;

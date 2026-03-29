@@ -13,6 +13,12 @@ public class SyncReadRequest
     /// <summary>游标列名。</summary>
     public string CursorColumn { get; set; } = string.Empty;
 
+    /// <summary>源端 Schema。</summary>
+    public string SourceSchema { get; set; } = string.Empty;
+
+    /// <summary>源端表名。</summary>
+    public string SourceTable { get; set; } = string.Empty;
+
     /// <summary>页码（从 1 开始）。</summary>
     public int PageNo { get; set; }
 

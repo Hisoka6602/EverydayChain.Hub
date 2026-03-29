@@ -68,6 +68,8 @@ public class SyncExecutionService(
                 var readRequest = new SyncReadRequest
                 {
                     TableCode = context.Definition.TableCode,
+                    SourceSchema = context.Definition.SourceSchema,
+                    SourceTable = context.Definition.SourceTable,
                     CursorColumn = context.Definition.CursorColumn,
                     PageNo = pageNo,
                     PageSize = context.Definition.PageSize,
@@ -165,6 +167,7 @@ public class SyncExecutionService(
                 LastError = null,
             }, ct);
 
+            var metrics = BuildMetrics(context.Window, readCount + deleteCount, stopwatch.Elapsed);
             var batchResult = new SyncBatchResult
             {
                 BatchId = context.BatchId,
@@ -177,12 +180,33 @@ public class SyncExecutionService(
                 DeleteCount = deleteCount,
                 SkipCount = skipCount,
                 Elapsed = stopwatch.Elapsed,
+                LagMinutes = metrics.LagMinutes,
+                BacklogMinutes = metrics.BacklogMinutes,
+                ThroughputRowsPerSecond = metrics.ThroughputRowsPerSecond,
+                FailureRate = 0,
             };
             await batchRepository.CompleteBatchAsync(batchResult, DateTime.Now, ct);
+            logger.LogInformation(
+                "同步指标。TableCode={TableCode}, BatchId={BatchId}, LagMinutes={LagMinutes}, BacklogMinutes={BacklogMinutes}, ThroughputRowsPerSecond={ThroughputRowsPerSecond}, FailureRate={FailureRate}",
+                batchResult.TableCode,
+                batchResult.BatchId,
+                batchResult.LagMinutes,
+                batchResult.BacklogMinutes,
+                batchResult.ThroughputRowsPerSecond,
+                batchResult.FailureRate);
             return batchResult;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
+            var metrics = BuildMetrics(context.Window, readCount + deleteCount, stopwatch.Elapsed);
+            logger.LogWarning(
+                "同步指标。TableCode={TableCode}, BatchId={BatchId}, LagMinutes={LagMinutes}, BacklogMinutes={BacklogMinutes}, ThroughputRowsPerSecond={ThroughputRowsPerSecond}, FailureRate={FailureRate}",
+                context.Definition.TableCode,
+                context.BatchId,
+                metrics.LagMinutes,
+                metrics.BacklogMinutes,
+                metrics.ThroughputRowsPerSecond,
+                1D);
             logger.LogInformation("同步批次已取消。TableCode={TableCode}, BatchId={BatchId}", context.Definition.TableCode, context.BatchId);
             await TryMarkBatchFailedAsync(
                 batchPersistedToRepository,
@@ -193,6 +217,15 @@ public class SyncExecutionService(
         }
         catch (Exception ex)
         {
+            var metrics = BuildMetrics(context.Window, readCount + deleteCount, stopwatch.Elapsed);
+            logger.LogWarning(
+                "同步指标。TableCode={TableCode}, BatchId={BatchId}, LagMinutes={LagMinutes}, BacklogMinutes={BacklogMinutes}, ThroughputRowsPerSecond={ThroughputRowsPerSecond}, FailureRate={FailureRate}",
+                context.Definition.TableCode,
+                context.BatchId,
+                metrics.LagMinutes,
+                metrics.BacklogMinutes,
+                metrics.ThroughputRowsPerSecond,
+                1D);
             logger.LogError(ex, "同步批次执行失败。TableCode={TableCode}, BatchId={BatchId}, Window=[{WindowStartLocal},{WindowEndLocal}], Checkpoint={Checkpoint}",
                 context.Definition.TableCode,
                 context.BatchId,
@@ -216,6 +249,57 @@ public class SyncExecutionService(
             }, errorCheckpointCts.Token);
             throw;
         }
+    }
+
+    /// <summary>
+    /// 构建统一指标快照。
+    /// </summary>
+    /// <param name="window">同步窗口。</param>
+    /// <param name="processedRows">处理行数。</param>
+    /// <param name="elapsed">耗时。</param>
+    /// <returns>指标元组。</returns>
+    private static (double LagMinutes, double BacklogMinutes, double ThroughputRowsPerSecond) BuildMetrics(
+        SyncWindow window,
+        int processedRows,
+        TimeSpan elapsed)
+    {
+        return (
+            CalculateLagMinutes(window.WindowEndLocal),
+            CalculateBacklogMinutes(window.WindowStartLocal),
+            CalculateThroughputRowsPerSecond(processedRows, elapsed));
+    }
+
+    /// <summary>
+    /// 计算窗口滞后分钟数。
+    /// </summary>
+    /// <param name="windowEndLocal">窗口结束时间。</param>
+    /// <returns>滞后分钟数。</returns>
+    private static double CalculateLagMinutes(DateTime windowEndLocal)
+    {
+        var lag = DateTime.Now - windowEndLocal;
+        return lag.TotalMinutes < 0 ? 0 : lag.TotalMinutes;
+    }
+
+    /// <summary>
+    /// 计算窗口积压分钟数。
+    /// </summary>
+    /// <param name="windowStartLocal">窗口起始时间。</param>
+    /// <returns>积压分钟数。</returns>
+    private static double CalculateBacklogMinutes(DateTime windowStartLocal)
+    {
+        var backlog = DateTime.Now - windowStartLocal;
+        return backlog.TotalMinutes < 0 ? 0 : backlog.TotalMinutes;
+    }
+
+    /// <summary>
+    /// 计算吞吐（每秒处理行数）。
+    /// </summary>
+    /// <param name="processedRows">处理行数。</param>
+    /// <param name="elapsed">耗时。</param>
+    /// <returns>吞吐。</returns>
+    private static double CalculateThroughputRowsPerSecond(int processedRows, TimeSpan elapsed)
+    {
+        return elapsed.TotalSeconds <= 0 ? 0 : processedRows / elapsed.TotalSeconds;
     }
 
     /// <summary>

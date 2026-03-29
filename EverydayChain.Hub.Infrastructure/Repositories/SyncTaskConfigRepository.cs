@@ -39,6 +39,13 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         return Task.FromResult<IReadOnlyList<SyncTableDefinition>>(definitions);
     }
 
+    /// <inheritdoc/>
+    public Task<int> GetMaxParallelTablesAsync(CancellationToken ct)
+    {
+        var maxParallelTables = _options.MaxParallelTables > 0 ? _options.MaxParallelTables : 1;
+        return Task.FromResult(maxParallelTables);
+    }
+
     /// <summary>
     /// 映射单表配置到领域定义。
     /// </summary>
@@ -50,6 +57,7 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         ValidateExcludedColumns(table);
         var globalPollingIntervalSeconds = _options.PollingIntervalSeconds > 0 ? _options.PollingIntervalSeconds : 60;
         var effectivePageSize = table.PageSize > 0 ? table.PageSize : 5000;
+        var priority = ParsePriority(table.Priority, table.TableCode);
         return new SyncTableDefinition
         {
             TableCode = table.TableCode,
@@ -62,6 +70,7 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             StartTimeLocal = startTimeLocal,
             PollingIntervalSeconds = table.PollingIntervalSeconds > 0 ? table.PollingIntervalSeconds : globalPollingIntervalSeconds,
             MaxLagMinutes = table.MaxLagMinutes > 0 ? table.MaxLagMinutes : _options.DefaultMaxLagMinutes,
+            Priority = priority,
             PageSize = effectivePageSize,
             UniqueKeys = table.UniqueKeys,
             ExcludedColumns = table.ExcludedColumns,
@@ -138,5 +147,32 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         var localTime = DateTime.SpecifyKind(parsed, DateTimeKind.Local);
         logger.LogInformation("加载同步配置成功。TableCode={TableCode}, StartTimeLocal={StartTimeLocal}", tableCode, localTime);
         return localTime;
+    }
+
+    /// <summary>
+    /// 解析同步优先级配置。
+    /// </summary>
+    /// <param name="priorityText">优先级文本。</param>
+    /// <param name="tableCode">表编码。</param>
+    /// <returns>优先级枚举。</returns>
+    private static SyncTablePriority ParsePriority(string? priorityText, string tableCode)
+    {
+        if (string.IsNullOrWhiteSpace(priorityText))
+        {
+            return SyncTablePriority.Low;
+        }
+
+        var normalized = priorityText.Trim();
+        if (normalized.Equals(nameof(SyncTablePriority.High), StringComparison.OrdinalIgnoreCase))
+        {
+            return SyncTablePriority.High;
+        }
+
+        if (normalized.Equals(nameof(SyncTablePriority.Low), StringComparison.OrdinalIgnoreCase))
+        {
+            return SyncTablePriority.Low;
+        }
+
+        throw new InvalidOperationException($"表 {tableCode} 的 Priority 配置非法，仅支持 High 或 Low。");
     }
 }

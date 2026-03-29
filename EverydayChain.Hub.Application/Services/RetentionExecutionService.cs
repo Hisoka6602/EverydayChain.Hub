@@ -45,7 +45,10 @@ public class RetentionExecutionService(
                         continue;
                     }
 
-                    var rollbackScript = BuildRollbackScript(table.TargetLogicalTable, physicalTable);
+                    var rollbackScript = await shardRetentionRepository.GenerateRollbackScriptAsync(
+                        table.TargetLogicalTable,
+                        physicalTable,
+                        ct);
                     if (table.RetentionDryRun || !table.RetentionAllowDrop)
                     {
                         dryRunCount++;
@@ -74,16 +77,5 @@ public class RetentionExecutionService(
         var summary = $"RetentionCleanup完成。Scanned={scannedCount}, Deleted={deletedCount}, DryRun={dryRunCount}, Failed={failedCount}";
         logger.LogInformation(summary);
         return summary;
-    }
-
-    /// <summary>
-    /// 生成分表回滚脚本（当前为占位模板，完整可回放 DDL 脚本后续升级）。
-    /// </summary>
-    /// <param name="logicalTableName">逻辑表名。</param>
-    /// <param name="physicalTableName">物理表名。</param>
-    /// <returns>回滚脚本文本。</returns>
-    private static string BuildRollbackScript(string logicalTableName, string physicalTableName)
-    {
-        return $"-- 回滚脚本（需人工补齐结构）{Environment.NewLine}-- 逻辑表: {logicalTableName}{Environment.NewLine}-- 物理表: {physicalTableName}{Environment.NewLine}/* CREATE TABLE [{physicalTableName}] (...) */";
     }
 }

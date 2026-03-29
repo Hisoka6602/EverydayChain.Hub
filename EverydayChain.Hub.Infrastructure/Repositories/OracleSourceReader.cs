@@ -15,6 +15,7 @@ public class OracleSourceReader : IOracleSourceReader
     /// <inheritdoc/>
     public Task<SyncReadResult> ReadIncrementalPageAsync(SyncReadRequest request, CancellationToken ct)
     {
+        EnsureReadOnlyRequest(request.SourceSchema, request.SourceTable);
         if (request.PageNo <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(request.PageNo), request.PageNo, "PageNo 必须大于 0。");
@@ -51,6 +52,7 @@ public class OracleSourceReader : IOracleSourceReader
     /// <inheritdoc/>
     public Task<IReadOnlySet<string>> ReadByKeysAsync(SyncKeyReadRequest request, CancellationToken ct)
     {
+        EnsureReadOnlyRequest(request.SourceSchema, request.SourceTable);
         ct.ThrowIfCancellationRequested();
         if (!SourceData.TryGetValue(request.TableCode, out var rows))
         {
@@ -107,5 +109,36 @@ public class OracleSourceReader : IOracleSourceReader
         {
             ["SortingTaskTrace"] = records,
         };
+    }
+
+    /// <summary>
+    /// 校验源端只读请求对象名，阻断 DDL/DML 注入风险。
+    /// </summary>
+    /// <param name="sourceSchema">源端 Schema。</param>
+    /// <param name="sourceTable">源端表名。</param>
+    /// <exception cref="InvalidOperationException">当对象名包含危险字符时抛出。</exception>
+    private static void EnsureReadOnlyRequest(string sourceSchema, string sourceTable)
+    {
+        ValidateSafeIdentifier(sourceSchema, nameof(sourceSchema));
+        ValidateSafeIdentifier(sourceTable, nameof(sourceTable));
+    }
+
+    /// <summary>
+    /// 校验对象名仅包含安全字符。
+    /// </summary>
+    /// <param name="identifier">对象名。</param>
+    /// <param name="fieldName">字段名。</param>
+    /// <exception cref="InvalidOperationException">当对象名非法时抛出。</exception>
+    private static void ValidateSafeIdentifier(string identifier, string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(identifier))
+        {
+            throw new InvalidOperationException($"{fieldName} 不能为空。");
+        }
+
+        if (!identifier.All(ch => char.IsLetterOrDigit(ch) || ch == '_'))
+        {
+            throw new InvalidOperationException($"{fieldName} 包含非法字符，仅允许字母、数字、下划线。");
+        }
     }
 }

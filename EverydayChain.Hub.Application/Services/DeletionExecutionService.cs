@@ -32,6 +32,8 @@ public class DeletionExecutionService(
         {
             TableCode = context.Definition.TableCode,
             CursorColumn = context.Definition.CursorColumn,
+            SourceSchema = context.Definition.SourceSchema,
+            SourceTable = context.Definition.SourceTable,
             Window = context.Window,
             UniqueKeys = context.Definition.UniqueKeys,
             CompareSegmentSize = context.Definition.DeletionCompareSegmentSize,
