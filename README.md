@@ -1,9 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 继续实施《Oracle到SQLServer同步实施计划.md》PR-4：在配置加载阶段新增 `ExcludedColumns` 关键约束校验。
-- 在 `SyncTaskConfigRepository` 增加校验规则：`ExcludedColumns` 禁止包含 `UniqueKeys`、`CursorColumn` 与软删除关键列（`IsDeleted`、`DeletedTimeLocal`）。
-- 更新实施计划：移除已完全落地的 PR-4 条目“增加排除列关键约束校验（禁止包含 `UniqueKeys`、`CursorColumn`、软删除标记列等）”。
+- 继续实施《Oracle到SQLServer同步实施计划.md》PR-4：完成 `ExcludedColumns` 在读取 / 暂存 / 合并阶段统一生效。
+- 同步执行链路已将 `ExcludedColumns` 透传到读取请求、暂存写入与幂等合并请求，三阶段统一过滤排除列。
+- 更新实施计划：移除已完全落地的 PR-4 条目“支持 `Sync.ExcludedColumns` 并在读取 / 暂存 / 合并阶段统一生效”。
 
 ## 解决方案文件树与职责
 ```text
@@ -141,8 +141,9 @@
 - `SyncJobOptions.cs` / `SyncTableOptions.cs` / `SyncDeleteOptions.cs`：同步任务全局、单表与删除配置绑定模型，统一约束本地时间配置、分页、滞后窗口、唯一键与删除策略参数。
 - `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，校验 `StartTimeLocal` 禁止 `Z` 与 offset，并校验 `ExcludedColumns` 不得与 `UniqueKeys`、`CursorColumn`、软删除关键列冲突。
 - `OracleSourceReader.cs`：源端读取器基础实现，支持按窗口分页读取与按窗口读取业务键集合。
-- `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存。
-- `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并提供目标键删除能力（软删/硬删）。
+- `OracleSourceReader.cs`：源端读取器基础实现，支持按窗口分页读取与按窗口读取业务键集合，并在分页读取阶段过滤 `ExcludedColumns`。
+- `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
+- `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并在合并比较/写入阶段过滤 `ExcludedColumns`，同时提供目标键删除能力（软删/硬删）。
 - `SyncDeletionRepository.cs`：删除同步仓储基础实现，支持窗口内源端键集合与目标键集合差异识别，并按策略执行删除。
 - `SyncCheckpointRepository.cs`：检查点文件持久化实现，支持失败后续跑。
 - `SyncBatchRepository.cs`：同步批次仓储基础实现，支持 `Pending/InProgress/Completed/Failed` 状态流转与最近失败批次查询。
@@ -159,5 +160,5 @@
 
 ## 可继续完善内容
 - 将 PR-1 剩余项从“基础实现”推进到“数据库落地实现”，包括真实 Oracle 读取、SQL Server 暂存表与 MERGE 语句对接。
-- 实现 PR-4 配置治理：高低优先级表差异化调度，以及 `ExcludedColumns` 在读取 / 暂存 / 合并阶段统一生效。
+- 实现 PR-4 配置治理：高低优先级表差异化调度。
 - 实现 PR-5/PR-6：保留期治理危险动作门禁、并行优化、重试熔断与可观测性指标收口。

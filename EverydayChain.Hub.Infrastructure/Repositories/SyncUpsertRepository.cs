@@ -32,8 +32,9 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         foreach (var row in request.Rows)
         {
             ct.ThrowIfCancellationRequested();
+            var filteredRow = FilterExcludedColumns(row, request.ExcludedColumns);
 
-            var rowKey = SyncBusinessKeyBuilder.Build(row, request.UniqueKeys);
+            var rowKey = SyncBusinessKeyBuilder.Build(filteredRow, request.UniqueKeys);
             if (string.IsNullOrWhiteSpace(rowKey))
             {
                 continue;
@@ -41,24 +42,24 @@ public class SyncUpsertRepository : ISyncUpsertRepository
 
             if (!targetTable.TryGetValue(rowKey, out var existedRow))
             {
-                targetTable[rowKey] = CloneRow(row);
+                targetTable[rowKey] = CloneRow(filteredRow);
                 result.InsertCount++;
                 changedOperations[rowKey] = SyncChangeOperationType.Insert;
-                UpdateLastCursor(result, row, request.CursorColumn);
+                UpdateLastCursor(result, filteredRow, request.CursorColumn);
                 continue;
             }
 
-            if (AreRowsEqual(existedRow, row))
+            if (AreRowsEqual(existedRow, filteredRow))
             {
                 result.SkipCount++;
-                UpdateLastCursor(result, row, request.CursorColumn);
+                UpdateLastCursor(result, filteredRow, request.CursorColumn);
                 continue;
             }
 
-            targetTable[rowKey] = CloneRow(row);
+            targetTable[rowKey] = CloneRow(filteredRow);
             result.UpdateCount++;
             changedOperations[rowKey] = SyncChangeOperationType.Update;
-            UpdateLastCursor(result, row, request.CursorColumn);
+            UpdateLastCursor(result, filteredRow, request.CursorColumn);
         }
 
         return Task.FromResult(result);
@@ -178,5 +179,39 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     private static IReadOnlyDictionary<string, object?> CloneRow(IReadOnlyDictionary<string, object?> row)
     {
         return new Dictionary<string, object?>(row);
+    }
+
+    /// <summary>
+    /// 过滤行中的排除列。
+    /// </summary>
+    /// <param name="row">原始数据行。</param>
+    /// <param name="excludedColumns">排除列集合。</param>
+    /// <returns>过滤后的数据行。</returns>
+    private static IReadOnlyDictionary<string, object?> FilterExcludedColumns(IReadOnlyDictionary<string, object?> row, IReadOnlyList<string> excludedColumns)
+    {
+        if (excludedColumns.Count == 0)
+        {
+            return row;
+        }
+
+        var excludedColumnSet = excludedColumns
+            .Where(static x => !string.IsNullOrWhiteSpace(x))
+            .Select(static x => x.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (excludedColumnSet.Count == 0)
+        {
+            return row;
+        }
+
+        var filtered = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in row)
+        {
+            if (!excludedColumnSet.Contains(pair.Key))
+            {
+                filtered[pair.Key] = pair.Value;
+            }
+        }
+
+        return filtered;
     }
 }

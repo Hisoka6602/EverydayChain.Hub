@@ -24,4 +24,7 @@ public class SyncReadRequest
 
     /// <summary>唯一键集合。</summary>
     public IReadOnlyList<string> UniqueKeys { get; set; } = Array.Empty<string>();
+
+    /// <summary>排除列集合。</summary>
+    public IReadOnlyList<string> ExcludedColumns { get; set; } = Array.Empty<string>();
 }
