@@ -204,6 +204,7 @@
   "Sync": {
     "Mode": "Incremental",
     "CursorColumn": "LastModifiedTime",
+    "ExcludedColumns": ["Remark", "LargeBlobContent"],
     "StartTimeLocal": "2026-03-01 00:00:00",
     "PollingIntervalSeconds": 60,
     "MaxLagMinutes": 10,
@@ -230,12 +231,14 @@
 配置解释：
 
 1. `CursorColumn + StartTimeLocal`：定义从哪个字段、哪个本地时间开始同步。
-2. `UniqueKeys`：定义幂等覆盖键（可单键/复合键）。
-3. `MaxLagMinutes`：实时性控制，采用固定延迟窗口；建议默认值 10 分钟（未配置时使用 `SyncJobOptions.DefaultMaxLagMinutes` 全局配置）。
+2. `Sync.ExcludedColumns`：定义同步排除列（读取、暂存、合并时均不处理这些列）。
+   - 约束：`ExcludedColumns` 不允许包含 `UniqueKeys`、`CursorColumn`、软删除标记列等关键控制列。
+3. `UniqueKeys`：定义幂等覆盖键（可单键/复合键）。
+4. `MaxLagMinutes`：实时性控制，采用固定延迟窗口；建议默认值 10 分钟（未配置时使用 `SyncJobOptions.DefaultMaxLagMinutes` 全局配置）。
    - 全局配置位置：Host 层 `SyncJobOptions`（绑定 `appsettings.json:SyncJob` 节点）。
-4. `Delete.Policy`：删除策略，支持关闭/软删/硬删。
-5. `Delete.CompareSegmentSize` / `Delete.CompareMaxParallelism`：删除键集差异比对的分段大小与并行度。
-6. `Retention.KeepMonths`：本地分表保留期（月）。
+5. `Delete.Policy`：删除策略，支持关闭/软删/硬删。
+6. `Delete.CompareSegmentSize` / `Delete.CompareMaxParallelism`：删除键集差异比对的分段大小与并行度。
+7. `Retention.KeepMonths`：本地分表保留期（月）。
 
 ---
 
@@ -259,7 +262,7 @@
 ## 6.2 读取与暂存
 
 1. Oracle 按 `CursorColumn` + `UniqueKeys` 排序分页读取。
-2. 单次尽量批量（例如 5000 行），减少往返次数。
+2. 投影读取时自动过滤 `ExcludedColumns`，单次尽量批量（例如 5000 行），减少往返次数。
 3. 每页写入本地 `Staging`，记录 `BatchId`、`PageNo`、抓取时间。
 
 ## 6.3 幂等合并（防重复 + 覆盖）
@@ -267,7 +270,7 @@
 按 `UniqueKeys` 合并规则：
 
 1. 目标不存在：插入。
-2. 目标存在且数据有差异：覆盖更新。
+2. 目标存在且数据有差异：覆盖更新（仅更新非 `ExcludedColumns` 字段）。
 3. 目标存在且数据一致：跳过。
 
 > 差异判定建议使用“字段比较 + 行摘要哈希”组合，减少不必要更新。
