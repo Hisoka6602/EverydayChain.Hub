@@ -20,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\EverydayChain.Hub.Application\EverydayChain.Hub.Application.csproj" />
     <ProjectReference Include="..\EverydayChain.Hub.Domain\EverydayChain.Hub.Domain.csproj" />
   </ItemGroup>
 

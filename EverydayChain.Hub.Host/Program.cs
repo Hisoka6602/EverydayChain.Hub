@@ -1,5 +1,6 @@
 using EverydayChain.Hub.Host;
 using EverydayChain.Hub.Host.Options;
+using EverydayChain.Hub.Host.Workers;
 using EverydayChain.Hub.Infrastructure.DependencyInjection;
 using NLog;
 using NLog.Extensions.Logging;
@@ -10,6 +11,7 @@ builder.Logging.AddNLog();
 builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection(WorkerOptions.SectionName));
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<Worker>();
+builder.Services.AddHostedService<SyncBackgroundWorker>();
 
 var host = builder.Build();
 try
