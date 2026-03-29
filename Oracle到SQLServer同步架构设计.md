@@ -310,6 +310,11 @@
 - `DeleteCount`
 - `SkipCount`
 - `Status`（建议值：`Pending` / `InProgress` / `Completed` / `Failed`）
+  - `Pending`：批次已创建，尚未开始读取与处理。
+  - `InProgress`：已进入执行中（读取、合并、删除、日志写入任一环节进行中）。
+  - `Completed`：本批次所有步骤成功完成，并已提交检查点。
+  - `Failed`：批次执行失败，已记录错误并等待重试/人工处理。
+  - 状态流转：`Pending -> InProgress -> Completed/Failed`（禁止跨级逆向流转）。
 - `StartedTimeLocal`
 - `CompletedTimeLocal`
 
