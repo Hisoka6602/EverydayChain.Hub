@@ -53,33 +53,20 @@ public class SyncOrchestrator(
         var orderedDefinitions = definitions
             .OrderByDescending(x => x.Priority == SyncTablePriority.High)
             .ThenBy(x => x.TableCode, StringComparer.OrdinalIgnoreCase)
+            .Select((definition, index) => (definition, index))
             .ToList();
         var maxParallelTables = await configRepository.GetMaxParallelTablesAsync(ct);
-        using var semaphore = new SemaphoreSlim(maxParallelTables, maxParallelTables);
-        var tasks = new List<Task<SyncBatchResult>>(orderedDefinitions.Count);
-        for (var index = 0; index < orderedDefinitions.Count; index++)
+        var results = new SyncBatchResult[orderedDefinitions.Count];
+        var parallelOptions = new ParallelOptions
         {
-            ct.ThrowIfCancellationRequested();
-            var tableCode = orderedDefinitions[index].TableCode;
-            tasks.Add(Task.Run(async () =>
-            {
-                var entered = false;
-                try
-                {
-                    await semaphore.WaitAsync(ct);
-                    entered = true;
-                    return await RunTableSyncAsync(tableCode, ct);
-                }
-                finally
-                {
-                    if (entered)
-                    {
-                        semaphore.Release();
-                    }
-                }
-            }, ct));
-        }
+            CancellationToken = ct,
+            MaxDegreeOfParallelism = maxParallelTables,
+        };
 
-        return await Task.WhenAll(tasks);
+        await Parallel.ForEachAsync(orderedDefinitions, parallelOptions, async (item, token) =>
+        {
+            results[item.index] = await RunTableSyncAsync(item.definition.TableCode, token);
+        });
+        return results;
     }
 }

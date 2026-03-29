@@ -162,9 +162,15 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             return SyncTablePriority.Low;
         }
 
-        if (Enum.TryParse<SyncTablePriority>(priorityText, true, out var priority))
+        var normalized = priorityText.Trim();
+        if (normalized.Equals(nameof(SyncTablePriority.High), StringComparison.OrdinalIgnoreCase))
         {
-            return priority;
+            return SyncTablePriority.High;
+        }
+
+        if (normalized.Equals(nameof(SyncTablePriority.Low), StringComparison.OrdinalIgnoreCase))
+        {
+            return SyncTablePriority.Low;
         }
 
         throw new InvalidOperationException($"表 {tableCode} 的 Priority 配置非法，仅支持 High 或 Low。");

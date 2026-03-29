@@ -51,7 +51,10 @@ ORDER BY c.column_id;
 """;
 
             var primaryKeySql = """
-SELECT c.name AS ColumnName
+SELECT
+    kc.name AS ConstraintName,
+    c.name AS ColumnName,
+    ic.is_descending_key AS IsDescending
 FROM sys.tables tb
 INNER JOIN sys.schemas s ON s.schema_id = tb.schema_id
 INNER JOIN sys.key_constraints kc ON kc.parent_object_id = tb.object_id AND kc.type = 'PK'
@@ -66,7 +69,11 @@ SELECT
     i.name AS IndexName,
     i.is_unique AS IsUnique,
     i.type_desc AS TypeDesc,
+    i.filter_definition AS FilterDefinition,
+    i.fill_factor AS FillFactor,
+    i.is_disabled AS IsDisabled,
     ic.key_ordinal AS KeyOrdinal,
+    ic.is_included_column AS IsIncludedColumn,
     ic.is_descending_key AS IsDescending,
     c.name AS ColumnName
 FROM sys.tables tb
@@ -78,11 +85,11 @@ WHERE s.name = @schemaName AND tb.name = @tableName
   AND i.is_primary_key = 0
   AND i.is_hypothetical = 0
   AND i.name IS NOT NULL
-ORDER BY i.name, ic.key_ordinal;
+ORDER BY i.name, ic.is_included_column, ic.key_ordinal, c.column_id;
 """;
 
             var columns = new List<ColumnMetadata>();
-            var pkColumns = new List<string>();
+            var pkColumns = new List<PrimaryKeyColumnMetadata>();
             var indexRows = new List<IndexMetadataRow>();
             await using var connection = new SqlConnection(_options.ConnectionString);
             await connection.OpenAsync(token);
@@ -114,7 +121,10 @@ ORDER BY i.name, ic.key_ordinal;
             {
                 while (await pkReader.ReadAsync(token))
                 {
-                    pkColumns.Add(pkReader.GetString(0));
+                    pkColumns.Add(new PrimaryKeyColumnMetadata(
+                        pkReader.GetString(0),
+                        pkReader.GetString(1),
+                        pkReader.GetBoolean(2)));
                 }
             }
 
@@ -127,9 +137,13 @@ ORDER BY i.name, ic.key_ordinal;
                         indexReader.GetString(0),
                         indexReader.GetBoolean(1),
                         indexReader.GetString(2),
-                        indexReader.GetInt32(3),
-                        indexReader.GetBoolean(4),
-                        indexReader.GetString(5)));
+                        indexReader.IsDBNull(3) ? null : indexReader.GetString(3),
+                        indexReader.GetByte(4),
+                        indexReader.GetBoolean(5),
+                        indexReader.GetInt32(6),
+                        indexReader.GetBoolean(7),
+                        indexReader.GetBoolean(8),
+                        indexReader.GetString(9)));
                 }
             }
 
@@ -153,25 +167,60 @@ ORDER BY i.name, ic.key_ordinal;
 
             if (pkColumns.Count > 0)
             {
-                var pkName = $"PK_{physicalTableName}";
-                var pkColumnSql = string.Join(", ", pkColumns.Select(x => $"[{x}]"));
+                var pkName = pkColumns[0].ConstraintName;
+                var pkColumnSql = string.Join(", ", pkColumns.Select(x => $"[{x.ColumnName}]{(x.IsDescending ? " DESC" : " ASC")}"));
                 scriptBuilder.AppendLine($"        CONSTRAINT [{pkName}] PRIMARY KEY ({pkColumnSql})");
             }
 
             scriptBuilder.AppendLine("    );");
 
             var indexes = indexRows
-                .GroupBy(x => new { x.IndexName, x.IsUnique, x.TypeDesc })
+                .GroupBy(x => new { x.IndexName, x.IsUnique, x.TypeDesc, x.FilterDefinition, x.FillFactor, x.IsDisabled })
                 .OrderBy(x => x.Key.IndexName)
                 .ToList();
             foreach (var index in indexes)
             {
+                if (!string.Equals(index.Key.TypeDesc, "CLUSTERED", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(index.Key.TypeDesc, "NONCLUSTERED", StringComparison.OrdinalIgnoreCase))
+                {
+                    scriptBuilder.AppendLine($"    -- 跳过暂不支持的索引类型：[{index.Key.IndexName}] ({index.Key.TypeDesc})");
+                    continue;
+                }
+
                 var uniqueSql = index.Key.IsUnique ? "UNIQUE " : string.Empty;
-                var columnsSqlPart = string.Join(", ", index
+                var clusteredSql = string.Equals(index.Key.TypeDesc, "CLUSTERED", StringComparison.OrdinalIgnoreCase)
+                    ? "CLUSTERED "
+                    : "NONCLUSTERED ";
+                var keyColumnsSqlPart = string.Join(", ", index
+                    .Where(x => !x.IsIncludedColumn && x.KeyOrdinal > 0)
                     .OrderBy(x => x.KeyOrdinal)
                     .Select(x => $"[{x.ColumnName}]{(x.IsDescending ? " DESC" : " ASC")}"));
+                if (string.IsNullOrWhiteSpace(keyColumnsSqlPart))
+                {
+                    scriptBuilder.AppendLine($"    -- 跳过无键列索引：[{index.Key.IndexName}]");
+                    continue;
+                }
+
+                var includeColumns = index
+                    .Where(x => x.IsIncludedColumn)
+                    .OrderBy(x => x.ColumnName, StringComparer.OrdinalIgnoreCase)
+                    .Select(x => $"[{x.ColumnName}]")
+                    .ToList();
+                var includeSql = includeColumns.Count > 0
+                    ? $" INCLUDE ({string.Join(", ", includeColumns)})"
+                    : string.Empty;
+                var filterSql = !string.IsNullOrWhiteSpace(index.Key.FilterDefinition)
+                    ? $" WHERE {index.Key.FilterDefinition}"
+                    : string.Empty;
+                var fillFactorSql = index.Key.FillFactor > 0
+                    ? $" WITH (FILLFACTOR = {index.Key.FillFactor})"
+                    : string.Empty;
                 scriptBuilder.AppendLine(
-                    $"    CREATE {uniqueSql}INDEX [{index.Key.IndexName}] ON [{_options.Schema}].[{physicalTableName}] ({columnsSqlPart});");
+                    $"    CREATE {uniqueSql}{clusteredSql}INDEX [{index.Key.IndexName}] ON [{_options.Schema}].[{physicalTableName}] ({keyColumnsSqlPart}){includeSql}{filterSql}{fillFactorSql};");
+                if (index.Key.IsDisabled)
+                {
+                    scriptBuilder.AppendLine($"    ALTER INDEX [{index.Key.IndexName}] ON [{_options.Schema}].[{physicalTableName}] DISABLE;");
+                }
             }
 
             scriptBuilder.AppendLine("END");
@@ -294,19 +343,38 @@ ORDER BY i.name, ic.key_ordinal;
         bool IsIdentity);
 
     /// <summary>
+    /// 主键列元数据。
+    /// </summary>
+    /// <param name="ConstraintName">主键约束名。</param>
+    /// <param name="ColumnName">列名。</param>
+    /// <param name="IsDescending">是否倒序。</param>
+    private readonly record struct PrimaryKeyColumnMetadata(
+        string ConstraintName,
+        string ColumnName,
+        bool IsDescending);
+
+    /// <summary>
     /// 索引元数据行。
     /// </summary>
     /// <param name="IndexName">索引名。</param>
     /// <param name="IsUnique">是否唯一。</param>
     /// <param name="TypeDesc">索引类型。</param>
+    /// <param name="FilterDefinition">过滤条件。</param>
+    /// <param name="FillFactor">填充因子。</param>
+    /// <param name="IsDisabled">是否禁用。</param>
     /// <param name="KeyOrdinal">键序号。</param>
+    /// <param name="IsIncludedColumn">是否包含列。</param>
     /// <param name="IsDescending">是否倒序。</param>
     /// <param name="ColumnName">列名。</param>
     private readonly record struct IndexMetadataRow(
         string IndexName,
         bool IsUnique,
         string TypeDesc,
+        string? FilterDefinition,
+        byte FillFactor,
+        bool IsDisabled,
         int KeyOrdinal,
+        bool IsIncludedColumn,
         bool IsDescending,
         string ColumnName);
 }
