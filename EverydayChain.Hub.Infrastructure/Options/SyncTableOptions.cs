@@ -43,4 +43,7 @@ public class SyncTableOptions
 
     /// <summary>删除同步配置。</summary>
     public SyncDeleteOptions Delete { get; set; } = new();
+
+    /// <summary>保留期治理配置。</summary>
+    public SyncRetentionOptions Retention { get; set; } = new();
 }

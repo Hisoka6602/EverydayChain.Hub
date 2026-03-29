@@ -29,6 +29,7 @@ public static class ServiceCollectionExtensions
         services.Configure<AutoTuneOptions>(configuration.GetSection(AutoTuneOptions.SectionName));
         services.Configure<DangerZoneOptions>(configuration.GetSection(DangerZoneOptions.SectionName));
         services.Configure<SyncJobOptions>(configuration.GetSection(SyncJobOptions.SectionName));
+        services.Configure<RetentionJobOptions>(configuration.GetSection(RetentionJobOptions.SectionName));
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
 
@@ -45,6 +46,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAutoMigrationService, AutoMigrationService>();
         services.AddScoped<ISortingTaskTraceWriter, SortingTaskTraceWriter>();
         services.AddSingleton<ISyncTaskConfigRepository, SyncTaskConfigRepository>();
+        services.AddSingleton<IShardTableResolver, ShardTableResolver>();
+        services.AddSingleton<IShardRetentionRepository, ShardRetentionRepository>();
         services.AddSingleton<IOracleSourceReader, OracleSourceReader>();
         services.AddSingleton<ISyncStagingRepository, SyncStagingRepository>();
         services.AddSingleton<ISyncUpsertRepository, SyncUpsertRepository>();
@@ -55,6 +58,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISyncDeletionLogRepository, SyncDeletionLogRepository>();
         services.AddSingleton<ISyncWindowCalculator, SyncWindowCalculator>();
         services.AddSingleton<IDeletionExecutionService, DeletionExecutionService>();
+        services.AddSingleton<IRetentionExecutionService, RetentionExecutionService>();
         services.AddSingleton<ISyncExecutionService, SyncExecutionService>();
         services.AddSingleton<ISyncOrchestrator, SyncOrchestrator>();
         services.AddHostedService<AutoMigrationHostedService>();

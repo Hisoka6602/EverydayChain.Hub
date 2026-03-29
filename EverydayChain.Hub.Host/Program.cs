@@ -12,6 +12,7 @@ builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection(Worke
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<Worker>();
 builder.Services.AddHostedService<SyncBackgroundWorker>();
+builder.Services.AddHostedService<RetentionBackgroundWorker>();
 
 var host = builder.Build();
 try

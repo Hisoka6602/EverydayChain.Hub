@@ -70,6 +70,10 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             DeletionDryRun = table.Delete.DryRun,
             DeletionCompareSegmentSize = table.Delete.CompareSegmentSize > 0 ? table.Delete.CompareSegmentSize : 20000,
             DeletionCompareMaxParallelism = table.Delete.CompareMaxParallelism > 0 ? table.Delete.CompareMaxParallelism : 4,
+            RetentionEnabled = table.Retention.Enabled,
+            RetentionKeepMonths = table.Retention.KeepMonths > 0 ? table.Retention.KeepMonths : 3,
+            RetentionDryRun = table.Retention.DryRun,
+            RetentionAllowDrop = table.Retention.AllowDrop,
         };
     }
 

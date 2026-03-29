@@ -22,11 +22,7 @@
 
 ## PR-5：分表保留期治理与危险动作门禁
 
-- [ ] 落地 `IRetentionExecutionService`、`IShardTableResolver`、`IShardRetentionRepository` 及实现。
-- [ ] 实现按分表时间维度保留期清理（如仅保留最近 3 个月）。
-- [ ] 危险动作门禁落地：总开关、表级开关、dry-run、审计、回滚脚本。
-- [ ] 落地 `RetentionBackgroundWorker` 定时任务。
-- [ ] 补齐过期表识别、删除执行、失败回滚与审计闭环。
+- [ ] 补齐保留期治理：回滚脚本从“占位模板”升级为可直接回放的完整 DDL 脚本。
 
 ## PR-6：性能优化与验收收口
 

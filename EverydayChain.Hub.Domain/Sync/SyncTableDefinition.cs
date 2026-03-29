@@ -60,4 +60,16 @@ public class SyncTableDefinition
 
     /// <summary>删除差异比对最大并行度。</summary>
     public int DeletionCompareMaxParallelism { get; set; } = 4;
+
+    /// <summary>是否启用保留期治理。</summary>
+    public bool RetentionEnabled { get; set; }
+
+    /// <summary>保留最近月份数。</summary>
+    public int RetentionKeepMonths { get; set; } = 3;
+
+    /// <summary>保留期清理是否仅预演。</summary>
+    public bool RetentionDryRun { get; set; } = true;
+
+    /// <summary>是否允许执行删除分表动作。</summary>
+    public bool RetentionAllowDrop { get; set; }
 }
