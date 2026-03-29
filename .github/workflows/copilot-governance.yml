@@ -55,6 +55,13 @@ jobs:
             fi
           fi
 
+          if echo "$CHANGED_FILES" | grep -qx "Oracle到SQLServer同步实施计划.md"; then
+            if ! echo "$CHANGED_FILES" | grep -qx ".github/copilot-instructions.md"; then
+              echo "错误：修改 Oracle到SQLServer同步实施计划.md 时必须同步检查并更新 .github/copilot-instructions.md 约束。"
+              exit 1
+            fi
+          fi
+
           if git diff --name-status "$BASE_SHA" "$HEAD_SHA" | awk '$1=="A" || $1=="D" {print $2}' | grep -q .; then
             if ! echo "$CHANGED_FILES" | grep -qx "README.md"; then
               echo "错误：检测到新增/删除文件，但 README.md 未同步更新。"
