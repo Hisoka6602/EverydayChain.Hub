@@ -208,7 +208,7 @@ public class SyncExecutionService(
                 BatchId = context.BatchId,
                 ParentBatchId = context.ParentBatchId,
                 TableCode = context.Definition.TableCode,
-                OperationType = SyncChangeOperationType.Update.ToString(),
+                OperationType = SyncChangeOperationType.Update,
                 BusinessKey = businessKey,
                 BeforeSnapshot = null,
                 AfterSnapshot = BuildSnapshot(row),

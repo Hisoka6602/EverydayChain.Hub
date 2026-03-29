@@ -1,3 +1,5 @@
+using EverydayChain.Hub.Domain.Enums;
+
 namespace EverydayChain.Hub.Domain.Sync;
 
 /// <summary>
@@ -14,8 +16,8 @@ public class SyncChangeLog
     /// <summary>表编码。</summary>
     public string TableCode { get; set; } = string.Empty;
 
-    /// <summary>变更操作类型（Insert/Update/Delete）。</summary>
-    public string OperationType { get; set; } = string.Empty;
+    /// <summary>变更操作类型。</summary>
+    public SyncChangeOperationType OperationType { get; set; } = SyncChangeOperationType.Update;
 
     /// <summary>业务键文本。</summary>
     public string BusinessKey { get; set; } = string.Empty;
