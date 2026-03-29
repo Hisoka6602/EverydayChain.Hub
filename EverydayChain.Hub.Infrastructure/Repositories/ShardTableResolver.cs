@@ -12,6 +12,8 @@ namespace EverydayChain.Hub.Infrastructure.Repositories;
 /// </summary>
 public class ShardTableResolver(IOptions<ShardingOptions> shardingOptions) : IShardTableResolver
 {
+    /// <summary>安全标识符校验正则（仅允许字母、数字、下划线）。</summary>
+    private static readonly Regex SqlIdentifierRegex = new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
     /// <summary>分表月份解析正则。</summary>
     private static readonly Regex ShardMonthRegex = new(@"_(\d{6})$", RegexOptions.Compiled);
     /// <summary>分表配置快照。</summary>
@@ -20,13 +22,18 @@ public class ShardTableResolver(IOptions<ShardingOptions> shardingOptions) : ISh
     /// <inheritdoc/>
     public async Task<IReadOnlyList<string>> ListPhysicalTablesAsync(string logicalTableName, CancellationToken ct)
     {
+        if (!IsSafeSqlIdentifier(logicalTableName))
+        {
+            throw new InvalidOperationException($"逻辑表名不合法：{logicalTableName}");
+        }
+
         var tables = new List<string>();
         var sql = """
                   SELECT [TABLE_NAME]
                   FROM [INFORMATION_SCHEMA].[TABLES]
                   WHERE [TABLE_SCHEMA] = @schema
                     AND [TABLE_TYPE] = 'BASE TABLE'
-                    AND [TABLE_NAME] LIKE @prefix + '_%'
+                    AND [TABLE_NAME] LIKE @prefix + '[_]%'
                   ORDER BY [TABLE_NAME];
                   """;
         await using var connection = new SqlConnection(_options.ConnectionString);
@@ -64,5 +71,15 @@ public class ShardTableResolver(IOptions<ShardingOptions> shardingOptions) : ISh
         }
 
         return DateTime.SpecifyKind(parsedMonth, DateTimeKind.Local);
+    }
+
+    /// <summary>
+    /// 判断标识符是否满足安全规则。
+    /// </summary>
+    /// <param name="identifier">待校验标识符。</param>
+    /// <returns>合法返回 <c>true</c>。</returns>
+    private static bool IsSafeSqlIdentifier(string identifier)
+    {
+        return !string.IsNullOrWhiteSpace(identifier) && SqlIdentifierRegex.IsMatch(identifier);
     }
 }
