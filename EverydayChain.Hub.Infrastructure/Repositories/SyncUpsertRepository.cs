@@ -33,7 +33,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         {
             ct.ThrowIfCancellationRequested();
 
-            var rowKey = SyncBusinessKeyBuilder.Build(request.UniqueKeys, row);
+            var rowKey = SyncBusinessKeyBuilder.Build(row, request.UniqueKeys);
             if (string.IsNullOrWhiteSpace(rowKey))
             {
                 continue;

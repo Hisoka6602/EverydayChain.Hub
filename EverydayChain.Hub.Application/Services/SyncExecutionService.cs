@@ -22,6 +22,10 @@ public class SyncExecutionService(
 {
     /// <summary>失败检查点写入超时秒数。</summary>
     private const int ErrorCheckpointSaveTimeoutSeconds = 3;
+    /// <summary>批次失败状态更新异常日志模板。</summary>
+    private const string FailBatchStatusUpdateErrorLogTemplate = "更新同步失败批次状态异常。TableCode={TableCode}, BatchId={BatchId}";
+    /// <summary>批次取消状态更新异常日志模板。</summary>
+    private const string FailBatchOnCancelErrorLogTemplate = "在处理同步批次取消时更新批次失败。TableCode={TableCode}, BatchId={BatchId}";
 
     /// <summary>快照序列化配置。</summary>
     private static readonly JsonSerializerOptions SnapshotSerializerOptions = new()
@@ -33,7 +37,7 @@ public class SyncExecutionService(
     public async Task<SyncBatchResult> ExecuteBatchAsync(SyncExecutionContext context, CancellationToken ct)
     {
         var stopwatch = Stopwatch.StartNew();
-        var batchCreated = false;
+        var batchPersistedToRepository = false;
         var readCount = 0;
         var insertCount = 0;
         var updateCount = 0;
@@ -51,7 +55,7 @@ public class SyncExecutionService(
                 WindowStartLocal = context.Window.WindowStartLocal,
                 WindowEndLocal = context.Window.WindowEndLocal,
             }, ct);
-            batchCreated = true;
+            batchPersistedToRepository = true;
             await batchRepository.MarkInProgressAsync(context.BatchId, DateTime.Now, ct);
 
             var pageNo = 1;
@@ -167,10 +171,10 @@ public class SyncExecutionService(
         {
             logger.LogInformation("同步批次已取消。TableCode={TableCode}, BatchId={BatchId}", context.Definition.TableCode, context.BatchId);
             await TryMarkBatchFailedAsync(
-                batchCreated,
+                batchPersistedToRepository,
                 context,
                 "同步任务被取消。",
-                "在处理同步批次取消时更新批次失败。TableCode={TableCode}, BatchId={BatchId}");
+                FailBatchOnCancelErrorLogTemplate);
             throw;
         }
         catch (Exception ex)
@@ -184,10 +188,10 @@ public class SyncExecutionService(
 
             using var errorCheckpointCts = new CancellationTokenSource(TimeSpan.FromSeconds(ErrorCheckpointSaveTimeoutSeconds));
             await TryMarkBatchFailedAsync(
-                batchCreated,
+                batchPersistedToRepository,
                 context,
                 ex.Message,
-                "更新同步失败批次状态异常。TableCode={TableCode}, BatchId={BatchId}");
+                FailBatchStatusUpdateErrorLogTemplate);
             await checkpointRepository.SaveAsync(new SyncCheckpoint
             {
                 TableCode = context.Definition.TableCode,
@@ -215,7 +219,7 @@ public class SyncExecutionService(
     {
         foreach (var row in rows)
         {
-            var businessKey = SyncBusinessKeyBuilder.Build(context.Definition.UniqueKeys, row);
+            var businessKey = SyncBusinessKeyBuilder.Build(row, context.Definition.UniqueKeys);
             if (string.IsNullOrWhiteSpace(businessKey))
             {
                 continue;
@@ -253,13 +257,13 @@ public class SyncExecutionService(
     /// <summary>
     /// 尝试标记批次失败（失败时仅记录日志，不影响主流程异常传递）。
     /// </summary>
-    /// <param name="batchCreated">是否已成功创建批次。</param>
+    /// <param name="batchPersistedToRepository">是否已成功创建并持久化批次。</param>
     /// <param name="context">执行上下文。</param>
     /// <param name="errorMessage">错误信息。</param>
-    /// <param name="logTemplate">日志模板。</param>
-    private async Task TryMarkBatchFailedAsync(bool batchCreated, SyncExecutionContext context, string errorMessage, string logTemplate)
+    /// <param name="onFailureLogTemplate">状态更新失败日志模板。</param>
+    private async Task TryMarkBatchFailedAsync(bool batchPersistedToRepository, SyncExecutionContext context, string errorMessage, string onFailureLogTemplate)
     {
-        if (!batchCreated)
+        if (!batchPersistedToRepository)
         {
             return;
         }
@@ -270,7 +274,7 @@ public class SyncExecutionService(
         }
         catch (Exception statusEx)
         {
-            logger.LogError(statusEx, logTemplate, context.Definition.TableCode, context.BatchId);
+            logger.LogError(statusEx, onFailureLogTemplate, context.Definition.TableCode, context.BatchId);
         }
     }
 }
