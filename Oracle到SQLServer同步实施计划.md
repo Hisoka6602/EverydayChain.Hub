@@ -20,10 +20,6 @@
 - [ ] 支持 `PollingIntervalSeconds`、`MaxLagMinutes` 调度与窗口控制。
 - [ ] 增加高优先级与低优先级表差异化调度参数。
 
-## PR-5：分表保留期治理与危险动作门禁
-
-- [ ] 补齐保留期治理：回滚脚本从“占位模板”升级为可直接回放的完整 DDL 脚本。
-
 ## PR-6：性能优化与验收收口
 
 - [ ] 落地大表删除优化：键集分段 + 并行比对（`CompareSegmentSize`、`CompareMaxParallelism`）。

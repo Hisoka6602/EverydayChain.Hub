@@ -1,11 +1,11 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 继续实施《Oracle到SQLServer同步实施计划.md》PR-5：落地保留期治理链路，新增 `IRetentionExecutionService`、`IShardTableResolver`、`IShardRetentionRepository` 及实现。
-- 已实现按分表月份维度识别过期分表并执行清理，支持 `KeepMonths` 配置（默认 3）与失败隔离统计。
-- 已落地危险动作门禁：`RetentionJob.AllowDangerousAction` 总开关、`Sync.Retention.AllowDrop` 表级开关、`Sync.Retention.DryRun` 预演、删除审计日志与回滚脚本输出。
-- 已新增 `RetentionBackgroundWorker` 定时任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发。
-- 更新实施计划：PR-5 当前仅保留“回滚脚本升级为完整 DDL”一项待完善。
+- 继续实施《Oracle到SQLServer同步实施计划.md》PR-5：将保留期回滚脚本从占位模板升级为完整可回放 DDL。
+- 已在 `IShardRetentionRepository` 增加 `GenerateRollbackScriptAsync` 契约，并在 `RetentionExecutionService` 中统一接入（dry-run 与实际删除一致输出）。
+- 已在 `ShardRetentionRepository` 基于 SQL Server 元数据查询生成 `CREATE TABLE`、主键与二级索引语句，回滚脚本可直接回放恢复被删分表。
+- 已保留并延续危险动作门禁：总开关、表级开关、dry-run、审计日志。
+- 已更新实施计划：PR-5 待办条目已完成并移除。
 
 ## 解决方案文件树与职责
 ```text
@@ -138,11 +138,11 @@
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
 - `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs`：同步执行、删除识别与删除执行的数据契约模型。
 - `ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。
-- `IShardTableResolver.cs` / `IShardRetentionRepository.cs`：定义分表识别与分表清理执行契约。
+- `IShardTableResolver.cs` / `IShardRetentionRepository.cs`：定义分表识别与分表清理执行契约（含分表完整回滚脚本生成）。
 - `ISyncOrchestrator.cs` / `SyncOrchestrator.cs`：同步任务编排入口，负责读取配置、加载检查点、计算窗口并触发批次执行。
 - `ISyncWindowCalculator.cs` / `SyncWindowCalculator.cs`：根据 `CursorColumn + StartTimeLocal` 与检查点计算本地增量窗口。
 - `IDeletionExecutionService.cs` / `DeletionExecutionService.cs`：执行删除识别、删除策略应用（含 DryRun）并生成删除审计与删除变更日志。
-- `IRetentionExecutionService.cs` / `RetentionExecutionService.cs`：执行分表保留期治理，完成过期分表识别、dry-run 审计、删除执行、失败隔离与汇总。
+- `IRetentionExecutionService.cs` / `RetentionExecutionService.cs`：执行分表保留期治理，完成过期分表识别、完整回滚脚本生成、dry-run 审计、删除执行、失败隔离与汇总。
 - `ISyncExecutionService.cs` / `SyncExecutionService.cs`：执行分页读取、暂存、幂等合并、删除同步、日志写入、检查点提交，并维护批次状态流转；异常场景输出 NLog 错误日志。
 - `HubDbContext.cs`：根据分表后缀动态映射表名。
 - `TableSuffixScope.cs` + `ShardModelCacheKeyFactory.cs`：保证不同后缀下 EF Model 能正确缓存隔离。
@@ -160,7 +160,7 @@
 - `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并在合并比较/写入阶段过滤 `ExcludedColumns`，同时提供目标键删除能力（软删/硬删）。
 - `SyncDeletionRepository.cs`：删除同步仓储基础实现，支持窗口内源端键集合与目标键集合差异识别，并按策略执行删除。
 - `ShardTableResolver.cs`：分表解析仓储实现，按逻辑表枚举物理分表并解析分表月份后缀。
-- `ShardRetentionRepository.cs`：分表保留期仓储实现，在危险动作隔离器保护下执行分表删除并输出审计日志。
+- `ShardRetentionRepository.cs`：分表保留期仓储实现，在危险动作隔离器保护下执行分表删除并输出审计日志，且可基于系统元数据生成可回放回滚 DDL。
 - `SyncCheckpointRepository.cs`：检查点文件持久化实现，支持失败后续跑。
 - `SyncBatchRepository.cs`：同步批次仓储基础实现，支持 `Pending/InProgress/Completed/Failed` 状态流转与最近失败批次查询。
 - `SyncChangeLogRepository.cs`：同步变更日志仓储基础实现，支持批量写入审计记录。
@@ -178,5 +178,5 @@
 ## 可继续完善内容
 - 将 PR-1 剩余项从“基础实现”推进到“数据库落地实现”，包括真实 Oracle 读取、SQL Server 暂存表与 MERGE 语句对接。
 - 实现 PR-4 配置治理：高低优先级表差异化调度。
-- 完成 PR-5 收口：将保留期清理回滚脚本从占位模板升级为完整可回放 DDL。
+- 完成 PR-4：增加高低优先级表差异化调度参数与执行策略。
 - 实现 PR-6：并行优化、重试熔断与可观测性指标收口。
