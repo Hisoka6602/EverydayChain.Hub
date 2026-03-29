@@ -15,8 +15,10 @@ public class SyncExecutionService(
     IOracleSourceReader oracleSourceReader,
     ISyncStagingRepository stagingRepository,
     ISyncUpsertRepository upsertRepository,
+    IDeletionExecutionService deletionExecutionService,
     ISyncBatchRepository batchRepository,
     ISyncChangeLogRepository changeLogRepository,
+    ISyncDeletionLogRepository deletionLogRepository,
     ISyncCheckpointRepository checkpointRepository,
     ILogger<SyncExecutionService> logger) : ISyncExecutionService
 {
@@ -41,6 +43,7 @@ public class SyncExecutionService(
         var readCount = 0;
         var insertCount = 0;
         var updateCount = 0;
+        var deleteCount = 0;
         var skipCount = 0;
         DateTime? lastSuccessCursorLocal = context.Checkpoint.LastSuccessCursorLocal;
         var pendingChanges = new List<SyncChangeLog>();
@@ -138,10 +141,19 @@ public class SyncExecutionService(
                 pageNo++;
             }
 
-            // 步骤4：读取与合并成功后，先落变更日志。
-            await changeLogRepository.WriteChangesAsync(pendingChanges, ct);
+            // 步骤4：执行删除同步（识别+执行+删除变更构建）。
+            var deletionExecutionResult = await deletionExecutionService.ExecuteDeletionAsync(context, ct);
+            deleteCount = deletionExecutionResult.DeletedCount;
+            foreach (var deletionChange in deletionExecutionResult.ChangeLogs)
+            {
+                pendingChanges.Add(deletionChange);
+            }
 
-            // 步骤5：仅在读取、合并、日志写入全部完成后提交检查点。
+            // 步骤5：读取、合并、删除处理完成后，先落变更日志与删除日志。
+            await changeLogRepository.WriteChangesAsync(pendingChanges, ct);
+            await deletionLogRepository.WriteDeletionsAsync(deletionExecutionResult.DeletionLogs, ct);
+
+            // 步骤6：仅在读取、合并、删除、日志写入全部完成后提交检查点。
             await checkpointRepository.SaveAsync(new SyncCheckpoint
             {
                 TableCode = context.Definition.TableCode,
@@ -160,7 +172,7 @@ public class SyncExecutionService(
                 ReadCount = readCount,
                 InsertCount = insertCount,
                 UpdateCount = updateCount,
-                DeleteCount = 0,
+                DeleteCount = deleteCount,
                 SkipCount = skipCount,
                 Elapsed = stopwatch.Elapsed,
             };

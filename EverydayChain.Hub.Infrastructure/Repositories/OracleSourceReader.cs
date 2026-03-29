@@ -46,6 +46,26 @@ public class OracleSourceReader : IOracleSourceReader
         });
     }
 
+    /// <inheritdoc/>
+    public Task<IReadOnlySet<string>> ReadByKeysAsync(SyncKeyReadRequest request, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (!SourceData.TryGetValue(request.TableCode, out var rows))
+        {
+            return Task.FromResult<IReadOnlySet<string>>(new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        }
+
+        var keySet = rows
+            .Where(row => row.TryGetValue(request.CursorColumn, out var value)
+                          && value is DateTime cursorLocal
+                          && cursorLocal > request.Window.WindowStartLocal
+                          && cursorLocal <= request.Window.WindowEndLocal)
+            .Select(row => BuildStableKey(row, request.UniqueKeys))
+            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return Task.FromResult<IReadOnlySet<string>>(keySet);
+    }
+
     /// <summary>
     /// 构造稳定排序键。
     /// </summary>

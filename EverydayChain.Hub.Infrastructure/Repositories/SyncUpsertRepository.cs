@@ -64,6 +64,64 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         return Task.FromResult(result);
     }
 
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ListTargetRowsAsync(string tableCode, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (!_targetTables.TryGetValue(tableCode, out var table))
+        {
+            return Task.FromResult<IReadOnlyList<IReadOnlyDictionary<string, object?>>>([]);
+        }
+
+        var rows = table.Values.Select(CloneRow).ToList();
+        return Task.FromResult<IReadOnlyList<IReadOnlyDictionary<string, object?>>>(rows);
+    }
+
+    /// <inheritdoc/>
+    public Task<int> DeleteByBusinessKeysAsync(string tableCode, IReadOnlyList<string> businessKeys, DeletionPolicy deletionPolicy, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (!_targetTables.TryGetValue(tableCode, out var table))
+        {
+            return Task.FromResult(0);
+        }
+
+        var deletedCount = 0;
+        foreach (var businessKey in businessKeys)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!table.TryGetValue(businessKey, out var row))
+            {
+                continue;
+            }
+
+            if (deletionPolicy == DeletionPolicy.SoftDelete)
+            {
+                var softDeletedRow = new Dictionary<string, object?>(row)
+                {
+                    ["IsDeleted"] = true,
+                    ["DeletedTimeLocal"] = DateTime.Now,
+                };
+                table[businessKey] = softDeletedRow;
+                deletedCount++;
+                continue;
+            }
+
+            if (deletionPolicy == DeletionPolicy.HardDelete && table.TryRemove(businessKey, out _))
+            {
+                deletedCount++;
+            }
+        }
+
+        return Task.FromResult(deletedCount);
+    }
+
+    /// <inheritdoc/>
+    public string BuildBusinessKey(IReadOnlyDictionary<string, object?> row, IReadOnlyList<string> uniqueKeys)
+    {
+        return SyncBusinessKeyBuilder.Build(row, uniqueKeys);
+    }
+
     /// <summary>
     /// 判断两行是否一致。
     /// </summary>

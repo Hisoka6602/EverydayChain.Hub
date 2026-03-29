@@ -40,4 +40,7 @@ public class SyncTableOptions
 
     /// <summary>排除列集合。</summary>
     public List<string> ExcludedColumns { get; set; } = [];
+
+    /// <summary>删除同步配置。</summary>
+    public SyncDeleteOptions Delete { get; set; } = new();
 }
