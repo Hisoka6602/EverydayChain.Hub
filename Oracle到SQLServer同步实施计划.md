@@ -14,14 +14,6 @@
 
 ## PR-2：审计与批次治理（可恢复可追踪）
 
-## PR-3：删除同步（识别 + 执行 + 记录）
-
-- [ ] 落地 `IDeletionExecutionService`、`ISyncDeletionRepository`、`ISyncDeletionLogRepository` 及实现。
-- [ ] 实现源端存在性差异识别删除键（支持窗口内对比）。
-- [ ] 实现 `DeletionPolicy`：`Disabled` / `SoftDelete` / `HardDelete`。
-- [ ] 删除动作强制写入 `SyncDeletionLog` 与 `SyncChangeLog`。
-- [ ] 支持删除 `DryRun`（仅审计不执行）并区分执行标记。
-
 ## PR-4：配置治理与准实时控制
 
 - [ ] 完成 `SyncJobOptions`、`SyncTableOptions` 配置绑定与校验。
