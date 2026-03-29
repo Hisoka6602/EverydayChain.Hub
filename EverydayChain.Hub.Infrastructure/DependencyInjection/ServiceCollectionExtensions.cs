@@ -1,6 +1,9 @@
+using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Application.Services;
 using EverydayChain.Hub.Infrastructure.Options;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
+using EverydayChain.Hub.Infrastructure.Repositories;
 using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -25,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.Configure<ShardingOptions>(configuration.GetSection(ShardingOptions.SectionName));
         services.Configure<AutoTuneOptions>(configuration.GetSection(AutoTuneOptions.SectionName));
         services.Configure<DangerZoneOptions>(configuration.GetSection(DangerZoneOptions.SectionName));
+        services.Configure<SyncJobOptions>(configuration.GetSection(SyncJobOptions.SectionName));
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
 
@@ -40,6 +44,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IShardTableProvisioner, ShardTableProvisioner>();
         services.AddScoped<IAutoMigrationService, AutoMigrationService>();
         services.AddScoped<ISortingTaskTraceWriter, SortingTaskTraceWriter>();
+        services.AddSingleton<ISyncTaskConfigRepository, SyncTaskConfigRepository>();
+        services.AddSingleton<IOracleSourceReader, OracleSourceReader>();
+        services.AddSingleton<ISyncStagingRepository, SyncStagingRepository>();
+        services.AddSingleton<ISyncUpsertRepository, SyncUpsertRepository>();
+        services.AddSingleton<ISyncCheckpointRepository, SyncCheckpointRepository>();
+        services.AddSingleton<ISyncWindowCalculator, SyncWindowCalculator>();
+        services.AddSingleton<ISyncExecutionService, SyncExecutionService>();
+        services.AddSingleton<ISyncOrchestrator, SyncOrchestrator>();
         services.AddHostedService<AutoMigrationHostedService>();
 
         return services;
