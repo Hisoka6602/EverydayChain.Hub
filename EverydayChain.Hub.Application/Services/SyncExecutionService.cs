@@ -68,6 +68,8 @@ public class SyncExecutionService(
                 var readRequest = new SyncReadRequest
                 {
                     TableCode = context.Definition.TableCode,
+                    SourceSchema = context.Definition.SourceSchema,
+                    SourceTable = context.Definition.SourceTable,
                     CursorColumn = context.Definition.CursorColumn,
                     PageNo = pageNo,
                     PageSize = context.Definition.PageSize,
@@ -177,8 +179,20 @@ public class SyncExecutionService(
                 DeleteCount = deleteCount,
                 SkipCount = skipCount,
                 Elapsed = stopwatch.Elapsed,
+                LagMinutes = CalculateLagMinutes(context.Window.WindowEndLocal),
+                BacklogMinutes = CalculateBacklogMinutes(context.Window.WindowStartLocal),
+                ThroughputRowsPerSecond = CalculateThroughputRowsPerSecond(readCount + deleteCount, stopwatch.Elapsed),
+                FailureRate = 0,
             };
             await batchRepository.CompleteBatchAsync(batchResult, DateTime.Now, ct);
+            logger.LogInformation(
+                "同步指标。TableCode={TableCode}, BatchId={BatchId}, LagMinutes={LagMinutes}, BacklogMinutes={BacklogMinutes}, ThroughputRowsPerSecond={ThroughputRowsPerSecond}, FailureRate={FailureRate}",
+                batchResult.TableCode,
+                batchResult.BatchId,
+                batchResult.LagMinutes,
+                batchResult.BacklogMinutes,
+                batchResult.ThroughputRowsPerSecond,
+                batchResult.FailureRate);
             return batchResult;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -216,6 +230,39 @@ public class SyncExecutionService(
             }, errorCheckpointCts.Token);
             throw;
         }
+    }
+
+    /// <summary>
+    /// 计算窗口滞后分钟数。
+    /// </summary>
+    /// <param name="windowEndLocal">窗口结束时间。</param>
+    /// <returns>滞后分钟数。</returns>
+    private static double CalculateLagMinutes(DateTime windowEndLocal)
+    {
+        var lag = DateTime.Now - windowEndLocal;
+        return lag.TotalMinutes < 0 ? 0 : lag.TotalMinutes;
+    }
+
+    /// <summary>
+    /// 计算窗口积压分钟数。
+    /// </summary>
+    /// <param name="windowStartLocal">窗口起始时间。</param>
+    /// <returns>积压分钟数。</returns>
+    private static double CalculateBacklogMinutes(DateTime windowStartLocal)
+    {
+        var backlog = DateTime.Now - windowStartLocal;
+        return backlog.TotalMinutes < 0 ? 0 : backlog.TotalMinutes;
+    }
+
+    /// <summary>
+    /// 计算吞吐（每秒处理行数）。
+    /// </summary>
+    /// <param name="processedRows">处理行数。</param>
+    /// <param name="elapsed">耗时。</param>
+    /// <returns>吞吐。</returns>
+    private static double CalculateThroughputRowsPerSecond(int processedRows, TimeSpan elapsed)
+    {
+        return elapsed.TotalSeconds <= 0 ? 0 : processedRows / elapsed.TotalSeconds;
     }
 
     /// <summary>

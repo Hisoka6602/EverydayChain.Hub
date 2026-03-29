@@ -35,6 +35,9 @@ public class SyncTableOptions
     /// <summary>最大滞后分钟数。</summary>
     public int MaxLagMinutes { get; set; } = 10;
 
+    /// <summary>同步优先级（High/Low）。</summary>
+    public string Priority { get; set; } = "Low";
+
     /// <summary>唯一键集合。</summary>
     public List<string> UniqueKeys { get; set; } = [];
 

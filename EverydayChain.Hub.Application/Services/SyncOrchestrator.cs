@@ -1,5 +1,6 @@
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Sync;
 using Microsoft.Extensions.Logging;
 
@@ -49,18 +50,34 @@ public class SyncOrchestrator(
     public async Task<IReadOnlyList<SyncBatchResult>> RunAllEnabledTableSyncAsync(CancellationToken ct)
     {
         var definitions = await configRepository.ListEnabledAsync(ct);
-        var results = new List<SyncBatchResult>(definitions.Count);
-        foreach (var definition in definitions)
+        var orderedDefinitions = definitions
+            .OrderByDescending(x => x.Priority == SyncTablePriority.High)
+            .ThenBy(x => x.TableCode, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var maxParallelTables = await configRepository.GetMaxParallelTablesAsync(ct);
+        var results = new SyncBatchResult[orderedDefinitions.Count];
+        using var semaphore = new SemaphoreSlim(maxParallelTables, maxParallelTables);
+        var tasks = new List<Task>(orderedDefinitions.Count);
+        for (var index = 0; index < orderedDefinitions.Count; index++)
         {
-            if (ct.IsCancellationRequested)
+            ct.ThrowIfCancellationRequested();
+            var currentIndex = index;
+            var tableCode = orderedDefinitions[currentIndex].TableCode;
+            tasks.Add(Task.Run(async () =>
             {
-                break;
-            }
-
-            var result = await RunTableSyncAsync(definition.TableCode, ct);
-            results.Add(result);
+                await semaphore.WaitAsync(ct);
+                try
+                {
+                    results[currentIndex] = await RunTableSyncAsync(tableCode, ct);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }, ct));
         }
 
+        await Task.WhenAll(tasks);
         return results;
     }
 }

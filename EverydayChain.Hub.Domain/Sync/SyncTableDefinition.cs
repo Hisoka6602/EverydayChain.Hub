@@ -37,6 +37,9 @@ public class SyncTableDefinition
     /// <summary>最大滞后分钟数。</summary>
     public int MaxLagMinutes { get; set; } = 10;
 
+    /// <summary>同步调度优先级。</summary>
+    public SyncTablePriority Priority { get; set; } = SyncTablePriority.Low;
+
     /// <summary>分页大小。</summary>
     public int PageSize { get; set; } = 5000;
 

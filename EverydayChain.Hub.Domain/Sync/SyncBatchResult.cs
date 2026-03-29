@@ -34,4 +34,16 @@ public class SyncBatchResult
 
     /// <summary>耗时。</summary>
     public TimeSpan Elapsed { get; set; }
+
+    /// <summary>窗口滞后分钟数。</summary>
+    public double LagMinutes { get; set; }
+
+    /// <summary>窗口积压分钟数。</summary>
+    public double BacklogMinutes { get; set; }
+
+    /// <summary>吞吐（每秒处理行数）。</summary>
+    public double ThroughputRowsPerSecond { get; set; }
+
+    /// <summary>失败率（0~1）。</summary>
+    public double FailureRate { get; set; }
 }
