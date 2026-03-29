@@ -9,6 +9,9 @@ namespace EverydayChain.Hub.Infrastructure.Repositories;
 /// </summary>
 public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyncUpsertRepository upsertRepository) : ISyncDeletionRepository
 {
+    /// <summary>源端缺失证据描述。</summary>
+    private const string MissingSourceEvidenceMessage = "窗口内源端未检索到该业务键。";
+
     /// <inheritdoc/>
     public async Task<IReadOnlyList<SyncDeletionCandidate>> DetectDeletedKeysAsync(SyncDeletionDetectRequest request, CancellationToken ct)
     {
@@ -40,7 +43,7 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
             {
                 BusinessKey = businessKey,
                 TargetSnapshot = new Dictionary<string, object?>(row),
-                SourceEvidence = "窗口内源端未检索到该业务键。",
+                SourceEvidence = MissingSourceEvidenceMessage,
             });
         }
 

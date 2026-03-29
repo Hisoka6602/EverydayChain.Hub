@@ -14,7 +14,7 @@ public class SyncKeyReadRequest
     public string CursorColumn { get; set; } = string.Empty;
 
     /// <summary>同步窗口。</summary>
-    public SyncWindow Window { get; set; }
+    public SyncWindow Window { get; set; } = new();
 
     /// <summary>唯一键集合。</summary>
     public IReadOnlyList<string> UniqueKeys { get; set; } = Array.Empty<string>();
