@@ -70,13 +70,11 @@ jobs:
 
           instructions_path = pathlib.Path(".github/copilot-instructions.md")
           instructions_text = instructions_path.read_text(encoding="utf-8")
-          required_tokens = [
-              "删除",
-              "Oracle到SQLServer同步实施计划.md",
-              "通读相关代码",
-              "已完全实现",
-          ]
-          if not all(token in instructions_text for token in required_tokens):
+          plan_rule_pattern = re.compile(
+              r"删除\s*`?Oracle到SQLServer同步实施计划\.md`?.{0,120}?通读相关代码.{0,120}?已完全实现",
+              re.DOTALL,
+          )
+          if not plan_rule_pattern.search(instructions_text):
               print("错误：.github/copilot-instructions.md 缺少实施计划条目删除前通读代码校验的强制约束。")
               sys.exit(1)
 
