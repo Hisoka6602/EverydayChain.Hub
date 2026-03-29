@@ -229,7 +229,7 @@
 
 1. `CursorColumn + StartTimeLocal`：定义从哪个字段、哪个本地时间开始同步。
 2. `UniqueKeys`：定义幂等覆盖键（可单键/复合键）。
-3. `MaxLagMinutes`：实时性控制，采用固定延迟窗口；建议默认值 10 分钟（未配置时使用全局默认值）。
+3. `MaxLagMinutes`：实时性控制，采用固定延迟窗口；建议默认值 10 分钟（未配置时使用 `SyncJobOptions.DefaultMaxLagMinutes` 全局配置）。
 4. `Delete.Policy`：删除策略，支持关闭/软删/硬删。
 5. `Retention.KeepMonths`：本地分表保留期（月）。
 
@@ -274,6 +274,8 @@
 
 1. **识别删除**：在同步窗口内，本地目标键集合与源端键集合做存在性差异比对。
    - 大表优化：采用键集分段（按主键范围/哈希分桶）+ 并行比对，避免全量键集一次性比对造成内存与 I/O 峰值。
+   - 触发条件建议：目标表估算行数 >= 100 万或单次键集 > 20 万时启用。
+   - 配置参数建议：`DeletionCompareSegmentSize`（默认 20000）、`DeletionCompareMaxParallelism`（默认 4）。
 2. **执行删除**：
    - `SoftDelete`：更新 `IsDeleted` 与删除时间。
    - `HardDelete`：物理删除本地数据。
@@ -317,6 +319,7 @@
   - `Failed`：批次执行失败，已记录错误并等待重试/人工处理。
   - 状态流转：`Pending -> InProgress -> Completed/Failed`。
   - 失败重试：重试时创建新 `BatchId` 并从 `Pending` 重新进入流程，不复用已失败批次状态。
+  - 重试关联：新增 `ParentBatchId`（首次为空，重试批次指向首个失败或上一次失败批次）用于审计串联。
 - `StartedTimeLocal`
 - `CompletedTimeLocal`
 
