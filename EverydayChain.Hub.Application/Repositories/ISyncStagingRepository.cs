@@ -11,8 +11,9 @@ public interface ISyncStagingRepository
     /// <param name="batchId">批次编号。</param>
     /// <param name="pageNo">页码。</param>
     /// <param name="rows">数据行。</param>
+    /// <param name="normalizedExcludedColumns">规范化后的排除列集合。</param>
     /// <param name="ct">取消令牌。</param>
-    Task BulkInsertAsync(string batchId, int pageNo, IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, CancellationToken ct);
+    Task BulkInsertAsync(string batchId, int pageNo, IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, IReadOnlySet<string> normalizedExcludedColumns, CancellationToken ct);
 
     /// <summary>
     /// 读取暂存页数据。

@@ -47,6 +47,7 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
     private SyncTableDefinition MapDefinition(SyncTableOptions table)
     {
         var startTimeLocal = ParseLocalTime(table.StartTimeLocal, table.TableCode);
+        ValidateExcludedColumns(table);
         var globalPollingIntervalSeconds = _options.PollingIntervalSeconds > 0 ? _options.PollingIntervalSeconds : 60;
         var effectivePageSize = table.PageSize > 0 ? table.PageSize : 5000;
         return new SyncTableDefinition
@@ -69,7 +70,46 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             DeletionDryRun = table.Delete.DryRun,
             DeletionCompareSegmentSize = table.Delete.CompareSegmentSize > 0 ? table.Delete.CompareSegmentSize : 20000,
             DeletionCompareMaxParallelism = table.Delete.CompareMaxParallelism > 0 ? table.Delete.CompareMaxParallelism : 4,
+            RetentionEnabled = table.Retention.Enabled,
+            RetentionKeepMonths = table.Retention.KeepMonths > 0 ? table.Retention.KeepMonths : 3,
+            RetentionDryRun = table.Retention.DryRun,
+            RetentionAllowDrop = table.Retention.AllowDrop,
         };
+    }
+
+    /// <summary>
+    /// 校验排除列关键约束。
+    /// </summary>
+    /// <param name="table">单表配置。</param>
+    /// <exception cref="InvalidOperationException">当排除列与关键控制列冲突时抛出。</exception>
+    private static void ValidateExcludedColumns(SyncTableOptions table)
+    {
+        var excludedColumns = SyncColumnFilter.NormalizeColumns(table.ExcludedColumns);
+        if (excludedColumns.Count == 0)
+        {
+            return;
+        }
+
+        var uniqueKeys = SyncColumnFilter.NormalizeColumns(table.UniqueKeys);
+        var conflictsWithUniqueKeys = uniqueKeys.Where(excludedColumns.Contains).ToList();
+        if (conflictsWithUniqueKeys.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"表 {table.TableCode} 的 ExcludedColumns 与 UniqueKeys 冲突：{string.Join(", ", conflictsWithUniqueKeys)}。");
+        }
+
+        var normalizedCursorColumn = SyncColumnFilter.NormalizeColumnName(table.CursorColumn);
+        if (!string.IsNullOrWhiteSpace(normalizedCursorColumn) && excludedColumns.Contains(normalizedCursorColumn))
+        {
+            throw new InvalidOperationException($"表 {table.TableCode} 的 ExcludedColumns 禁止包含 CursorColumn：{table.CursorColumn}。");
+        }
+
+        var conflictsWithSoftDeleteColumns = SyncColumnFilter.NormalizedSoftDeleteColumns.Where(excludedColumns.Contains).ToList();
+        if (conflictsWithSoftDeleteColumns.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"表 {table.TableCode} 的 ExcludedColumns 禁止包含软删除标记列：{string.Join(", ", conflictsWithSoftDeleteColumns)}。");
+        }
     }
 
     /// <summary>

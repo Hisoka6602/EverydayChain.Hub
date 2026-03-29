@@ -34,6 +34,7 @@ public class SyncOrchestrator(
                 Window = window,
                 BatchId = Guid.NewGuid().ToString("N"),
                 ParentBatchId = parentBatchId,
+                NormalizedExcludedColumns = SyncColumnFilter.NormalizeColumns(definition.ExcludedColumns),
             };
             return await executionService.ExecuteBatchAsync(context, ct);
         }

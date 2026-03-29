@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Domain.Sync;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
@@ -12,10 +13,17 @@ public class SyncStagingRepository : ISyncStagingRepository
     private readonly ConcurrentDictionary<string, IReadOnlyList<IReadOnlyDictionary<string, object?>>> _staging = new();
 
     /// <inheritdoc/>
-    public Task BulkInsertAsync(string batchId, int pageNo, IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, CancellationToken ct)
+    public Task BulkInsertAsync(string batchId, int pageNo, IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, IReadOnlySet<string> normalizedExcludedColumns, CancellationToken ct)
     {
         var storageKey = BuildStorageKey(batchId, pageNo);
-        _staging[storageKey] = rows.Select(row => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>(row)).ToList();
+        var pageRows = rows
+            .Select(row =>
+            {
+                var filteredRow = SyncColumnFilter.FilterExcludedColumns(row, normalizedExcludedColumns);
+                return new Dictionary<string, object?>(filteredRow);
+            })
+            .ToList();
+        _staging[storageKey] = pageRows;
         return Task.CompletedTask;
     }
 
@@ -49,4 +57,5 @@ public class SyncStagingRepository : ISyncStagingRepository
     {
         return $"{batchId}:{pageNo}";
     }
+
 }

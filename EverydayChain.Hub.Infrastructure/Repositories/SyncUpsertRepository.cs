@@ -32,8 +32,9 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         foreach (var row in request.Rows)
         {
             ct.ThrowIfCancellationRequested();
+            var filteredRow = SyncColumnFilter.FilterExcludedColumns(row, request.NormalizedExcludedColumns);
 
-            var rowKey = SyncBusinessKeyBuilder.Build(row, request.UniqueKeys);
+            var rowKey = SyncBusinessKeyBuilder.Build(filteredRow, request.UniqueKeys);
             if (string.IsNullOrWhiteSpace(rowKey))
             {
                 continue;
@@ -41,24 +42,24 @@ public class SyncUpsertRepository : ISyncUpsertRepository
 
             if (!targetTable.TryGetValue(rowKey, out var existedRow))
             {
-                targetTable[rowKey] = CloneRow(row);
+                targetTable[rowKey] = CloneRow(filteredRow);
                 result.InsertCount++;
                 changedOperations[rowKey] = SyncChangeOperationType.Insert;
-                UpdateLastCursor(result, row, request.CursorColumn);
+                UpdateLastCursor(result, filteredRow, request.CursorColumn);
                 continue;
             }
 
-            if (AreRowsEqual(existedRow, row))
+            if (AreRowsEqual(existedRow, filteredRow))
             {
                 result.SkipCount++;
-                UpdateLastCursor(result, row, request.CursorColumn);
+                UpdateLastCursor(result, filteredRow, request.CursorColumn);
                 continue;
             }
 
-            targetTable[rowKey] = CloneRow(row);
+            targetTable[rowKey] = CloneRow(filteredRow);
             result.UpdateCount++;
             changedOperations[rowKey] = SyncChangeOperationType.Update;
-            UpdateLastCursor(result, row, request.CursorColumn);
+            UpdateLastCursor(result, filteredRow, request.CursorColumn);
         }
 
         return Task.FromResult(result);
@@ -99,8 +100,8 @@ public class SyncUpsertRepository : ISyncUpsertRepository
             {
                 var softDeletedRow = new Dictionary<string, object?>(row)
                 {
-                    ["IsDeleted"] = true,
-                    ["DeletedTimeLocal"] = DateTime.Now,
+                    [SyncColumnFilter.SoftDeleteFlagColumn] = true,
+                    [SyncColumnFilter.SoftDeleteTimeColumn] = DateTime.Now,
                 };
                 table[businessKey] = softDeletedRow;
                 deletedCount++;
@@ -179,4 +180,5 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     {
         return new Dictionary<string, object?>(row);
     }
+
 }
