@@ -15,7 +15,8 @@ public class SyncStagingRepository : ISyncStagingRepository
     public Task BulkInsertAsync(string batchId, int pageNo, IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, IReadOnlyList<string> excludedColumns, CancellationToken ct)
     {
         var storageKey = BuildStorageKey(batchId, pageNo);
-        _staging[storageKey] = rows.Select(row => SyncColumnFilter.FilterExcludedColumns(row, excludedColumns)).ToList();
+        var normalizedExcludedColumns = SyncColumnFilter.NormalizeColumns(excludedColumns);
+        _staging[storageKey] = rows.Select(row => SyncColumnFilter.FilterExcludedColumns(row, normalizedExcludedColumns)).ToList();
         return Task.CompletedTask;
     }
 

@@ -29,6 +29,7 @@ public class OracleSourceReader : IOracleSourceReader
             return Task.FromResult(new SyncReadResult());
         }
 
+        var normalizedExcludedColumns = SyncColumnFilter.NormalizeColumns(request.ExcludedColumns);
         var filteredRows = rows
             .Where(row => row.TryGetValue(request.CursorColumn, out var value)
                           && value is DateTime cursorLocal
@@ -38,7 +39,7 @@ public class OracleSourceReader : IOracleSourceReader
             .ThenBy(row => BuildStableKey(row, request.UniqueKeys))
             .Skip((request.PageNo - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Select(row => SyncColumnFilter.FilterExcludedColumns(row, request.ExcludedColumns))
+            .Select(row => SyncColumnFilter.FilterExcludedColumns(row, normalizedExcludedColumns))
             .ToList();
 
         return Task.FromResult(new SyncReadResult

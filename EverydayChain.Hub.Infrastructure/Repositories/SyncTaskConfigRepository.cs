@@ -96,8 +96,7 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
                 $"表 {table.TableCode} 的 ExcludedColumns 与 UniqueKeys 冲突：{string.Join(", ", conflictsWithUniqueKeys)}。");
         }
 
-        var normalizedCursorColumns = SyncColumnFilter.NormalizeColumns([table.CursorColumn]);
-        var normalizedCursorColumn = normalizedCursorColumns.FirstOrDefault();
+        var normalizedCursorColumn = SyncColumnFilter.NormalizeColumnName(table.CursorColumn);
         if (!string.IsNullOrWhiteSpace(normalizedCursorColumn) && excludedColumns.Contains(normalizedCursorColumn))
         {
             throw new InvalidOperationException($"表 {table.TableCode} 的 ExcludedColumns 禁止包含 CursorColumn：{table.CursorColumn}。");

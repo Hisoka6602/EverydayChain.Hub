@@ -28,11 +28,12 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         {
             ChangedOperations = changedOperations,
         };
+        var normalizedExcludedColumns = SyncColumnFilter.NormalizeColumns(request.ExcludedColumns);
 
         foreach (var row in request.Rows)
         {
             ct.ThrowIfCancellationRequested();
-            var filteredRow = SyncColumnFilter.FilterExcludedColumns(row, request.ExcludedColumns);
+            var filteredRow = SyncColumnFilter.FilterExcludedColumns(row, normalizedExcludedColumns);
 
             var rowKey = SyncBusinessKeyBuilder.Build(filteredRow, request.UniqueKeys);
             if (string.IsNullOrWhiteSpace(rowKey))

@@ -35,6 +35,20 @@ public static class SyncColumnFilter
         IReadOnlyList<string> excludedColumns)
     {
         var excludedColumnSet = NormalizeColumns(excludedColumns);
+        return FilterExcludedColumns(row, excludedColumnSet);
+    }
+
+    /// <summary>
+    /// 过滤行中的排除列（使用已规范化集合）。
+    /// </summary>
+    /// <param name="row">原始数据行。</param>
+    /// <param name="normalizedExcludedColumns">规范化排除列集合。</param>
+    /// <returns>过滤后的数据行。</returns>
+    public static IReadOnlyDictionary<string, object?> FilterExcludedColumns(
+        IReadOnlyDictionary<string, object?> row,
+        ISet<string> normalizedExcludedColumns)
+    {
+        var excludedColumnSet = normalizedExcludedColumns;
         if (excludedColumnSet.Count == 0)
         {
             return new Dictionary<string, object?>(row);
@@ -65,5 +79,15 @@ public static class SyncColumnFilter
             .Where(static x => !string.IsNullOrWhiteSpace(x))
             .Select(static x => x.Trim())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 规范化单个列名。
+    /// </summary>
+    /// <param name="columnName">列名。</param>
+    /// <returns>规范化后的列名，空白返回空字符串。</returns>
+    public static string NormalizeColumnName(string columnName)
+    {
+        return string.IsNullOrWhiteSpace(columnName) ? string.Empty : columnName.Trim();
     }
 }
