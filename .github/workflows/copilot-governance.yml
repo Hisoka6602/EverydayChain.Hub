@@ -55,13 +55,6 @@ jobs:
             fi
           fi
 
-          if echo "$CHANGED_FILES" | grep -qx "Oracle到SQLServer同步实施计划.md"; then
-            if ! echo "$CHANGED_FILES" | grep -qx ".github/copilot-instructions.md"; then
-              echo "错误：修改 Oracle到SQLServer同步实施计划.md 时必须同步检查并更新 .github/copilot-instructions.md 约束。"
-              exit 1
-            fi
-          fi
-
           if git diff --name-status "$BASE_SHA" "$HEAD_SHA" | awk '$1=="A" || $1=="D" {print $2}' | grep -q .; then
             if ! echo "$CHANGED_FILES" | grep -qx "README.md"; then
               echo "错误：检测到新增/删除文件，但 README.md 未同步更新。"
@@ -74,6 +67,13 @@ jobs:
           import re
           import subprocess
           import sys
+
+          instructions_path = pathlib.Path(".github/copilot-instructions.md")
+          instructions_text = instructions_path.read_text(encoding="utf-8")
+          required_phrase = "删除 `Oracle到SQLServer同步实施计划.md` 任一条目之前，必须先通读相关代码并确认“已完全实现 + 行为可用 + 验收通过”；未完全实现不得删除该条目。"
+          if required_phrase not in instructions_text:
+              print("错误：.github/copilot-instructions.md 缺少实施计划条目删除前通读代码校验的强制约束。")
+              sys.exit(1)
 
           banned_patterns = [
               r"\bDateTime\.UtcNow\b",
