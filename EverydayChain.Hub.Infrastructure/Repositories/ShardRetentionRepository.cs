@@ -203,7 +203,6 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, c.column_id;
 
                 var includeColumns = index
                     .Where(x => x.IsIncludedColumn)
-                    .OrderBy(x => x.ColumnName, StringComparer.OrdinalIgnoreCase)
                     .Select(x => $"[{x.ColumnName}]")
                     .ToList();
                 var includeSql = includeColumns.Count > 0
