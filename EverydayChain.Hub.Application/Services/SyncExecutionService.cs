@@ -244,7 +244,7 @@ public class SyncExecutionService(
         }
 
         var keyValues = uniqueKeys.Select(key =>
-            row.TryGetValue(key, out var value) ? value?.ToString() ?? string.Empty : string.Empty);
+            row.TryGetValue(key, out var value) ? value?.ToString() ?? string.Empty : string.Empty).ToArray();
         return JsonSerializer.Serialize(keyValues, SnapshotSerializerOptions);
     }
 

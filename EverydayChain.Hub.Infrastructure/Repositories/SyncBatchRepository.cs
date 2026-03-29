@@ -74,7 +74,7 @@ public class SyncBatchRepository : ISyncBatchRepository
         _latestFailedBatchIndex.AddOrUpdate(
             batch.TableCode,
             _ => (batch.BatchId, failedTimeLocal),
-            (_, current) => current.CompletedTimeLocal > failedTimeLocal
+            (_, current) => current.CompletedTimeLocal >= failedTimeLocal
                 ? current
                 : (batch.BatchId, failedTimeLocal));
         return Task.CompletedTask;
