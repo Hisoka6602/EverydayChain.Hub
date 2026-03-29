@@ -278,8 +278,8 @@
 
 1. **识别删除**：在同步窗口内，本地目标键集合与源端键集合做存在性差异比对。
    - 大表优化：采用键集分段（按主键范围/哈希分桶）+ 并行比对，避免全量键集一次性比对造成内存与 I/O 峰值。
-   - 触发条件建议：目标表估算行数 >= 100 万或单次键集 > 20 万时启用。
-   - 配置参数建议：`DeletionCompareSegmentSize`（默认 20000）、`DeletionCompareMaxParallelism`（默认 4）。
+   - 触发条件建议：目标表估算行数大于等于 100 万，或单次键集大于 20 万时启用。
+   - 配置参数建议：`DeletionCompareSegmentSize`（默认 20000），`DeletionCompareMaxParallelism`（默认 4）。
 2. **执行删除**：
    - `SoftDelete`：更新 `IsDeleted` 与删除时间。
    - `HardDelete`：物理删除本地数据。
@@ -383,7 +383,7 @@
 
 ## 9.2 控制准实时
 
-1. `PollingIntervalSeconds` 可配置（如 30s/60s/120s）。
+1. `PollingIntervalSeconds` 可配置（如 30 秒、60 秒、120 秒）。
 2. `MaxLagMinutes` 可配置（如 10 分钟）。
 3. 对高优先级表使用更短轮询周期。
 4. 对低优先级表使用较长周期，减轻整体压力。
