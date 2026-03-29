@@ -216,7 +216,9 @@
   "Delete": {
     "Policy": "HardDelete",
     "Enabled": true,
-    "DryRun": false
+    "DryRun": false,
+    "CompareSegmentSize": 20000,
+    "CompareMaxParallelism": 4
   },
   "Retention": {
     "Enabled": true,
@@ -230,8 +232,10 @@
 1. `CursorColumn + StartTimeLocal`：定义从哪个字段、哪个本地时间开始同步。
 2. `UniqueKeys`：定义幂等覆盖键（可单键/复合键）。
 3. `MaxLagMinutes`：实时性控制，采用固定延迟窗口；建议默认值 10 分钟（未配置时使用 `SyncJobOptions.DefaultMaxLagMinutes` 全局配置）。
+   - 全局配置位置：Host 层 `SyncJobOptions`（绑定 `appsettings.json:SyncJob` 节点）。
 4. `Delete.Policy`：删除策略，支持关闭/软删/硬删。
-5. `Retention.KeepMonths`：本地分表保留期（月）。
+5. `Delete.CompareSegmentSize` / `Delete.CompareMaxParallelism`：删除键集差异比对的分段大小与并行度。
+6. `Retention.KeepMonths`：本地分表保留期（月）。
 
 ---
 
@@ -304,6 +308,7 @@
 ## 7.2 `SyncBatch`
 
 - `BatchId`
+- `ParentBatchId`（首次为空；重试批次指向关联失败批次）
 - `TableCode`
 - `WindowStartLocal`
 - `WindowEndLocal`
@@ -326,6 +331,7 @@
 ## 7.3 `SyncChangeLog`
 
 - `BatchId`
+- `ParentBatchId`（首次为空；重试批次指向关联失败批次）
 - `TableCode`
 - `OperationType`（Insert/Update/Delete）
 - `BusinessKey`
@@ -336,6 +342,7 @@
 ## 7.4 `SyncDeletionLog`
 
 - `BatchId`
+- `ParentBatchId`（首次为空；重试批次指向关联失败批次）
 - `TableCode`
 - `BusinessKey`
 - `DeletionPolicy`
