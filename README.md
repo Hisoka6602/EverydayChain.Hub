@@ -25,6 +25,7 @@
 │   ├── Enums/DeletionPolicy.cs
 │   ├── Enums/LagControlMode.cs
 │   ├── Enums/SyncBatchStatus.cs
+│   ├── Enums/SyncChangeOperationType.cs
 │   ├── Sync/SyncTableDefinition.cs
 │   ├── Sync/SyncWindow.cs
 │   ├── Sync/SyncCheckpoint.cs
@@ -108,7 +109,7 @@
 - `.github/workflows/copilot-governance.yml`：执行规则自动校验，并强制规则文件与工作流联动修改。
 - `SyncTableDefinition.cs` / `SyncWindow.cs` / `SyncCheckpoint.cs` / `SyncBatchResult.cs`：定义同步链路执行、窗口与结果统计的核心领域模型。
 - `SyncBatch.cs` / `SyncChangeLog.cs`：定义批次状态跟踪与变更审计的数据模型。
-- `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs`：同步模式、删除策略、滞后控制与批次状态枚举，均含中文 XML 注释与 `Description`。
+- `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs`：同步模式、删除策略、滞后控制、批次状态与变更操作类型枚举，均含中文 XML 注释与 `Description`。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
 - `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs`：同步执行上下文、分页读取与幂等合并的数据契约模型。
 - `ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs`：定义批次状态持久化与变更日志写入契约。

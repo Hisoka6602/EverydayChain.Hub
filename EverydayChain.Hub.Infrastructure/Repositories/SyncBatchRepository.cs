@@ -78,8 +78,7 @@ public class SyncBatchRepository : ISyncBatchRepository
         var latestFailedBatch = _batches.Values
             .Where(batch => string.Equals(batch.TableCode, tableCode, StringComparison.OrdinalIgnoreCase)
                 && batch.Status == SyncBatchStatus.Failed)
-            .OrderByDescending(batch => batch.CompletedTimeLocal ?? DateTime.MinValue)
-            .FirstOrDefault();
+            .MaxBy(batch => batch.CompletedTimeLocal ?? DateTime.MinValue);
         return Task.FromResult(latestFailedBatch?.BatchId);
     }
 

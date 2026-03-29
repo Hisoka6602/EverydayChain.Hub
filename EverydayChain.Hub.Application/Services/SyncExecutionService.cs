@@ -1,8 +1,10 @@
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Sync;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Text.Json;
 
 namespace EverydayChain.Hub.Application.Services;
 
@@ -206,7 +208,7 @@ public class SyncExecutionService(
                 BatchId = context.BatchId,
                 ParentBatchId = context.ParentBatchId,
                 TableCode = context.Definition.TableCode,
-                OperationType = "Upsert",
+                OperationType = SyncChangeOperationType.Update.ToString(),
                 BusinessKey = businessKey,
                 BeforeSnapshot = null,
                 AfterSnapshot = BuildSnapshot(row),
@@ -239,6 +241,6 @@ public class SyncExecutionService(
     /// <returns>快照文本。</returns>
     private static string BuildSnapshot(IReadOnlyDictionary<string, object?> row)
     {
-        return string.Join(", ", row.Select(pair => $"{pair.Key}={pair.Value}"));
+        return JsonSerializer.Serialize(row);
     }
 }
