@@ -54,6 +54,7 @@ public class DeletionExecutionService(
         {
             ct.ThrowIfCancellationRequested();
             var snapshot = JsonSerializer.Serialize(candidate.TargetSnapshot, SnapshotSerializerOptions);
+            var nowLocal = DateTime.Now;
             deletionLogs.Add(new SyncDeletionLog
             {
                 BatchId = context.BatchId,
@@ -62,7 +63,7 @@ public class DeletionExecutionService(
                 BusinessKey = candidate.BusinessKey,
                 DeletionPolicy = context.Definition.DeletionPolicy,
                 Executed = executed,
-                DeletedTimeLocal = DateTime.Now,
+                DeletedTimeLocal = executed ? nowLocal : null,
                 SourceEvidence = candidate.SourceEvidence,
             });
             changeLogs.Add(new SyncChangeLog
@@ -74,7 +75,7 @@ public class DeletionExecutionService(
                 BusinessKey = candidate.BusinessKey,
                 BeforeSnapshot = snapshot,
                 AfterSnapshot = null,
-                ChangedTimeLocal = DateTime.Now,
+                ChangedTimeLocal = nowLocal,
             });
         }
 

@@ -11,7 +11,6 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
 {
     /// <summary>源端缺失证据描述。</summary>
     private const string MissingSourceEvidenceMessage = "窗口内源端未检索到该业务键。";
-
     /// <inheritdoc/>
     public async Task<IReadOnlyList<SyncDeletionCandidate>> DetectDeletedKeysAsync(SyncDeletionDetectRequest request, CancellationToken ct)
     {
@@ -25,29 +24,77 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
 
         var targetRows = await upsertRepository.ListTargetRowsAsync(request.TableCode, ct);
         var candidates = new List<SyncDeletionCandidate>();
-        foreach (var row in targetRows)
+        var segmentSize = request.CompareSegmentSize > 0 ? request.CompareSegmentSize : 20000;
+        var maxParallelism = request.CompareMaxParallelism > 0 ? request.CompareMaxParallelism : 1;
+        var parallelOptions = new ParallelOptions
         {
-            ct.ThrowIfCancellationRequested();
-            var businessKey = upsertRepository.BuildBusinessKey(row, request.UniqueKeys);
-            if (string.IsNullOrWhiteSpace(businessKey))
-            {
-                continue;
-            }
+            CancellationToken = ct,
+            MaxDegreeOfParallelism = maxParallelism,
+        };
 
-            if (sourceKeys.Contains(businessKey))
+        var candidateBag = new System.Collections.Concurrent.ConcurrentBag<SyncDeletionCandidate>();
+        var segments = targetRows
+            .Select((row, index) => new { row, index })
+            .GroupBy(item => item.index / segmentSize)
+            .Select(group => group.Select(item => item.row).ToList())
+            .ToList();
+        await Parallel.ForEachAsync(segments, parallelOptions, (segmentRows, token) =>
+        {
+            foreach (var row in segmentRows)
             {
-                continue;
-            }
+                token.ThrowIfCancellationRequested();
 
-            candidates.Add(new SyncDeletionCandidate
-            {
-                BusinessKey = businessKey,
-                TargetSnapshot = new Dictionary<string, object?>(row),
-                SourceEvidence = MissingSourceEvidenceMessage,
-            });
-        }
+                if (!IsRowWithinWindow(row, request.CursorColumn, request.Window))
+                {
+                    continue;
+                }
+
+                var businessKey = upsertRepository.BuildBusinessKey(row, request.UniqueKeys);
+                if (string.IsNullOrWhiteSpace(businessKey) || sourceKeys.Contains(businessKey))
+                {
+                    continue;
+                }
+
+                candidateBag.Add(new SyncDeletionCandidate
+                {
+                    BusinessKey = businessKey,
+                    TargetSnapshot = new Dictionary<string, object?>(row),
+                    SourceEvidence = MissingSourceEvidenceMessage,
+                });
+            }
+            return ValueTask.CompletedTask;
+        });
+
+        candidates.AddRange(candidateBag.OrderBy(x => x.BusinessKey, StringComparer.OrdinalIgnoreCase));
 
         return candidates;
+    }
+
+    /// <summary>
+    /// 判断目标数据行是否在同步窗口内。
+    /// </summary>
+    /// <param name="row">目标数据行。</param>
+    /// <param name="cursorColumn">游标列名。</param>
+    /// <param name="window">同步窗口。</param>
+    /// <returns>在窗口内返回 <c>true</c>。</returns>
+    private static bool IsRowWithinWindow(IReadOnlyDictionary<string, object?> row, string cursorColumn, Domain.Sync.SyncWindow window)
+    {
+        if (!row.TryGetValue(cursorColumn, out var cursorValue) || cursorValue is not DateTime cursorLocal)
+        {
+            return false;
+        }
+
+        if (cursorLocal.Kind == DateTimeKind.Utc)
+        {
+            return false;
+        }
+
+        if (cursorLocal.Kind == DateTimeKind.Unspecified)
+        {
+            cursorLocal = DateTime.SpecifyKind(cursorLocal, DateTimeKind.Local);
+        }
+
+        return cursorLocal > window.WindowStartLocal && cursorLocal <= window.WindowEndLocal;
     }
 
     /// <inheritdoc/>

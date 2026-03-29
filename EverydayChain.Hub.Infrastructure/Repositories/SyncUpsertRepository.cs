@@ -73,7 +73,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
             return Task.FromResult<IReadOnlyList<IReadOnlyDictionary<string, object?>>>([]);
         }
 
-        var rows = table.Values.Select(CloneRow).ToList();
+        var rows = table.Values.ToList();
         return Task.FromResult<IReadOnlyList<IReadOnlyDictionary<string, object?>>>(rows);
     }
 

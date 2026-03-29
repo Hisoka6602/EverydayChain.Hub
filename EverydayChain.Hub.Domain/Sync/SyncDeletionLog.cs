@@ -26,7 +26,7 @@ public class SyncDeletionLog
     public bool Executed { get; set; }
 
     /// <summary>删除时间（本地）。</summary>
-    public DateTime DeletedTimeLocal { get; set; }
+    public DateTime? DeletedTimeLocal { get; set; }
 
     /// <summary>源端缺失证据。</summary>
     public string SourceEvidence { get; set; } = string.Empty;

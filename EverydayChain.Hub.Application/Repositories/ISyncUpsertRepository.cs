@@ -1,4 +1,5 @@
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Application.Repositories;
 
@@ -31,7 +32,7 @@ public interface ISyncUpsertRepository
     /// <param name="deletionPolicy">删除策略。</param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>删除数量。</returns>
-    Task<int> DeleteByBusinessKeysAsync(string tableCode, IReadOnlyList<string> businessKeys, EverydayChain.Hub.Domain.Enums.DeletionPolicy deletionPolicy, CancellationToken ct);
+    Task<int> DeleteByBusinessKeysAsync(string tableCode, IReadOnlyList<string> businessKeys, DeletionPolicy deletionPolicy, CancellationToken ct);
 
     /// <summary>
     /// 构建业务键文本。
