@@ -229,7 +229,7 @@
 
 1. `CursorColumn + StartTimeLocal`：定义从哪个字段、哪个本地时间开始同步。
 2. `UniqueKeys`：定义幂等覆盖键（可单键/复合键）。
-3. `MaxLagMinutes`：实时性控制，默认固定延迟窗口（例如 10 分钟）。
+3. `MaxLagMinutes`：实时性控制，采用固定延迟窗口；建议默认值 10 分钟（未配置时使用全局默认值）。
 4. `Delete.Policy`：删除策略，支持关闭/软删/硬删。
 5. `Retention.KeepMonths`：本地分表保留期（月）。
 
@@ -245,7 +245,7 @@
 
 - `WindowEndLocal`：
   - `NowLocal - MaxLagMinutes`。
-  - 目的：避免读取到仍在源端事务中的“未稳定数据”。
+  - 目的：为源端提交传播、网络抖动与批处理聚合预留安全滞后窗口，降低近端频繁回查与抖动。
 
 - 查询条件：
   - `CursorColumn > WindowStartLocal AND CursorColumn <= WindowEndLocal`
@@ -273,6 +273,7 @@
 删除同步分两步：
 
 1. **识别删除**：在同步窗口内，本地目标键集合与源端键集合做存在性差异比对。
+   - 大表优化：采用键集分段（按主键范围/哈希分桶）+ 并行比对，避免全量键集一次性比对造成内存与 I/O 峰值。
 2. **执行删除**：
    - `SoftDelete`：更新 `IsDeleted` 与删除时间。
    - `HardDelete`：物理删除本地数据。
@@ -314,7 +315,8 @@
   - `InProgress`：已进入执行中（读取、合并、删除、日志写入任一环节进行中）。
   - `Completed`：本批次所有步骤成功完成，并已提交检查点。
   - `Failed`：批次执行失败，已记录错误并等待重试/人工处理。
-  - 状态流转：`Pending -> InProgress -> Completed/Failed`（禁止跨级逆向流转）。
+  - 状态流转：`Pending -> InProgress -> Completed/Failed`。
+  - 失败重试：重试时创建新 `BatchId` 并从 `Pending` 重新进入流程，不复用已失败批次状态。
 - `StartedTimeLocal`
 - `CompletedTimeLocal`
 
