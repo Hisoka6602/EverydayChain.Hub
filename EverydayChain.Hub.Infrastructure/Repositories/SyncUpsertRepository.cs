@@ -543,9 +543,7 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
             case JsonValueKind.String:
                 if (element.TryGetDateTime(out var dateTimeValue))
                 {
-                    return dateTimeValue.Kind == DateTimeKind.Unspecified
-                        ? DateTime.SpecifyKind(dateTimeValue, DateTimeKind.Local)
-                        : dateTimeValue.ToLocalTime();
+                    return EnsureLocalDateTime(dateTimeValue, element.GetString());
                 }
 
                 var stringValue = element.GetString();
@@ -554,18 +552,71 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
                     return stringValue;
                 }
 
+                if (ContainsOffsetOrZulu(stringValue))
+                {
+                    throw new InvalidOperationException($"不支持包含 Z 或 offset 的时间文本：{stringValue}");
+                }
+
                 if (DateTime.TryParse(
                         stringValue,
-                        CultureInfo.InvariantCulture,
+                        CultureInfo.CurrentCulture,
                         DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces,
                         out var parsedLocalDateTime))
                 {
-                    return parsedLocalDateTime;
+                    return EnsureLocalDateTime(parsedLocalDateTime, stringValue);
                 }
 
                 return stringValue;
             default:
                 return element.GetRawText();
         }
+    }
+
+    /// <summary>
+    /// 确保时间值满足本地时间语义。
+    /// </summary>
+    /// <param name="value">时间值。</param>
+    /// <param name="originalText">原始文本。</param>
+    /// <returns>本地语义时间值。</returns>
+    private static DateTime EnsureLocalDateTime(DateTime value, string? originalText)
+    {
+        if (value.Kind == DateTimeKind.Unspecified)
+        {
+            return DateTime.SpecifyKind(value, DateTimeKind.Local);
+        }
+
+        if (value.Kind == DateTimeKind.Local)
+        {
+            return value;
+        }
+
+        throw new InvalidOperationException($"检测到非本地时间语义，已拒绝加载：{originalText ?? value.ToString("O")}");
+    }
+
+    /// <summary>
+    /// 判断时间文本是否包含 Z 或 offset 信息。
+    /// </summary>
+    /// <param name="value">时间文本。</param>
+    /// <returns>包含则返回 <c>true</c>。</returns>
+    private static bool ContainsOffsetOrZulu(string value)
+    {
+        if (value.EndsWith('Z') || value.EndsWith('z'))
+        {
+            return true;
+        }
+
+        var separatorIndex = value.IndexOf('T');
+        if (separatorIndex < 0)
+        {
+            separatorIndex = value.IndexOf(' ');
+        }
+
+        if (separatorIndex < 0 || separatorIndex >= value.Length - 1)
+        {
+            return false;
+        }
+
+        var timePart = value[(separatorIndex + 1)..];
+        return timePart.Contains('+') || timePart.Contains('-');
     }
 }
