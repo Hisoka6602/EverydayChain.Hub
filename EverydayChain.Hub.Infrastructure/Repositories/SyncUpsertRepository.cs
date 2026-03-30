@@ -14,20 +14,37 @@ namespace EverydayChain.Hub.Infrastructure.Repositories;
 /// <summary>
 /// 同步幂等合并仓储基础实现（内存幂等仓）。
 /// </summary>
-public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogger<SyncUpsertRepository> logger) : ISyncUpsertRepository
+public class SyncUpsertRepository : ISyncUpsertRepository
 {
     /// <summary>目标内存表，按表编码分组。</summary>
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, IReadOnlyDictionary<string, object?>>> _targetTables = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>目标端持久化文件访问锁。</summary>
     private static readonly SemaphoreSlim TargetStoreFileLock = new(1, 1);
+    /// <summary>日志组件。</summary>
+    private readonly ILogger<SyncUpsertRepository> _logger;
     /// <summary>目标端持久化文件路径。</summary>
-    private readonly string _targetStoreFilePath = ResolveTargetStoreFilePath(syncJobOptions.Value.TargetStoreFilePath);
+    private readonly string _targetStoreFilePath;
     /// <summary>目标端持久化文件目录。</summary>
-    private readonly string _targetStoreDirectoryPath = ResolveTargetStoreDirectoryPath(ResolveTargetStoreFilePath(syncJobOptions.Value.TargetStoreFilePath));
+    private readonly string _targetStoreDirectoryPath;
     /// <summary>目标端持久化文件名前缀。</summary>
-    private readonly string _targetStoreFileNamePrefix = ResolveTargetStoreFileNamePrefix(ResolveTargetStoreFilePath(syncJobOptions.Value.TargetStoreFilePath));
+    private readonly string _targetStoreFileNamePrefix;
     /// <summary>目标端持久化文件扩展名。</summary>
-    private readonly string _targetStoreFileNameExtension = ResolveTargetStoreFileNameExtension(ResolveTargetStoreFilePath(syncJobOptions.Value.TargetStoreFilePath));
+    private readonly string _targetStoreFileNameExtension;
+
+    /// <summary>
+    /// 初始化同步幂等合并仓储。
+    /// </summary>
+    /// <param name="syncJobOptions">同步任务配置。</param>
+    /// <param name="logger">日志组件。</param>
+    public SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogger<SyncUpsertRepository> logger)
+    {
+        _logger = logger;
+        var resolvedTargetStoreFilePath = ResolveTargetStoreFilePath(syncJobOptions.Value.TargetStoreFilePath);
+        _targetStoreFilePath = resolvedTargetStoreFilePath;
+        _targetStoreDirectoryPath = ResolveTargetStoreDirectoryPath(resolvedTargetStoreFilePath);
+        _targetStoreFileNamePrefix = ResolveTargetStoreFileNamePrefix(resolvedTargetStoreFilePath);
+        _targetStoreFileNameExtension = ResolveTargetStoreFileNameExtension(resolvedTargetStoreFilePath);
+    }
 
     /// <summary>
     /// 解析目标端持久化文件路径。
@@ -326,7 +343,7 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "写入同步目标落地文件失败。Path={TargetStoreFilePath}, TableCode={TableCode}", _targetStoreFilePath, tableCode);
+            _logger.LogError(ex, "写入同步目标落地文件失败。Path={TargetStoreFilePath}, TableCode={TableCode}", _targetStoreFilePath, tableCode);
             throw;
         }
         finally
@@ -380,7 +397,7 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "读取同步目标落地文件失败。Path={TargetStoreFilePath}, TableCode={TableCode}", _targetStoreFilePath, tableCode);
+            _logger.LogError(ex, "读取同步目标落地文件失败。Path={TargetStoreFilePath}, TableCode={TableCode}", _targetStoreFilePath, tableCode);
             throw new InvalidOperationException(
                 $"读取同步目标落地文件失败（Path={_targetStoreFilePath}, TableCode={tableCode}）。请检查文件内容是否为有效 JSON，必要时备份后清理该运行期文件再重试。",
                 ex);
@@ -412,7 +429,7 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
             await File.WriteAllTextAsync(tempFilePath, json, ct);
             if (File.Exists(tableStoreFilePath))
             {
-                File.Replace(tempFilePath, tableStoreFilePath, backupFilePath, true);
+                File.Replace(tempFilePath, tableStoreFilePath, backupFilePath, false);
                 if (File.Exists(backupFilePath))
                 {
                     File.Delete(backupFilePath);
@@ -425,7 +442,7 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "原子写入同步目标落地文件失败。Path={TargetStoreFilePath}, TableCode={TableCode}", tableStoreFilePath, tableCode);
+            _logger.LogError(ex, "原子写入同步目标落地文件失败。Path={TargetStoreFilePath}, TableCode={TableCode}", tableStoreFilePath, tableCode);
             throw new InvalidOperationException(
                 $"原子写入同步目标落地文件失败（Path={tableStoreFilePath}, TableCode={tableCode}）。请检查目录权限与磁盘空间后重试。",
                 ex);
@@ -446,14 +463,29 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
     /// <returns>按表落地文件绝对路径。</returns>
     private string BuildPerTableStoreFilePath(string tableCode)
     {
-        var safeTableCode = tableCode;
-        foreach (var invalidFileNameChar in Path.GetInvalidFileNameChars())
-        {
-            safeTableCode = safeTableCode.Replace(invalidFileNameChar, '_');
-        }
-
+        var safeTableCode = ReplaceInvalidFileNameChars(tableCode);
         var fileName = $"{_targetStoreFileNamePrefix}.{safeTableCode}{_targetStoreFileNameExtension}";
         return Path.Combine(_targetStoreDirectoryPath, fileName);
+    }
+
+    /// <summary>
+    /// 将非法文件名字符替换为下划线。
+    /// </summary>
+    /// <param name="value">原始字符串。</param>
+    /// <returns>替换结果。</returns>
+    private static string ReplaceInvalidFileNameChars(string value)
+    {
+        var invalidChars = Path.GetInvalidFileNameChars().ToHashSet();
+        var chars = value.ToCharArray();
+        for (var i = 0; i < chars.Length; i++)
+        {
+            if (invalidChars.Contains(chars[i]))
+            {
+                chars[i] = '_';
+            }
+        }
+
+        return new string(chars);
     }
 
     /// <summary>
@@ -473,7 +505,7 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "读取同步目标落地文件失败。Path={TargetStoreFilePath}, TableCode={TableCode}", path, tableCode);
+            _logger.LogError(ex, "读取同步目标落地文件失败。Path={TargetStoreFilePath}, TableCode={TableCode}", path, tableCode);
             throw new InvalidOperationException(
                 $"读取同步目标落地文件失败（Path={path}, TableCode={tableCode}）。请检查文件内容是否为有效 JSON，必要时备份后清理该运行期文件再重试。",
                 ex);
@@ -559,7 +591,8 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
 
                 if (DateTime.TryParse(
                         stringValue,
-                        CultureInfo.CurrentCulture,
+                        CultureInfo.InvariantCulture,
+                        // 统一按本地时间语义解析无 Kind 文本，避免进入 UTC 语义。
                         DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces,
                         out var parsedLocalDateTime))
                 {
@@ -600,15 +633,16 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
     /// <returns>包含则返回 <c>true</c>。</returns>
     private static bool ContainsOffsetOrZulu(string value)
     {
-        if (value.EndsWith('Z') || value.EndsWith('z'))
+        if (value.EndsWith("Z", StringComparison.Ordinal))
         {
             return true;
         }
 
-        var separatorIndex = value.IndexOf('T');
+        // 同时兼容 ISO 8601（T 分隔）和常见本地格式（空格分隔）。
+        var separatorIndex = value.IndexOf('T', StringComparison.Ordinal);
         if (separatorIndex < 0)
         {
-            separatorIndex = value.IndexOf(' ');
+            separatorIndex = value.IndexOf(' ', StringComparison.Ordinal);
         }
 
         if (separatorIndex < 0 || separatorIndex >= value.Length - 1)
@@ -617,6 +651,31 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
         }
 
         var timePart = value[(separatorIndex + 1)..];
-        return timePart.Contains('+') || timePart.Contains('-');
+        for (var i = 0; i < timePart.Length; i++)
+        {
+            var current = timePart[i];
+            if (current != '+' && current != '-')
+            {
+                continue;
+            }
+
+            var remainLength = timePart.Length - i;
+            if (remainLength < 6)
+            {
+                continue;
+            }
+
+            if (!char.IsDigit(timePart[i + 1]) || !char.IsDigit(timePart[i + 2]) || timePart[i + 3] != ':' || !char.IsDigit(timePart[i + 4]) || !char.IsDigit(timePart[i + 5]))
+            {
+                continue;
+            }
+
+            if (remainLength == 6 || !char.IsDigit(timePart[i + 6]))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
