@@ -239,14 +239,21 @@ public class SyncExecutionService(
                 context,
                 ex.Message,
                 FailBatchStatusUpdateErrorLogTemplate);
-            await checkpointRepository.SaveAsync(new SyncCheckpoint
+            try
             {
-                TableCode = context.Definition.TableCode,
-                LastBatchId = context.BatchId,
-                LastSuccessCursorLocal = context.Checkpoint.LastSuccessCursorLocal,
-                LastSuccessTimeLocal = context.Checkpoint.LastSuccessTimeLocal,
-                LastError = ex.Message,
-            }, errorCheckpointCts.Token);
+                await checkpointRepository.SaveAsync(new SyncCheckpoint
+                {
+                    TableCode = context.Definition.TableCode,
+                    LastBatchId = context.BatchId,
+                    LastSuccessCursorLocal = context.Checkpoint.LastSuccessCursorLocal,
+                    LastSuccessTimeLocal = context.Checkpoint.LastSuccessTimeLocal,
+                    LastError = ex.Message,
+                }, errorCheckpointCts.Token);
+            }
+            catch (Exception checkpointEx)
+            {
+                logger.LogError(checkpointEx, "写入失败检查点异常。TableCode={TableCode}, BatchId={BatchId}", context.Definition.TableCode, context.BatchId);
+            }
             throw;
         }
     }

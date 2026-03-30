@@ -1,6 +1,11 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 已修复同步主链路关键缺陷：失败检查点写入不再覆盖原始异常，检查点读取异常不再静默降级为空结果。
+- 已修复删除同步语义问题：dry-run 场景不再写入 Delete 变更日志，且删除候选按业务键去重后再写审计。
+- 已修复业务键大小写一致性问题：目标端业务键字典改为忽略大小写比较。
+- 已补齐同步数据落地能力：`SyncUpsertRepository` 新增目标端文件持久化（`SyncJob.TargetStoreFilePath`），保障同步结果可留存并可恢复加载；运行期落地文件位于 `data/` 目录，属于运行产物，已通过 `.gitignore` 忽略。
+- 新增《当前程序能力与缺陷分析.md》，总结当前程序能力、功能边界，并给出代码缺陷与逻辑 BUG 分析结论。
 - 继续实施《Oracle到SQLServer同步实施计划.md》，补齐 PR-4 与 PR-6 剩余能力并完成全量收口。
 - 已新增高/低优先级差异化调度参数：`SyncTableOptions.Priority`（High/Low），并在多表同步编排中按优先级排序执行。
 - 已新增多表并发上限：`SyncJob.MaxParallelTables`，在编排层通过限流并发执行避免源端过载。
@@ -14,6 +19,7 @@
 ├── EverydayChain.Hub.sln
 ├── README.md
 ├── EFCore手动迁移操作指南.md
+├── 当前程序能力与缺陷分析.md
 ├── Oracle到SQLServer同步架构设计.md
 ├── Oracle到SQLServer同步实施计划.md
 ├── .github
@@ -157,15 +163,15 @@
 - `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断），弹性参数来自 `DangerZoneOptions`。
 - `DangerZoneOptions.cs`：`DangerZoneExecutor` 弹性策略配置类，绑定 `DangerZone` 节点，覆盖超时、重试、熔断全部参数，所有属性含 XML 注释。
 - `SortingTaskTraceWriter.cs`：按分表后缀分组写入，并将执行结果回传给调谐器。
-- `SyncJobOptions.cs` / `SyncTableOptions.cs` / `SyncDeleteOptions.cs` / `SyncRetentionOptions.cs` / `RetentionJobOptions.cs`：同步任务与保留期任务配置绑定模型，统一约束本地时间配置、分页、删除、优先级、并发上限与保留期治理参数。
+- `SyncJobOptions.cs` / `SyncTableOptions.cs` / `SyncDeleteOptions.cs` / `SyncRetentionOptions.cs` / `RetentionJobOptions.cs`：同步任务与保留期任务配置绑定模型，统一约束本地时间配置、分页、删除、优先级、并发上限、检查点与目标端数据落地路径等参数。
 - `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，校验 `StartTimeLocal` 禁止 `Z` 与 offset，校验 `ExcludedColumns` 不得与 `UniqueKeys`、`CursorColumn`、软删除关键列冲突，并解析优先级与多表并发上限。
 - `OracleSourceReader.cs`：源端读取器基础实现，支持按窗口分页读取与按窗口读取业务键集合，并在分页读取阶段过滤 `ExcludedColumns`；同时强制校验 `SourceSchema/SourceTable` 安全标识符，确保外部 Oracle 只读链路安全。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
-- `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并在合并比较/写入阶段过滤 `ExcludedColumns`，同时提供目标键删除能力（软删/硬删）。
+- `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并在合并比较/写入阶段过滤 `ExcludedColumns`；同时提供目标键删除能力（软删/硬删）与目标端文件持久化落地能力。
 - `SyncDeletionRepository.cs`：删除同步仓储基础实现，支持窗口内源端键集合与目标键集合差异识别，并按策略执行删除。
 - `ShardTableResolver.cs`：分表解析仓储实现，按逻辑表枚举物理分表并解析分表月份后缀。
 - `ShardRetentionRepository.cs`：分表保留期仓储实现，在危险动作隔离器保护下执行分表删除并输出审计日志，且可基于系统元数据生成可回放回滚 DDL。
-- `SyncCheckpointRepository.cs`：检查点文件持久化实现，支持失败后续跑。
+- `SyncCheckpointRepository.cs`：检查点文件持久化实现，支持失败后续跑；读取失败时抛出异常，避免静默回退引发窗口误回溯。
 - `SyncBatchRepository.cs`：同步批次仓储基础实现，支持 `Pending/InProgress/Completed/Failed` 状态流转与最近失败批次查询。
 - `SyncChangeLogRepository.cs`：同步变更日志仓储基础实现，支持批量写入审计记录。
 - `SyncDeletionLogRepository.cs`：同步删除日志仓储基础实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
@@ -176,6 +182,7 @@
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
 - `EFCore手动迁移操作指南.md`：提供手工迁移、脚本导出、回滚、排障流程。
+- `当前程序能力与缺陷分析.md`：汇总当前程序能力、功能清单、代码缺陷与逻辑 BUG，作为后续修复与优化输入。
 - `Oracle到SQLServer同步架构设计.md`：定义外部 Oracle DB First 只读同步到本地 SQL Server 的详细落地方案，包含接口与实现命名、配置模型、可配置排除列、幂等覆盖、删除同步、分表保留期治理与验收清单。
 - `Oracle到SQLServer同步实施计划.md`：按 PR 拆分同步架构落地步骤（最多 6 个 PR）的进度跟踪文档，定义完成项删除前必须通读代码确认完全实现的维护规则，随实施进展动态更新。
 

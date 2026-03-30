@@ -105,7 +105,7 @@ public class SyncCheckpointRepository(IOptions<SyncJobOptions> syncJobOptions, I
         catch (Exception ex)
         {
             logger.LogError(ex, "读取检查点文件失败。Path={CheckpointFilePath}", _checkpointFilePath);
-            return new Dictionary<string, SyncCheckpoint>(StringComparer.OrdinalIgnoreCase);
+            throw;
         }
         finally
         {

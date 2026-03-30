@@ -52,7 +52,11 @@ public class DeletionExecutionService(
         var deletionLogs = new List<SyncDeletionLog>(candidates.Count);
         var changeLogs = new List<SyncChangeLog>(candidates.Count);
         var executed = !context.Definition.DeletionDryRun && context.Definition.DeletionPolicy != DeletionPolicy.Disabled;
-        foreach (var candidate in candidates)
+        var uniqueCandidates = candidates
+            .GroupBy(x => x.BusinessKey, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToList();
+        foreach (var candidate in uniqueCandidates)
         {
             ct.ThrowIfCancellationRequested();
             var snapshot = JsonSerializer.Serialize(candidate.TargetSnapshot, SnapshotSerializerOptions);
@@ -68,31 +72,34 @@ public class DeletionExecutionService(
                 DeletedTimeLocal = executed ? nowLocal : null,
                 SourceEvidence = candidate.SourceEvidence,
             });
-            changeLogs.Add(new SyncChangeLog
+            if (executed)
             {
-                BatchId = context.BatchId,
-                ParentBatchId = context.ParentBatchId,
-                TableCode = context.Definition.TableCode,
-                OperationType = SyncChangeOperationType.Delete,
-                BusinessKey = candidate.BusinessKey,
-                BeforeSnapshot = snapshot,
-                AfterSnapshot = null,
-                ChangedTimeLocal = nowLocal,
-            });
+                changeLogs.Add(new SyncChangeLog
+                {
+                    BatchId = context.BatchId,
+                    ParentBatchId = context.ParentBatchId,
+                    TableCode = context.Definition.TableCode,
+                    OperationType = SyncChangeOperationType.Delete,
+                    BusinessKey = candidate.BusinessKey,
+                    BeforeSnapshot = snapshot,
+                    AfterSnapshot = null,
+                    ChangedTimeLocal = nowLocal,
+                });
+            }
         }
 
         logger.LogInformation(
             "删除同步执行完成。TableCode={TableCode}, BatchId={BatchId}, DetectedCount={DetectedCount}, DeletedCount={DeletedCount}, DryRun={DryRun}, Policy={Policy}",
             context.Definition.TableCode,
             context.BatchId,
-            candidates.Count,
+            uniqueCandidates.Count,
             deletedCount,
             context.Definition.DeletionDryRun,
             context.Definition.DeletionPolicy);
 
         return new SyncDeletionExecutionResult
         {
-            DetectedCount = candidates.Count,
+            DetectedCount = uniqueCandidates.Count,
             DeletedCount = deletedCount,
             DeletionLogs = deletionLogs,
             ChangeLogs = changeLogs,
