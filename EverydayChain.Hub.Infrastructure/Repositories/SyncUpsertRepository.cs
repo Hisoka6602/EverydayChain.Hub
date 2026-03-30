@@ -429,7 +429,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
             await File.WriteAllTextAsync(tempFilePath, json, ct);
             if (File.Exists(tableStoreFilePath))
             {
-                File.Replace(tempFilePath, tableStoreFilePath, backupFilePath, false);
+                File.Replace(tempFilePath, tableStoreFilePath, backupFilePath, ignoreMetadataErrors: false);
                 if (File.Exists(backupFilePath))
                 {
                     File.Delete(backupFilePath);
@@ -665,7 +665,12 @@ public class SyncUpsertRepository : ISyncUpsertRepository
                 continue;
             }
 
-            if (!char.IsDigit(timePart[i + 1]) || !char.IsDigit(timePart[i + 2]) || timePart[i + 3] != ':' || !char.IsDigit(timePart[i + 4]) || !char.IsDigit(timePart[i + 5]))
+            var hasValidOffsetPattern = char.IsDigit(timePart[i + 1])
+                                        && char.IsDigit(timePart[i + 2])
+                                        && timePart[i + 3] == ':'
+                                        && char.IsDigit(timePart[i + 4])
+                                        && char.IsDigit(timePart[i + 5]);
+            if (!hasValidOffsetPattern)
             {
                 continue;
             }
