@@ -1,28 +1,54 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Repositories;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Sync;
+using EverydayChain.Hub.Infrastructure.Options;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
 /// 同步幂等合并仓储基础实现（内存幂等仓）。
 /// </summary>
-public class SyncUpsertRepository : ISyncUpsertRepository
+public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogger<SyncUpsertRepository> logger) : ISyncUpsertRepository
 {
     /// <summary>目标内存表，按表编码分组。</summary>
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, IReadOnlyDictionary<string, object?>>> _targetTables = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>目标端持久化文件访问锁。</summary>
+    private static readonly SemaphoreSlim TargetStoreFileLock = new(1, 1);
+    /// <summary>目标端持久化文件路径。</summary>
+    private readonly string _targetStoreFilePath = ResolveTargetStoreFilePath(syncJobOptions.Value.TargetStoreFilePath);
+
+    /// <summary>
+    /// 解析目标端持久化文件路径。
+    /// </summary>
+    /// <param name="configuredPath">配置路径。</param>
+    /// <returns>可用路径。</returns>
+    private static string ResolveTargetStoreFilePath(string configuredPath)
+    {
+        if (string.IsNullOrWhiteSpace(configuredPath))
+        {
+            return Path.Combine(AppContext.BaseDirectory, "data", "sync-target-store.json");
+        }
+
+        return Path.IsPathRooted(configuredPath)
+            ? configuredPath
+            : Path.Combine(AppContext.BaseDirectory, configuredPath);
+    }
 
     /// <inheritdoc/>
-    public Task<SyncMergeResult> MergeFromStagingAsync(SyncMergeRequest request, CancellationToken ct)
+    public async Task<SyncMergeResult> MergeFromStagingAsync(SyncMergeRequest request, CancellationToken ct)
     {
         if (request.UniqueKeys.Count == 0)
         {
             throw new InvalidOperationException($"同步表 {request.TableCode} 未配置 UniqueKeys，无法执行幂等合并。");
         }
 
-        var targetTable = _targetTables.GetOrAdd(request.TableCode, _ => new ConcurrentDictionary<string, IReadOnlyDictionary<string, object?>>());
+        await EnsureTableLoadedAsync(request.TableCode, ct);
+        var targetTable = _targetTables.GetOrAdd(request.TableCode, _ => CreateBusinessKeyDictionary());
         var changedOperations = new Dictionary<string, SyncChangeOperationType>(StringComparer.OrdinalIgnoreCase);
         var result = new SyncMergeResult
         {
@@ -62,29 +88,32 @@ public class SyncUpsertRepository : ISyncUpsertRepository
             UpdateLastCursor(result, filteredRow, request.CursorColumn);
         }
 
-        return Task.FromResult(result);
+        await PersistTableAsync(request.TableCode, targetTable, ct);
+        return result;
     }
 
     /// <inheritdoc/>
-    public Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ListTargetRowsAsync(string tableCode, CancellationToken ct)
+    public async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ListTargetRowsAsync(string tableCode, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+        await EnsureTableLoadedAsync(tableCode, ct);
         if (!_targetTables.TryGetValue(tableCode, out var table))
         {
-            return Task.FromResult<IReadOnlyList<IReadOnlyDictionary<string, object?>>>([]);
+            return [];
         }
 
         var rows = table.Values.ToList();
-        return Task.FromResult<IReadOnlyList<IReadOnlyDictionary<string, object?>>>(rows);
+        return rows;
     }
 
     /// <inheritdoc/>
-    public Task<int> DeleteByBusinessKeysAsync(string tableCode, IReadOnlyList<string> businessKeys, DeletionPolicy deletionPolicy, CancellationToken ct)
+    public async Task<int> DeleteByBusinessKeysAsync(string tableCode, IReadOnlyList<string> businessKeys, DeletionPolicy deletionPolicy, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+        await EnsureTableLoadedAsync(tableCode, ct);
         if (!_targetTables.TryGetValue(tableCode, out var table))
         {
-            return Task.FromResult(0);
+            return 0;
         }
 
         var deletedCount = 0;
@@ -114,7 +143,8 @@ public class SyncUpsertRepository : ISyncUpsertRepository
             }
         }
 
-        return Task.FromResult(deletedCount);
+        await PersistTableAsync(tableCode, table, ct);
+        return deletedCount;
     }
 
     /// <inheritdoc/>
@@ -181,4 +211,128 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         return new Dictionary<string, object?>(row);
     }
 
+    /// <summary>
+    /// 创建业务键字典（忽略大小写）。
+    /// </summary>
+    /// <returns>业务键字典。</returns>
+    private static ConcurrentDictionary<string, IReadOnlyDictionary<string, object?>> CreateBusinessKeyDictionary()
+    {
+        return new ConcurrentDictionary<string, IReadOnlyDictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 确保表数据已从落地文件加载。
+    /// </summary>
+    /// <param name="tableCode">表编码。</param>
+    /// <param name="ct">取消令牌。</param>
+    private async Task EnsureTableLoadedAsync(string tableCode, CancellationToken ct)
+    {
+        if (_targetTables.ContainsKey(tableCode))
+        {
+            return;
+        }
+
+        await TargetStoreFileLock.WaitAsync(ct);
+        try
+        {
+            if (_targetTables.ContainsKey(tableCode))
+            {
+                return;
+            }
+
+            var allTables = await LoadAllTablesWithoutLockAsync(ct);
+            if (!allTables.TryGetValue(tableCode, out var tableRows))
+            {
+                _targetTables.TryAdd(tableCode, CreateBusinessKeyDictionary());
+                return;
+            }
+
+            var targetTable = CreateBusinessKeyDictionary();
+            foreach (var pair in tableRows)
+            {
+                targetTable[pair.Key] = CloneRow(pair.Value);
+            }
+
+            _targetTables.TryAdd(tableCode, targetTable);
+        }
+        finally
+        {
+            TargetStoreFileLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// 将指定表持久化到目标端落地文件。
+    /// </summary>
+    /// <param name="tableCode">表编码。</param>
+    /// <param name="table">目标表字典。</param>
+    /// <param name="ct">取消令牌。</param>
+    private async Task PersistTableAsync(string tableCode, ConcurrentDictionary<string, IReadOnlyDictionary<string, object?>> table, CancellationToken ct)
+    {
+        await TargetStoreFileLock.WaitAsync(ct);
+        try
+        {
+            var allTables = await LoadAllTablesWithoutLockAsync(ct);
+            var persistedTable = new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in table)
+            {
+                persistedTable[pair.Key] = new Dictionary<string, object?>(pair.Value);
+            }
+
+            allTables[tableCode] = persistedTable;
+            await SaveAllTablesWithoutLockAsync(allTables, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "写入同步目标落地文件失败。Path={TargetStoreFilePath}, TableCode={TableCode}", _targetStoreFilePath, tableCode);
+            throw;
+        }
+        finally
+        {
+            TargetStoreFileLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// 读取全部目标表持久化数据（调用方需保证已持锁）。
+    /// </summary>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>全部目标表数据。</returns>
+    private async Task<Dictionary<string, Dictionary<string, Dictionary<string, object?>>>> LoadAllTablesWithoutLockAsync(CancellationToken ct)
+    {
+        if (!File.Exists(_targetStoreFilePath))
+        {
+            return new Dictionary<string, Dictionary<string, Dictionary<string, object?>>>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var json = await File.ReadAllTextAsync(_targetStoreFilePath, ct);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return new Dictionary<string, Dictionary<string, Dictionary<string, object?>>>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var deserialized = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, object?>>>>(json)
+            ?? new Dictionary<string, Dictionary<string, Dictionary<string, object?>>>(StringComparer.OrdinalIgnoreCase);
+        return new Dictionary<string, Dictionary<string, Dictionary<string, object?>>>(deserialized, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 保存全部目标表持久化数据（调用方需保证已持锁）。
+    /// </summary>
+    /// <param name="allTables">全部目标表数据。</param>
+    /// <param name="ct">取消令牌。</param>
+    private async Task SaveAllTablesWithoutLockAsync(Dictionary<string, Dictionary<string, Dictionary<string, object?>>> allTables, CancellationToken ct)
+    {
+        var directory = Path.GetDirectoryName(_targetStoreFilePath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var json = JsonSerializer.Serialize(allTables, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+        });
+        await File.WriteAllTextAsync(_targetStoreFilePath, json, ct);
+    }
 }

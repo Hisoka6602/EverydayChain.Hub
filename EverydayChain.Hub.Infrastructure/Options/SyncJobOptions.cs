@@ -20,6 +20,9 @@ public class SyncJobOptions
     /// <summary>检查点文件路径（为空时使用应用基目录下 sync-checkpoints.json）。</summary>
     public string CheckpointFilePath { get; set; } = string.Empty;
 
+    /// <summary>目标端同步数据落地文件路径（为空时使用应用基目录下 data/sync-target-store.json）。</summary>
+    public string TargetStoreFilePath { get; set; } = string.Empty;
+
     /// <summary>单表配置集合。</summary>
     public List<SyncTableOptions> Tables { get; set; } = [];
 }
