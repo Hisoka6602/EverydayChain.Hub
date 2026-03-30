@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 新增《当前程序能力与缺陷分析.md》，总结当前程序能力、功能边界，并给出代码缺陷与逻辑 BUG 分析结论。
 - 继续实施《Oracle到SQLServer同步实施计划.md》，补齐 PR-4 与 PR-6 剩余能力并完成全量收口。
 - 已新增高/低优先级差异化调度参数：`SyncTableOptions.Priority`（High/Low），并在多表同步编排中按优先级排序执行。
 - 已新增多表并发上限：`SyncJob.MaxParallelTables`，在编排层通过限流并发执行避免源端过载。
@@ -14,6 +15,7 @@
 ├── EverydayChain.Hub.sln
 ├── README.md
 ├── EFCore手动迁移操作指南.md
+├── 当前程序能力与缺陷分析.md
 ├── Oracle到SQLServer同步架构设计.md
 ├── Oracle到SQLServer同步实施计划.md
 ├── .github
@@ -176,6 +178,7 @@
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
 - `EFCore手动迁移操作指南.md`：提供手工迁移、脚本导出、回滚、排障流程。
+- `当前程序能力与缺陷分析.md`：汇总当前程序能力、功能清单、代码缺陷与逻辑 BUG，作为后续修复与优化输入。
 - `Oracle到SQLServer同步架构设计.md`：定义外部 Oracle DB First 只读同步到本地 SQL Server 的详细落地方案，包含接口与实现命名、配置模型、可配置排除列、幂等覆盖、删除同步、分表保留期治理与验收清单。
 - `Oracle到SQLServer同步实施计划.md`：按 PR 拆分同步架构落地步骤（最多 6 个 PR）的进度跟踪文档，定义完成项删除前必须通读代码确认完全实现的维护规则，随实施进展动态更新。
 
