@@ -4,7 +4,7 @@
 - 已修复同步主链路关键缺陷：失败检查点写入不再覆盖原始异常，检查点读取异常不再静默降级为空结果。
 - 已修复删除同步语义问题：dry-run 场景不再写入 Delete 变更日志，且删除候选按业务键去重后再写审计。
 - 已修复业务键大小写一致性问题：目标端业务键字典改为忽略大小写比较。
-- 已补齐同步数据落地能力：`SyncUpsertRepository` 新增目标端文件持久化（`SyncJob.TargetStoreFilePath`），保障同步结果可留存并可恢复加载。
+- 已补齐同步数据落地能力：`SyncUpsertRepository` 新增目标端文件持久化（`SyncJob.TargetStoreFilePath`），保障同步结果可留存并可恢复加载；运行期落地文件位于 `data/` 目录，属于运行产物，已通过 `.gitignore` 忽略。
 - 新增《当前程序能力与缺陷分析.md》，总结当前程序能力、功能边界，并给出代码缺陷与逻辑 BUG 分析结论。
 - 继续实施《Oracle到SQLServer同步实施计划.md》，补齐 PR-4 与 PR-6 剩余能力并完成全量收口。
 - 已新增高/低优先级差异化调度参数：`SyncTableOptions.Priority`（High/Low），并在多表同步编排中按优先级排序执行。

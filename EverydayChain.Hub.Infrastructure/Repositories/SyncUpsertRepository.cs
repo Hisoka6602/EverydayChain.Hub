@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Text.Json;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Repositories;
@@ -21,6 +22,12 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
     private static readonly SemaphoreSlim TargetStoreFileLock = new(1, 1);
     /// <summary>目标端持久化文件路径。</summary>
     private readonly string _targetStoreFilePath = ResolveTargetStoreFilePath(syncJobOptions.Value.TargetStoreFilePath);
+    /// <summary>目标端持久化文件目录。</summary>
+    private readonly string _targetStoreDirectoryPath = ResolveTargetStoreDirectoryPath(ResolveTargetStoreFilePath(syncJobOptions.Value.TargetStoreFilePath));
+    /// <summary>目标端持久化文件名前缀。</summary>
+    private readonly string _targetStoreFileNamePrefix = ResolveTargetStoreFileNamePrefix(ResolveTargetStoreFilePath(syncJobOptions.Value.TargetStoreFilePath));
+    /// <summary>目标端持久化文件扩展名。</summary>
+    private readonly string _targetStoreFileNameExtension = ResolveTargetStoreFileNameExtension(ResolveTargetStoreFilePath(syncJobOptions.Value.TargetStoreFilePath));
 
     /// <summary>
     /// 解析目标端持久化文件路径。
@@ -39,6 +46,38 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
             : Path.Combine(AppContext.BaseDirectory, configuredPath);
     }
 
+    /// <summary>
+    /// 解析目标端持久化文件目录。
+    /// </summary>
+    /// <param name="targetStoreFilePath">目标端持久化文件路径。</param>
+    /// <returns>目录绝对路径。</returns>
+    private static string ResolveTargetStoreDirectoryPath(string targetStoreFilePath)
+    {
+        return Path.GetDirectoryName(targetStoreFilePath) ?? AppContext.BaseDirectory;
+    }
+
+    /// <summary>
+    /// 解析目标端持久化文件名前缀。
+    /// </summary>
+    /// <param name="targetStoreFilePath">目标端持久化文件路径。</param>
+    /// <returns>文件名前缀。</returns>
+    private static string ResolveTargetStoreFileNamePrefix(string targetStoreFilePath)
+    {
+        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(targetStoreFilePath);
+        return string.IsNullOrWhiteSpace(fileNameWithoutExtension) ? "sync-target-store" : fileNameWithoutExtension;
+    }
+
+    /// <summary>
+    /// 解析目标端持久化文件扩展名。
+    /// </summary>
+    /// <param name="targetStoreFilePath">目标端持久化文件路径。</param>
+    /// <returns>文件扩展名。</returns>
+    private static string ResolveTargetStoreFileNameExtension(string targetStoreFilePath)
+    {
+        var extension = Path.GetExtension(targetStoreFilePath);
+        return string.IsNullOrWhiteSpace(extension) ? ".json" : extension;
+    }
+
     /// <inheritdoc/>
     public async Task<SyncMergeResult> MergeFromStagingAsync(SyncMergeRequest request, CancellationToken ct)
     {
@@ -54,6 +93,7 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
         {
             ChangedOperations = changedOperations,
         };
+        var hasChanges = false;
 
         foreach (var row in request.Rows)
         {
@@ -72,6 +112,7 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
                 result.InsertCount++;
                 changedOperations[rowKey] = SyncChangeOperationType.Insert;
                 UpdateLastCursor(result, filteredRow, request.CursorColumn);
+                hasChanges = true;
                 continue;
             }
 
@@ -86,9 +127,14 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
             result.UpdateCount++;
             changedOperations[rowKey] = SyncChangeOperationType.Update;
             UpdateLastCursor(result, filteredRow, request.CursorColumn);
+            hasChanges = true;
         }
 
-        await PersistTableAsync(request.TableCode, targetTable, ct);
+        if (hasChanges)
+        {
+            await PersistTableAsync(request.TableCode, targetTable, ct);
+        }
+
         return result;
     }
 
@@ -143,7 +189,11 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
             }
         }
 
-        await PersistTableAsync(tableCode, table, ct);
+        if (deletedCount > 0)
+        {
+            await PersistTableAsync(tableCode, table, ct);
+        }
+
         return deletedCount;
     }
 
@@ -240,14 +290,8 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
                 return;
             }
 
-            var allTables = await LoadAllTablesWithoutLockAsync(ct);
-            if (!allTables.TryGetValue(tableCode, out var tableRows))
-            {
-                _targetTables.TryAdd(tableCode, CreateBusinessKeyDictionary());
-                return;
-            }
-
             var targetTable = CreateBusinessKeyDictionary();
+            var tableRows = await LoadTableRowsWithoutLockAsync(tableCode, ct);
             foreach (var pair in tableRows)
             {
                 targetTable[pair.Key] = CloneRow(pair.Value);
@@ -269,18 +313,16 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
     /// <param name="ct">取消令牌。</param>
     private async Task PersistTableAsync(string tableCode, ConcurrentDictionary<string, IReadOnlyDictionary<string, object?>> table, CancellationToken ct)
     {
+        var persistedTable = new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in table)
+        {
+            persistedTable[pair.Key] = new Dictionary<string, object?>(pair.Value);
+        }
+
         await TargetStoreFileLock.WaitAsync(ct);
         try
         {
-            var allTables = await LoadAllTablesWithoutLockAsync(ct);
-            var persistedTable = new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var pair in table)
-            {
-                persistedTable[pair.Key] = new Dictionary<string, object?>(pair.Value);
-            }
-
-            allTables[tableCode] = persistedTable;
-            await SaveAllTablesWithoutLockAsync(allTables, ct);
+            await SaveTableRowsWithoutLockAsync(tableCode, persistedTable, ct);
         }
         catch (Exception ex)
         {
@@ -294,45 +336,236 @@ public class SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogg
     }
 
     /// <summary>
-    /// 读取全部目标表持久化数据（调用方需保证已持锁）。
+    /// 读取指定表持久化数据（调用方需保证已持锁）。
     /// </summary>
+    /// <param name="tableCode">表编码。</param>
     /// <param name="ct">取消令牌。</param>
-    /// <returns>全部目标表数据。</returns>
-    private async Task<Dictionary<string, Dictionary<string, Dictionary<string, object?>>>> LoadAllTablesWithoutLockAsync(CancellationToken ct)
+    /// <returns>指定表持久化数据。</returns>
+    private async Task<Dictionary<string, Dictionary<string, object?>>> LoadTableRowsWithoutLockAsync(string tableCode, CancellationToken ct)
     {
-        if (!File.Exists(_targetStoreFilePath))
+        var tableStoreFilePath = BuildPerTableStoreFilePath(tableCode);
+        if (File.Exists(tableStoreFilePath))
         {
-            return new Dictionary<string, Dictionary<string, Dictionary<string, object?>>>(StringComparer.OrdinalIgnoreCase);
+            var tableJson = await File.ReadAllTextAsync(tableStoreFilePath, ct);
+            if (string.IsNullOrWhiteSpace(tableJson))
+            {
+                return new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            return DeserializeTableRows(tableJson, tableStoreFilePath, tableCode);
         }
 
+        if (!File.Exists(_targetStoreFilePath))
+        {
+            return new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        // 兼容旧版全量文件落地格式，迁移后新写入统一落到按表文件。
         var json = await File.ReadAllTextAsync(_targetStoreFilePath, ct);
         if (string.IsNullOrWhiteSpace(json))
         {
-            return new Dictionary<string, Dictionary<string, Dictionary<string, object?>>>(StringComparer.OrdinalIgnoreCase);
+            return new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
         }
 
-        var deserialized = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, object?>>>>(json)
-            ?? new Dictionary<string, Dictionary<string, Dictionary<string, object?>>>(StringComparer.OrdinalIgnoreCase);
-        return new Dictionary<string, Dictionary<string, Dictionary<string, object?>>>(deserialized, StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var deserialized = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, object?>>>>(json)
+                ?? new Dictionary<string, Dictionary<string, Dictionary<string, object?>>>(StringComparer.OrdinalIgnoreCase);
+            if (!deserialized.TryGetValue(tableCode, out var legacyRows))
+            {
+                return new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            return NormalizeTableRows(legacyRows);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "读取同步目标落地文件失败。Path={TargetStoreFilePath}, TableCode={TableCode}", _targetStoreFilePath, tableCode);
+            throw new InvalidOperationException(
+                $"读取同步目标落地文件失败（Path={_targetStoreFilePath}, TableCode={tableCode}）。请检查文件内容是否为有效 JSON，必要时备份后清理该运行期文件再重试。",
+                ex);
+        }
     }
 
     /// <summary>
-    /// 保存全部目标表持久化数据（调用方需保证已持锁）。
+    /// 保存指定表持久化数据（调用方需保证已持锁）。
     /// </summary>
-    /// <param name="allTables">全部目标表数据。</param>
+    /// <param name="tableCode">表编码。</param>
+    /// <param name="tableRows">指定表数据。</param>
     /// <param name="ct">取消令牌。</param>
-    private async Task SaveAllTablesWithoutLockAsync(Dictionary<string, Dictionary<string, Dictionary<string, object?>>> allTables, CancellationToken ct)
+    private async Task SaveTableRowsWithoutLockAsync(string tableCode, Dictionary<string, Dictionary<string, object?>> tableRows, CancellationToken ct)
     {
-        var directory = Path.GetDirectoryName(_targetStoreFilePath);
-        if (!string.IsNullOrWhiteSpace(directory))
+        if (!Directory.Exists(_targetStoreDirectoryPath))
         {
-            Directory.CreateDirectory(directory);
+            Directory.CreateDirectory(_targetStoreDirectoryPath);
         }
 
-        var json = JsonSerializer.Serialize(allTables, new JsonSerializerOptions
+        var json = JsonSerializer.Serialize(tableRows, new JsonSerializerOptions
         {
             WriteIndented = true,
         });
-        await File.WriteAllTextAsync(_targetStoreFilePath, json, ct);
+        var tableStoreFilePath = BuildPerTableStoreFilePath(tableCode);
+        var tempFilePath = $"{tableStoreFilePath}.tmp";
+        var backupFilePath = $"{tableStoreFilePath}.bak";
+        try
+        {
+            await File.WriteAllTextAsync(tempFilePath, json, ct);
+            if (File.Exists(tableStoreFilePath))
+            {
+                File.Replace(tempFilePath, tableStoreFilePath, backupFilePath, true);
+                if (File.Exists(backupFilePath))
+                {
+                    File.Delete(backupFilePath);
+                }
+            }
+            else
+            {
+                File.Move(tempFilePath, tableStoreFilePath);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "原子写入同步目标落地文件失败。Path={TargetStoreFilePath}, TableCode={TableCode}", tableStoreFilePath, tableCode);
+            throw new InvalidOperationException(
+                $"原子写入同步目标落地文件失败（Path={tableStoreFilePath}, TableCode={tableCode}）。请检查目录权限与磁盘空间后重试。",
+                ex);
+        }
+        finally
+        {
+            if (File.Exists(tempFilePath))
+            {
+                File.Delete(tempFilePath);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 构建按表落地文件路径。
+    /// </summary>
+    /// <param name="tableCode">表编码。</param>
+    /// <returns>按表落地文件绝对路径。</returns>
+    private string BuildPerTableStoreFilePath(string tableCode)
+    {
+        var safeTableCode = tableCode;
+        foreach (var invalidFileNameChar in Path.GetInvalidFileNameChars())
+        {
+            safeTableCode = safeTableCode.Replace(invalidFileNameChar, '_');
+        }
+
+        var fileName = $"{_targetStoreFileNamePrefix}.{safeTableCode}{_targetStoreFileNameExtension}";
+        return Path.Combine(_targetStoreDirectoryPath, fileName);
+    }
+
+    /// <summary>
+    /// 反序列化按表持久化数据并恢复字段类型。
+    /// </summary>
+    /// <param name="json">JSON 文本。</param>
+    /// <param name="path">文件路径。</param>
+    /// <param name="tableCode">表编码。</param>
+    /// <returns>按表数据。</returns>
+    private Dictionary<string, Dictionary<string, object?>> DeserializeTableRows(string json, string path, string tableCode)
+    {
+        try
+        {
+            var deserialized = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, object?>>>(json)
+                ?? new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
+            return NormalizeTableRows(deserialized);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "读取同步目标落地文件失败。Path={TargetStoreFilePath}, TableCode={TableCode}", path, tableCode);
+            throw new InvalidOperationException(
+                $"读取同步目标落地文件失败（Path={path}, TableCode={tableCode}）。请检查文件内容是否为有效 JSON，必要时备份后清理该运行期文件再重试。",
+                ex);
+        }
+    }
+
+    /// <summary>
+    /// 归一化按表数据，避免 JsonElement 影响后续比较与游标计算。
+    /// </summary>
+    /// <param name="rows">按表数据。</param>
+    /// <returns>归一化结果。</returns>
+    private static Dictionary<string, Dictionary<string, object?>> NormalizeTableRows(Dictionary<string, Dictionary<string, object?>> rows)
+    {
+        var normalized = new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in rows)
+        {
+            normalized[pair.Key] = ConvertPersistedRow(pair.Value);
+        }
+
+        return normalized;
+    }
+
+    /// <summary>
+    /// 将单行持久化数据转换为可比较的 CLR 类型。
+    /// </summary>
+    /// <param name="row">单行数据。</param>
+    /// <returns>转换后的行。</returns>
+    private static Dictionary<string, object?> ConvertPersistedRow(Dictionary<string, object?> row)
+    {
+        var converted = new Dictionary<string, object?>(row.Count, StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in row)
+        {
+            converted[pair.Key] = pair.Value is JsonElement element ? ConvertJsonElement(element) : pair.Value;
+        }
+
+        return converted;
+    }
+
+    /// <summary>
+    /// 将 JsonElement 转换为常见 CLR 类型。
+    /// </summary>
+    /// <param name="element">JSON 值。</param>
+    /// <returns>转换结果。</returns>
+    private static object? ConvertJsonElement(JsonElement element)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Null:
+            case JsonValueKind.Undefined:
+                return null;
+            case JsonValueKind.True:
+                return true;
+            case JsonValueKind.False:
+                return false;
+            case JsonValueKind.Number:
+                if (element.TryGetInt64(out var longValue))
+                {
+                    return longValue;
+                }
+
+                if (element.TryGetDecimal(out var decimalValue))
+                {
+                    return decimalValue;
+                }
+
+                return element.GetRawText();
+            case JsonValueKind.String:
+                if (element.TryGetDateTime(out var dateTimeValue))
+                {
+                    return dateTimeValue.Kind == DateTimeKind.Unspecified
+                        ? DateTime.SpecifyKind(dateTimeValue, DateTimeKind.Local)
+                        : dateTimeValue.ToLocalTime();
+                }
+
+                var stringValue = element.GetString();
+                if (string.IsNullOrWhiteSpace(stringValue))
+                {
+                    return stringValue;
+                }
+
+                if (DateTime.TryParse(
+                        stringValue,
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces,
+                        out var parsedLocalDateTime))
+                {
+                    return parsedLocalDateTime;
+                }
+
+                return stringValue;
+            default:
+                return element.GetRawText();
+        }
     }
 }
