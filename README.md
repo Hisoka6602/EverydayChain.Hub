@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 新增《数据同步机制详解.md》，系统梳理 Oracle→SQL Server 数据同步链路的触发调度、增量游标窗口、Upsert 变化感知（INSERT/UPDATE/SKIP）、删除感知（窗口内源键差集）、检查点与批次状态流转等核心机制，含架构依赖关系图与批次状态流转图。
 - 已修复同步主链路关键缺陷：失败检查点写入不再覆盖原始异常，检查点读取异常不再静默降级为空结果。
 - 已修复删除同步语义问题：dry-run 场景不再写入 Delete 变更日志，且删除候选按业务键去重后再写审计。
 - 已修复业务键大小写一致性问题：目标端业务键字典改为忽略大小写比较。
@@ -20,6 +21,7 @@
 ├── README.md
 ├── EFCore手动迁移操作指南.md
 ├── 当前程序能力与缺陷分析.md
+├── 数据同步机制详解.md
 ├── Oracle到SQLServer同步架构设计.md
 ├── Oracle到SQLServer同步实施计划.md
 ├── .github
@@ -183,6 +185,7 @@
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
 - `EFCore手动迁移操作指南.md`：提供手工迁移、脚本导出、回滚、排障流程。
 - `当前程序能力与缺陷分析.md`：汇总当前程序能力、功能清单、代码缺陷与逻辑 BUG，作为后续修复与优化输入。
+- `数据同步机制详解.md`：详细描述 Oracle→SQL Server 数据同步链路的触发调度、增量游标窗口策略、Upsert 变化感知（INSERT/UPDATE/SKIP）、删除感知（窗口内源键差集）、检查点机制与批次状态流转，含架构依赖关系图与批次状态流转图。
 - `Oracle到SQLServer同步架构设计.md`：定义外部 Oracle DB First 只读同步到本地 SQL Server 的详细落地方案，包含接口与实现命名、配置模型、可配置排除列、幂等覆盖、删除同步、分表保留期治理与验收清单。
 - `Oracle到SQLServer同步实施计划.md`：按 PR 拆分同步架构落地步骤（最多 6 个 PR）的进度跟踪文档，定义完成项删除前必须通读代码确认完全实现的维护规则，随实施进展动态更新。
 
