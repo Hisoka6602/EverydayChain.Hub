@@ -214,11 +214,6 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         return deletedCount;
     }
 
-    /// <inheritdoc/>
-    public string BuildBusinessKey(IReadOnlyDictionary<string, object?> row, IReadOnlyList<string> uniqueKeys)
-    {
-        return SyncBusinessKeyBuilder.Build(row, uniqueKeys);
-    }
 
     /// <summary>
     /// 判断两行是否一致。

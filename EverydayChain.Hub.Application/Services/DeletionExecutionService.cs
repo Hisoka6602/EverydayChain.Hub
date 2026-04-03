@@ -40,7 +40,11 @@ public class DeletionExecutionService(
             CompareMaxParallelism = context.Definition.DeletionCompareMaxParallelism,
         }, ct);
 
-        var businessKeys = candidates.Select(x => x.BusinessKey).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var uniqueCandidates = candidates
+            .GroupBy(x => x.BusinessKey, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToList();
+        var businessKeys = uniqueCandidates.Select(x => x.BusinessKey).ToList();
         var deletedCount = await deletionRepository.ApplyDeletionAsync(new SyncDeletionApplyRequest
         {
             TableCode = context.Definition.TableCode,
@@ -49,13 +53,9 @@ public class DeletionExecutionService(
             DryRun = context.Definition.DeletionDryRun,
         }, ct);
 
-        var deletionLogs = new List<SyncDeletionLog>(candidates.Count);
-        var changeLogs = new List<SyncChangeLog>(candidates.Count);
+        var deletionLogs = new List<SyncDeletionLog>(uniqueCandidates.Count);
+        var changeLogs = new List<SyncChangeLog>(uniqueCandidates.Count);
         var executed = !context.Definition.DeletionDryRun && context.Definition.DeletionPolicy != DeletionPolicy.Disabled;
-        var uniqueCandidates = candidates
-            .GroupBy(x => x.BusinessKey, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.First())
-            .ToList();
         foreach (var candidate in uniqueCandidates)
         {
             ct.ThrowIfCancellationRequested();
