@@ -81,7 +81,10 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
             return normalizedLocalTime;
         }
 
-        var adjustedLocalTime = normalizedLocalTime.AddMinutes(InitialDstInvalidTimeJumpMinutes);
+        var adjustedLocalTime = TryResolveInvalidLocalTime(
+            normalizedLocalTime,
+            normalizedLocalTime.AddMinutes(InitialDstInvalidTimeJumpMinutes),
+            InitialDstInvalidTimeJumpMinutes);
         adjustedLocalTime = TryResolveInvalidLocalTime(normalizedLocalTime, adjustedLocalTime, SecondaryDstInvalidTimeJumpMinutes);
         adjustedLocalTime = TryResolveInvalidLocalTime(normalizedLocalTime, adjustedLocalTime, TertiaryDstInvalidTimeJumpMinutes);
         if (TimeZoneInfo.Local.IsInvalidTime(adjustedLocalTime))
@@ -129,7 +132,7 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
         if (localTime.Kind == DateTimeKind.Utc)
         {
             logger.LogError(
-                "检测到 UTC 时间输入，不允许参与本地时间窗口计算。TableCode={TableCode}, Scene={Scene}, InputValue={InputValue}",
+                "检测到 UTC 时间输入，本地时间窗口计算不支持 UTC 语义。TableCode={TableCode}, Scene={Scene}, InputValue={InputValue}",
                 tableCode,
                 scene,
                 localTime);
