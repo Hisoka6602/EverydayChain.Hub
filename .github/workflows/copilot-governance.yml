@@ -70,6 +70,10 @@ jobs:
 
           instructions_path = pathlib.Path(".github/copilot-instructions.md")
           instructions_text = instructions_path.read_text(encoding="utf-8")
+          
+          second_person_base_pattern = r"(?<![\u4e00-\u9fffA-Za-z0-9_])(你们|你)(?![\u4e00-\u9fffA-Za-z0-9_])"
+          second_person_inline_comment_pattern = re.compile(rf"(///.*{second_person_base_pattern})|(//.*{second_person_base_pattern})", re.MULTILINE)
+          second_person_block_comment_pattern = re.compile(rf"/\*[\s\S]*?{second_person_base_pattern}[\s\S]*?\*/", re.MULTILINE)
           plan_rule_pattern = re.compile(
               r"删除\s*`?Oracle到SQLServer同步实施计划\.md`?.{0,120}?通读相关代码.{0,120}?已完全实现",
               re.DOTALL,
@@ -190,8 +194,6 @@ jobs:
                   print(f" - {item}")
               sys.exit(1)
           
-          second_person_inline_comment_pattern = re.compile(r"(///.*(?:你们|你))|(//.*(?:你们|你))", re.MULTILINE)
-          second_person_block_comment_pattern = re.compile(r"/\*[\s\S]*?(?:你们|你)[\s\S]*?\*/", re.MULTILINE)
           second_person_violations = []
           for path in candidate_files:
               if path.suffix != ".cs":
@@ -203,8 +205,11 @@ jobs:
                   content = path.read_text(encoding="utf-8")
               except UnicodeDecodeError:
                   continue
-              # 仅检查 C# 代码注释，避免将说明文档正文误判为“注释”。
-              if second_person_inline_comment_pattern.search(content) or second_person_block_comment_pattern.search(content):
+              # 仅检查 C# 代码注释；该规则基于正则近似匹配，不做完整语法解析。
+              if second_person_inline_comment_pattern.search(content):
+                  second_person_violations.append(relative)
+                  continue
+              if second_person_block_comment_pattern.search(content):
                   second_person_violations.append(relative)
           
           if second_person_violations:
