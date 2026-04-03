@@ -1,4 +1,4 @@
-namespace EverydayChain.Hub.Domain.Sync;
+namespace EverydayChain.Hub.SharedKernel.Utilities;
 
 /// <summary>
 /// 同步列过滤组件，提供排除列过滤与列名规范化能力。

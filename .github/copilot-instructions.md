@@ -19,6 +19,10 @@
 - 项目内所有代码文件的命名空间必须与物理目录层级严格一致。
 - 每个类必须独立文件，禁止多类同文件。
 - 所有枚举必须定义在 `EverydayChain.Hub.Domain.Enums` 子目录下。
+- 所有配置实体类必须定义在 `EverydayChain.Hub.Domain.Options` 子目录下。
+- 聚合根只能定义在 `Aggregates` 子目录下。
+- 所有事件必须定义在 `EverydayChain.Hub.Domain.Events` 子目录下。
+- 静态工具类只能定义在 `EverydayChain.Hub.SharedKernel.Utilities` 子目录下。
 - 所有枚举必须包含 XML 注释与 `Description`。
 - 所有事件载荷必须定义在 `Events` 子目录下，并使用 `readonly record struct`。
 - 字段、类型、文件、项目命名必须符合专业领域术语。
@@ -29,7 +33,7 @@
 - 所有方法必须有注释；复杂实现方法必须含步骤注释。
 - 所有类字段必须有注释。
 - 所有配置项必须有中文注释（至少体现在配置类属性 XML 注释或配套文档中，并在 Swagger 中补齐配置参数中文说明）。
-- 配置文件（如 `appsettings*.json`）的每一项都需要注释，且需与配置项同级维护，保证可追溯。
+- 配置文件（如 `appsettings*.json`）的每一项都需要注释，注释方式参考 `https://github.com/Hisoka6602/Zeye.NarrowBeltSorter/blob/master/Zeye.NarrowBeltSorter.Host/appsettings.json`（JSON 注释风格）。
 - 若配置项为集合类型（数组），至少需要提供一个示例元素。
 - 全局禁止复制粘贴式重复代码；发现同义工具代码需提取集中。
 - 小工具类优先简洁、高性能、高复用。

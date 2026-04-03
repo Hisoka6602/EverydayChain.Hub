@@ -92,7 +92,7 @@ jobs:
               sys.exit(1)
           
           config_file_comment_rule_pattern = re.compile(
-              r"配置文件（如\s*`?appsettings\*\.json`?）的每一项都需要注释",
+              r"配置文件（如\s*`?appsettings\*\.json`?）的每一项都需要注释.*?JSON\s*注释风格",
               re.DOTALL,
           )
           if not config_file_comment_rule_pattern.search(instructions_text):
@@ -105,6 +105,46 @@ jobs:
           )
           if not array_sample_rule_pattern.search(instructions_text):
               print("错误：.github/copilot-instructions.md 缺少“集合配置项至少一个示例元素”的强制约束。")
+              sys.exit(1)
+
+          enum_dir_rule_pattern = re.compile(
+              r"所有枚举必须定义在\s*`?EverydayChain\.Hub\.Domain\.Enums`?\s*子目录下",
+              re.DOTALL,
+          )
+          if not enum_dir_rule_pattern.search(instructions_text):
+              print("错误：.github/copilot-instructions.md 缺少“枚举目录约束”。")
+              sys.exit(1)
+
+          option_dir_rule_pattern = re.compile(
+              r"所有配置实体类必须定义在\s*`?EverydayChain\.Hub\.Domain\.Options`?\s*子目录下",
+              re.DOTALL,
+          )
+          if not option_dir_rule_pattern.search(instructions_text):
+              print("错误：.github/copilot-instructions.md 缺少“配置实体目录约束”。")
+              sys.exit(1)
+
+          aggregate_dir_rule_pattern = re.compile(
+              r"聚合根只能定义在\s*`?Aggregates`?\s*子目录下",
+              re.DOTALL,
+          )
+          if not aggregate_dir_rule_pattern.search(instructions_text):
+              print("错误：.github/copilot-instructions.md 缺少“聚合根目录约束”。")
+              sys.exit(1)
+
+          event_dir_rule_pattern = re.compile(
+              r"所有事件必须定义在\s*`?EverydayChain\.Hub\.Domain\.Events`?\s*子目录下",
+              re.DOTALL,
+          )
+          if not event_dir_rule_pattern.search(instructions_text):
+              print("错误：.github/copilot-instructions.md 缺少“事件目录约束”。")
+              sys.exit(1)
+
+          utility_dir_rule_pattern = re.compile(
+              r"静态工具类只能定义在\s*`?EverydayChain\.Hub\.SharedKernel\.Utilities`?\s*子目录下",
+              re.DOTALL,
+          )
+          if not utility_dir_rule_pattern.search(instructions_text):
+              print("错误：.github/copilot-instructions.md 缺少“静态工具类目录约束”。")
               sys.exit(1)
           
           polly_rule_pattern = re.compile(
@@ -235,7 +275,6 @@ jobs:
                   print(f" - {item}")
               sys.exit(1)
 
-          config_comment_violations = []
           config_array_sample_violations = []
           config_files = [path for path in candidate_files if re.match(r".*/appsettings.*\.json$", path.as_posix())]
           for config_path in config_files:
@@ -244,44 +283,116 @@ jobs:
                   content = config_path.read_text(encoding="utf-8")
               except UnicodeDecodeError:
                   continue
+              stripped_lines = []
+              pending_comments = []
+              for line in content.splitlines():
+                  pure = re.sub(r"//.*$", "", line)
+                  stripped_lines.append(pure)
+                  s = line.strip()
+                  if s.startswith("//"):
+                      pending_comments.append(s)
+                      continue
+                  if s == "" or s in {"{", "}", "[", "]"}:
+                      continue
+                  if ":" in pure:
+                      is_property = bool(re.match(r'^\s*\"[^\"]+\"\s*:', pure))
+                      if is_property:
+                          key_match = re.match(r'^\s*\"([^\"]+)\"\s*:', pure)
+                          key_name = key_match.group(1) if key_match else ""
+                          if not pending_comments:
+                              print(f"错误：配置项缺少上方注释：{relative} -> {key_name}")
+                              sys.exit(1)
+                  pending_comments = []
+
+              uncommented = "\n".join(stripped_lines)
               try:
-                  data = json.loads(content)
+                  data = json.loads(uncommented)
               except json.JSONDecodeError:
-                  continue
+                  print(f"错误：配置文件在去除注释后无法解析 JSON：{relative}")
+                  sys.exit(1)
 
-              def walk(node, current_path):
-                  def build_path(path_segments, key=None):
-                      segments = path_segments + ([key] if key is not None else [])
-                      return ".".join(segments) if segments else "<root>"
-
+              def walk_array(node, current_path):
                   if isinstance(node, dict):
-                      keys = [key for key in node.keys() if not key.endswith("__Comment")]
-                      for key in keys:
-                          comment_key = f"{key}__Comment"
-                          if comment_key not in node:
-                              full_path = build_path(current_path, key)
-                              config_comment_violations.append(f"{relative}: 路径 {full_path} 缺少同级注释键 {comment_key}")
-                      for child_key in keys:
-                          walk(node[child_key], current_path + [child_key])
+                      for key, value in node.items():
+                          walk_array(value, current_path + [key])
                   elif isinstance(node, list):
                       if not node:
-                          full_path = build_path(current_path)
+                          full_path = ".".join(current_path) if current_path else "<root>"
                           config_array_sample_violations.append(f"{relative}: 集合 {full_path} 不能为空，至少需要一个示例元素")
                           return
                       for item in node:
-                          walk(item, current_path)
+                          walk_array(item, current_path)
 
-              walk(data, [])
-
-          if config_comment_violations:
-              print("错误：发现配置文件存在未注释项（需使用同级 __Comment 键）：")
-              for item in config_comment_violations:
-                  print(f" - {item}")
-              sys.exit(1)
+              walk_array(data, [])
 
           if config_array_sample_violations:
               print("错误：发现集合配置项缺少示例元素：")
               for item in config_array_sample_violations:
+                  print(f" - {item}")
+              sys.exit(1)
+
+          enum_dir_violations = []
+          option_dir_violations = []
+          aggregate_dir_violations = []
+          event_dir_violations = []
+          utility_dir_violations = []
+
+          for path in candidate_files:
+              if path.suffix != ".cs":
+                  continue
+              relative = path.as_posix()
+              if any(part in ignored_dirs for part in path.parts):
+                  continue
+              text = path.read_text(encoding="utf-8")
+              class_matches = re.findall(r"\b(class|record|record\s+struct)\s+([A-Za-z_][A-Za-z0-9_]*)", text)
+              enum_matches = re.findall(r"\benum\s+([A-Za-z_][A-Za-z0-9_]*)", text)
+
+              if enum_matches and not relative.startswith("EverydayChain.Hub.Domain/Enums/"):
+                  enum_dir_violations.append(relative)
+
+              if class_matches:
+                  if relative.endswith("Options.cs") and not relative.startswith("EverydayChain.Hub.Domain/Options/"):
+                      option_dir_violations.append(relative)
+
+                  for _, type_name in class_matches:
+                      if type_name.endswith("Aggregate") and "/Aggregates/" not in relative:
+                          aggregate_dir_violations.append(relative)
+                      if type_name.endswith("Event") and not relative.startswith("EverydayChain.Hub.Domain/Events/"):
+                          event_dir_violations.append(relative)
+
+              static_class_matches = re.findall(r"\bpublic\s+static\s+class\s+([A-Za-z_][A-Za-z0-9_]*)", text)
+              for type_name in static_class_matches:
+                  if type_name.endswith(("Utility", "Utilities", "Helper", "Builder", "Filter")):
+                      if not relative.startswith("EverydayChain.Hub.SharedKernel/Utilities/"):
+                          utility_dir_violations.append(relative)
+
+          if enum_dir_violations:
+              print("错误：发现枚举未定义在 EverydayChain.Hub.Domain.Enums：")
+              for item in sorted(set(enum_dir_violations)):
+                  print(f" - {item}")
+              sys.exit(1)
+
+          if option_dir_violations:
+              print("错误：发现配置实体未定义在 EverydayChain.Hub.Domain.Options：")
+              for item in sorted(set(option_dir_violations)):
+                  print(f" - {item}")
+              sys.exit(1)
+
+          if aggregate_dir_violations:
+              print("错误：发现聚合根未定义在 Aggregates 子目录：")
+              for item in sorted(set(aggregate_dir_violations)):
+                  print(f" - {item}")
+              sys.exit(1)
+
+          if event_dir_violations:
+              print("错误：发现事件未定义在 EverydayChain.Hub.Domain.Events：")
+              for item in sorted(set(event_dir_violations)):
+                  print(f" - {item}")
+              sys.exit(1)
+
+          if utility_dir_violations:
+              print("错误：发现静态工具类未定义在 EverydayChain.Hub.SharedKernel.Utilities：")
+              for item in sorted(set(utility_dir_violations)):
                   print(f" - {item}")
               sys.exit(1)
 

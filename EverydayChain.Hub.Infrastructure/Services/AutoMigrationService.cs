@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Infrastructure.Options;
+using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using Microsoft.EntityFrameworkCore;

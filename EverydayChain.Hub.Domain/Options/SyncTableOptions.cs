@@ -1,4 +1,4 @@
-namespace EverydayChain.Hub.Infrastructure.Options;
+namespace EverydayChain.Hub.Domain.Options;
 
 /// <summary>
 /// 单表同步配置。

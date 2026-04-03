@@ -1,4 +1,4 @@
-namespace EverydayChain.Hub.Infrastructure.Options;
+namespace EverydayChain.Hub.Domain.Options;
 
 /// <summary>
 /// 分表配置，从 <c>appsettings.json</c> 的 <c>Sharding</c> 节点绑定。

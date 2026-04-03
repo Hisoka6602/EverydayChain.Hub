@@ -1,3 +1,4 @@
+using EverydayChain.Hub.SharedKernel.Utilities;
 using EverydayChain.Hub.Domain.Sync;
 
 namespace EverydayChain.Hub.Application.Models;

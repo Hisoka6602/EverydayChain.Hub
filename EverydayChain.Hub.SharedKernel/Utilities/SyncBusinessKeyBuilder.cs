@@ -1,4 +1,4 @@
-namespace EverydayChain.Hub.Domain.Sync;
+namespace EverydayChain.Hub.SharedKernel.Utilities;
 
 /// <summary>
 /// 同步业务键构建器。

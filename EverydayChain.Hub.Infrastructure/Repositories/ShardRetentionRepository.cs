@@ -1,5 +1,5 @@
 using EverydayChain.Hub.Application.Repositories;
-using EverydayChain.Hub.Infrastructure.Options;
+using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;

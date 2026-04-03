@@ -1,4 +1,4 @@
-namespace EverydayChain.Hub.Host.Options;
+namespace EverydayChain.Hub.Domain.Options;
 
 /// <summary>
 /// 后台工作服务配置，从 <c>appsettings.json</c> 的 <c>Worker</c> 节点绑定。

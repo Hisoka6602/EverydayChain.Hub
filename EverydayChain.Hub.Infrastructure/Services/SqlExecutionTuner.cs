@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Infrastructure.Options;
+using EverydayChain.Hub.Domain.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

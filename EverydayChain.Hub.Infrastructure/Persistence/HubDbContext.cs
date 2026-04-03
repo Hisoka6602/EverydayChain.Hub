@@ -1,5 +1,5 @@
 using EverydayChain.Hub.Domain.Aggregates.SortingTaskTraceAggregate;
-using EverydayChain.Hub.Infrastructure.Options;
+using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence.EntityConfigurations;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using Microsoft.EntityFrameworkCore;

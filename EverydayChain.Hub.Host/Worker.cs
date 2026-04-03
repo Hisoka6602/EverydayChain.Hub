@@ -1,5 +1,5 @@
 using EverydayChain.Hub.Domain.Aggregates.SortingTaskTraceAggregate;
-using EverydayChain.Hub.Host.Options;
+using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.Extensions.Options;
 

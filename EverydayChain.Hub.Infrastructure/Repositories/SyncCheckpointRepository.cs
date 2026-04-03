@@ -1,9 +1,10 @@
 using System.Text.Json;
 using EverydayChain.Hub.Application.Repositories;
-using EverydayChain.Hub.Domain.Sync;
+using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using EverydayChain.Hub.Infrastructure.Options;
+using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.Domain.Sync;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 

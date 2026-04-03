@@ -22,4 +22,9 @@
     <ProjectReference Include="..\EverydayChain.Hub.Domain\EverydayChain.Hub.Domain.csproj" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <ProjectReference Include="..\EverydayChain.Hub.SharedKernel\EverydayChain.Hub.SharedKernel.csproj" />
+  </ItemGroup>
+
 </Project>

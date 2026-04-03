@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using EverydayChain.Hub.Application.Repositories;
-using EverydayChain.Hub.Infrastructure.Options;
+using EverydayChain.Hub.Domain.Options;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
 
