@@ -1,9 +1,11 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 删除 `EverydayChain.Hub.Host/appsettings.Development.json`，统一仅保留正式环境配置文件 `appsettings.json`。
 - 新增 `Oracle` 配置节与 `OracleOptions` 配置实体，支持远端 Oracle 连接字符串、默认 Schema、只读开关、命令超时与分页上限的集中配置。
 - `OracleSourceReader` 已从内存模拟实现切换为真实 Oracle 只读查询实现，支持按窗口分页读取、按窗口读取业务键、列过滤与异常日志落盘。
 - `EverydayChain.Hub.Infrastructure` 引入 `Oracle.ManagedDataAccess.Core` 依赖用于 Oracle 连接与参数化查询执行。
+- Oracle 连接字符串中的 `ORACLE_PASSWORD` 为占位符，部署时需通过环境变量、UserSecrets 或密钥服务替换，禁止提交真实密码。
 - 配置文件注释方式改为参考 Zeye.NarrowBeltSorter 的 JSON 注释风格（`//` 行注释），并在 CI 中按‘每个配置项上方必须有注释’进行自动校验。
 - 新增并落地结构强制约束：配置实体统一迁移至 `EverydayChain.Hub.Domain/Options`；静态工具类 `SyncBusinessKeyBuilder` 与 `SyncColumnFilter` 迁移至 `EverydayChain.Hub.SharedKernel/Utilities`；删除 SharedKernel 占位类 `Class1.cs`。
 - CI 新增结构扫描：枚举目录、配置实体目录、聚合根目录、事件目录、静态工具类目录约束自动校验。
@@ -141,7 +143,7 @@
 - `SyncBusinessKeyBuilder.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：同步业务键构建共享组件，按 `UniqueKeys` 配置将行数据拼接为 `|` 分隔的业务键文本，供 Upsert 与删除识别阶段统一调用。
 - `SyncColumnFilter.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：同步列过滤共享组件，提供 `ExcludedColumns` 规范化与行级过滤能力，并统一维护软删除关键列常量。
 - `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs` / `SyncTablePriority.cs`：同步模式、删除策略、滞后控制、批次状态、变更操作类型与调度优先级枚举，均含中文 XML 注释与 `Description`。
-- `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Worker`、`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`RetentionJob` 等），供 Host/Infrastructure 绑定读取。
+- `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Worker`、`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`RetentionJob`、`Oracle` 等），供 Host/Infrastructure 绑定读取。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
 - `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs`：同步执行、删除识别与删除执行的数据契约模型。
 - `ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。

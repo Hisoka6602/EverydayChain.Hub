@@ -166,7 +166,7 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
 
         if (orderColumns.Count == 1)
         {
-            // 当未配置 UniqueKeys 时，使用 Oracle ROWID 作为分页稳定排序兜底列，避免窗口内重复/漏读。
+            // 当未配置 UniqueKeys 时, 使用 Oracle ROWID 作为分页稳定排序兜底列, 避免窗口内重复/漏读。
             orderColumns.Add("t.ROWID");
         }
 
@@ -327,7 +327,7 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
     }
 
     /// <summary>
-    /// 强制只读命令校验。
+    /// 强制只读命令校验.
     /// </summary>
     /// <param name="command">命令对象。</param>
     /// <exception cref="InvalidOperationException">当命令不是 SELECT 且启用只读约束时抛出。</exception>

@@ -14,7 +14,7 @@ public class OracleOptions
     /// <summary>默认源端 Schema（Oracle 有效 Schema 名称）。</summary>
     public string DefaultSchema { get; set; } = string.Empty;
 
-    /// <summary>是否强制只读（true 表示所有命令统一设置为只读）。</summary>
+    /// <summary>是否强制只读（true 表示仅允许执行 SELECT 语句）。</summary>
     public bool ReadOnly { get; set; } = true;
 
     /// <summary>数据库命令超时秒数（建议范围：1~3600）。</summary>
