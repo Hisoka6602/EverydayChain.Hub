@@ -181,7 +181,7 @@ public class SyncWindowCalculatorTests
         var definition = BuildDefinition(maxLagMinutes: 0);
         var checkpoint = EmptyCheckpoint();
 
-        var utcNow = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Utc);
+        var utcNow = DateTime.SpecifyKind(DateTime.Now, (DateTimeKind)1);
 
         Assert.Throws<InvalidOperationException>(() =>
             calculator.CalculateWindow(definition, checkpoint, utcNow));
@@ -196,7 +196,7 @@ public class SyncWindowCalculatorTests
         var calculator = CreateCalculator();
         var definition = BuildDefinition(maxLagMinutes: 0);
         var checkpoint = EmptyCheckpoint();
-        checkpoint.LastSuccessCursorLocal = DateTime.SpecifyKind(new DateTime(2026, 1, 1), DateTimeKind.Utc);
+        checkpoint.LastSuccessCursorLocal = DateTime.SpecifyKind(new DateTime(2026, 1, 1), (DateTimeKind)1);
 
         var nowLocal = new DateTime(2026, 3, 1, 12, 0, 0, DateTimeKind.Local);
 
@@ -212,7 +212,7 @@ public class SyncWindowCalculatorTests
     {
         var calculator = CreateCalculator();
         var definition = BuildDefinition(maxLagMinutes: 0);
-        definition.StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 1, 1), DateTimeKind.Utc);
+        definition.StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 1, 1), (DateTimeKind)1);
         var checkpoint = EmptyCheckpoint();
 
         var nowLocal = new DateTime(2026, 3, 1, 12, 0, 0, DateTimeKind.Local);

@@ -52,13 +52,13 @@ public class SyncBackgroundWorker(
     private async Task RunOnceAsync(CancellationToken stoppingToken)
     {
         var sw = Stopwatch.StartNew();
-        var tableSyncTimeoutSeconds = _syncJobOptions.TableSyncTimeoutSeconds;
+        var roundTimeoutSeconds = _syncJobOptions.TableSyncTimeoutSeconds;
         IReadOnlyList<SyncBatchResult> results;
 
-        // 若配置了表级超时，使用 CancellationTokenSource 限制整轮同步最大耗时。
-        if (tableSyncTimeoutSeconds > 0)
+        // 若配置了整轮超时，使用 CancellationTokenSource 限制本轮整体最大耗时。
+        if (roundTimeoutSeconds > 0)
         {
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(tableSyncTimeoutSeconds));
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(roundTimeoutSeconds));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, timeoutCts.Token);
             try
             {
@@ -68,7 +68,7 @@ public class SyncBackgroundWorker(
             {
                 logger.LogError(
                     "同步整轮执行超时，已取消本轮所有未完成表同步。TableSyncTimeoutSeconds={TableSyncTimeoutSeconds}",
-                    tableSyncTimeoutSeconds);
+                    roundTimeoutSeconds);
                 return;
             }
         }

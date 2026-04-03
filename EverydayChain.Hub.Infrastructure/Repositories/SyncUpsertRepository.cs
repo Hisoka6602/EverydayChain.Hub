@@ -490,8 +490,10 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         try
         {
             // 含毫秒精度，避免高频写入场景下同秒内文件名冲突。
+            // 去掉活跃文件扩展名后拼接时间戳，避免双重扩展名（如 .json.{ts}.json.gz）。
             var timestamp = DateTime.Now.ToString("yyyyMMddHHmmssfff", CultureInfo.InvariantCulture);
-            var archiveFilePath = $"{activeFilePath}.{timestamp}.json.gz";
+            var activeFileBasePath = activeFilePath[..^Path.GetExtension(activeFilePath).Length];
+            var archiveFilePath = $"{activeFileBasePath}.{timestamp}.json.gz";
             // 使用 GZip 压缩 .bak 文件到归档。
             using (var inputStream = File.OpenRead(backupFilePath))
             using (var outputStream = File.Create(archiveFilePath))
@@ -531,7 +533,9 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     {
         try
         {
-            var archivePattern = $"{Path.GetFileName(activeFilePath)}.*.json.gz";
+            // 归档文件名模式：去掉活跃文件扩展名后，拼接 .{timestamp}.json.gz，故 glob 模式也需先去掉扩展名。
+            var activeFileNameNoExt = Path.GetFileNameWithoutExtension(activeFilePath);
+            var archivePattern = $"{activeFileNameNoExt}.*.json.gz";
             // 按文件最后写入时间升序排序，确保最旧文件最先被清理。
             var archives = Directory
                 .GetFiles(_targetStoreDirectoryPath, archivePattern)

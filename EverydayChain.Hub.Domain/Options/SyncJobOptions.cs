@@ -50,7 +50,7 @@ public class SyncJobOptions
     /// <summary>目标端快照文件归档最大保留数量（可填写范围：[0, 100]；0 表示关闭压缩归档；超出保留数量的最旧归档自动删除；建议值 7）。</summary>
     public int TargetStoreArchiveMaxCount { get; set; } = 7;
 
-    /// <summary>单表同步超时时间（单位：秒，可填写范围：[0, 86400]；0 表示关闭超时保护；建议值 600）。</summary>
+    /// <summary>单轮同步整体超时时间（单位：秒，可填写范围：[0, 86400]；当前用于限制一次 RunAllEnabledTableSyncAsync 的整轮执行时长；0 表示关闭超时保护；建议值 600）。</summary>
     public int TableSyncTimeoutSeconds { get; set; } = 600;
 
     /// <summary>单表配置集合。</summary>

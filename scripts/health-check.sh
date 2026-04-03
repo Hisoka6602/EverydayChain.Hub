@@ -125,11 +125,13 @@ check_file_readable "$APPSETTINGS_FILE" "配置文件 appsettings.json"
 check_file_readable "$NLOG_CONFIG_FILE" "日志配置 nlog.config"
 
 # 目标快照文件（按表分片）
-TARGET_FILES=$(ls $TARGET_STORE_PATTERN 2>/dev/null || true)
-if [ -z "$TARGET_FILES" ]; then
+shopt -s nullglob
+TARGET_FILES=("$DATA_DIR"/sync-target-store.*.json)
+shopt -u nullglob
+if [ ${#TARGET_FILES[@]} -eq 0 ]; then
     warn "未发现目标快照文件（首次运行前正常）：$TARGET_STORE_PATTERN"
 else
-    for f in $TARGET_FILES; do
+    for f in "${TARGET_FILES[@]}"; do
         check_file_readable "$f" "目标快照"
     done
 fi
@@ -146,35 +148,38 @@ import json, sys
 with open('$APPSETTINGS_FILE', 'r', encoding='utf-8') as f:
     content = f.read()
 
-# 剥离行注释（// ...），正确追踪转义字符避免误判字符串边界。
+# 剥离行注释（// ...），正确追踪字符串与转义状态，避免误判字符串边界。
 def strip_comments(text):
     result = []
     in_string = False
     i = 0
     while i < len(text):
-        c = text[i]
+        ch = text[i]
         if in_string:
-            result.append(c)
-            if c == '\\\\':
-                # 转义字符：跳过下一个字符，不改变 in_string 状态。
+            result.append(ch)
+            if ch == '\\\\':
+                # 转义字符：保留并跳过下一个字符，不改变字符串状态。
                 i += 1
                 if i < len(text):
                     result.append(text[i])
-            elif c == '\\\"':
+                i += 1
+                continue
+            if ch == '\"':
                 in_string = False
             i += 1
             continue
-        if c == '\\\"':
+        if ch == '\"':
             in_string = True
-            result.append(c)
+            result.append(ch)
             i += 1
             continue
-        if c == '/' and i + 1 < len(text) and text[i + 1] == '/':
-            # 行注释：跳过直到换行。
+        if ch == '/' and i + 1 < len(text) and text[i + 1] == '/':
+            # 行注释：跳过直到换行，换行符保留给后续逻辑处理。
+            i += 2
             while i < len(text) and text[i] != '\\n':
                 i += 1
             continue
-        result.append(c)
+        result.append(ch)
         i += 1
     return ''.join(result)
 
