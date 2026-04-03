@@ -734,7 +734,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
                 _logger.LogInformation(
                     "空闲表内存已驱逐。TableCode={TableCode}, IdleEvictionThresholdMinutes={ThresholdMinutes}",
                     tableCode,
-                    TimeSpan.FromTicks(_idleEvictionThresholdTicks / Stopwatch.Frequency * TimeSpan.TicksPerSecond).TotalMinutes);
+                    TimeSpan.FromTicks(_idleEvictionThresholdTicks * TimeSpan.TicksPerSecond / Stopwatch.Frequency).TotalMinutes);
             }
         }
 

@@ -13,6 +13,10 @@ namespace EverydayChain.Hub.Infrastructure.Repositories;
 /// <summary>
 /// Oracle 源端读取器实现（真实 Oracle 只读查询）。
 /// 通过项目统一安全执行器 <see cref="IDangerZoneExecutor"/> 提供指数退避重试、熔断与超时保护。
+/// 错误处理策略说明：
+///   - 参数/配置校验异常（<see cref="InvalidOperationException"/>、<see cref="ArgumentOutOfRangeException"/>）
+///     属于本地不可重试错误，在弹性管道外先行抛出，不消耗重试次数，快速失败。
+///   - Oracle 网络超时、连接失败等瞬态异常经由弹性管道自动重试，达到上限后触发熔断，保护下游资源。
 /// </summary>
 public class OracleSourceReader(
     IOptions<OracleOptions> oracleOptions,

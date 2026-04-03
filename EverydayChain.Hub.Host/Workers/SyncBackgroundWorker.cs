@@ -31,7 +31,7 @@ public class SyncBackgroundWorker(
                 var results = await syncOrchestrator.RunAllEnabledTableSyncAsync(stoppingToken);
                 foreach (var result in results)
                 {
-                    if (result.FailureRate >= 1D)
+                    if (!string.IsNullOrEmpty(result.FailureMessage))
                     {
                         logger.LogError(
                             "同步执行失败。TableCode={TableCode}, FailureMessage={FailureMessage}",

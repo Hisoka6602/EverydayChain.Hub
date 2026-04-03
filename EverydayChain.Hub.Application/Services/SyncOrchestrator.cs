@@ -89,6 +89,8 @@ public class SyncOrchestrator(
             }
         });
 
+        // 注：若所有表均失败或均未分配到结果槽，返回空集合；调用方应以空集合为合法结果处理，
+        // 不应依赖结果数量等于启用表数量。
         return results.Where(x => x is not null).ToList().AsReadOnly();
     }
 }
