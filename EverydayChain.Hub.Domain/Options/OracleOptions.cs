@@ -8,7 +8,7 @@ public class OracleOptions
     /// <summary>配置节名称。</summary>
     public const string SectionName = "Oracle";
 
-    /// <summary>远端 Oracle 连接字符串（Oracle 标准连接字符串）。</summary>
+    /// <summary>远端 Oracle 连接字符串（Oracle 标准连接字符串，建议启用连接池并通过密钥注入密码）。</summary>
     public string ConnectionString { get; set; } = string.Empty;
 
     /// <summary>默认源端 Schema（Oracle 有效 Schema 名称）。</summary>

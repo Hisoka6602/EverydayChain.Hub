@@ -14,17 +14,22 @@ namespace EverydayChain.Hub.Infrastructure.Repositories;
 /// </summary>
 public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<OracleSourceReader> logger) : IOracleSourceReader
 {
+    /// <summary>默认分页上限。</summary>
+    private const int DefaultMaxPageSize = 5000;
+
+    /// <summary>默认命令超时秒数。</summary>
+    private const int DefaultCommandTimeoutSeconds = 60;
+
     /// <summary>Oracle 配置快照。</summary>
     private readonly OracleOptions _options = oracleOptions.Value;
 
     /// <inheritdoc/>
     public async Task<SyncReadResult> ReadIncrementalPageAsync(SyncReadRequest request, CancellationToken ct)
     {
-        var sourceSchema = string.Empty;
         try
         {
-            sourceSchema = ResolveSourceSchema(request.SourceSchema);
-            ValidateReadRequest(request);
+            var sourceSchema = ResolveSourceSchema(request.SourceSchema);
+            ValidateReadRequest(request, sourceSchema);
             var pageSize = ResolvePageSize(request.PageSize);
             var offset = (request.PageNo - 1) * pageSize;
             var limit = offset + pageSize;
@@ -36,8 +41,8 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
             command.BindByName = true;
             command.CommandTimeout = ResolveCommandTimeout();
             command.CommandText = sql;
-            command.Parameters.Add("p_windowStart", OracleDbType.Date, request.Window.WindowStartLocal, ParameterDirection.Input);
-            command.Parameters.Add("p_windowEnd", OracleDbType.Date, request.Window.WindowEndLocal, ParameterDirection.Input);
+            command.Parameters.Add("p_windowStart", OracleDbType.TimeStamp, request.Window.WindowStartLocal, ParameterDirection.Input);
+            command.Parameters.Add("p_windowEnd", OracleDbType.TimeStamp, request.Window.WindowEndLocal, ParameterDirection.Input);
             command.Parameters.Add("p_offset", OracleDbType.Int32, offset, ParameterDirection.Input);
             command.Parameters.Add("p_limit", OracleDbType.Int32, limit, ParameterDirection.Input);
             EnsureReadOnlyCommand(command);
@@ -76,7 +81,7 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
                 exception,
                 "Oracle 增量读取失败。TableCode={TableCode}, SourceSchema={SourceSchema}, SourceTable={SourceTable}, PageNo={PageNo}",
                 request.TableCode,
-                sourceSchema,
+                ResolveSourceSchemaForLog(request.SourceSchema),
                 request.SourceTable,
                 request.PageNo);
             throw;
@@ -86,11 +91,10 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
     /// <inheritdoc/>
     public async Task<IReadOnlySet<string>> ReadByKeysAsync(SyncKeyReadRequest request, CancellationToken ct)
     {
-        var sourceSchema = string.Empty;
         try
         {
-            sourceSchema = ResolveSourceSchema(request.SourceSchema);
-            ValidateReadKeyRequest(request);
+            var sourceSchema = ResolveSourceSchema(request.SourceSchema);
+            ValidateReadKeyRequest(request, sourceSchema);
             if (request.UniqueKeys.Count == 0)
             {
                 return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -103,8 +107,8 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
             command.BindByName = true;
             command.CommandTimeout = ResolveCommandTimeout();
             command.CommandText = sql;
-            command.Parameters.Add("p_windowStart", OracleDbType.Date, request.Window.WindowStartLocal, ParameterDirection.Input);
-            command.Parameters.Add("p_windowEnd", OracleDbType.Date, request.Window.WindowEndLocal, ParameterDirection.Input);
+            command.Parameters.Add("p_windowStart", OracleDbType.TimeStamp, request.Window.WindowStartLocal, ParameterDirection.Input);
+            command.Parameters.Add("p_windowEnd", OracleDbType.TimeStamp, request.Window.WindowEndLocal, ParameterDirection.Input);
             EnsureReadOnlyCommand(command);
 
             var keySet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -136,7 +140,7 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
                 exception,
                 "Oracle 业务键读取失败。TableCode={TableCode}, SourceSchema={SourceSchema}, SourceTable={SourceTable}",
                 request.TableCode,
-                sourceSchema,
+                ResolveSourceSchemaForLog(request.SourceSchema),
                 request.SourceTable);
             throw;
         }
@@ -144,8 +148,10 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
 
     /// <summary>
     /// 构建分页读取 SQL。
+    /// 前置条件：入参标识符已通过 <see cref="ValidateSafeIdentifier"/> 校验，禁止移除该前置校验。
     /// </summary>
     /// <param name="request">读取请求。</param>
+    /// <param name="sourceSchema">生效源端 Schema。</param>
     /// <returns>SQL 文本。</returns>
     private static string BuildReadPageSql(SyncReadRequest request, string sourceSchema)
     {
@@ -180,8 +186,10 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
 
     /// <summary>
     /// 构建业务键读取 SQL。
+    /// 前置条件：入参标识符已通过 <see cref="ValidateSafeIdentifier"/> 校验，禁止移除该前置校验。
     /// </summary>
     /// <param name="request">业务键读取请求。</param>
+    /// <param name="sourceSchema">生效源端 Schema。</param>
     /// <returns>SQL 文本。</returns>
     private static string BuildReadKeysSql(SyncKeyReadRequest request, string sourceSchema)
     {
@@ -198,10 +206,12 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
     /// 校验分页读取请求。
     /// </summary>
     /// <param name="request">读取请求。</param>
-    private void ValidateReadRequest(SyncReadRequest request)
+    /// <param name="sourceSchema">生效源端 Schema。</param>
+    /// <exception cref="InvalidOperationException">当连接配置或标识符非法时抛出。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">当分页参数小于等于 0 时抛出。</exception>
+    private void ValidateReadRequest(SyncReadRequest request, string sourceSchema)
     {
         ValidateConnectionOptions();
-        var sourceSchema = ResolveSourceSchema(request.SourceSchema);
         EnsureReadOnlyRequest(sourceSchema, request.SourceTable, request.CursorColumn, request.UniqueKeys);
         if (request.PageNo <= 0)
         {
@@ -218,10 +228,11 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
     /// 校验业务键读取请求。
     /// </summary>
     /// <param name="request">业务键读取请求。</param>
-    private void ValidateReadKeyRequest(SyncKeyReadRequest request)
+    /// <param name="sourceSchema">生效源端 Schema。</param>
+    /// <exception cref="InvalidOperationException">当连接配置或标识符非法时抛出。</exception>
+    private void ValidateReadKeyRequest(SyncKeyReadRequest request, string sourceSchema)
     {
         ValidateConnectionOptions();
-        var sourceSchema = ResolveSourceSchema(request.SourceSchema);
         EnsureReadOnlyRequest(sourceSchema, request.SourceTable, request.CursorColumn, request.UniqueKeys);
     }
 
@@ -230,6 +241,7 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
     /// </summary>
     /// <param name="sourceSchema">请求 Schema。</param>
     /// <returns>生效 Schema。</returns>
+    /// <exception cref="InvalidOperationException">当请求值与默认配置均为空时抛出。</exception>
     private string ResolveSourceSchema(string sourceSchema)
     {
         if (!string.IsNullOrWhiteSpace(sourceSchema))
@@ -248,6 +260,7 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
     /// <summary>
     /// 校验 Oracle 连接配置。
     /// </summary>
+    /// <exception cref="InvalidOperationException">当连接字符串为空时抛出。</exception>
     private void ValidateConnectionOptions()
     {
         if (string.IsNullOrWhiteSpace(_options.ConnectionString))
@@ -263,7 +276,7 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
     /// <returns>生效分页大小。</returns>
     private int ResolvePageSize(int requestedPageSize)
     {
-        var maxPageSize = _options.MaxPageSize > 0 ? _options.MaxPageSize : 5000;
+        var maxPageSize = _options.MaxPageSize > 0 ? _options.MaxPageSize : DefaultMaxPageSize;
         if (requestedPageSize <= maxPageSize)
         {
             return requestedPageSize;
@@ -282,13 +295,34 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
     /// <returns>命令超时秒数。</returns>
     private int ResolveCommandTimeout()
     {
-        return _options.CommandTimeoutSeconds > 0 ? _options.CommandTimeoutSeconds : 60;
+        return _options.CommandTimeoutSeconds > 0 ? _options.CommandTimeoutSeconds : DefaultCommandTimeoutSeconds;
+    }
+
+    /// <summary>
+    /// 解析日志使用的源端 Schema。
+    /// </summary>
+    /// <param name="sourceSchema">请求 Schema。</param>
+    /// <returns>可用于日志的 Schema 文本。</returns>
+    private string ResolveSourceSchemaForLog(string sourceSchema)
+    {
+        if (!string.IsNullOrWhiteSpace(sourceSchema))
+        {
+            return sourceSchema;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_options.DefaultSchema))
+        {
+            return _options.DefaultSchema;
+        }
+
+        return "未配置";
     }
 
     /// <summary>
     /// 强制只读命令校验。
     /// </summary>
     /// <param name="command">命令对象。</param>
+    /// <exception cref="InvalidOperationException">当命令不是 SELECT 且启用只读约束时抛出。</exception>
     private void EnsureReadOnlyCommand(OracleCommand command)
     {
         if (!_options.ReadOnly)
