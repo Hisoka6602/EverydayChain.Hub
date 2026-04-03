@@ -281,15 +281,15 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     /// <param name="scene">场景描述。</param>
     private void EnsureDiskFreeSpace(string targetFilePath, long minFreeSpaceMb, string scene)
     {
-        string? rootPath = null;
+        string? rootPath = Path.GetPathRoot(Path.GetFullPath(targetFilePath));
+        if (string.IsNullOrWhiteSpace(rootPath))
+        {
+            logger.LogError("{Scene}失败：无法解析磁盘根路径。Path={Path}", scene, targetFilePath);
+            throw new InvalidOperationException($"{scene}失败：无法解析磁盘根路径。Path={targetFilePath}");
+        }
+
         try
         {
-            rootPath = Path.GetPathRoot(Path.GetFullPath(targetFilePath));
-            if (string.IsNullOrWhiteSpace(rootPath))
-            {
-                throw new InvalidOperationException($"{scene}失败：无法解析磁盘根路径。Path={targetFilePath}");
-            }
-
             var driveInfo = new DriveInfo(rootPath);
             var freeSpaceMb = driveInfo.AvailableFreeSpace / 1024d / 1024d;
             if (freeSpaceMb >= minFreeSpaceMb)
@@ -307,18 +307,49 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
             throw new InvalidOperationException(
                 $"{scene}失败：磁盘可用空间不足。Path={targetFilePath}, Root={rootPath}, FreeSpaceMb={freeSpaceMb:F2}, ThresholdMb={minFreeSpaceMb}");
         }
-        catch (Exception ex)
+        catch (IOException ex)
         {
-            logger.LogError(
-                ex,
-                "{Scene}失败：磁盘可用空间校验异常。Path={Path}, Root={Root}, ThresholdMb={ThresholdMb}",
-                scene,
-                targetFilePath,
-                rootPath,
-                minFreeSpaceMb);
-            throw new InvalidOperationException(
-                $"{scene}失败：磁盘可用空间校验异常。Path={targetFilePath}, Root={rootPath ?? "未知"}, ThresholdMb={minFreeSpaceMb}",
-                ex);
+            throw CreateDiskSpaceValidationException(ex, scene, targetFilePath, rootPath, minFreeSpaceMb);
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            throw CreateDiskSpaceValidationException(ex, scene, targetFilePath, rootPath, minFreeSpaceMb);
+        }
+        catch (ArgumentException ex)
+        {
+            throw CreateDiskSpaceValidationException(ex, scene, targetFilePath, rootPath, minFreeSpaceMb);
+        }
+        catch (NotSupportedException ex)
+        {
+            throw CreateDiskSpaceValidationException(ex, scene, targetFilePath, rootPath, minFreeSpaceMb);
+        }
+    }
+
+    /// <summary>
+    /// 创建磁盘可用空间校验异常并输出错误日志。
+    /// </summary>
+    /// <param name="exception">原始异常。</param>
+    /// <param name="scene">场景描述。</param>
+    /// <param name="targetFilePath">目标文件路径。</param>
+    /// <param name="rootPath">磁盘根路径。</param>
+    /// <param name="minFreeSpaceMb">最小可用空间。</param>
+    /// <returns>包装后的异常。</returns>
+    private InvalidOperationException CreateDiskSpaceValidationException(
+        Exception exception,
+        string scene,
+        string targetFilePath,
+        string? rootPath,
+        long minFreeSpaceMb)
+    {
+        logger.LogError(
+            exception,
+            "{Scene}失败：磁盘可用空间校验异常。Path={Path}, Root={Root}, ThresholdMb={ThresholdMb}",
+            scene,
+            targetFilePath,
+            rootPath,
+            minFreeSpaceMb);
+        return new InvalidOperationException(
+            $"{scene}失败：磁盘可用空间校验异常。Path={targetFilePath}, Root={rootPath ?? "N/A"}, ThresholdMb={minFreeSpaceMb}",
+            exception);
     }
 }
