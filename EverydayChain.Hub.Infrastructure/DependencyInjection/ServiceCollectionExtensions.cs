@@ -42,6 +42,7 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IShardSuffixResolver, MonthShardSuffixResolver>();
         services.AddSingleton<IDangerZoneExecutor, DangerZoneExecutor>();
+        services.AddSingleton<IRuntimeStorageGuard, RuntimeStorageGuard>();
         services.AddSingleton<ISqlExecutionTuner, SqlExecutionTuner>();
         services.AddSingleton<IShardTableProvisioner, ShardTableProvisioner>();
         services.AddScoped<IAutoMigrationService, AutoMigrationService>();

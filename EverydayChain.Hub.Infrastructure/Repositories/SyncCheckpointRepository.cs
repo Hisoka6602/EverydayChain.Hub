@@ -4,13 +4,18 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Domain.Sync;
+using EverydayChain.Hub.Infrastructure.Services;
+using EverydayChain.Hub.SharedKernel.Utilities;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
 /// 同步检查点仓储基础实现（文件持久化）。
 /// </summary>
-public class SyncCheckpointRepository(IOptions<SyncJobOptions> syncJobOptions, ILogger<SyncCheckpointRepository> logger) : ISyncCheckpointRepository
+public class SyncCheckpointRepository(
+    IOptions<SyncJobOptions> syncJobOptions,
+    IRuntimeStorageGuard runtimeStorageGuard,
+    ILogger<SyncCheckpointRepository> logger) : ISyncCheckpointRepository
 {
     /// <summary>文件访问锁。</summary>
     private static readonly SemaphoreSlim FileLock = new(1, 1);
@@ -19,24 +24,9 @@ public class SyncCheckpointRepository(IOptions<SyncJobOptions> syncJobOptions, I
     private static readonly JsonSerializerOptions CheckpointSerializerOptions = new() { WriteIndented = true };
 
     /// <summary>检查点文件路径。</summary>
-    private readonly string _checkpointFilePath = ResolveCheckpointFilePath(syncJobOptions.Value.CheckpointFilePath);
-
-    /// <summary>
-    /// 解析检查点文件路径。
-    /// </summary>
-    /// <param name="configuredPath">配置路径。</param>
-    /// <returns>可用路径。</returns>
-    private static string ResolveCheckpointFilePath(string configuredPath)
-    {
-        if (string.IsNullOrWhiteSpace(configuredPath))
-        {
-            return Path.Combine(AppContext.BaseDirectory, "sync-checkpoints.json");
-        }
-
-        return Path.IsPathRooted(configuredPath)
-            ? configuredPath
-            : Path.Combine(AppContext.BaseDirectory, configuredPath);
-    }
+    private readonly string _checkpointFilePath = RuntimeStoragePathResolver.ResolveAbsolutePath(
+        syncJobOptions.Value.CheckpointFilePath,
+        "sync-checkpoints.json");
 
     /// <inheritdoc/>
     public async Task<SyncCheckpoint> GetAsync(string tableCode, CancellationToken ct)
@@ -61,6 +51,7 @@ public class SyncCheckpointRepository(IOptions<SyncJobOptions> syncJobOptions, I
             _checkpointFilePath,
             checkpoint.TableCode,
             checkpoint.LastBatchId);
+        await runtimeStorageGuard.EnsureWriteSpaceAsync(_checkpointFilePath, "检查点写入", ct);
         await FileLock.WaitAsync(ct);
         try
         {
