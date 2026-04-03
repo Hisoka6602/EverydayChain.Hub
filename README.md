@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 新增 `持续运行一年稳定性改造清单.md`，沉淀连续运行一年的稳定性改造路线，覆盖内存治理、持久化 I/O 治理、Polly 重试与熔断、本地时间窗口防护、观测告警与运维自愈等优先级清单。
 - 删除 `EverydayChain.Hub.Host/appsettings.Development.json`，统一仅保留正式环境配置文件 `appsettings.json`。
 - 新增 `Oracle` 配置节与 `OracleOptions` 配置实体，支持远端 Oracle 连接字符串、默认 Schema、只读开关、命令超时与分页上限的集中配置。
 - `OracleSourceReader` 已从内存模拟实现切换为真实 Oracle 只读查询实现，支持按窗口分页读取、按窗口读取业务键、列过滤与异常日志落盘。
@@ -23,6 +24,7 @@
 ├── EverydayChain.Hub.sln
 ├── README.md
 ├── EFCore手动迁移操作指南.md
+├── 持续运行一年稳定性改造清单.md
 ├── 当前程序能力与缺陷分析.md
 ├── Oracle到SQLServer同步架构设计.md
 ├── Oracle到SQLServer同步实施计划.md
@@ -179,10 +181,12 @@
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
 - `EFCore手动迁移操作指南.md`：提供手工迁移、脚本导出、回滚、排障流程。
+- `持续运行一年稳定性改造清单.md`：面向“连续运行一年”目标的稳定性改造清单，按 P0/P1/P2 组织改造优先级、待确认项与验收标准。
 - `当前程序能力与缺陷分析.md`：汇总当前程序能力、功能清单、代码缺陷与逻辑 BUG，作为后续修复与优化输入。
 - `Oracle到SQLServer同步架构设计.md`：定义外部 Oracle DB First 只读同步到本地 SQL Server 的详细落地方案，包含接口与实现命名、配置模型、可配置排除列、幂等覆盖、删除同步、分表保留期治理与验收清单。
 - `Oracle到SQLServer同步实施计划.md`：按 PR 拆分同步架构落地步骤（最多 6 个 PR）的进度跟踪文档，定义完成项删除前必须通读代码确认完全实现的维护规则，随实施进展动态更新。
 
 ## 可继续完善内容
+- 将改造清单中的 P0 项拆分为独立 PR，并补齐对应压测、故障注入与验收记录。
 - 将 Oracle 源端读取补充集成测试（含非法标识符、防注入与分页边界场景）。
 - 将同步指标从日志输出升级为可接入监控平台的统一指标管道（如 Prometheus/OpenTelemetry）。
