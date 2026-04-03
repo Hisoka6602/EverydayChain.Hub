@@ -3,6 +3,7 @@
 ## 本次更新内容
 - 新增 `持续运行一年稳定性改造清单.md`，沉淀连续运行一年的稳定性改造路线，覆盖内存治理、持久化 I/O 治理、Polly 重试与熔断、本地时间窗口防护、观测告警与运维自愈等优先级清单。
 - README 已联动补充该清单文档的文件树入口与逐项职责说明，便于按清单持续推进后续实施。
+- 已补充 P0 时间窗口防护首批落地：新增时钟回拨检测与 DST 非法本地时刻窗口边界修正，降低长稳运行中的窗口重复/空洞风险。
 
 ## 解决方案文件树与职责
 ```text
@@ -139,7 +140,7 @@
 - `ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。
 - `IShardTableResolver.cs` / `IShardRetentionRepository.cs`：定义分表识别与分表清理执行契约（含分表完整回滚脚本生成）。
 - `ISyncOrchestrator.cs` / `SyncOrchestrator.cs`：同步任务编排入口，负责读取配置、加载检查点、计算窗口，并基于优先级与并发上限执行多表同步。
-- `ISyncWindowCalculator.cs` / `SyncWindowCalculator.cs`：根据 `CursorColumn + StartTimeLocal` 与检查点计算本地增量窗口。
+- `ISyncWindowCalculator.cs` / `SyncWindowCalculator.cs`：根据 `CursorColumn + StartTimeLocal` 与检查点计算本地增量窗口，并对时钟回拨与 DST 非法本地时刻执行窗口边界保护。
 - `IDeletionExecutionService.cs` / `DeletionExecutionService.cs`：执行删除识别、删除策略应用（含 DryRun）并生成删除审计与删除变更日志。
 - `IRetentionExecutionService.cs` / `RetentionExecutionService.cs`：执行分表保留期治理，完成过期分表识别、完整回滚脚本生成、dry-run 审计、删除执行、失败隔离与汇总。
 - `ISyncExecutionService.cs` / `SyncExecutionService.cs`：执行分页读取、暂存、幂等合并、删除同步、日志写入、检查点提交，并输出延迟/积压/吞吐/失败率指标日志；异常场景输出 NLog 错误日志。
@@ -178,3 +179,4 @@
 ## 可继续完善内容（本次 PR 后续行动项）
 - 继续推进 P0：内存上限治理（按表惰性加载、空闲回收、单轮/单表上限与分段降级）。
 - 继续推进 P0：目标快照增量/分片持久化、文件大小阈值、轮转与压缩策略。
+- 继续推进 P0：补齐时间窗口防护回归用例（DST 边界、时钟回拨/跃迁注入）。
