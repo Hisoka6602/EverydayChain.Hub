@@ -7,7 +7,10 @@ namespace EverydayChain.Hub.Infrastructure.Services;
 /// <summary>
 /// 托管服务入口，在应用启动阶段触发自动迁移与分表预置流程。
 /// </summary>
-public class AutoMigrationHostedService(IServiceScopeFactory scopeFactory, ILogger<AutoMigrationHostedService> logger) : IHostedService
+public class AutoMigrationHostedService(
+    IServiceScopeFactory scopeFactory,
+    IRuntimeStorageGuard runtimeStorageGuard,
+    ILogger<AutoMigrationHostedService> logger) : IHostedService
 {
     /// <summary>
     /// 应用启动时调用，创建作用域并执行 <see cref="IAutoMigrationService.RunAsync"/>。
@@ -16,6 +19,7 @@ public class AutoMigrationHostedService(IServiceScopeFactory scopeFactory, ILogg
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         logger.LogInformation("启动自动迁移与分表自治流程。");
+        await runtimeStorageGuard.EnsureStartupHealthyAsync(cancellationToken);
         using var scope = scopeFactory.CreateScope();
         var autoMigrationService = scope.ServiceProvider.GetRequiredService<IAutoMigrationService>();
         await autoMigrationService.RunAsync(cancellationToken);

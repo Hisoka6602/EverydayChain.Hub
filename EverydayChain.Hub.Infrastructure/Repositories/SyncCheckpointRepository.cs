@@ -4,13 +4,17 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Domain.Sync;
+using EverydayChain.Hub.Infrastructure.Services;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
 /// 同步检查点仓储基础实现（文件持久化）。
 /// </summary>
-public class SyncCheckpointRepository(IOptions<SyncJobOptions> syncJobOptions, ILogger<SyncCheckpointRepository> logger) : ISyncCheckpointRepository
+public class SyncCheckpointRepository(
+    IOptions<SyncJobOptions> syncJobOptions,
+    IRuntimeStorageGuard runtimeStorageGuard,
+    ILogger<SyncCheckpointRepository> logger) : ISyncCheckpointRepository
 {
     /// <summary>文件访问锁。</summary>
     private static readonly SemaphoreSlim FileLock = new(1, 1);
@@ -61,6 +65,7 @@ public class SyncCheckpointRepository(IOptions<SyncJobOptions> syncJobOptions, I
             _checkpointFilePath,
             checkpoint.TableCode,
             checkpoint.LastBatchId);
+        await runtimeStorageGuard.EnsureWriteSpaceAsync(_checkpointFilePath, "检查点写入", ct);
         await FileLock.WaitAsync(ct);
         try
         {

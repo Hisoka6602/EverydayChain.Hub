@@ -6,6 +6,7 @@ using EverydayChain.Hub.Application.Repositories;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using EverydayChain.Hub.Domain.Sync;
@@ -31,15 +32,22 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     private readonly string _targetStoreFileNamePrefix;
     /// <summary>目标端持久化文件扩展名。</summary>
     private readonly string _targetStoreFileNameExtension;
+    /// <summary>运行期存储守护服务。</summary>
+    private readonly IRuntimeStorageGuard _runtimeStorageGuard;
 
     /// <summary>
     /// 初始化同步幂等合并仓储。
     /// </summary>
     /// <param name="syncJobOptions">同步任务配置。</param>
+    /// <param name="runtimeStorageGuard">运行期存储守护服务。</param>
     /// <param name="logger">日志组件。</param>
-    public SyncUpsertRepository(IOptions<SyncJobOptions> syncJobOptions, ILogger<SyncUpsertRepository> logger)
+    public SyncUpsertRepository(
+        IOptions<SyncJobOptions> syncJobOptions,
+        IRuntimeStorageGuard runtimeStorageGuard,
+        ILogger<SyncUpsertRepository> logger)
     {
         _logger = logger;
+        _runtimeStorageGuard = runtimeStorageGuard;
         var resolvedTargetStoreFilePath = ResolveTargetStoreFilePath(syncJobOptions.Value.TargetStoreFilePath);
         _targetStoreFilePath = resolvedTargetStoreFilePath;
         _targetStoreDirectoryPath = ResolveTargetStoreDirectoryPath(resolvedTargetStoreFilePath);
@@ -326,6 +334,8 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     /// <param name="ct">取消令牌。</param>
     private async Task PersistTableAsync(string tableCode, ConcurrentDictionary<string, IReadOnlyDictionary<string, object?>> table, CancellationToken ct)
     {
+        var tableStoreFilePath = BuildPerTableStoreFilePath(tableCode);
+        await _runtimeStorageGuard.EnsureWriteSpaceAsync(tableStoreFilePath, $"目标快照写入[{tableCode}]", ct);
         var persistedTable = new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
         foreach (var pair in table)
         {
