@@ -95,7 +95,7 @@ jobs:
               sys.exit(1)
           
           host_services_rule_pattern = re.compile(
-              r"Host\s*层禁止使用\s*`?Servers`?\s*目录命名.{0,40}?Services",
+              r"Host\s*层禁止使用\s*`?Servers`?\s*目录命名.*?统一使用\s*`?Services`?",
               re.DOTALL,
           )
           if not host_services_rule_pattern.search(instructions_text):
@@ -181,7 +181,7 @@ jobs:
           host_server_dir_violations = []
           for path in candidate_files:
               relative = path.as_posix()
-              if relative.startswith("EverydayChain.Hub.Host/Servers/") or "/Servers/" in relative and relative.startswith("EverydayChain.Hub.Host/"):
+              if "EverydayChain.Hub.Host/Servers/" in relative:
                   host_server_dir_violations.append(relative)
           
           if host_server_dir_violations:
@@ -190,21 +190,21 @@ jobs:
                   print(f" - {item}")
               sys.exit(1)
           
-          second_person_comment_pattern = re.compile(r"(//|///|/\*|\*)[^\n\r]*(你|你们)")
+          second_person_inline_comment_pattern = re.compile(r"(///.*(?:你们|你))|(//.*(?:你们|你))", re.MULTILINE)
+          second_person_block_comment_pattern = re.compile(r"/\*[\s\S]*?(?:你们|你)[\s\S]*?\*/", re.MULTILINE)
           second_person_violations = []
           for path in candidate_files:
-              if path.suffix not in {".cs", ".md"}:
+              if path.suffix != ".cs":
                   continue
               relative = path.as_posix()
               if any(part in ignored_dirs for part in path.parts):
-                  continue
-              if relative.startswith(".github/"):
                   continue
               try:
                   content = path.read_text(encoding="utf-8")
               except UnicodeDecodeError:
                   continue
-              if second_person_comment_pattern.search(content):
+              # 仅检查 C# 代码注释，避免将说明文档正文误判为“注释”。
+              if second_person_inline_comment_pattern.search(content) or second_person_block_comment_pattern.search(content):
                   second_person_violations.append(relative)
           
           if second_person_violations:
