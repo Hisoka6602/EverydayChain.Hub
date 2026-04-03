@@ -85,6 +85,22 @@ jobs:
           if not config_comment_rule_pattern.search(instructions_text):
               print("错误：.github/copilot-instructions.md 缺少“所有配置项必须有中文注释”的强制约束。")
               sys.exit(1)
+          
+          polly_rule_pattern = re.compile(
+              r"重试策略需要使用\s*`?Polly`?\s*库",
+              re.DOTALL,
+          )
+          if not polly_rule_pattern.search(instructions_text):
+              print("错误：.github/copilot-instructions.md 缺少“重试策略需要使用 Polly 库”的强制约束。")
+              sys.exit(1)
+          
+          host_services_rule_pattern = re.compile(
+              r"Host\s*层禁止使用\s*`?Servers`?\s*目录命名.{0,40}?Services",
+              re.DOTALL,
+          )
+          if not host_services_rule_pattern.search(instructions_text):
+              print("错误：.github/copilot-instructions.md 缺少“Host 层 Servers -> Services 命名约束”。")
+              sys.exit(1)
 
           banned_patterns = [
               r"\bDateTime\.UtcNow\b",
@@ -160,6 +176,41 @@ jobs:
               print("错误：发现命名空间与物理目录不一致：")
               for file_path, actual, expected in namespace_violations:
                   print(f" - {file_path}: 实际={actual} 期望={expected}")
+              sys.exit(1)
+          
+          host_server_dir_violations = []
+          for path in candidate_files:
+              relative = path.as_posix()
+              if relative.startswith("EverydayChain.Hub.Host/Servers/") or "/Servers/" in relative and relative.startswith("EverydayChain.Hub.Host/"):
+                  host_server_dir_violations.append(relative)
+          
+          if host_server_dir_violations:
+              print("错误：发现 Host 层使用 Servers 目录命名，必须统一为 Services：")
+              for item in sorted(set(host_server_dir_violations)):
+                  print(f" - {item}")
+              sys.exit(1)
+          
+          second_person_comment_pattern = re.compile(r"(//|///|/\*|\*)[^\n\r]*(你|你们)")
+          second_person_violations = []
+          for path in candidate_files:
+              if path.suffix not in {".cs", ".md"}:
+                  continue
+              relative = path.as_posix()
+              if any(part in ignored_dirs for part in path.parts):
+                  continue
+              if relative.startswith(".github/"):
+                  continue
+              try:
+                  content = path.read_text(encoding="utf-8")
+              except UnicodeDecodeError:
+                  continue
+              if second_person_comment_pattern.search(content):
+                  second_person_violations.append(relative)
+          
+          if second_person_violations:
+              print("错误：发现注释中包含第二人称（你/你们）：")
+              for item in sorted(set(second_person_violations)):
+                  print(f" - {item}")
               sys.exit(1)
 
           print("治理规则检查通过。")
