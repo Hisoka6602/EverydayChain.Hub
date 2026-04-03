@@ -11,11 +11,20 @@ namespace EverydayChain.Hub.Infrastructure.Services;
 /// </summary>
 public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogger<RuntimeStorageGuard> logger) : IRuntimeStorageGuard
 {
+    /// <summary>单表内存告警阈值上限（MB）。</summary>
+    private const long MaxTableMemoryWarningThresholdMb = 65536;
+
     /// <summary>单表内存估算默认每条字节数（单位：Byte）。</summary>
     private const double DefaultBytesPerEntryEstimate = 1024d;
 
     /// <summary>单表内存告警默认阈值（MB）。</summary>
     private const long DefaultTableMemoryWarningThresholdMb = 256;
+
+    /// <summary>单表内存告警节流间隔默认值（秒）。</summary>
+    private const int DefaultTableMemoryWarningLogIntervalSeconds = 300;
+
+    /// <summary>单表内存告警节流间隔上限（秒）。</summary>
+    private const int MaxTableMemoryWarningLogIntervalSeconds = 86400;
 
     /// <summary>检查点文件绝对路径。</summary>
     private readonly string _checkpointFilePath = RuntimeStoragePathResolver.ResolveAbsolutePath(
@@ -59,6 +68,21 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
 
     /// <summary>单表内存阈值非法日志是否已输出。</summary>
     private bool _tableMemoryThresholdInvalidLogged;
+
+    /// <summary>单表内存阈值超上限日志是否已输出。</summary>
+    private bool _tableMemoryThresholdTooLargeLogged;
+
+    /// <summary>单表内存告警节流配置非法日志是否已输出。</summary>
+    private bool _tableMemoryWarningIntervalInvalidLogged;
+
+    /// <summary>单表内存告警节流配置超上限日志是否已输出。</summary>
+    private bool _tableMemoryWarningIntervalTooLargeLogged;
+
+    /// <summary>单表内存告警最近输出时间缓存（Stopwatch 时间戳）。</summary>
+    private readonly Dictionary<string, long> _tableMemoryWarningLogTimestamps = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>单表内存告警最近输出时间缓存锁。</summary>
+    private readonly object _tableMemoryWarningLogTimestampsLock = new();
 
     /// <inheritdoc/>
     public Task EnsureStartupHealthyAsync(CancellationToken ct)
@@ -132,6 +156,11 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
             return Task.CompletedTask;
         }
 
+        if (ShouldSkipTableMemoryWarningLog(tableCode))
+        {
+            return Task.CompletedTask;
+        }
+
         logger.LogWarning(
             "场景【{Scene}】触发单表内存水位告警。TableCode={TableCode}, EntryCount={EntryCount}, EstimatedMemoryMb={EstimatedMemoryMb:F2}, WarningThresholdMb={WarningThresholdMb}",
             scene,
@@ -139,6 +168,7 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
             entryCount,
             estimatedMemoryMb,
             warningThresholdMb);
+        UpdateTableMemoryWarningLogTime(tableCode);
         return Task.CompletedTask;
     }
 
@@ -264,6 +294,24 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
             return DefaultTableMemoryWarningThresholdMb;
         }
 
+        if (_options.TableMemoryWarningThresholdMb > MaxTableMemoryWarningThresholdMb)
+        {
+            lock (_thresholdLogLock)
+            {
+                if (!_tableMemoryThresholdTooLargeLogged)
+                {
+                    logger.LogWarning(
+                        "单表内存告警阈值超出上限，已钳制为最大值。Option={OptionName}, Value={OptionValue}, MaxValue={MaxValue}",
+                        nameof(_options.TableMemoryWarningThresholdMb),
+                        _options.TableMemoryWarningThresholdMb,
+                        MaxTableMemoryWarningThresholdMb);
+                    _tableMemoryThresholdTooLargeLogged = true;
+                }
+            }
+
+            return MaxTableMemoryWarningThresholdMb;
+        }
+
         return _options.TableMemoryWarningThresholdMb;
     }
 
@@ -278,6 +326,85 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         // 该值用于告警预估而非精确计量；若单条字段显著增多或大字段占比提升，应结合实测调整。
         var estimatedBytes = entryCount * DefaultBytesPerEntryEstimate;
         return estimatedBytes / 1024d / 1024d;
+    }
+
+    /// <summary>
+    /// 判断是否跳过本次单表内存告警日志输出。
+    /// </summary>
+    /// <param name="tableCode">表编码。</param>
+    /// <returns>需要跳过返回 <c>true</c>。</returns>
+    private bool ShouldSkipTableMemoryWarningLog(string tableCode)
+    {
+        var intervalSeconds = NormalizeTableMemoryWarningLogIntervalSeconds();
+        if (intervalSeconds <= 0)
+        {
+            return false;
+        }
+
+        var currentTimestamp = Stopwatch.GetTimestamp();
+        var intervalTicks = (long)(intervalSeconds * Stopwatch.Frequency);
+        lock (_tableMemoryWarningLogTimestampsLock)
+        {
+            return _tableMemoryWarningLogTimestamps.TryGetValue(tableCode, out var lastTimestamp)
+                   && currentTimestamp - lastTimestamp < intervalTicks;
+        }
+    }
+
+    /// <summary>
+    /// 更新单表内存告警日志输出时间。
+    /// </summary>
+    /// <param name="tableCode">表编码。</param>
+    private void UpdateTableMemoryWarningLogTime(string tableCode)
+    {
+        lock (_tableMemoryWarningLogTimestampsLock)
+        {
+            _tableMemoryWarningLogTimestamps[tableCode] = Stopwatch.GetTimestamp();
+        }
+    }
+
+    /// <summary>
+    /// 获取规范化后的单表内存告警节流间隔。
+    /// </summary>
+    /// <returns>节流间隔（秒）。</returns>
+    private int NormalizeTableMemoryWarningLogIntervalSeconds()
+    {
+        if (_options.TableMemoryWarningLogIntervalSeconds < 0)
+        {
+            lock (_thresholdLogLock)
+            {
+                if (!_tableMemoryWarningIntervalInvalidLogged)
+                {
+                    logger.LogWarning(
+                        "单表内存告警节流间隔配置非法，已回退默认值。Option={OptionName}, Value={OptionValue}, DefaultValue={DefaultValue}",
+                        nameof(_options.TableMemoryWarningLogIntervalSeconds),
+                        _options.TableMemoryWarningLogIntervalSeconds,
+                        DefaultTableMemoryWarningLogIntervalSeconds);
+                    _tableMemoryWarningIntervalInvalidLogged = true;
+                }
+            }
+
+            return DefaultTableMemoryWarningLogIntervalSeconds;
+        }
+
+        if (_options.TableMemoryWarningLogIntervalSeconds > MaxTableMemoryWarningLogIntervalSeconds)
+        {
+            lock (_thresholdLogLock)
+            {
+                if (!_tableMemoryWarningIntervalTooLargeLogged)
+                {
+                    logger.LogWarning(
+                        "单表内存告警节流间隔超出上限，已钳制为最大值。Option={OptionName}, Value={OptionValue}, MaxValue={MaxValue}",
+                        nameof(_options.TableMemoryWarningLogIntervalSeconds),
+                        _options.TableMemoryWarningLogIntervalSeconds,
+                        MaxTableMemoryWarningLogIntervalSeconds);
+                    _tableMemoryWarningIntervalTooLargeLogged = true;
+                }
+            }
+
+            return MaxTableMemoryWarningLogIntervalSeconds;
+        }
+
+        return _options.TableMemoryWarningLogIntervalSeconds;
     }
 
     /// <summary>
