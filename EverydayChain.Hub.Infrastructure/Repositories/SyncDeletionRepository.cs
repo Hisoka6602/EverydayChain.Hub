@@ -56,7 +56,7 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
                     continue;
                 }
 
-                var businessKey = upsertRepository.BuildBusinessKey(row, request.UniqueKeys);
+                var businessKey = SyncBusinessKeyBuilder.Build(row, request.UniqueKeys);
                 if (string.IsNullOrWhiteSpace(businessKey) || sourceKeys.Contains(businessKey))
                 {
                     continue;

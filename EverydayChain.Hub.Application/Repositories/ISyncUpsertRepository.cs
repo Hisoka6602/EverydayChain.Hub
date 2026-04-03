@@ -34,11 +34,4 @@ public interface ISyncUpsertRepository
     /// <returns>删除数量。</returns>
     Task<int> DeleteByBusinessKeysAsync(string tableCode, IReadOnlyList<string> businessKeys, DeletionPolicy deletionPolicy, CancellationToken ct);
 
-    /// <summary>
-    /// 构建业务键文本。
-    /// </summary>
-    /// <param name="row">数据行。</param>
-    /// <param name="uniqueKeys">唯一键集合。</param>
-    /// <returns>业务键文本。</returns>
-    string BuildBusinessKey(IReadOnlyDictionary<string, object?> row, IReadOnlyList<string> uniqueKeys);
 }
