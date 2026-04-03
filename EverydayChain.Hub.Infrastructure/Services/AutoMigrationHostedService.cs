@@ -18,11 +18,22 @@ public class AutoMigrationHostedService(
     /// <param name="cancellationToken">取消令牌。</param>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        logger.LogInformation("启动自动迁移与分表自治流程。");
-        await runtimeStorageGuard.EnsureStartupHealthyAsync(cancellationToken);
-        using var scope = scopeFactory.CreateScope();
-        var autoMigrationService = scope.ServiceProvider.GetRequiredService<IAutoMigrationService>();
-        await autoMigrationService.RunAsync(cancellationToken);
+        var currentStage = "启动初始化阶段";
+        try
+        {
+            logger.LogInformation("启动自动迁移与分表自治流程。");
+            currentStage = "启动自检阶段";
+            await runtimeStorageGuard.EnsureStartupHealthyAsync(cancellationToken);
+            using var scope = scopeFactory.CreateScope();
+            var autoMigrationService = scope.ServiceProvider.GetRequiredService<IAutoMigrationService>();
+            currentStage = "自动迁移阶段";
+            await autoMigrationService.RunAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "自动迁移与分表自治流程在{Stage}发生异常，应用启动终止。", currentStage);
+            throw;
+        }
     }
 
     /// <summary>

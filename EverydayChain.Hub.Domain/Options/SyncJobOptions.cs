@@ -23,10 +23,10 @@ public class SyncJobOptions
     /// <summary>目标端同步数据落地文件路径（为空时使用应用基目录下 data/sync-target-store.json）。</summary>
     public string TargetStoreFilePath { get; set; } = string.Empty;
 
-    /// <summary>启动自检最小可用磁盘空间（MB，建议范围：100~10240）。</summary>
+    /// <summary>启动自检最小可用磁盘空间（MB，建议范围：0~10240；0 表示关闭启动阶段磁盘空间校验）。</summary>
     public long StartupMinFreeSpaceMb { get; set; } = 500;
 
-    /// <summary>关键写入最小可用磁盘空间（MB，建议范围：50~10240）。</summary>
+    /// <summary>关键写入最小可用磁盘空间（MB，建议范围：0~10240；0 表示关闭写入前磁盘空间校验）。</summary>
     public long WriteMinFreeSpaceMb { get; set; } = 100;
 
     /// <summary>关键写入磁盘空间检查缓存秒数（建议范围：0~300，0 表示每次都检查）。</summary>

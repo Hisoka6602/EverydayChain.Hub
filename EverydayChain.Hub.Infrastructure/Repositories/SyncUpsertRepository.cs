@@ -48,28 +48,13 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     {
         _logger = logger;
         _runtimeStorageGuard = runtimeStorageGuard;
-        var resolvedTargetStoreFilePath = ResolveTargetStoreFilePath(syncJobOptions.Value.TargetStoreFilePath);
+        var resolvedTargetStoreFilePath = RuntimeStoragePathResolver.ResolveAbsolutePath(
+            syncJobOptions.Value.TargetStoreFilePath,
+            Path.Combine("data", "sync-target-store.json"));
         _targetStoreFilePath = resolvedTargetStoreFilePath;
         _targetStoreDirectoryPath = ResolveTargetStoreDirectoryPath(resolvedTargetStoreFilePath);
         _targetStoreFileNamePrefix = ResolveTargetStoreFileNamePrefix(resolvedTargetStoreFilePath);
         _targetStoreFileNameExtension = ResolveTargetStoreFileNameExtension(resolvedTargetStoreFilePath);
-    }
-
-    /// <summary>
-    /// 解析目标端持久化文件路径。
-    /// </summary>
-    /// <param name="configuredPath">配置路径。</param>
-    /// <returns>可用路径。</returns>
-    private static string ResolveTargetStoreFilePath(string configuredPath)
-    {
-        if (string.IsNullOrWhiteSpace(configuredPath))
-        {
-            return Path.Combine(AppContext.BaseDirectory, "data", "sync-target-store.json");
-        }
-
-        return Path.IsPathRooted(configuredPath)
-            ? configuredPath
-            : Path.Combine(AppContext.BaseDirectory, configuredPath);
     }
 
     /// <summary>
