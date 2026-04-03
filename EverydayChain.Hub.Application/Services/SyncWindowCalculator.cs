@@ -129,7 +129,7 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
     /// <exception cref="InvalidOperationException">输入为 UTC 语义时抛出。</exception>
     private DateTime EnsureLocalOrUnspecified(DateTime localTime, string tableCode, string scene)
     {
-        if (localTime.Kind != DateTimeKind.Local && localTime.Kind != DateTimeKind.Unspecified)
+        if (localTime.Kind is not (DateTimeKind.Local or DateTimeKind.Unspecified))
         {
             logger.LogError(
                 "检测到非本地时间语义输入，本地时间窗口计算仅支持 Local/Unspecified。TableCode={TableCode}, Scene={Scene}, InputValue={InputValue}",
