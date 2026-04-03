@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Collections.Concurrent;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.Extensions.Logging;
@@ -11,6 +12,21 @@ namespace EverydayChain.Hub.Infrastructure.Services;
 /// </summary>
 public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogger<RuntimeStorageGuard> logger) : IRuntimeStorageGuard
 {
+    /// <summary>单表内存告警阈值上限（MB）。</summary>
+    private const long MaxTableMemoryWarningThresholdMb = 65536;
+
+    /// <summary>单表内存估算默认每条字节数（单位：Byte）。</summary>
+    private const double DefaultBytesPerEntryEstimate = 1024d;
+
+    /// <summary>单表内存告警默认阈值（MB）。</summary>
+    private const long DefaultTableMemoryWarningThresholdMb = 256;
+
+    /// <summary>单表内存告警节流间隔默认值（秒）。</summary>
+    private const int DefaultTableMemoryWarningLogIntervalSeconds = 300;
+
+    /// <summary>单表内存告警节流间隔上限（秒）。</summary>
+    private const int MaxTableMemoryWarningLogIntervalSeconds = 86400;
+
     /// <summary>检查点文件绝对路径。</summary>
     private readonly string _checkpointFilePath = RuntimeStoragePathResolver.ResolveAbsolutePath(
         syncJobOptions.Value.CheckpointFilePath,
@@ -44,6 +60,36 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
 
     /// <summary>写入阈值非法日志是否已输出。</summary>
     private bool _writeThresholdInvalidLogged;
+
+    /// <summary>单表内存监控关闭日志是否已输出。</summary>
+    private bool _tableMemoryMonitoringDisabledLogged;
+
+    /// <summary>单表内存阈值关闭日志是否已输出。</summary>
+    private bool _tableMemoryThresholdDisabledLogged;
+
+    /// <summary>单表内存阈值非法日志是否已输出。</summary>
+    private bool _tableMemoryThresholdInvalidLogged;
+
+    /// <summary>单表内存阈值超上限日志是否已输出。</summary>
+    private bool _tableMemoryThresholdTooLargeLogged;
+
+    /// <summary>单表内存告警节流配置非法日志是否已输出。</summary>
+    private bool _tableMemoryWarningIntervalInvalidLogged;
+
+    /// <summary>单表内存告警节流配置超上限日志是否已输出。</summary>
+    private bool _tableMemoryWarningIntervalTooLargeLogged;
+
+    /// <summary>单表内存告警最近输出时间缓存（Stopwatch 时间戳）。</summary>
+    private readonly ConcurrentDictionary<string, long> _tableMemoryWarningLogTimestamps = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>单表内存告警判定与时间戳更新锁。</summary>
+    private readonly object _tableMemoryWarningGateLock = new();
+
+    /// <summary>单表内存告警节流间隔缓存（Stopwatch Tick）。</summary>
+    private long _tableMemoryWarningIntervalTicksCache = -1;
+
+    /// <summary>单表内存告警节流间隔缓存锁。</summary>
+    private readonly object _tableMemoryWarningIntervalTicksCacheLock = new();
 
     /// <inheritdoc/>
     public Task EnsureStartupHealthyAsync(CancellationToken ct)
@@ -84,6 +130,51 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
 
         EnsureDiskFreeSpace(targetPath, writeMinFreeSpaceMb, scene);
         UpdateWriteSpaceCheckTime(targetPath);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    public Task ReportTableMemoryAsync(string tableCode, int entryCount, string scene, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (!_options.EnableTableMemoryMonitoring)
+        {
+            lock (_thresholdLogLock)
+            {
+                if (!_tableMemoryMonitoringDisabledLogged)
+                {
+                    logger.LogWarning("单表内存监控已关闭。Option={OptionName}", nameof(_options.EnableTableMemoryMonitoring));
+                    _tableMemoryMonitoringDisabledLogged = true;
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+
+        var warningThresholdMb = NormalizeTableMemoryWarningThresholdMb();
+        if (warningThresholdMb == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        var estimatedMemoryMb = EstimateTableMemoryMb(entryCount);
+        if (estimatedMemoryMb < warningThresholdMb)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (!TryAcquireTableMemoryWarningLogPermission(tableCode))
+        {
+            return Task.CompletedTask;
+        }
+
+        logger.LogWarning(
+            "场景【{Scene}】触发单表内存水位告警。TableCode={TableCode}, EntryCount={EntryCount}, EstimatedMemoryMb={EstimatedMemoryMb:F2}, WarningThresholdMb={WarningThresholdMb}",
+            scene,
+            tableCode,
+            entryCount,
+            estimatedMemoryMb,
+            warningThresholdMb);
         return Task.CompletedTask;
     }
 
@@ -167,6 +258,178 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         }
 
         return _options.WriteMinFreeSpaceMb;
+    }
+
+    /// <summary>
+    /// 获取规范化后的单表内存告警阈值。
+    /// </summary>
+    /// <returns>阈值（MB）。</returns>
+    private long NormalizeTableMemoryWarningThresholdMb()
+    {
+        if (_options.TableMemoryWarningThresholdMb == 0)
+        {
+            lock (_thresholdLogLock)
+            {
+                if (!_tableMemoryThresholdDisabledLogged)
+                {
+                    logger.LogWarning(
+                        "单表内存告警阈值已关闭。Option={OptionName}",
+                        nameof(_options.TableMemoryWarningThresholdMb));
+                    _tableMemoryThresholdDisabledLogged = true;
+                }
+            }
+
+            return 0;
+        }
+
+        if (_options.TableMemoryWarningThresholdMb < 0)
+        {
+            lock (_thresholdLogLock)
+            {
+                if (!_tableMemoryThresholdInvalidLogged)
+                {
+                    logger.LogWarning(
+                        "单表内存告警阈值配置非法，已回退默认值。Option={OptionName}, Value={OptionValue}, DefaultValue={DefaultValue}",
+                        nameof(_options.TableMemoryWarningThresholdMb),
+                        _options.TableMemoryWarningThresholdMb,
+                        DefaultTableMemoryWarningThresholdMb);
+                    _tableMemoryThresholdInvalidLogged = true;
+                }
+            }
+
+            return DefaultTableMemoryWarningThresholdMb;
+        }
+
+        if (_options.TableMemoryWarningThresholdMb > MaxTableMemoryWarningThresholdMb)
+        {
+            lock (_thresholdLogLock)
+            {
+                if (!_tableMemoryThresholdTooLargeLogged)
+                {
+                    logger.LogWarning(
+                        "单表内存告警阈值超出上限，已钳制为最大值。Option={OptionName}, Value={OptionValue}, MaxValue={MaxValue}",
+                        nameof(_options.TableMemoryWarningThresholdMb),
+                        _options.TableMemoryWarningThresholdMb,
+                        MaxTableMemoryWarningThresholdMb);
+                    _tableMemoryThresholdTooLargeLogged = true;
+                }
+            }
+
+            return MaxTableMemoryWarningThresholdMb;
+        }
+
+        return _options.TableMemoryWarningThresholdMb;
+    }
+
+    /// <summary>
+    /// 估算单表内存占用（MB）。
+    /// </summary>
+    /// <param name="entryCount">条目数量。</param>
+    /// <returns>估算内存（MB）。</returns>
+    private static double EstimateTableMemoryMb(int entryCount)
+    {
+        // 保守估算：按每条记录约 1KB（1024 Byte）计算，适用于键+字段字典常见场景。
+        // 该值用于告警预估而非精确计量；若单条字段显著增多或大字段占比提升，应结合实测调整。
+        var estimatedBytes = entryCount * DefaultBytesPerEntryEstimate;
+        return estimatedBytes / 1024d / 1024d;
+    }
+
+    /// <summary>
+    /// 判断并获取单表内存告警日志输出许可（原子执行）。
+    /// </summary>
+    /// <param name="tableCode">表编码。</param>
+    /// <returns>允许输出返回 <c>true</c>。</returns>
+    private bool TryAcquireTableMemoryWarningLogPermission(string tableCode)
+    {
+        var intervalTicks = GetTableMemoryWarningIntervalTicks();
+        if (intervalTicks <= 0)
+        {
+            return true;
+        }
+
+        var currentTimestamp = Stopwatch.GetTimestamp();
+        lock (_tableMemoryWarningGateLock)
+        {
+            if (_tableMemoryWarningLogTimestamps.TryGetValue(tableCode, out var lastTimestamp)
+                && currentTimestamp - lastTimestamp < intervalTicks)
+            {
+                return false;
+            }
+
+            _tableMemoryWarningLogTimestamps[tableCode] = currentTimestamp;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// 获取单表内存告警节流间隔（Stopwatch Tick）。
+    /// </summary>
+    /// <returns>节流间隔 Tick（0 表示不节流）。</returns>
+    private long GetTableMemoryWarningIntervalTicks()
+    {
+        if (_tableMemoryWarningIntervalTicksCache >= 0)
+        {
+            return _tableMemoryWarningIntervalTicksCache;
+        }
+
+        lock (_tableMemoryWarningIntervalTicksCacheLock)
+        {
+            if (_tableMemoryWarningIntervalTicksCache >= 0)
+            {
+                return _tableMemoryWarningIntervalTicksCache;
+            }
+
+            var intervalSeconds = NormalizeTableMemoryWarningLogIntervalSeconds();
+            _tableMemoryWarningIntervalTicksCache = intervalSeconds <= 0
+                ? 0
+                : (long)(intervalSeconds * Stopwatch.Frequency);
+            return _tableMemoryWarningIntervalTicksCache;
+        }
+    }
+
+    /// <summary>
+    /// 获取规范化后的单表内存告警节流间隔。
+    /// </summary>
+    /// <returns>节流间隔（秒）。</returns>
+    private int NormalizeTableMemoryWarningLogIntervalSeconds()
+    {
+        if (_options.TableMemoryWarningLogIntervalSeconds < 0)
+        {
+            lock (_thresholdLogLock)
+            {
+                if (!_tableMemoryWarningIntervalInvalidLogged)
+                {
+                    logger.LogWarning(
+                        "单表内存告警节流间隔配置非法，已回退默认值。Option={OptionName}, Value={OptionValue}, DefaultValue={DefaultValue}",
+                        nameof(_options.TableMemoryWarningLogIntervalSeconds),
+                        _options.TableMemoryWarningLogIntervalSeconds,
+                        DefaultTableMemoryWarningLogIntervalSeconds);
+                    _tableMemoryWarningIntervalInvalidLogged = true;
+                }
+            }
+
+            return DefaultTableMemoryWarningLogIntervalSeconds;
+        }
+
+        if (_options.TableMemoryWarningLogIntervalSeconds > MaxTableMemoryWarningLogIntervalSeconds)
+        {
+            lock (_thresholdLogLock)
+            {
+                if (!_tableMemoryWarningIntervalTooLargeLogged)
+                {
+                    logger.LogWarning(
+                        "单表内存告警节流间隔超出上限，已钳制为最大值。Option={OptionName}, Value={OptionValue}, MaxValue={MaxValue}",
+                        nameof(_options.TableMemoryWarningLogIntervalSeconds),
+                        _options.TableMemoryWarningLogIntervalSeconds,
+                        MaxTableMemoryWarningLogIntervalSeconds);
+                    _tableMemoryWarningIntervalTooLargeLogged = true;
+                }
+            }
+
+            return MaxTableMemoryWarningLogIntervalSeconds;
+        }
+
+        return _options.TableMemoryWarningLogIntervalSeconds;
     }
 
     /// <summary>

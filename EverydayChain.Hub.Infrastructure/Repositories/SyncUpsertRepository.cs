@@ -99,6 +99,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
 
         await EnsureTableLoadedAsync(request.TableCode, ct);
         var targetTable = _targetTables.GetOrAdd(request.TableCode, _ => CreateBusinessKeyDictionary());
+        await _runtimeStorageGuard.ReportTableMemoryAsync(request.TableCode, targetTable.Count, "目标快照合并前", ct);
         var changedOperations = new Dictionary<string, SyncChangeOperationType>(StringComparer.OrdinalIgnoreCase);
         var result = new SyncMergeResult
         {
@@ -145,6 +146,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         {
             await PersistTableAsync(request.TableCode, targetTable, ct);
         }
+        await _runtimeStorageGuard.ReportTableMemoryAsync(request.TableCode, targetTable.Count, "目标快照合并后", ct);
 
         return result;
     }
@@ -204,6 +206,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         {
             await PersistTableAsync(tableCode, table, ct);
         }
+        await _runtimeStorageGuard.ReportTableMemoryAsync(tableCode, table.Count, "目标快照删除后", ct);
 
         return deletedCount;
     }
