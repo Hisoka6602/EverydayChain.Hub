@@ -1,6 +1,5 @@
 using System.Text.Json;
 using EverydayChain.Hub.Application.Repositories;
-using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using EverydayChain.Hub.Domain.Options;

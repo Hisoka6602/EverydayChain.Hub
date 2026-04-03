@@ -283,10 +283,45 @@ jobs:
                   content = config_path.read_text(encoding="utf-8")
               except UnicodeDecodeError:
                   continue
+              # 逐字符移除 JSON 行注释，仅删除字符串字面量之外的 `//` 注释片段。
+              # raw_line: 原始配置行文本。
+              # 返回值: 去除行注释后的文本（若无注释则返回原文本）。
+              def strip_json_line_comment(raw_line):
+                  """移除 JSON 行注释，仅删除字符串字面量外部的 `//`。
+
+                  Args:
+                      raw_line: 原始配置行文本。
+
+                  Returns:
+                      去除行注释后的文本；未命中注释时返回原文本。
+                  """
+                  in_string = False
+                  escaped = False
+                  index = 0
+                  length = len(raw_line)
+                  while index < length:
+                      ch = raw_line[index]
+                      if escaped:
+                          escaped = False
+                          index += 1
+                          continue
+                      if ch == "\\":
+                          escaped = True
+                          index += 1
+                          continue
+                      if ch == '"':
+                          in_string = not in_string
+                          index += 1
+                          continue
+                      if not in_string and ch == "/" and index + 1 < length and raw_line[index + 1] == "/":
+                          return raw_line[:index]
+                      index += 1
+                  return raw_line
+
               stripped_lines = []
               pending_comments = []
               for line in content.splitlines():
-                  pure = re.sub(r"//.*$", "", line)
+                  pure = strip_json_line_comment(line)
                   stripped_lines.append(pure)
                   s = line.strip()
                   if s.startswith("//"):
@@ -355,7 +390,12 @@ jobs:
                       option_dir_violations.append(relative)
 
                   for _, type_name in class_matches:
-                      if type_name.endswith("Aggregate") and "/Aggregates/" not in relative:
+                      is_entity_outside_aggregates = (
+                          type_name.endswith("Entity")
+                          and relative.startswith("EverydayChain.Hub.Domain/")
+                          and "/Aggregates/" not in relative
+                      )
+                      if is_entity_outside_aggregates:
                           aggregate_dir_violations.append(relative)
                       if type_name.endswith("Event") and not relative.startswith("EverydayChain.Hub.Domain/Events/"):
                           event_dir_violations.append(relative)
