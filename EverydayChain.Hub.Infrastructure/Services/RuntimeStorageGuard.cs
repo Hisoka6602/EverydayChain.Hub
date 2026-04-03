@@ -11,6 +11,12 @@ namespace EverydayChain.Hub.Infrastructure.Services;
 /// </summary>
 public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogger<RuntimeStorageGuard> logger) : IRuntimeStorageGuard
 {
+    /// <summary>单表内存估算默认每条字节数。</summary>
+    private const double DefaultBytesPerEntryEstimate = 1024d;
+
+    /// <summary>单表内存告警默认阈值（MB）。</summary>
+    private const long DefaultTableMemoryWarningThresholdMb = 256;
+
     /// <summary>检查点文件绝对路径。</summary>
     private readonly string _checkpointFilePath = RuntimeStoragePathResolver.ResolveAbsolutePath(
         syncJobOptions.Value.CheckpointFilePath,
@@ -250,12 +256,12 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
                         "单表内存告警阈值配置非法，已回退默认值。Option={OptionName}, Value={OptionValue}, DefaultValue={DefaultValue}",
                         nameof(_options.TableMemoryWarningThresholdMb),
                         _options.TableMemoryWarningThresholdMb,
-                        256);
+                        DefaultTableMemoryWarningThresholdMb);
                     _tableMemoryThresholdInvalidLogged = true;
                 }
             }
 
-            return 256;
+            return DefaultTableMemoryWarningThresholdMb;
         }
 
         return _options.TableMemoryWarningThresholdMb;
@@ -269,8 +275,7 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     private static double EstimateTableMemoryMb(int entryCount)
     {
         // 保守估算：每条约 1KB，用于触发预警而非精确计量。
-        const double bytesPerEntryEstimate = 1024d;
-        var estimatedBytes = entryCount * bytesPerEntryEstimate;
+        var estimatedBytes = entryCount * DefaultBytesPerEntryEstimate;
         return estimatedBytes / 1024d / 1024d;
     }
 
