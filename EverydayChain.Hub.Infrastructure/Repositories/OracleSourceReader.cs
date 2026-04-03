@@ -71,10 +71,6 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
                 Rows = rows,
             };
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
         catch (Exception exception)
         {
             logger.LogError(
@@ -129,10 +125,6 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
             }
 
             return keySet;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
         }
         catch (Exception exception)
         {
@@ -362,9 +354,15 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
         ValidateSafeIdentifier(sourceSchema, nameof(sourceSchema));
         ValidateSafeIdentifier(sourceTable, nameof(sourceTable));
         ValidateSafeIdentifier(cursorColumn, nameof(cursorColumn));
-        foreach (var uniqueKey in uniqueKeys)
+        for (var index = 0; index < uniqueKeys.Count; index++)
         {
-            ValidateSafeIdentifier(uniqueKey, nameof(uniqueKeys));
+            var uniqueKey = uniqueKeys[index];
+            if (string.IsNullOrWhiteSpace(uniqueKey))
+            {
+                continue;
+            }
+
+            ValidateSafeIdentifier(uniqueKey, $"uniqueKeys[{index}]");
         }
     }
 
