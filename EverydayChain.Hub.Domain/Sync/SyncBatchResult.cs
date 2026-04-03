@@ -46,4 +46,7 @@ public class SyncBatchResult
 
     /// <summary>失败率（0~1）。</summary>
     public double FailureRate { get; set; }
+
+    /// <summary>失败时的错误信息（成功时为 null）。</summary>
+    public string? FailureMessage { get; set; }
 }

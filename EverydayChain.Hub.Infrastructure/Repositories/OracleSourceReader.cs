@@ -2,6 +2,7 @@ using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Repositories;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.SharedKernel.Utilities;
+using EverydayChain.Hub.Infrastructure.Services;
 using System.Data;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -11,8 +12,12 @@ namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
 /// Oracle 源端读取器实现（真实 Oracle 只读查询）。
+/// 通过项目统一安全执行器 <see cref="IDangerZoneExecutor"/> 提供指数退避重试、熔断与超时保护。
 /// </summary>
-public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<OracleSourceReader> logger) : IOracleSourceReader
+public class OracleSourceReader(
+    IOptions<OracleOptions> oracleOptions,
+    IDangerZoneExecutor dangerZoneExecutor,
+    ILogger<OracleSourceReader> logger) : IOracleSourceReader
 {
     /// <summary>默认分页上限。</summary>
     private const int DefaultMaxPageSize = 5000;
@@ -26,56 +31,62 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
     /// <inheritdoc/>
     public async Task<SyncReadResult> ReadIncrementalPageAsync(SyncReadRequest request, CancellationToken ct)
     {
+        // 步骤1: 参数/配置校验为本地不可重试操作，在弹性管道外执行。
+        var sourceSchema = ResolveSourceSchema(request.SourceSchema);
+        ValidateReadRequest(request, sourceSchema);
+        var pageSize = ResolvePageSize(request.PageSize);
+
         try
         {
-            var sourceSchema = ResolveSourceSchema(request.SourceSchema);
-            ValidateReadRequest(request, sourceSchema);
-            var pageSize = ResolvePageSize(request.PageSize);
-            var offset = (request.PageNo - 1) * pageSize;
-            var limit = offset + pageSize;
-            var sql = BuildReadPageSql(request, sourceSchema);
-
-            await using var connection = new OracleConnection(_options.ConnectionString);
-            await connection.OpenAsync(ct);
-            await using var command = connection.CreateCommand();
-            command.BindByName = true;
-            command.CommandTimeout = ResolveCommandTimeout();
-            command.CommandText = sql;
-            command.Parameters.Add("p_windowStart", OracleDbType.TimeStamp, request.Window.WindowStartLocal, ParameterDirection.Input);
-            command.Parameters.Add("p_windowEnd", OracleDbType.TimeStamp, request.Window.WindowEndLocal, ParameterDirection.Input);
-            command.Parameters.Add("p_offset", OracleDbType.Int32, offset, ParameterDirection.Input);
-            command.Parameters.Add("p_limit", OracleDbType.Int32, limit, ParameterDirection.Input);
-            EnsureReadOnlyCommand(command);
-
-            var rows = new List<IReadOnlyDictionary<string, object?>>();
-            await using var reader = await command.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct))
-            {
-                var row = new Dictionary<string, object?>(reader.FieldCount, StringComparer.OrdinalIgnoreCase);
-                for (var index = 0; index < reader.FieldCount; index++)
+            // 步骤2: 通过项目统一安全执行器包装实际 Oracle 查询，启用指数退避重试 + 熔断 + 超时。
+            return await dangerZoneExecutor.ExecuteAsync(
+                $"OracleIncrementalRead:{request.TableCode}:P{request.PageNo}",
+                async token =>
                 {
-                    var name = reader.GetName(index);
-                    if (string.Equals(name, "RN", StringComparison.OrdinalIgnoreCase))
+                    var offset = (request.PageNo - 1) * pageSize;
+                    var limit = offset + pageSize;
+                    var sql = BuildReadPageSql(request, sourceSchema);
+
+                    await using var connection = new OracleConnection(_options.ConnectionString);
+                    await connection.OpenAsync(token);
+                    await using var command = connection.CreateCommand();
+                    command.BindByName = true;
+                    command.CommandTimeout = ResolveCommandTimeout();
+                    command.CommandText = sql;
+                    command.Parameters.Add("p_windowStart", OracleDbType.TimeStamp, request.Window.WindowStartLocal, ParameterDirection.Input);
+                    command.Parameters.Add("p_windowEnd", OracleDbType.TimeStamp, request.Window.WindowEndLocal, ParameterDirection.Input);
+                    command.Parameters.Add("p_offset", OracleDbType.Int32, offset, ParameterDirection.Input);
+                    command.Parameters.Add("p_limit", OracleDbType.Int32, limit, ParameterDirection.Input);
+                    EnsureReadOnlyCommand(command);
+
+                    var rows = new List<IReadOnlyDictionary<string, object?>>();
+                    await using var reader = await command.ExecuteReaderAsync(token);
+                    while (await reader.ReadAsync(token))
                     {
-                        continue;
+                        var row = new Dictionary<string, object?>(reader.FieldCount, StringComparer.OrdinalIgnoreCase);
+                        for (var index = 0; index < reader.FieldCount; index++)
+                        {
+                            var name = reader.GetName(index);
+                            if (string.Equals(name, "RN", StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
+
+                            row[name] = reader.IsDBNull(index) ? null : reader.GetValue(index);
+                        }
+
+                        rows.Add(SyncColumnFilter.FilterExcludedColumns(row, request.NormalizedExcludedColumns));
                     }
 
-                    row[name] = reader.IsDBNull(index) ? null : reader.GetValue(index);
-                }
-
-                rows.Add(SyncColumnFilter.FilterExcludedColumns(row, request.NormalizedExcludedColumns));
-            }
-
-            return new SyncReadResult
-            {
-                Rows = rows,
-            };
+                    return new SyncReadResult { Rows = rows };
+                },
+                ct);
         }
         catch (Exception exception)
         {
             logger.LogError(
                 exception,
-                "Oracle 增量读取失败。TableCode={TableCode}, SourceSchema={SourceSchema}, SourceTable={SourceTable}, PageNo={PageNo}",
+                "Oracle 增量读取失败（含重试耗尽）。TableCode={TableCode}, SourceSchema={SourceSchema}, SourceTable={SourceTable}, PageNo={PageNo}",
                 request.TableCode,
                 ResolveSourceSchemaForLog(request.SourceSchema),
                 request.SourceTable,
@@ -87,50 +98,58 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
     /// <inheritdoc/>
     public async Task<IReadOnlySet<string>> ReadByKeysAsync(SyncKeyReadRequest request, CancellationToken ct)
     {
+        // 步骤1: 参数/配置校验为本地不可重试操作，在弹性管道外执行。
+        var sourceSchema = ResolveSourceSchema(request.SourceSchema);
+        ValidateReadKeyRequest(request, sourceSchema);
+        if (request.UniqueKeys.Count == 0)
+        {
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+
         try
         {
-            var sourceSchema = ResolveSourceSchema(request.SourceSchema);
-            ValidateReadKeyRequest(request, sourceSchema);
-            if (request.UniqueKeys.Count == 0)
-            {
-                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            }
-
-            var sql = BuildReadKeysSql(request, sourceSchema);
-            await using var connection = new OracleConnection(_options.ConnectionString);
-            await connection.OpenAsync(ct);
-            await using var command = connection.CreateCommand();
-            command.BindByName = true;
-            command.CommandTimeout = ResolveCommandTimeout();
-            command.CommandText = sql;
-            command.Parameters.Add("p_windowStart", OracleDbType.TimeStamp, request.Window.WindowStartLocal, ParameterDirection.Input);
-            command.Parameters.Add("p_windowEnd", OracleDbType.TimeStamp, request.Window.WindowEndLocal, ParameterDirection.Input);
-            EnsureReadOnlyCommand(command);
-
-            var keySet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            await using var reader = await command.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct))
-            {
-                var row = new Dictionary<string, object?>(request.UniqueKeys.Count, StringComparer.OrdinalIgnoreCase);
-                for (var index = 0; index < reader.FieldCount; index++)
+            // 步骤2: 通过项目统一安全执行器包装实际 Oracle 查询，启用指数退避重试 + 熔断 + 超时。
+            return await dangerZoneExecutor.ExecuteAsync(
+                $"OracleKeyRead:{request.TableCode}",
+                async token =>
                 {
-                    row[reader.GetName(index)] = reader.IsDBNull(index) ? null : reader.GetValue(index);
-                }
+                    var sql = BuildReadKeysSql(request, sourceSchema);
+                    await using var connection = new OracleConnection(_options.ConnectionString);
+                    await connection.OpenAsync(token);
+                    await using var command = connection.CreateCommand();
+                    command.BindByName = true;
+                    command.CommandTimeout = ResolveCommandTimeout();
+                    command.CommandText = sql;
+                    command.Parameters.Add("p_windowStart", OracleDbType.TimeStamp, request.Window.WindowStartLocal, ParameterDirection.Input);
+                    command.Parameters.Add("p_windowEnd", OracleDbType.TimeStamp, request.Window.WindowEndLocal, ParameterDirection.Input);
+                    EnsureReadOnlyCommand(command);
 
-                var key = SyncBusinessKeyBuilder.Build(row, request.UniqueKeys);
-                if (!string.IsNullOrWhiteSpace(key))
-                {
-                    keySet.Add(key);
-                }
-            }
+                    var keySet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    await using var reader = await command.ExecuteReaderAsync(token);
+                    while (await reader.ReadAsync(token))
+                    {
+                        var row = new Dictionary<string, object?>(request.UniqueKeys.Count, StringComparer.OrdinalIgnoreCase);
+                        for (var index = 0; index < reader.FieldCount; index++)
+                        {
+                            row[reader.GetName(index)] = reader.IsDBNull(index) ? null : reader.GetValue(index);
+                        }
 
-            return keySet;
+                        var key = SyncBusinessKeyBuilder.Build(row, request.UniqueKeys);
+                        if (!string.IsNullOrWhiteSpace(key))
+                        {
+                            keySet.Add(key);
+                        }
+                    }
+
+                    return (IReadOnlySet<string>)keySet;
+                },
+                ct);
         }
         catch (Exception exception)
         {
             logger.LogError(
                 exception,
-                "Oracle 业务键读取失败。TableCode={TableCode}, SourceSchema={SourceSchema}, SourceTable={SourceTable}",
+                "Oracle 业务键读取失败（含重试耗尽）。TableCode={TableCode}, SourceSchema={SourceSchema}, SourceTable={SourceTable}",
                 request.TableCode,
                 ResolveSourceSchemaForLog(request.SourceSchema),
                 request.SourceTable);

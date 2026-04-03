@@ -1,9 +1,13 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 新增 `持续运行一年稳定性改造清单.md`，沉淀连续运行一年的稳定性改造路线，覆盖内存治理、持久化 I/O 治理、Polly 重试与熔断、本地时间窗口防护、观测告警与运维自愈等优先级清单。
-- README 已联动补充该清单文档的文件树入口与逐项职责说明，便于按清单持续推进后续实施。
-- 已补充 P0 时间窗口防护首批落地：新增时钟回拨检测与 DST 非法本地时刻窗口边界修正，降低长稳运行中的窗口重复/空洞风险。
+- P0-3.3：OracleSourceReader 接入项目统一安全执行器（DangerZoneExecutor），Oracle 查询具备指数退避重试 + 熔断 + 超时保护；参数校验异常（本地错误）在弹性管道外立即抛出，不参与重试。
+- P0-3.1：SyncUpsertRepository 新增空闲驱逐机制，按表最后访问时间追踪，空闲超过 `IdleEvictionThresholdMinutes` 后卸载内存（持久化文件保留，下次访问自动重新加载）；SyncBackgroundWorker 每轮结束后自动触发驱逐。
+- P1-4.1：SyncOrchestrator 批次隔离改造，单表失败不阻塞其余表并行推进；失败表返回结构化结果（FailureRate=1、FailureMessage），整轮仅全局取消时停止。
+- P1-4.2：nlog.config 增加 `archiveAboveSize="104857600"`，限制单日日志文件最大 100 MB，防止单日日志膨胀。
+- P1-4.3：appsettings.json 顶部补充热更新/重启生效范围说明，运维可明确判断配置改动何时生效。
+- SyncJobOptions 新增 `EnableIdleEviction`、`IdleEvictionThresholdMinutes` 配置项，并在 appsettings.json 补充对应注释与示例值。
+- SyncBatchResult 新增 `FailureMessage` 字段，用于单表失败时记录错误信息。
 
 ## 解决方案文件树与职责
 ```text
@@ -177,6 +181,6 @@
 - `Oracle到SQLServer同步实施计划.md`：按 PR 拆分同步架构落地步骤（最多 6 个 PR）的进度跟踪文档，定义完成项删除前必须通读代码确认完全实现的维护规则，随实施进展动态更新。
 
 ## 可继续完善内容（本次 PR 后续行动项）
-- 继续推进 P0：内存上限治理（按表惰性加载、空闲回收、单轮/单表上限与分段降级）。
 - 继续推进 P0：目标快照增量/分片持久化、文件大小阈值、轮转与压缩策略。
 - 继续推进 P0：补齐时间窗口防护回归用例（DST 边界、时钟回拨/跃迁注入）。
+- 继续推进 P1-4.2：输出统一监控指标与告警规则（失败率、滞后、积压、吞吐、磁盘/内存水位）。

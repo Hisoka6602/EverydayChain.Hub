@@ -66,14 +66,29 @@ public class SyncOrchestrator(
 
         await Parallel.ForEachAsync(orderedDefinitions, parallelOptions, async (item, token) =>
         {
-            results[item.index] = await RunTableSyncAsync(item.definition.TableCode, token);
+            try
+            {
+                results[item.index] = await RunTableSyncAsync(item.definition.TableCode, token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                // 全局取消时向外传播，停止整轮同步。
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // 单表失败不阻塞其余表继续推进，记录失败结果。
+                logger.LogError(ex, "单表同步失败，其余表继续推进。TableCode={TableCode}", item.definition.TableCode);
+                results[item.index] = new SyncBatchResult
+                {
+                    BatchId = string.Empty,
+                    TableCode = item.definition.TableCode,
+                    FailureRate = 1D,
+                    FailureMessage = ex.Message,
+                };
+            }
         });
 
-        if (results.Any(x => x is null))
-        {
-            throw new InvalidOperationException("同步编排结果不完整，存在未写入的表结果。");
-        }
-
-        return results;
+        return results.Where(x => x is not null).ToList().AsReadOnly();
     }
 }
