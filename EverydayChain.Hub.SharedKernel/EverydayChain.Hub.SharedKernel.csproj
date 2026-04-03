@@ -6,9 +6,4 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-
-  <ItemGroup>
-    <ProjectReference Include="..\EverydayChain.Hub.Domain\EverydayChain.Hub.Domain.csproj" />
-  </ItemGroup>
-
 </Project>
