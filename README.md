@@ -104,6 +104,8 @@
 │   └── Services
 │       ├── IDangerZoneExecutor.cs
 │       ├── DangerZoneExecutor.cs
+│       ├── IRuntimeStorageGuard.cs
+│       ├── RuntimeStorageGuard.cs
 │       ├── IAutoMigrationService.cs
 │       ├── AutoMigrationService.cs
 │       ├── AutoMigrationHostedService.cs
@@ -148,6 +150,7 @@
 - `AutoMigrationService.cs` + `AutoMigrationHostedService.cs`：应用启动时自动执行 `Migrate` 与分表预创建。
 - `SqlExecutionTuner.cs`：基于失败率和耗时进行批量窗口升降调谐；采样窗口大小与失败率阈值均来自 `AutoTuneOptions`。
 - `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断），弹性参数来自 `DangerZoneOptions`。
+- `IRuntimeStorageGuard.cs` + `RuntimeStorageGuard.cs`：运行期存储守护服务，负责启动阶段的磁盘空间、目录权限、关键文件可读写自检，并在检查点/目标快照写入前执行磁盘阈值校验与告警阻断。
 - `SortingTaskTraceWriter.cs`：按分表后缀分组写入，并将执行结果回传给调谐器。
 - `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，校验 `StartTimeLocal` 禁止 `Z` 与 offset，校验 `ExcludedColumns` 不得与 `UniqueKeys`、`CursorColumn`、软删除关键列冲突，并解析优先级与多表并发上限。
 - `OracleOptions.cs`：远端 Oracle 连接配置实体，定义连接字符串、默认 Schema、只读开关、命令超时与分页上限。
@@ -173,5 +176,5 @@
 - `Oracle到SQLServer同步实施计划.md`：按 PR 拆分同步架构落地步骤（最多 6 个 PR）的进度跟踪文档，定义完成项删除前必须通读代码确认完全实现的维护规则，随实施进展动态更新。
 
 ## 可继续完善内容（本次 PR 后续行动项）
-- 将改造清单中的 P0 项拆分为独立 PR，并补齐对应压测、故障注入与验收记录。
-- 将改造清单中的 P1/P2 项补充为 Issue，并按里程碑建立周度跟踪。
+- 继续推进 P0：内存上限治理（按表惰性加载、空闲回收、单轮/单表上限与分段降级）。
+- 继续推进 P0：目标快照增量/分片持久化、文件大小阈值、轮转与压缩策略。
