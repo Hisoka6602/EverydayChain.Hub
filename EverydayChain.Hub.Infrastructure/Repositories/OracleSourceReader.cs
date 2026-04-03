@@ -166,6 +166,7 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
 
         if (orderColumns.Count == 1)
         {
+            // 当未配置 UniqueKeys 时，使用 Oracle ROWID 作为分页稳定排序兜底列，避免窗口内重复/漏读。
             orderColumns.Add("t.ROWID");
         }
 
@@ -191,9 +192,16 @@ public class OracleSourceReader(IOptions<OracleOptions> oracleOptions, ILogger<O
     /// <param name="request">业务键读取请求。</param>
     /// <param name="sourceSchema">生效源端 Schema。</param>
     /// <returns>SQL 文本。</returns>
+    /// <exception cref="InvalidOperationException">当唯一键列为空时抛出。</exception>
     private static string BuildReadKeysSql(SyncKeyReadRequest request, string sourceSchema)
     {
-        var selectColumns = string.Join(", ", request.UniqueKeys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => $"t.{key}"));
+        var validUniqueKeys = request.UniqueKeys.Where(key => !string.IsNullOrWhiteSpace(key)).ToList();
+        if (validUniqueKeys.Count == 0)
+        {
+            throw new InvalidOperationException($"表 {request.TableCode} 的 UniqueKeys 不能为空。");
+        }
+
+        var selectColumns = string.Join(", ", validUniqueKeys.Select(key => $"t.{key}"));
         return $"""
                 SELECT {selectColumns}
                 FROM {sourceSchema}.{request.SourceTable} t
