@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using EverydayChain.Hub.Application.Models;
@@ -20,6 +21,8 @@ public class SyncUpsertRepository : ISyncUpsertRepository
 {
     /// <summary>目标内存表，按表编码分组。</summary>
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, IReadOnlyDictionary<string, object?>>> _targetTables = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>各表最后访问时间戳（Stopwatch.GetTimestamp()），用于空闲驱逐判定。</summary>
+    private readonly ConcurrentDictionary<string, long> _tableLastAccessTimestamps = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>目标端持久化文件访问锁。</summary>
     private static readonly SemaphoreSlim TargetStoreFileLock = new(1, 1);
     /// <summary>日志组件。</summary>
@@ -34,6 +37,12 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     private readonly string _targetStoreFileNameExtension;
     /// <summary>运行期存储守护服务。</summary>
     private readonly IRuntimeStorageGuard _runtimeStorageGuard;
+    /// <summary>是否启用空闲驱逐。</summary>
+    private readonly bool _enableIdleEviction;
+    /// <summary>空闲驱逐阈值（Stopwatch Ticks）。</summary>
+    private readonly long _idleEvictionThresholdTicks;
+    /// <summary>空闲驱逐阈值分钟数（用于日志输出，避免运行时反向计算带来溢出风险）。</summary>
+    private readonly double _idleEvictionThresholdMinutes;
 
     /// <summary>
     /// 初始化同步幂等合并仓储。
@@ -48,13 +57,18 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     {
         _logger = logger;
         _runtimeStorageGuard = runtimeStorageGuard;
+        var opts = syncJobOptions.Value;
         var resolvedTargetStoreFilePath = RuntimeStoragePathResolver.ResolveAbsolutePath(
-            syncJobOptions.Value.TargetStoreFilePath,
+            opts.TargetStoreFilePath,
             Path.Combine("data", "sync-target-store.json"));
         _targetStoreFilePath = resolvedTargetStoreFilePath;
         _targetStoreDirectoryPath = ResolveTargetStoreDirectoryPath(resolvedTargetStoreFilePath);
         _targetStoreFileNamePrefix = ResolveTargetStoreFileNamePrefix(resolvedTargetStoreFilePath);
         _targetStoreFileNameExtension = ResolveTargetStoreFileNameExtension(resolvedTargetStoreFilePath);
+        _enableIdleEviction = opts.EnableIdleEviction;
+        var thresholdMinutes = opts.IdleEvictionThresholdMinutes >= 1 ? opts.IdleEvictionThresholdMinutes : 30;
+        _idleEvictionThresholdMinutes = thresholdMinutes;
+        _idleEvictionThresholdTicks = (long)(TimeSpan.FromMinutes(thresholdMinutes).TotalSeconds * Stopwatch.Frequency);
     }
 
     /// <summary>
@@ -98,6 +112,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         }
 
         await EnsureTableLoadedAsync(request.TableCode, ct);
+        TouchTableAccessTime(request.TableCode);
         var targetTable = _targetTables.GetOrAdd(request.TableCode, _ => CreateBusinessKeyDictionary());
         await _runtimeStorageGuard.ReportTableMemoryAsync(request.TableCode, targetTable.Count, "目标快照合并前", ct);
         var changedOperations = new Dictionary<string, SyncChangeOperationType>(StringComparer.OrdinalIgnoreCase);
@@ -156,6 +171,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     {
         ct.ThrowIfCancellationRequested();
         await EnsureTableLoadedAsync(tableCode, ct);
+        TouchTableAccessTime(tableCode);
         if (!_targetTables.TryGetValue(tableCode, out var table))
         {
             return [];
@@ -170,6 +186,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     {
         ct.ThrowIfCancellationRequested();
         await EnsureTableLoadedAsync(tableCode, ct);
+        TouchTableAccessTime(tableCode);
         if (!_targetTables.TryGetValue(tableCode, out var table))
         {
             return 0;
@@ -676,5 +693,59 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// 更新指定表的最后访问时间戳。
+    /// </summary>
+    /// <param name="tableCode">表编码。</param>
+    private void TouchTableAccessTime(string tableCode)
+    {
+        _tableLastAccessTimestamps[tableCode] = Stopwatch.GetTimestamp();
+    }
+
+    /// <inheritdoc/>
+    public Task<int> EvictIdleTablesAsync(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (!_enableIdleEviction)
+        {
+            return Task.FromResult(0);
+        }
+
+        var now = Stopwatch.GetTimestamp();
+        var evictedCount = 0;
+        foreach (var tableCode in _targetTables.Keys)
+        {
+            ct.ThrowIfCancellationRequested();
+            // 若表从未记录访问时间，说明是新加载但未被实际访问的边界情况，跳过驱逐。
+            if (!_tableLastAccessTimestamps.TryGetValue(tableCode, out var lastAccessTick))
+            {
+                continue;
+            }
+
+            if (now - lastAccessTick < _idleEvictionThresholdTicks)
+            {
+                continue;
+            }
+
+            // 将表从内存中卸载；持久化文件已在写入时落盘，卸载后下次访问会按需重新加载。
+            if (_targetTables.TryRemove(tableCode, out _))
+            {
+                _tableLastAccessTimestamps.TryRemove(tableCode, out _);
+                evictedCount++;
+                _logger.LogInformation(
+                    "空闲表内存已驱逐。TableCode={TableCode}, IdleEvictionThresholdMinutes={ThresholdMinutes}",
+                    tableCode,
+                    _idleEvictionThresholdMinutes);
+            }
+        }
+
+        if (evictedCount > 0)
+        {
+            _logger.LogInformation("空闲表内存驱逐完成。EvictedCount={EvictedCount}", evictedCount);
+        }
+
+        return Task.FromResult(evictedCount);
     }
 }

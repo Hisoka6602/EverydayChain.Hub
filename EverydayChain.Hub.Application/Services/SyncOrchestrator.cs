@@ -66,9 +66,30 @@ public class SyncOrchestrator(
 
         await Parallel.ForEachAsync(orderedDefinitions, parallelOptions, async (item, token) =>
         {
-            results[item.index] = await RunTableSyncAsync(item.definition.TableCode, token);
+            try
+            {
+                results[item.index] = await RunTableSyncAsync(item.definition.TableCode, token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                // 全局取消时向外传播，停止整轮同步。
+                throw;
+            }
+            catch (Exception)
+            {
+                // RunTableSyncAsync 内部已记录详细异常日志，此处仅构造失败结果，不重复记录。
+                // 单表失败不阻塞其余表继续推进。
+                results[item.index] = new SyncBatchResult
+                {
+                    BatchId = string.Empty,
+                    TableCode = item.definition.TableCode,
+                    FailureRate = 1D,
+                    FailureMessage = "单表同步失败，详情见详细日志。",
+                };
+            }
         });
 
+        // 每个槽位在成功或异常分支中均已写入，不存在 null 槽；此处断言保障调用方契约。
         if (results.Any(x => x is null))
         {
             throw new InvalidOperationException("同步编排结果不完整，存在未写入的表结果。");

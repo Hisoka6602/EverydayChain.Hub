@@ -41,6 +41,12 @@ public class SyncJobOptions
     /// <summary>单表内存告警节流间隔（秒，可填写范围：[0, 86400] 的整数；0 表示不节流；建议值 300）。</summary>
     public int TableMemoryWarningLogIntervalSeconds { get; set; } = 300;
 
+    /// <summary>是否启用空闲表内存驱逐（可填写项：true、false；true 时空闲超过阈值的表将从内存卸载，需要时重新按需加载）。</summary>
+    public bool EnableIdleEviction { get; set; } = true;
+
+    /// <summary>单表内存空闲驱逐阈值（分钟，可填写范围：[1, 1440]；空闲超过该时间后将被从内存卸载；建议值 30）。</summary>
+    public int IdleEvictionThresholdMinutes { get; set; } = 30;
+
     /// <summary>单表配置集合。</summary>
     public List<SyncTableOptions> Tables { get; set; } = [];
 }
