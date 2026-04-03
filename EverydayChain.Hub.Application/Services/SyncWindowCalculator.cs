@@ -11,8 +11,11 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
     /// <summary>DST 非法本地时刻初始跳跃分钟数。</summary>
     private const int InitialDstInvalidTimeJumpMinutes = 60;
 
-    /// <summary>DST 非法本地时刻最大修正分钟数。</summary>
-    private const int MaxDstInvalidTimeAdjustMinutes = 180;
+    /// <summary>DST 非法本地时刻二次跳跃分钟数。</summary>
+    private const int SecondaryDstInvalidTimeJumpMinutes = 120;
+
+    /// <summary>DST 非法本地时刻三次跳跃分钟数。</summary>
+    private const int TertiaryDstInvalidTimeJumpMinutes = 180;
 
     /// <inheritdoc/>
     public SyncWindow CalculateWindow(SyncTableDefinition definition, SyncCheckpoint checkpoint, DateTime nowLocal)
@@ -21,7 +24,10 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
             checkpoint.LastSuccessCursorLocal ?? definition.StartTimeLocal,
             definition.TableCode,
             "窗口起点");
-        var effectiveNowLocal = ResolveEffectiveNowLocal(nowLocal, checkpoint.LastSuccessTimeLocal, definition.TableCode);
+        var normalizedNowLocal = nowLocal.Kind == DateTimeKind.Local
+            ? nowLocal
+            : DateTime.SpecifyKind(nowLocal, DateTimeKind.Local);
+        var effectiveNowLocal = ResolveEffectiveNowLocal(normalizedNowLocal, checkpoint.LastSuccessTimeLocal, definition.TableCode);
         var windowEndLocal = NormalizeLocalWindowBoundary(
             effectiveNowLocal.AddMinutes(-definition.MaxLagMinutes),
             definition.TableCode,
@@ -43,22 +49,21 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
     /// <returns>有效当前本地时间。</returns>
     private DateTime ResolveEffectiveNowLocal(DateTime nowLocal, DateTime? lastSuccessTimeLocal, string tableCode)
     {
-        var normalizedNowLocal = NormalizeLocalWindowBoundary(nowLocal, tableCode, "当前时间");
         if (!lastSuccessTimeLocal.HasValue)
         {
-            return normalizedNowLocal;
+            return nowLocal;
         }
 
         var normalizedLastSuccessTimeLocal = NormalizeLocalWindowBoundary(lastSuccessTimeLocal.Value, tableCode, "上次成功时间");
-        if (normalizedNowLocal >= normalizedLastSuccessTimeLocal)
+        if (nowLocal >= normalizedLastSuccessTimeLocal)
         {
-            return normalizedNowLocal;
+            return nowLocal;
         }
 
         logger.LogWarning(
             "检测到本地时钟回拨，窗口终点将冻结在上次成功时间以避免重复/漏同步。TableCode={TableCode}, NowLocal={NowLocal}, LastSuccessTimeLocal={LastSuccessTimeLocal}",
             tableCode,
-            normalizedNowLocal,
+            nowLocal,
             normalizedLastSuccessTimeLocal);
         return normalizedLastSuccessTimeLocal;
     }
@@ -81,17 +86,13 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
         }
 
         var adjustedLocalTime = normalizedLocalTime.AddMinutes(InitialDstInvalidTimeJumpMinutes);
-        var adjustMinutes = InitialDstInvalidTimeJumpMinutes;
-        while (TimeZoneInfo.Local.IsInvalidTime(adjustedLocalTime) && adjustMinutes < MaxDstInvalidTimeAdjustMinutes)
-        {
-            adjustedLocalTime = adjustedLocalTime.AddMinutes(1);
-            adjustMinutes++;
-        }
-
+        adjustedLocalTime = TryResolveInvalidLocalTime(normalizedLocalTime, adjustedLocalTime);
+        adjustedLocalTime = TryResolveInvalidLocalTime(normalizedLocalTime, adjustedLocalTime, SecondaryDstInvalidTimeJumpMinutes);
+        adjustedLocalTime = TryResolveInvalidLocalTime(normalizedLocalTime, adjustedLocalTime, TertiaryDstInvalidTimeJumpMinutes);
         if (TimeZoneInfo.Local.IsInvalidTime(adjustedLocalTime))
         {
             throw new InvalidOperationException(
-                $"表 {tableCode} 在场景 {scene} 发生 DST 非法时刻修正失败，修正分钟数已达上限 {MaxDstInvalidTimeAdjustMinutes}。");
+                $"表 {tableCode} 在场景 {scene} 发生 DST 非法时刻修正失败，已尝试顺延 {InitialDstInvalidTimeJumpMinutes}/{SecondaryDstInvalidTimeJumpMinutes}/{TertiaryDstInvalidTimeJumpMinutes} 分钟。");
         }
 
         logger.LogWarning(
@@ -101,5 +102,22 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
             normalizedLocalTime,
             adjustedLocalTime);
         return adjustedLocalTime;
+    }
+
+    /// <summary>
+    /// 在指定顺延分钟数下尝试修复 DST 非法时刻。
+    /// </summary>
+    /// <param name="originalLocalTime">原始本地时间。</param>
+    /// <param name="candidateLocalTime">当前候选时间。</param>
+    /// <param name="adjustMinutes">顺延分钟数。</param>
+    /// <returns>修复后的候选时间。</returns>
+    private static DateTime TryResolveInvalidLocalTime(DateTime originalLocalTime, DateTime candidateLocalTime, int adjustMinutes = InitialDstInvalidTimeJumpMinutes)
+    {
+        if (!TimeZoneInfo.Local.IsInvalidTime(candidateLocalTime))
+        {
+            return candidateLocalTime;
+        }
+
+        return originalLocalTime.AddMinutes(adjustMinutes);
     }
 }
