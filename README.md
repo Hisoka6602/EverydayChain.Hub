@@ -1,6 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 配置文件注释方式改为参考 Zeye.NarrowBeltSorter 的 JSON 注释风格（`//` 行注释），并在 CI 中按‘每个配置项上方必须有注释’进行自动校验。
+- 新增并落地结构强制约束：配置实体统一迁移至 `EverydayChain.Hub.Domain/Options`；静态工具类 `SyncBusinessKeyBuilder` 与 `SyncColumnFilter` 迁移至 `EverydayChain.Hub.SharedKernel/Utilities`；删除 SharedKernel 占位类 `Class1.cs`。
+- CI 新增结构扫描：枚举目录、配置实体目录、聚合根目录、事件目录、静态工具类目录约束自动校验。
 - 删除 `ISyncUpsertRepository.BuildBusinessKey` 转发方法及其实现（违反"禁止仅做一层转发的方法"规则），调用方 `SyncDeletionRepository` 改为直接调用 `SyncBusinessKeyBuilder.Build`。
 - 修复 `WmsPickToWcsEntity.cs` 和 `WmsSplitPickToLightCartonEntity.cs` 命名空间格式：从老式花括号块改为文件范围 namespace，并移除无用的 using 导入。
 - 修复 `SyncCheckpointRepository` 热路径性能问题：`JsonSerializerOptions` 从每次 SaveAsync 内联创建改为静态只读字段，避免重复分配。
@@ -38,11 +41,11 @@
 │   ├── Sync/SyncBatch.cs
 │   ├── Sync/SyncChangeLog.cs
 │   ├── Sync/SyncDeletionLog.cs
-│   ├── Sync/SyncBusinessKeyBuilder.cs
-│   ├── Sync/SyncColumnFilter.cs
 │   ├── Aggregates/SortingTaskTraceAggregate/SortingTaskTraceEntity.cs
 │   ├── Aggregates/WmsPickToWcsAggregate/WmsPickToWcsEntity.cs
-│   └── Aggregates/WmsSplitPickToLightCartonAggregate/WmsSplitPickToLightCartonEntity.cs
+│   ├── Aggregates/WmsSplitPickToLightCartonAggregate/WmsSplitPickToLightCartonEntity.cs
+│   ├── Options/WorkerOptions.cs
+│   └── Options/RetentionJobOptions.cs
 ├── EverydayChain.Hub.Application
 │   ├── EverydayChain.Hub.Application.csproj
 │   ├── Models/SyncExecutionContext.cs
@@ -78,18 +81,12 @@
 │   └── Services/RetentionExecutionService.cs
 ├── EverydayChain.Hub.SharedKernel
 │   ├── EverydayChain.Hub.SharedKernel.csproj
-│   └── Class1.cs
+│   └── Utilities
+│       ├── SyncBusinessKeyBuilder.cs
+│       └── SyncColumnFilter.cs
 ├── EverydayChain.Hub.Infrastructure
 │   ├── EverydayChain.Hub.Infrastructure.csproj
 │   ├── DependencyInjection/ServiceCollectionExtensions.cs
-│   ├── Options/ShardingOptions.cs
-│   ├── Options/AutoTuneOptions.cs
-│   ├── Options/DangerZoneOptions.cs
-│   ├── Options/SyncJobOptions.cs
-│   ├── Options/SyncTableOptions.cs
-│   ├── Options/SyncDeleteOptions.cs
-│   ├── Options/SyncRetentionOptions.cs
-│   ├── Options/RetentionJobOptions.cs
 │   ├── Repositories/SyncTaskConfigRepository.cs
 │   ├── Repositories/OracleSourceReader.cs
 │   ├── Repositories/SyncStagingRepository.cs
@@ -129,8 +126,7 @@
     ├── Workers/SyncBackgroundWorker.cs
     ├── Workers/RetentionBackgroundWorker.cs
     ├── nlog.config
-    ├── appsettings.json
-    └── Options/WorkerOptions.cs
+    └── appsettings.json
 ```
 
 ## 各层级与各文件作用说明（逐项）
@@ -138,9 +134,10 @@
 - `.github/workflows/copilot-governance.yml`：执行规则自动校验，并强制规则文件与工作流联动修改。
 - `SyncTableDefinition.cs` / `SyncWindow.cs` / `SyncCheckpoint.cs` / `SyncBatchResult.cs`：定义同步链路执行、窗口与结果统计的核心领域模型。
 - `SyncBatch.cs` / `SyncChangeLog.cs` / `SyncDeletionLog.cs`：定义批次状态跟踪、变更审计与删除审计的数据模型。
-- `SyncBusinessKeyBuilder.cs`：同步业务键构建共享组件，按 `UniqueKeys` 配置将行数据拼接为 `|` 分隔的业务键文本，供 Upsert 与删除识别阶段统一调用。
-- `SyncColumnFilter.cs`：同步列过滤共享组件，提供 `ExcludedColumns` 规范化与行级过滤能力，并统一维护软删除关键列常量。
+- `SyncBusinessKeyBuilder.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：同步业务键构建共享组件，按 `UniqueKeys` 配置将行数据拼接为 `|` 分隔的业务键文本，供 Upsert 与删除识别阶段统一调用。
+- `SyncColumnFilter.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：同步列过滤共享组件，提供 `ExcludedColumns` 规范化与行级过滤能力，并统一维护软删除关键列常量。
 - `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs` / `SyncTablePriority.cs`：同步模式、删除策略、滞后控制、批次状态、变更操作类型与调度优先级枚举，均含中文 XML 注释与 `Description`。
+- `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Worker`、`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`RetentionJob` 等），供 Host/Infrastructure 绑定读取。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
 - `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs`：同步执行、删除识别与删除执行的数据契约模型。
 - `ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。
@@ -157,9 +154,7 @@
 - `AutoMigrationService.cs` + `AutoMigrationHostedService.cs`：应用启动时自动执行 `Migrate` 与分表预创建。
 - `SqlExecutionTuner.cs`：基于失败率和耗时进行批量窗口升降调谐；采样窗口大小与失败率阈值均来自 `AutoTuneOptions`。
 - `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断），弹性参数来自 `DangerZoneOptions`。
-- `DangerZoneOptions.cs`：`DangerZoneExecutor` 弹性策略配置类，绑定 `DangerZone` 节点，覆盖超时、重试、熔断全部参数，所有属性含 XML 注释。
 - `SortingTaskTraceWriter.cs`：按分表后缀分组写入，并将执行结果回传给调谐器。
-- `SyncJobOptions.cs` / `SyncTableOptions.cs` / `SyncDeleteOptions.cs` / `SyncRetentionOptions.cs` / `RetentionJobOptions.cs`：同步任务与保留期任务配置绑定模型，统一约束本地时间配置、分页、删除、优先级、并发上限、检查点与目标端数据落地路径等参数。
 - `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，校验 `StartTimeLocal` 禁止 `Z` 与 offset，校验 `ExcludedColumns` 不得与 `UniqueKeys`、`CursorColumn`、软删除关键列冲突，并解析优先级与多表并发上限。
 - `OracleSourceReader.cs`：源端读取器基础实现，支持按窗口分页读取与按窗口读取业务键集合，并在分页读取阶段过滤 `ExcludedColumns`；同时强制校验 `SourceSchema/SourceTable` 安全标识符，确保外部 Oracle 只读链路安全。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
@@ -174,7 +169,6 @@
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖。
 - `202603280001_InitialHubSchema.cs`：基础表结构迁移。
 - `nlog.config`：NLog 日志配置，输出至控制台与滚动日志文件（按日切割，保留 30 天）。
-- `WorkerOptions.cs`：后台工作服务配置类，绑定 `Worker` 节点，覆盖轮询间隔（`PollingIntervalSeconds`），含 XML 注释。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
 - `EFCore手动迁移操作指南.md`：提供手工迁移、脚本导出、回滚、排障流程。

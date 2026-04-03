@@ -1,6 +1,6 @@
 using EverydayChain.Hub.Application.Repositories;
 using EverydayChain.Hub.Application.Services;
-using EverydayChain.Hub.Infrastructure.Options;
+using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Infrastructure.Repositories;

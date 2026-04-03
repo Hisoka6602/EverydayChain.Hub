@@ -1,5 +1,5 @@
 using EverydayChain.Hub.Host;
-using EverydayChain.Hub.Host.Options;
+using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Host.Workers;
 using EverydayChain.Hub.Infrastructure.DependencyInjection;
 using NLog;

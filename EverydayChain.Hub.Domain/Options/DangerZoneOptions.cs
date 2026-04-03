@@ -1,4 +1,4 @@
-namespace EverydayChain.Hub.Infrastructure.Options;
+namespace EverydayChain.Hub.Domain.Options;
 
 /// <summary>
 /// 危险操作隔离器弹性策略配置，从 <c>appsettings.json</c> 的 <c>DangerZone</c> 节点绑定。

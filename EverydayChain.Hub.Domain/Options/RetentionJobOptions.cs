@@ -1,4 +1,4 @@
-namespace EverydayChain.Hub.Infrastructure.Options;
+namespace EverydayChain.Hub.Domain.Options;
 
 /// <summary>
 /// 分表保留期后台任务配置，从 <c>appsettings.json</c> 的 <c>RetentionJob</c> 节点绑定。

@@ -1,4 +1,4 @@
-namespace EverydayChain.Hub.Infrastructure.Options;
+namespace EverydayChain.Hub.Domain.Options;
 
 /// <summary>
 /// 批量写入自动调谐配置，从 <c>appsettings.json</c> 的 <c>AutoTune</c> 节点绑定。

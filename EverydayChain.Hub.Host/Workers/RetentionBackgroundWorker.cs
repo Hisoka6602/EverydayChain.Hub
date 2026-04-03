@@ -1,5 +1,5 @@
 using EverydayChain.Hub.Application.Services;
-using EverydayChain.Hub.Infrastructure.Options;
+using EverydayChain.Hub.Domain.Options;
 using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Host.Workers;
