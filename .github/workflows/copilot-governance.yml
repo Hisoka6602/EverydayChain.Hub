@@ -250,18 +250,22 @@ jobs:
                   continue
 
               def walk(node, current_path):
+                  def build_path(path_segments, key=None):
+                      segments = path_segments + ([key] if key is not None else [])
+                      return ".".join(segments) if segments else "<root>"
+
                   if isinstance(node, dict):
                       keys = [key for key in node.keys() if not key.endswith("__Comment")]
                       for key in keys:
                           comment_key = f"{key}__Comment"
                           if comment_key not in node:
-                              full_path = ".".join(current_path + [key]) if current_path else key
+                              full_path = build_path(current_path, key)
                               config_comment_violations.append(f"{relative}: 路径 {full_path} 缺少同级注释键 {comment_key}")
                       for child_key in keys:
                           walk(node[child_key], current_path + [child_key])
                   elif isinstance(node, list):
-                      if len(node) == 0:
-                          full_path = ".".join(current_path) if current_path else "<root>"
+                      if not node:
+                          full_path = build_path(current_path)
                           config_array_sample_violations.append(f"{relative}: 集合 {full_path} 不能为空，至少需要一个示例元素")
                           return
                       for item in node:
