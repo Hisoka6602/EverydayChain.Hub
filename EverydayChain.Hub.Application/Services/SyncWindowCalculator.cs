@@ -8,9 +8,6 @@ namespace EverydayChain.Hub.Application.Services;
 /// </summary>
 public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncWindowCalculator
 {
-    /// <summary>UTC 类型对应的 DateTimeKind 数值。</summary>
-    private const int UtcDateTimeKindValue = 1;
-
     /// <summary>DST 非法本地时刻初始跳跃分钟数。</summary>
     private const int InitialDstInvalidTimeJumpMinutes = 60;
 
@@ -132,15 +129,15 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
     /// <exception cref="InvalidOperationException">输入为 UTC 语义时抛出。</exception>
     private DateTime EnsureLocalOrUnspecified(DateTime localTime, string tableCode, string scene)
     {
-        if ((int)localTime.Kind == UtcDateTimeKindValue)
+        if (localTime.Kind != DateTimeKind.Local && localTime.Kind != DateTimeKind.Unspecified)
         {
             logger.LogError(
-                "检测到 UTC 时间输入，本地时间窗口计算不支持 UTC 语义。TableCode={TableCode}, Scene={Scene}, InputValue={InputValue}",
+                "检测到非本地时间语义输入，本地时间窗口计算仅支持 Local/Unspecified。TableCode={TableCode}, Scene={Scene}, InputValue={InputValue}",
                 tableCode,
                 scene,
                 localTime);
             throw new InvalidOperationException(
-                $"表 {tableCode} 在场景 {scene} 收到 UTC 时间输入 {localTime:O}，无法按本地时间语义计算窗口。");
+                $"表 {tableCode} 在场景 {scene} 收到非本地时间语义输入 {localTime:O}，无法按本地时间语义计算窗口。");
         }
 
         return localTime.Kind == DateTimeKind.Local
