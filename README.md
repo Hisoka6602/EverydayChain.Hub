@@ -1,6 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 新增 `Oracle` 配置节与 `OracleOptions` 配置实体，支持远端 Oracle 连接字符串、默认 Schema、只读开关、命令超时与分页上限的集中配置。
+- `OracleSourceReader` 已从内存模拟实现切换为真实 Oracle 只读查询实现，支持按窗口分页读取、按窗口读取业务键、列过滤与异常日志落盘。
+- `EverydayChain.Hub.Infrastructure` 引入 `Oracle.ManagedDataAccess.Core` 依赖用于 Oracle 连接与参数化查询执行。
 - 配置文件注释方式改为参考 Zeye.NarrowBeltSorter 的 JSON 注释风格（`//` 行注释），并在 CI 中按‘每个配置项上方必须有注释’进行自动校验。
 - 新增并落地结构强制约束：配置实体统一迁移至 `EverydayChain.Hub.Domain/Options`；静态工具类 `SyncBusinessKeyBuilder` 与 `SyncColumnFilter` 迁移至 `EverydayChain.Hub.SharedKernel/Utilities`；删除 SharedKernel 占位类 `Class1.cs`。
 - CI 新增结构扫描：枚举目录、配置实体目录、聚合根目录、事件目录、静态工具类目录约束自动校验。
@@ -45,7 +48,8 @@
 │   ├── Aggregates/WmsPickToWcsAggregate/WmsPickToWcsEntity.cs
 │   ├── Aggregates/WmsSplitPickToLightCartonAggregate/WmsSplitPickToLightCartonEntity.cs
 │   ├── Options/WorkerOptions.cs
-│   └── Options/RetentionJobOptions.cs
+│   ├── Options/RetentionJobOptions.cs
+│   └── Options/OracleOptions.cs
 ├── EverydayChain.Hub.Application
 │   ├── EverydayChain.Hub.Application.csproj
 │   ├── Models/SyncExecutionContext.cs
@@ -156,7 +160,8 @@
 - `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断），弹性参数来自 `DangerZoneOptions`。
 - `SortingTaskTraceWriter.cs`：按分表后缀分组写入，并将执行结果回传给调谐器。
 - `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，校验 `StartTimeLocal` 禁止 `Z` 与 offset，校验 `ExcludedColumns` 不得与 `UniqueKeys`、`CursorColumn`、软删除关键列冲突，并解析优先级与多表并发上限。
-- `OracleSourceReader.cs`：源端读取器基础实现，支持按窗口分页读取与按窗口读取业务键集合，并在分页读取阶段过滤 `ExcludedColumns`；同时强制校验 `SourceSchema/SourceTable` 安全标识符，确保外部 Oracle 只读链路安全。
+- `OracleOptions.cs`：远端 Oracle 连接配置实体，定义连接字符串、默认 Schema、只读开关、命令超时与分页上限。
+- `OracleSourceReader.cs`：源端读取器 Oracle 实现，使用参数化 SQL 执行真实只读查询，支持分页增量读取、业务键读取、`ExcludedColumns` 过滤，并在异常场景输出错误日志。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
 - `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并在合并比较/写入阶段过滤 `ExcludedColumns`；同时提供目标键删除能力（软删/硬删）与目标端文件持久化落地能力。业务键构建直接使用 `SyncBusinessKeyBuilder.Build`。
 - `SyncDeletionRepository.cs`：删除同步仓储基础实现，支持窗口内源端键集合与目标键集合差异识别，并按策略执行删除。
@@ -177,5 +182,5 @@
 - `Oracle到SQLServer同步实施计划.md`：按 PR 拆分同步架构落地步骤（最多 6 个 PR）的进度跟踪文档，定义完成项删除前必须通读代码确认完全实现的维护规则，随实施进展动态更新。
 
 ## 可继续完善内容
-- 将 PR-1 基础实现继续推进到真实数据库落地实现（真实 Oracle 读取、SQL Server 暂存表与 MERGE 对接）。
+- 将 Oracle 源端读取补充集成测试（含非法标识符、防注入与分页边界场景）。
 - 将同步指标从日志输出升级为可接入监控平台的统一指标管道（如 Prometheus/OpenTelemetry）。
