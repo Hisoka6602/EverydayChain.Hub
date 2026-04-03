@@ -129,11 +129,12 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
         if (localTime.Kind == DateTimeKind.Utc)
         {
             logger.LogError(
-                "检测到 UTC 时间输入，不允许参与本地时间窗口计算。TableCode={TableCode}, Scene={Scene}, UtcValue={UtcValue}",
+                "检测到 UTC 时间输入，不允许参与本地时间窗口计算。TableCode={TableCode}, Scene={Scene}, InputValue={InputValue}",
                 tableCode,
                 scene,
                 localTime);
-            throw new InvalidOperationException($"表 {tableCode} 在场景 {scene} 收到 UTC 时间输入，无法按本地时间语义计算窗口。");
+            throw new InvalidOperationException(
+                $"表 {tableCode} 在场景 {scene} 收到 UTC 时间输入 {localTime:O}，无法按本地时间语义计算窗口。");
         }
 
         return localTime.Kind == DateTimeKind.Local
