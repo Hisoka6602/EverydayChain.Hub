@@ -24,9 +24,7 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
             checkpoint.LastSuccessCursorLocal ?? definition.StartTimeLocal,
             definition.TableCode,
             "窗口起点");
-        var normalizedNowLocal = nowLocal.Kind == DateTimeKind.Local
-            ? nowLocal
-            : DateTime.SpecifyKind(nowLocal, DateTimeKind.Local);
+        var normalizedNowLocal = EnsureLocalOrUnspecified(nowLocal, definition.TableCode, "当前时间");
         var effectiveNowLocal = ResolveEffectiveNowLocal(normalizedNowLocal, checkpoint.LastSuccessTimeLocal, definition.TableCode);
         var windowEndLocal = NormalizeLocalWindowBoundary(
             effectiveNowLocal.AddMinutes(-definition.MaxLagMinutes),
@@ -77,16 +75,13 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
     /// <returns>规范化后的本地时间。</returns>
     private DateTime NormalizeLocalWindowBoundary(DateTime localTime, string tableCode, string scene)
     {
-        var normalizedLocalTime = localTime.Kind == DateTimeKind.Local
-            ? localTime
-            : DateTime.SpecifyKind(localTime, DateTimeKind.Local);
+        var normalizedLocalTime = EnsureLocalOrUnspecified(localTime, tableCode, scene);
         if (!TimeZoneInfo.Local.IsInvalidTime(normalizedLocalTime))
         {
             return normalizedLocalTime;
         }
 
         var adjustedLocalTime = normalizedLocalTime.AddMinutes(InitialDstInvalidTimeJumpMinutes);
-        adjustedLocalTime = TryResolveInvalidLocalTime(normalizedLocalTime, adjustedLocalTime);
         adjustedLocalTime = TryResolveInvalidLocalTime(normalizedLocalTime, adjustedLocalTime, SecondaryDstInvalidTimeJumpMinutes);
         adjustedLocalTime = TryResolveInvalidLocalTime(normalizedLocalTime, adjustedLocalTime, TertiaryDstInvalidTimeJumpMinutes);
         if (TimeZoneInfo.Local.IsInvalidTime(adjustedLocalTime))
@@ -111,7 +106,7 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
     /// <param name="candidateLocalTime">当前候选时间。</param>
     /// <param name="adjustMinutes">顺延分钟数。</param>
     /// <returns>修复后的候选时间。</returns>
-    private static DateTime TryResolveInvalidLocalTime(DateTime originalLocalTime, DateTime candidateLocalTime, int adjustMinutes = InitialDstInvalidTimeJumpMinutes)
+    private static DateTime TryResolveInvalidLocalTime(DateTime originalLocalTime, DateTime candidateLocalTime, int adjustMinutes)
     {
         if (!TimeZoneInfo.Local.IsInvalidTime(candidateLocalTime))
         {
@@ -119,5 +114,30 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
         }
 
         return originalLocalTime.AddMinutes(adjustMinutes);
+    }
+
+    /// <summary>
+    /// 规范化输入时间，拒绝 UTC 语义并统一为本地语义。
+    /// </summary>
+    /// <param name="localTime">输入时间。</param>
+    /// <param name="tableCode">表编码。</param>
+    /// <param name="scene">场景描述。</param>
+    /// <returns>规范化后的本地时间。</returns>
+    /// <exception cref="InvalidOperationException">输入为 UTC 语义时抛出。</exception>
+    private DateTime EnsureLocalOrUnspecified(DateTime localTime, string tableCode, string scene)
+    {
+        if (localTime.Kind == DateTimeKind.Utc)
+        {
+            logger.LogError(
+                "检测到 UTC 时间输入，不允许参与本地时间窗口计算。TableCode={TableCode}, Scene={Scene}, UtcValue={UtcValue}",
+                tableCode,
+                scene,
+                localTime);
+            throw new InvalidOperationException($"表 {tableCode} 在场景 {scene} 收到 UTC 时间输入，无法按本地时间语义计算窗口。");
+        }
+
+        return localTime.Kind == DateTimeKind.Local
+            ? localTime
+            : DateTime.SpecifyKind(localTime, DateTimeKind.Local);
     }
 }
