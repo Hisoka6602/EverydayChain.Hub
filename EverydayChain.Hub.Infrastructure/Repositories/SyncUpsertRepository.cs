@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO.Compression;
 using System.Text.Json;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Repositories;
@@ -43,6 +44,8 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     private readonly long _idleEvictionThresholdTicks;
     /// <summary>空闲驱逐阈值分钟数（用于日志输出，避免运行时反向计算带来溢出风险）。</summary>
     private readonly double _idleEvictionThresholdMinutes;
+    /// <summary>目标端文件归档最大保留数量（0 表示关闭）。</summary>
+    private readonly int _targetStoreArchiveMaxCount;
 
     /// <summary>
     /// 初始化同步幂等合并仓储。
@@ -69,6 +72,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         var thresholdMinutes = opts.IdleEvictionThresholdMinutes >= 1 ? opts.IdleEvictionThresholdMinutes : 30;
         _idleEvictionThresholdMinutes = thresholdMinutes;
         _idleEvictionThresholdTicks = (long)(TimeSpan.FromMinutes(thresholdMinutes).TotalSeconds * Stopwatch.Frequency);
+        _targetStoreArchiveMaxCount = opts.TargetStoreArchiveMaxCount >= 0 ? opts.TargetStoreArchiveMaxCount : 7;
     }
 
     /// <summary>
@@ -443,7 +447,15 @@ public class SyncUpsertRepository : ISyncUpsertRepository
                 File.Replace(tempFilePath, tableStoreFilePath, backupFilePath, ignoreMetadataErrors: false);
                 if (File.Exists(backupFilePath))
                 {
-                    File.Delete(backupFilePath);
+                    // 若已开启归档压缩，将旧版本压缩为 .{timestamp}.json.gz 并清理超限的旧归档。
+                    if (_targetStoreArchiveMaxCount > 0)
+                    {
+                        ArchiveBackupFile(tableCode, tableStoreFilePath, backupFilePath);
+                    }
+                    else
+                    {
+                        File.Delete(backupFilePath);
+                    }
                 }
             }
             else
@@ -464,6 +476,89 @@ public class SyncUpsertRepository : ISyncUpsertRepository
             {
                 File.Delete(tempFilePath);
             }
+        }
+    }
+
+    /// <summary>
+    /// 将旧版本备份文件压缩归档，并清理超出保留数量的最旧归档文件。
+    /// </summary>
+    /// <param name="tableCode">表编码。</param>
+    /// <param name="activeFilePath">当前活跃文件路径（用于匹配归档前缀）。</param>
+    /// <param name="backupFilePath">待归档的 .bak 文件路径。</param>
+    private void ArchiveBackupFile(string tableCode, string activeFilePath, string backupFilePath)
+    {
+        try
+        {
+            var timestamp = DateTime.Now.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
+            var archiveFilePath = $"{activeFilePath}.{timestamp}.json.gz";
+            // 使用 GZip 压缩 .bak 文件到归档。
+            using (var inputStream = File.OpenRead(backupFilePath))
+            using (var outputStream = File.Create(archiveFilePath))
+            using (var gzipStream = new GZipStream(outputStream, CompressionLevel.Optimal))
+            {
+                inputStream.CopyTo(gzipStream);
+            }
+
+            File.Delete(backupFilePath);
+            TrimOldArchives(tableCode, activeFilePath);
+        }
+        catch (Exception ex)
+        {
+            // 归档失败不应阻断正常写入流程，仅记录警告。
+            _logger.LogWarning(ex, "压缩归档旧版本目标快照文件失败，将直接删除备份文件。TableCode={TableCode}, BackupPath={BackupPath}", tableCode, backupFilePath);
+            try
+            {
+                if (File.Exists(backupFilePath))
+                {
+                    File.Delete(backupFilePath);
+                }
+            }
+            catch (Exception deleteEx)
+            {
+                _logger.LogWarning(deleteEx, "删除备份文件失败。BackupPath={BackupPath}", backupFilePath);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 清理超出保留数量的最旧压缩归档文件。
+    /// </summary>
+    /// <param name="tableCode">表编码。</param>
+    /// <param name="activeFilePath">当前活跃文件路径（用于匹配归档前缀）。</param>
+    private void TrimOldArchives(string tableCode, string activeFilePath)
+    {
+        try
+        {
+            var archivePattern = $"{Path.GetFileName(activeFilePath)}.*.json.gz";
+            var archives = Directory
+                .GetFiles(_targetStoreDirectoryPath, archivePattern)
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var excessCount = archives.Count - _targetStoreArchiveMaxCount;
+            if (excessCount <= 0)
+            {
+                return;
+            }
+
+            for (var i = 0; i < excessCount; i++)
+            {
+                try
+                {
+                    File.Delete(archives[i]);
+                    _logger.LogInformation(
+                        "清理超限目标快照压缩归档。TableCode={TableCode}, Path={ArchivePath}",
+                        tableCode,
+                        archives[i]);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "清理超限目标快照压缩归档失败。TableCode={TableCode}, Path={ArchivePath}", tableCode, archives[i]);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "枚举目标快照压缩归档文件失败。TableCode={TableCode}", tableCode);
         }
     }
 

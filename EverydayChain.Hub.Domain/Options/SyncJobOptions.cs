@@ -47,6 +47,12 @@ public class SyncJobOptions
     /// <summary>单表内存空闲驱逐阈值（分钟，可填写范围：[1, 1440]；空闲超过该时间后将被从内存卸载；建议值 30）。</summary>
     public int IdleEvictionThresholdMinutes { get; set; } = 30;
 
+    /// <summary>目标端快照文件归档最大保留数量（可填写范围：[0, 100]；0 表示关闭压缩归档；超出保留数量的最旧归档自动删除；建议值 7）。</summary>
+    public int TargetStoreArchiveMaxCount { get; set; } = 7;
+
+    /// <summary>单表同步超时时间（单位：秒，可填写范围：[0, 86400]；0 表示关闭超时保护；建议值 600）。</summary>
+    public int TableSyncTimeoutSeconds { get; set; } = 600;
+
     /// <summary>单表配置集合。</summary>
     public List<SyncTableOptions> Tables { get; set; } = [];
 }

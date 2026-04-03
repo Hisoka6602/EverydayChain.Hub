@@ -1,6 +1,7 @@
 using EverydayChain.Hub.Application.Repositories;
 using EverydayChain.Hub.Application.Services;
 using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.Domain.Sync;
 using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Host.Workers;
@@ -28,37 +29,7 @@ public class SyncBackgroundWorker(
         {
             try
             {
-                var results = await syncOrchestrator.RunAllEnabledTableSyncAsync(stoppingToken);
-                foreach (var result in results)
-                {
-                    if (result.FailureRate > 0)
-                    {
-                        logger.LogError(
-                            "同步执行失败。TableCode={TableCode}, BatchId={BatchId}, FailureRate={FailureRate:F4}, FailureMessage={FailureMessage}",
-                            result.TableCode,
-                            result.BatchId,
-                            result.FailureRate,
-                            result.FailureMessage);
-                        continue;
-                    }
-
-                    logger.LogInformation(
-                        "同步执行完成。TableCode={TableCode}, BatchId={BatchId}, Read={ReadCount}, Insert={InsertCount}, Update={UpdateCount}, Delete={DeleteCount}, Skip={SkipCount}, LagMinutes={LagMinutes:F2}, BacklogMinutes={BacklogMinutes:F2}, Throughput={ThroughputRowsPerSecond:F2}, ElapsedMs={ElapsedMs}",
-                        result.TableCode,
-                        result.BatchId,
-                        result.ReadCount,
-                        result.InsertCount,
-                        result.UpdateCount,
-                        result.DeleteCount,
-                        result.SkipCount,
-                        result.LagMinutes,
-                        result.BacklogMinutes,
-                        result.ThroughputRowsPerSecond,
-                        result.Elapsed.TotalMilliseconds);
-                }
-
-                // 每轮同步结束后驱逐空闲表内存缓存，避免长期不活跃表占用内存。
-                await upsertRepository.EvictIdleTablesAsync(stoppingToken);
+                await RunOnceAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -71,5 +42,112 @@ public class SyncBackgroundWorker(
 
             await Task.Delay(TimeSpan.FromSeconds(pollingIntervalSeconds), stoppingToken);
         }
+    }
+
+    /// <summary>
+    /// 执行单轮同步，包含各表结果汇总与整轮指标日志输出。
+    /// </summary>
+    /// <param name="stoppingToken">取消令牌。</param>
+    private async Task RunOnceAsync(CancellationToken stoppingToken)
+    {
+        var roundStart = DateTime.Now;
+        var tableSyncTimeoutSeconds = _syncJobOptions.TableSyncTimeoutSeconds;
+        IReadOnlyList<SyncBatchResult> results;
+
+        // 若配置了表级超时，使用 CancellationTokenSource 限制整轮同步最大耗时。
+        if (tableSyncTimeoutSeconds > 0)
+        {
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(tableSyncTimeoutSeconds));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, timeoutCts.Token);
+            try
+            {
+                results = await syncOrchestrator.RunAllEnabledTableSyncAsync(linkedCts.Token);
+            }
+            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
+            {
+                logger.LogError(
+                    "同步整轮执行超时，已取消本轮所有未完成表同步。TableSyncTimeoutSeconds={TableSyncTimeoutSeconds}",
+                    tableSyncTimeoutSeconds);
+                return;
+            }
+        }
+        else
+        {
+            results = await syncOrchestrator.RunAllEnabledTableSyncAsync(stoppingToken);
+        }
+
+        // 逐表输出详细结果日志。
+        foreach (var result in results)
+        {
+            if (result.FailureRate > 0)
+            {
+                logger.LogError(
+                    "同步执行失败。TableCode={TableCode}, BatchId={BatchId}, FailureRate={FailureRate:F4}, FailureMessage={FailureMessage}",
+                    result.TableCode,
+                    result.BatchId,
+                    result.FailureRate,
+                    result.FailureMessage);
+                continue;
+            }
+
+            logger.LogInformation(
+                "同步执行完成。TableCode={TableCode}, BatchId={BatchId}, Read={ReadCount}, Insert={InsertCount}, Update={UpdateCount}, Delete={DeleteCount}, Skip={SkipCount}, LagMinutes={LagMinutes:F2}, BacklogMinutes={BacklogMinutes:F2}, Throughput={ThroughputRowsPerSecond:F2}, ElapsedMs={ElapsedMs}",
+                result.TableCode,
+                result.BatchId,
+                result.ReadCount,
+                result.InsertCount,
+                result.UpdateCount,
+                result.DeleteCount,
+                result.SkipCount,
+                result.LagMinutes,
+                result.BacklogMinutes,
+                result.ThroughputRowsPerSecond,
+                result.Elapsed.TotalMilliseconds);
+        }
+
+        // 输出整轮汇总指标，便于在分钟级发现整体异常趋势。
+        var roundElapsed = DateTime.Now - roundStart;
+        var totalTables = results.Count;
+        var failedTables = results.Count(r => r.FailureRate > 0);
+        var successTables = totalTables - failedTables;
+        var totalRead = results.Sum(r => r.ReadCount);
+        var totalInsert = results.Sum(r => r.InsertCount);
+        var totalUpdate = results.Sum(r => r.UpdateCount);
+        var totalDelete = results.Sum(r => r.DeleteCount);
+        var overallFailureRate = totalTables > 0 ? (double)failedTables / totalTables : 0d;
+        var maxLagMinutes = results.Count > 0 ? results.Max(r => r.LagMinutes) : 0d;
+        var maxBacklogMinutes = results.Count > 0 ? results.Max(r => r.BacklogMinutes) : 0d;
+        if (failedTables > 0)
+        {
+            logger.LogWarning(
+                "本轮同步存在失败表。TotalTables={TotalTables}, SuccessTables={SuccessTables}, FailedTables={FailedTables}, OverallFailureRate={OverallFailureRate:F4}, TotalRead={TotalRead}, TotalInsert={TotalInsert}, TotalUpdate={TotalUpdate}, TotalDelete={TotalDelete}, MaxLagMinutes={MaxLagMinutes:F2}, MaxBacklogMinutes={MaxBacklogMinutes:F2}, RoundElapsedMs={RoundElapsedMs}",
+                totalTables,
+                successTables,
+                failedTables,
+                overallFailureRate,
+                totalRead,
+                totalInsert,
+                totalUpdate,
+                totalDelete,
+                maxLagMinutes,
+                maxBacklogMinutes,
+                (long)roundElapsed.TotalMilliseconds);
+        }
+        else
+        {
+            logger.LogInformation(
+                "本轮同步全部成功。TotalTables={TotalTables}, TotalRead={TotalRead}, TotalInsert={TotalInsert}, TotalUpdate={TotalUpdate}, TotalDelete={TotalDelete}, MaxLagMinutes={MaxLagMinutes:F2}, MaxBacklogMinutes={MaxBacklogMinutes:F2}, RoundElapsedMs={RoundElapsedMs}",
+                totalTables,
+                totalRead,
+                totalInsert,
+                totalUpdate,
+                totalDelete,
+                maxLagMinutes,
+                maxBacklogMinutes,
+                (long)roundElapsed.TotalMilliseconds);
+        }
+
+        // 每轮同步结束后驱逐空闲表内存缓存，避免长期不活跃表占用内存。
+        await upsertRepository.EvictIdleTablesAsync(stoppingToken);
     }
 }
