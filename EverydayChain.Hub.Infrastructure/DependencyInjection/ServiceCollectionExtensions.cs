@@ -30,6 +30,7 @@ public static class ServiceCollectionExtensions
         services.Configure<DangerZoneOptions>(configuration.GetSection(DangerZoneOptions.SectionName));
         services.Configure<SyncJobOptions>(configuration.GetSection(SyncJobOptions.SectionName));
         services.Configure<RetentionJobOptions>(configuration.GetSection(RetentionJobOptions.SectionName));
+        services.Configure<OracleOptions>(configuration.GetSection(OracleOptions.SectionName));
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
 
