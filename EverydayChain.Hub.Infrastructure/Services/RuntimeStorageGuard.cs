@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Collections.Concurrent;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.Extensions.Logging;
@@ -79,10 +80,16 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     private bool _tableMemoryWarningIntervalTooLargeLogged;
 
     /// <summary>单表内存告警最近输出时间缓存（Stopwatch 时间戳）。</summary>
-    private readonly Dictionary<string, long> _tableMemoryWarningLogTimestamps = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, long> _tableMemoryWarningLogTimestamps = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>单表内存告警最近输出时间缓存锁。</summary>
-    private readonly object _tableMemoryWarningLogTimestampsLock = new();
+    /// <summary>单表内存告警判定与时间戳更新锁。</summary>
+    private readonly object _tableMemoryWarningGateLock = new();
+
+    /// <summary>单表内存告警节流间隔缓存（Stopwatch Tick）。</summary>
+    private long _tableMemoryWarningIntervalTicksCache = -1;
+
+    /// <summary>单表内存告警节流间隔缓存锁。</summary>
+    private readonly object _tableMemoryWarningIntervalTicksCacheLock = new();
 
     /// <inheritdoc/>
     public Task EnsureStartupHealthyAsync(CancellationToken ct)
@@ -156,7 +163,7 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
             return Task.CompletedTask;
         }
 
-        if (ShouldSkipTableMemoryWarningLog(tableCode))
+        if (!TryAcquireTableMemoryWarningLogPermission(tableCode))
         {
             return Task.CompletedTask;
         }
@@ -168,7 +175,6 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
             entryCount,
             estimatedMemoryMb,
             warningThresholdMb);
-        UpdateTableMemoryWarningLogTime(tableCode);
         return Task.CompletedTask;
     }
 
@@ -329,36 +335,55 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     }
 
     /// <summary>
-    /// 判断是否跳过本次单表内存告警日志输出。
+    /// 判断并获取单表内存告警日志输出许可（原子执行）。
     /// </summary>
     /// <param name="tableCode">表编码。</param>
-    /// <returns>需要跳过返回 <c>true</c>。</returns>
-    private bool ShouldSkipTableMemoryWarningLog(string tableCode)
+    /// <returns>允许输出返回 <c>true</c>。</returns>
+    private bool TryAcquireTableMemoryWarningLogPermission(string tableCode)
     {
-        var intervalSeconds = NormalizeTableMemoryWarningLogIntervalSeconds();
-        if (intervalSeconds <= 0)
+        var intervalTicks = GetTableMemoryWarningIntervalTicks();
+        if (intervalTicks <= 0)
         {
-            return false;
+            return true;
         }
 
         var currentTimestamp = Stopwatch.GetTimestamp();
-        var intervalTicks = (long)(intervalSeconds * Stopwatch.Frequency);
-        lock (_tableMemoryWarningLogTimestampsLock)
+        lock (_tableMemoryWarningGateLock)
         {
-            return _tableMemoryWarningLogTimestamps.TryGetValue(tableCode, out var lastTimestamp)
-                   && currentTimestamp - lastTimestamp < intervalTicks;
+            if (_tableMemoryWarningLogTimestamps.TryGetValue(tableCode, out var lastTimestamp)
+                && currentTimestamp - lastTimestamp < intervalTicks)
+            {
+                return false;
+            }
+
+            _tableMemoryWarningLogTimestamps[tableCode] = currentTimestamp;
+            return true;
         }
     }
 
     /// <summary>
-    /// 更新单表内存告警日志输出时间。
+    /// 获取单表内存告警节流间隔（Stopwatch Tick）。
     /// </summary>
-    /// <param name="tableCode">表编码。</param>
-    private void UpdateTableMemoryWarningLogTime(string tableCode)
+    /// <returns>节流间隔 Tick（0 表示不节流）。</returns>
+    private long GetTableMemoryWarningIntervalTicks()
     {
-        lock (_tableMemoryWarningLogTimestampsLock)
+        if (_tableMemoryWarningIntervalTicksCache >= 0)
         {
-            _tableMemoryWarningLogTimestamps[tableCode] = Stopwatch.GetTimestamp();
+            return _tableMemoryWarningIntervalTicksCache;
+        }
+
+        lock (_tableMemoryWarningIntervalTicksCacheLock)
+        {
+            if (_tableMemoryWarningIntervalTicksCache >= 0)
+            {
+                return _tableMemoryWarningIntervalTicksCache;
+            }
+
+            var intervalSeconds = NormalizeTableMemoryWarningLogIntervalSeconds();
+            _tableMemoryWarningIntervalTicksCache = intervalSeconds <= 0
+                ? 0
+                : (long)(intervalSeconds * Stopwatch.Frequency);
+            return _tableMemoryWarningIntervalTicksCache;
         }
     }
 
