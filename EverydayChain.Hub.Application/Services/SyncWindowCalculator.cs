@@ -8,6 +8,12 @@ namespace EverydayChain.Hub.Application.Services;
 /// </summary>
 public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncWindowCalculator
 {
+    /// <summary>DST 非法本地时刻初始跳跃分钟数。</summary>
+    private const int InitialDstInvalidTimeJumpMinutes = 60;
+
+    /// <summary>DST 非法本地时刻最大修正分钟数。</summary>
+    private const int MaxDstInvalidTimeAdjustMinutes = 180;
+
     /// <inheritdoc/>
     public SyncWindow CalculateWindow(SyncTableDefinition definition, SyncCheckpoint checkpoint, DateTime nowLocal)
     {
@@ -74,10 +80,18 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
             return normalizedLocalTime;
         }
 
-        var adjustedLocalTime = normalizedLocalTime;
-        while (TimeZoneInfo.Local.IsInvalidTime(adjustedLocalTime))
+        var adjustedLocalTime = normalizedLocalTime.AddMinutes(InitialDstInvalidTimeJumpMinutes);
+        var adjustMinutes = InitialDstInvalidTimeJumpMinutes;
+        while (TimeZoneInfo.Local.IsInvalidTime(adjustedLocalTime) && adjustMinutes < MaxDstInvalidTimeAdjustMinutes)
         {
             adjustedLocalTime = adjustedLocalTime.AddMinutes(1);
+            adjustMinutes++;
+        }
+
+        if (TimeZoneInfo.Local.IsInvalidTime(adjustedLocalTime))
+        {
+            throw new InvalidOperationException(
+                $"表 {tableCode} 在场景 {scene} 发生 DST 非法时刻修正失败，修正分钟数已达上限 {MaxDstInvalidTimeAdjustMinutes}。");
         }
 
         logger.LogWarning(
