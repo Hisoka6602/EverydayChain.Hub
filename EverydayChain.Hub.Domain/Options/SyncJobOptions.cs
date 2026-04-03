@@ -32,6 +32,12 @@ public class SyncJobOptions
     /// <summary>关键写入磁盘空间检查缓存秒数（建议范围：0~300，0 表示每次都检查）。</summary>
     public int WriteSpaceCheckCacheSeconds { get; set; } = 5;
 
+    /// <summary>是否启用单表内存水位监控（可填写项：true、false）。</summary>
+    public bool EnableTableMemoryMonitoring { get; set; } = true;
+
+    /// <summary>单表内存水位告警阈值（MB，建议范围：0~65536；0 表示关闭阈值告警）。</summary>
+    public long TableMemoryWarningThresholdMb { get; set; } = 256;
+
     /// <summary>单表配置集合。</summary>
     public List<SyncTableOptions> Tables { get; set; } = [];
 }

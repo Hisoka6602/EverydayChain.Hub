@@ -45,6 +45,15 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     /// <summary>写入阈值非法日志是否已输出。</summary>
     private bool _writeThresholdInvalidLogged;
 
+    /// <summary>单表内存监控关闭日志是否已输出。</summary>
+    private bool _tableMemoryMonitoringDisabledLogged;
+
+    /// <summary>单表内存阈值关闭日志是否已输出。</summary>
+    private bool _tableMemoryThresholdDisabledLogged;
+
+    /// <summary>单表内存阈值非法日志是否已输出。</summary>
+    private bool _tableMemoryThresholdInvalidLogged;
+
     /// <inheritdoc/>
     public Task EnsureStartupHealthyAsync(CancellationToken ct)
     {
@@ -84,6 +93,46 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
 
         EnsureDiskFreeSpace(targetPath, writeMinFreeSpaceMb, scene);
         UpdateWriteSpaceCheckTime(targetPath);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    public Task ReportTableMemoryAsync(string tableCode, int entryCount, string scene, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (!_options.EnableTableMemoryMonitoring)
+        {
+            lock (_thresholdLogLock)
+            {
+                if (!_tableMemoryMonitoringDisabledLogged)
+                {
+                    logger.LogWarning("单表内存监控已关闭。Option={OptionName}", nameof(_options.EnableTableMemoryMonitoring));
+                    _tableMemoryMonitoringDisabledLogged = true;
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+
+        var warningThresholdMb = NormalizeTableMemoryWarningThresholdMb();
+        if (warningThresholdMb == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        var estimatedMemoryMb = EstimateTableMemoryMb(entryCount);
+        if (estimatedMemoryMb < warningThresholdMb)
+        {
+            return Task.CompletedTask;
+        }
+
+        logger.LogWarning(
+            "{Scene}触发单表内存水位告警。TableCode={TableCode}, EntryCount={EntryCount}, EstimatedMemoryMb={EstimatedMemoryMb:F2}, WarningThresholdMb={WarningThresholdMb}",
+            scene,
+            tableCode,
+            entryCount,
+            estimatedMemoryMb,
+            warningThresholdMb);
         return Task.CompletedTask;
     }
 
@@ -167,6 +216,62 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         }
 
         return _options.WriteMinFreeSpaceMb;
+    }
+
+    /// <summary>
+    /// 获取规范化后的单表内存告警阈值。
+    /// </summary>
+    /// <returns>阈值（MB）。</returns>
+    private long NormalizeTableMemoryWarningThresholdMb()
+    {
+        if (_options.TableMemoryWarningThresholdMb == 0)
+        {
+            lock (_thresholdLogLock)
+            {
+                if (!_tableMemoryThresholdDisabledLogged)
+                {
+                    logger.LogWarning(
+                        "单表内存告警阈值已关闭。Option={OptionName}",
+                        nameof(_options.TableMemoryWarningThresholdMb));
+                    _tableMemoryThresholdDisabledLogged = true;
+                }
+            }
+
+            return 0;
+        }
+
+        if (_options.TableMemoryWarningThresholdMb < 0)
+        {
+            lock (_thresholdLogLock)
+            {
+                if (!_tableMemoryThresholdInvalidLogged)
+                {
+                    logger.LogWarning(
+                        "单表内存告警阈值配置非法，已回退默认值。Option={OptionName}, Value={OptionValue}, DefaultValue={DefaultValue}",
+                        nameof(_options.TableMemoryWarningThresholdMb),
+                        _options.TableMemoryWarningThresholdMb,
+                        256);
+                    _tableMemoryThresholdInvalidLogged = true;
+                }
+            }
+
+            return 256;
+        }
+
+        return _options.TableMemoryWarningThresholdMb;
+    }
+
+    /// <summary>
+    /// 估算单表内存占用（MB）。
+    /// </summary>
+    /// <param name="entryCount">条目数量。</param>
+    /// <returns>估算内存（MB）。</returns>
+    private static double EstimateTableMemoryMb(int entryCount)
+    {
+        // 保守估算：每条约 1KB，用于触发预警而非精确计量。
+        const double bytesPerEntryEstimate = 1024d;
+        var estimatedBytes = entryCount * bytesPerEntryEstimate;
+        return estimatedBytes / 1024d / 1024d;
     }
 
     /// <summary>
