@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using EverydayChain.Hub.Domain.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -9,17 +10,20 @@ namespace EverydayChain.Hub.Infrastructure.Services;
 /// </summary>
 public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogger<RuntimeStorageGuard> logger) : IRuntimeStorageGuard
 {
-    /// <summary>启动自检最小可用空间（单位：MB，建议范围：100~10240）。</summary>
-    private const long StartupMinFreeSpaceMb = 500;
-
-    /// <summary>关键写入最小可用空间（单位：MB，建议范围：50~10240）。</summary>
-    private const long WriteMinFreeSpaceMb = 100;
-
     /// <summary>检查点文件绝对路径。</summary>
     private readonly string _checkpointFilePath = ResolvePath(syncJobOptions.Value.CheckpointFilePath, "sync-checkpoints.json");
 
     /// <summary>目标端快照文件绝对路径。</summary>
     private readonly string _targetStoreFilePath = ResolvePath(syncJobOptions.Value.TargetStoreFilePath, Path.Combine("data", "sync-target-store.json"));
+
+    /// <summary>运行期配置。</summary>
+    private readonly SyncJobOptions _options = syncJobOptions.Value;
+
+    /// <summary>关键写入磁盘检查缓存。</summary>
+    private readonly Dictionary<string, long> _writeSpaceCheckCache = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>关键写入磁盘检查缓存锁。</summary>
+    private readonly object _writeSpaceCheckCacheLock = new();
 
     /// <inheritdoc/>
     public Task EnsureStartupHealthyAsync(CancellationToken ct)
@@ -29,13 +33,13 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         EnsureDirectoryWritable(_targetStoreFilePath, "目标快照目录");
         EnsureFileReadableAndWritable(_checkpointFilePath, "检查点文件");
         EnsureFileReadableAndWritable(_targetStoreFilePath, "目标快照文件");
-        EnsureDiskFreeSpace(_checkpointFilePath, StartupMinFreeSpaceMb, "启动自检-检查点路径");
-        EnsureDiskFreeSpace(_targetStoreFilePath, StartupMinFreeSpaceMb, "启动自检-目标快照路径");
+        EnsureDiskFreeSpace(_checkpointFilePath, NormalizeStartupMinFreeSpaceMb(), "启动自检-检查点路径");
+        EnsureDiskFreeSpace(_targetStoreFilePath, NormalizeStartupMinFreeSpaceMb(), "启动自检-目标快照路径");
         logger.LogInformation(
             "运行期存储启动自检通过。CheckpointPath={CheckpointPath}, TargetStorePath={TargetStorePath}, MinFreeSpaceMb={MinFreeSpaceMb}",
             _checkpointFilePath,
             _targetStoreFilePath,
-            StartupMinFreeSpaceMb);
+            NormalizeStartupMinFreeSpaceMb());
         return Task.CompletedTask;
     }
 
@@ -43,8 +47,66 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     public Task EnsureWriteSpaceAsync(string targetPath, string scene, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        EnsureDiskFreeSpace(targetPath, WriteMinFreeSpaceMb, scene);
+        if (CanSkipWriteSpaceCheck(targetPath))
+        {
+            return Task.CompletedTask;
+        }
+
+        EnsureDiskFreeSpace(targetPath, NormalizeWriteMinFreeSpaceMb(), scene);
+        UpdateWriteSpaceCheckTime(targetPath);
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 获取规范化后的启动最小可用空间。
+    /// </summary>
+    /// <returns>最小可用空间（MB）。</returns>
+    private long NormalizeStartupMinFreeSpaceMb()
+    {
+        return _options.StartupMinFreeSpaceMb > 0 ? _options.StartupMinFreeSpaceMb : 500;
+    }
+
+    /// <summary>
+    /// 获取规范化后的关键写入最小可用空间。
+    /// </summary>
+    /// <returns>最小可用空间（MB）。</returns>
+    private long NormalizeWriteMinFreeSpaceMb()
+    {
+        return _options.WriteMinFreeSpaceMb > 0 ? _options.WriteMinFreeSpaceMb : 100;
+    }
+
+    /// <summary>
+    /// 判断是否可跳过本次关键写入磁盘检查。
+    /// </summary>
+    /// <param name="targetPath">目标路径。</param>
+    /// <returns>可跳过返回 <c>true</c>。</returns>
+    private bool CanSkipWriteSpaceCheck(string targetPath)
+    {
+        var cacheSeconds = _options.WriteSpaceCheckCacheSeconds;
+        if (cacheSeconds <= 0)
+        {
+            return false;
+        }
+
+        var currentTimestamp = Stopwatch.GetTimestamp();
+        var cacheWindowTicks = (long)(cacheSeconds * Stopwatch.Frequency);
+        lock (_writeSpaceCheckCacheLock)
+        {
+            return _writeSpaceCheckCache.TryGetValue(targetPath, out var lastCheckedAt)
+                && currentTimestamp - lastCheckedAt <= cacheWindowTicks;
+        }
+    }
+
+    /// <summary>
+    /// 更新关键写入磁盘检查时间戳。
+    /// </summary>
+    /// <param name="targetPath">目标路径。</param>
+    private void UpdateWriteSpaceCheckTime(string targetPath)
+    {
+        lock (_writeSpaceCheckCacheLock)
+        {
+            _writeSpaceCheckCache[targetPath] = Stopwatch.GetTimestamp();
+        }
     }
 
     /// <summary>
@@ -100,7 +162,7 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
             }
             catch (Exception cleanupEx)
             {
-                logger.LogError(cleanupEx, "{Scene}失败：目录探针文件清理异常。ProbePath={ProbePath}", scene, probePath);
+                logger.LogError(cleanupEx, "{Scene}失败：目录探针文件清理失败。ProbePath={ProbePath}", scene, probePath);
             }
         }
     }
@@ -120,8 +182,10 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
             }
 
             using var readStream = File.Open(targetFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            readStream.ReadByte();
-            readStream.Close();
+            if (readStream.Length > 0)
+            {
+                _ = readStream.ReadByte();
+            }
             using var writeStream = File.Open(targetFilePath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
             writeStream.Flush();
         }
