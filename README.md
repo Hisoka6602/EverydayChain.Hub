@@ -1,21 +1,8 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 删除 `EverydayChain.Hub.Host/appsettings.Development.json`，统一仅保留正式环境配置文件 `appsettings.json`。
-- 新增 `Oracle` 配置节与 `OracleOptions` 配置实体，支持远端 Oracle 连接字符串、默认 Schema、只读开关、命令超时与分页上限的集中配置。
-- `OracleSourceReader` 已从内存模拟实现切换为真实 Oracle 只读查询实现，支持按窗口分页读取、按窗口读取业务键、列过滤与异常日志落盘。
-- `EverydayChain.Hub.Infrastructure` 引入 `Oracle.ManagedDataAccess.Core` 依赖用于 Oracle 连接与参数化查询执行。
-- Oracle 连接字符串中的 `ORACLE_PASSWORD` 为占位符，部署时需通过环境变量、UserSecrets 或密钥服务替换，禁止提交真实密码。
-- 配置文件注释方式改为参考 Zeye.NarrowBeltSorter 的 JSON 注释风格（`//` 行注释），并在 CI 中按‘每个配置项上方必须有注释’进行自动校验。
-- 新增并落地结构强制约束：配置实体统一迁移至 `EverydayChain.Hub.Domain/Options`；静态工具类 `SyncBusinessKeyBuilder` 与 `SyncColumnFilter` 迁移至 `EverydayChain.Hub.SharedKernel/Utilities`；删除 SharedKernel 占位类 `Class1.cs`。
-- CI 新增结构扫描：枚举目录、配置实体目录、聚合根目录、事件目录、静态工具类目录约束自动校验。
-- 删除 `ISyncUpsertRepository.BuildBusinessKey` 转发方法及其实现（违反"禁止仅做一层转发的方法"规则），调用方 `SyncDeletionRepository` 改为直接调用 `SyncBusinessKeyBuilder.Build`。
-- 修复 `WmsPickToWcsEntity.cs` 和 `WmsSplitPickToLightCartonEntity.cs` 命名空间格式：从老式花括号块改为文件范围 namespace，并移除无用的 using 导入。
-- 修复 `SyncCheckpointRepository` 热路径性能问题：`JsonSerializerOptions` 从每次 SaveAsync 内联创建改为静态只读字段，避免重复分配。
-- 修复 `SyncCheckpointRepository` 日志级别：读写检查点的业务日志从 `LogDebug` 改为 `LogInformation`，确保所有业务日志均落盘（NLog 当前 minLevel 为 Info）。
-- 修复 `SyncCheckpointRepository.SaveAsync` 写入安全：改为临时文件 + `File.Replace`/`File.Move` 原子替换，防止进程崩溃时产生半写 JSON；写入失败时自动清理临时文件并输出错误日志。
-- 修复 `DeletionExecutionService` 重复去重逻辑：合并两次独立的业务键去重操作，先生成 `uniqueCandidates`，再从中派生 `businessKeys`，减少一次不必要的遍历。
-- 已完成 Copilot 仓库执行规范约束检查：确认无 UTC 时间 API 使用、命名空间与目录一致、配置项含中文注释、日志均路由至文件 target、无 Obsolete 标注、无 Manager/Helper/Wrapper 等禁用类名、无跨 PR 历史变更日志累积。
+- 新增 `持续运行一年稳定性改造清单.md`，沉淀连续运行一年的稳定性改造路线，覆盖内存治理、持久化 I/O 治理、Polly 重试与熔断、本地时间窗口防护、观测告警与运维自愈等优先级清单。
+- README 已联动补充该清单文档的文件树入口与逐项职责说明，便于按清单持续推进后续实施。
 
 ## 解决方案文件树与职责
 ```text
@@ -23,6 +10,7 @@
 ├── EverydayChain.Hub.sln
 ├── README.md
 ├── EFCore手动迁移操作指南.md
+├── 持续运行一年稳定性改造清单.md
 ├── 当前程序能力与缺陷分析.md
 ├── Oracle到SQLServer同步架构设计.md
 ├── Oracle到SQLServer同步实施计划.md
@@ -179,10 +167,11 @@
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
 - `EFCore手动迁移操作指南.md`：提供手工迁移、脚本导出、回滚、排障流程。
+- `持续运行一年稳定性改造清单.md`：面向“连续运行一年”目标的稳定性改造清单，按 P0/P1/P2 组织改造优先级、待确认项与验收标准。
 - `当前程序能力与缺陷分析.md`：汇总当前程序能力、功能清单、代码缺陷与逻辑 BUG，作为后续修复与优化输入。
 - `Oracle到SQLServer同步架构设计.md`：定义外部 Oracle DB First 只读同步到本地 SQL Server 的详细落地方案，包含接口与实现命名、配置模型、可配置排除列、幂等覆盖、删除同步、分表保留期治理与验收清单。
 - `Oracle到SQLServer同步实施计划.md`：按 PR 拆分同步架构落地步骤（最多 6 个 PR）的进度跟踪文档，定义完成项删除前必须通读代码确认完全实现的维护规则，随实施进展动态更新。
 
-## 可继续完善内容
-- 将 Oracle 源端读取补充集成测试（含非法标识符、防注入与分页边界场景）。
-- 将同步指标从日志输出升级为可接入监控平台的统一指标管道（如 Prometheus/OpenTelemetry）。
+## 可继续完善内容（本次 PR 后续行动项）
+- 将改造清单中的 P0 项拆分为独立 PR，并补齐对应压测、故障注入与验收记录。
+- 将改造清单中的 P1/P2 项补充为 Issue，并按里程碑建立周度跟踪。
