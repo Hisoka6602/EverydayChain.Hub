@@ -73,7 +73,12 @@ public class SyncCheckpointRepository(IOptions<SyncJobOptions> syncJobOptions, I
             var checkpoints = await LoadAllWithoutLockAsync(ct);
             checkpoints[checkpoint.TableCode] = checkpoint;
             var json = JsonSerializer.Serialize(checkpoints, CheckpointSerializerOptions);
-            await File.WriteAllTextAsync(_checkpointFilePath, json, ct);
+
+            // 原子写入：先落临时文件，再通过 File.Replace/Move 替换，避免进程崩溃时产生半写 JSON。
+            var tempFilePath = $"{_checkpointFilePath}.tmp";
+            var backupFilePath = $"{_checkpointFilePath}.bak";
+            await WriteAtomicAsync(tempFilePath, backupFilePath, json, ct);
+
             logger.LogInformation("写入同步检查点成功。Path={CheckpointFilePath}, TableCode={TableCode}, BatchId={BatchId}",
                 _checkpointFilePath,
                 checkpoint.TableCode,
@@ -87,6 +92,49 @@ public class SyncCheckpointRepository(IOptions<SyncJobOptions> syncJobOptions, I
         finally
         {
             FileLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// 将 JSON 内容原子写入目标文件（写临时文件后替换）。
+    /// 写入失败时尝试清理临时文件并重新抛出原始异常。
+    /// </summary>
+    /// <param name="tempFilePath">临时文件路径。</param>
+    /// <param name="backupFilePath">替换备份文件路径。</param>
+    /// <param name="json">待写入内容。</param>
+    /// <param name="ct">取消令牌。</param>
+    private async Task WriteAtomicAsync(string tempFilePath, string backupFilePath, string json, CancellationToken ct)
+    {
+        try
+        {
+            await File.WriteAllTextAsync(tempFilePath, json, ct);
+            if (File.Exists(_checkpointFilePath))
+            {
+                File.Replace(tempFilePath, _checkpointFilePath, backupFilePath, ignoreMetadataErrors: false);
+                if (File.Exists(backupFilePath))
+                {
+                    File.Delete(backupFilePath);
+                }
+            }
+            else
+            {
+                File.Move(tempFilePath, _checkpointFilePath);
+            }
+        }
+        catch
+        {
+            try
+            {
+                if (File.Exists(tempFilePath))
+                {
+                    File.Delete(tempFilePath);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                logger.LogError(cleanupEx, "清理检查点临时文件失败。TempPath={TempFilePath}", tempFilePath);
+            }
+            throw;
         }
     }
 

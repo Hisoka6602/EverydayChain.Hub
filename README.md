@@ -5,6 +5,7 @@
 - 修复 `WmsPickToWcsEntity.cs` 和 `WmsSplitPickToLightCartonEntity.cs` 命名空间格式：从老式花括号块改为文件范围 namespace，并移除无用的 using 导入。
 - 修复 `SyncCheckpointRepository` 热路径性能问题：`JsonSerializerOptions` 从每次 SaveAsync 内联创建改为静态只读字段，避免重复分配。
 - 修复 `SyncCheckpointRepository` 日志级别：读写检查点的业务日志从 `LogDebug` 改为 `LogInformation`，确保所有业务日志均落盘（NLog 当前 minLevel 为 Info）。
+- 修复 `SyncCheckpointRepository.SaveAsync` 写入安全：改为临时文件 + `File.Replace`/`File.Move` 原子替换，防止进程崩溃时产生半写 JSON；写入失败时自动清理临时文件并输出错误日志。
 - 修复 `DeletionExecutionService` 重复去重逻辑：合并两次独立的业务键去重操作，先生成 `uniqueCandidates`，再从中派生 `businessKeys`，减少一次不必要的遍历。
 - 已完成 Copilot 仓库执行规范约束检查：确认无 UTC 时间 API 使用、命名空间与目录一致、配置项含中文注释、日志均路由至文件 target、无 Obsolete 标注、无 Manager/Helper/Wrapper 等禁用类名、无跨 PR 历史变更日志累积。
 
@@ -166,7 +167,7 @@
 - `SyncDeletionRepository.cs`：删除同步仓储基础实现，支持窗口内源端键集合与目标键集合差异识别，并按策略执行删除。
 - `ShardTableResolver.cs`：分表解析仓储实现，按逻辑表枚举物理分表并解析分表月份后缀。
 - `ShardRetentionRepository.cs`：分表保留期仓储实现，在危险动作隔离器保护下执行分表删除并输出审计日志，且可基于系统元数据生成可回放回滚 DDL。
-- `SyncCheckpointRepository.cs`：检查点文件持久化实现，支持失败后续跑；读取失败时抛出异常，避免静默回退引发窗口误回溯；序列化选项复用静态只读字段，读写日志均以 Information 级落盘。
+- `SyncCheckpointRepository.cs`：检查点文件持久化实现，支持失败后续跑；读取失败时抛出异常，避免静默回退引发窗口误回溯；序列化选项复用静态只读字段，读写日志均以 Information 级落盘；写入改为临时文件 + File.Replace/Move 原子替换，防止崩溃产生半写 JSON。
 - `SyncBatchRepository.cs`：同步批次仓储基础实现，支持 `Pending/InProgress/Completed/Failed` 状态流转与最近失败批次查询。
 - `SyncChangeLogRepository.cs`：同步变更日志仓储基础实现，支持批量写入审计记录。
 - `SyncDeletionLogRepository.cs`：同步删除日志仓储基础实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
