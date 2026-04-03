@@ -75,22 +75,26 @@ public class SyncOrchestrator(
                 // 全局取消时向外传播，停止整轮同步。
                 throw;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                // 单表失败不阻塞其余表继续推进，记录失败结果。
-                logger.LogError(ex, "单表同步失败，其余表继续推进。TableCode={TableCode}", item.definition.TableCode);
+                // RunTableSyncAsync 内部已记录详细异常日志，此处仅构造失败结果，不重复记录。
+                // 单表失败不阻塞其余表继续推进。
                 results[item.index] = new SyncBatchResult
                 {
                     BatchId = string.Empty,
                     TableCode = item.definition.TableCode,
                     FailureRate = 1D,
-                    FailureMessage = ex.Message,
+                    FailureMessage = "单表同步失败，详情见详细日志。",
                 };
             }
         });
 
-        // 注：若所有表均失败或均未分配到结果槽，返回空集合；调用方应以空集合为合法结果处理，
-        // 不应依赖结果数量等于启用表数量。
-        return results.Where(x => x is not null).ToList().AsReadOnly();
+        // 每个槽位在成功或异常分支中均已写入，不存在 null 槽；此处断言保障调用方契约。
+        if (results.Any(x => x is null))
+        {
+            throw new InvalidOperationException("同步编排结果不完整，存在未写入的表结果。");
+        }
+
+        return results;
     }
 }

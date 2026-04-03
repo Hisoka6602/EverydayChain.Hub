@@ -31,11 +31,13 @@ public class SyncBackgroundWorker(
                 var results = await syncOrchestrator.RunAllEnabledTableSyncAsync(stoppingToken);
                 foreach (var result in results)
                 {
-                    if (!string.IsNullOrEmpty(result.FailureMessage))
+                    if (result.FailureRate > 0)
                     {
                         logger.LogError(
-                            "同步执行失败。TableCode={TableCode}, FailureMessage={FailureMessage}",
+                            "同步执行失败。TableCode={TableCode}, BatchId={BatchId}, FailureRate={FailureRate:F4}, FailureMessage={FailureMessage}",
                             result.TableCode,
+                            result.BatchId,
+                            result.FailureRate,
                             result.FailureMessage);
                         continue;
                     }

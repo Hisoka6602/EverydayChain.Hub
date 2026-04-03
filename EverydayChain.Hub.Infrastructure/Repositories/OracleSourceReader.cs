@@ -110,6 +110,9 @@ public class OracleSourceReader(
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
+        // 步骤1b: SQL 构建中含有本地 UniqueKeys 校验逻辑（全空时抛出），也在管道外执行以避免无效重试。
+        var sql = BuildReadKeysSql(request, sourceSchema);
+
         try
         {
             // 步骤2: 通过项目统一安全执行器包装实际 Oracle 查询，启用指数退避重试 + 熔断 + 超时。
@@ -117,7 +120,6 @@ public class OracleSourceReader(
                 $"OracleKeyRead:{request.TableCode}",
                 async token =>
                 {
-                    var sql = BuildReadKeysSql(request, sourceSchema);
                     await using var connection = new OracleConnection(_options.ConnectionString);
                     await connection.OpenAsync(token);
                     await using var command = connection.CreateCommand();

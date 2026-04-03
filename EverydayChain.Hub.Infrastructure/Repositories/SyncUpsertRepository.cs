@@ -41,6 +41,8 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     private readonly bool _enableIdleEviction;
     /// <summary>空闲驱逐阈值（Stopwatch Ticks）。</summary>
     private readonly long _idleEvictionThresholdTicks;
+    /// <summary>空闲驱逐阈值分钟数（用于日志输出，避免运行时反向计算带来溢出风险）。</summary>
+    private readonly double _idleEvictionThresholdMinutes;
 
     /// <summary>
     /// 初始化同步幂等合并仓储。
@@ -65,6 +67,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         _targetStoreFileNameExtension = ResolveTargetStoreFileNameExtension(resolvedTargetStoreFilePath);
         _enableIdleEviction = opts.EnableIdleEviction;
         var thresholdMinutes = opts.IdleEvictionThresholdMinutes >= 1 ? opts.IdleEvictionThresholdMinutes : 30;
+        _idleEvictionThresholdMinutes = thresholdMinutes;
         _idleEvictionThresholdTicks = (long)(TimeSpan.FromMinutes(thresholdMinutes).TotalSeconds * Stopwatch.Frequency);
     }
 
@@ -734,7 +737,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
                 _logger.LogInformation(
                     "空闲表内存已驱逐。TableCode={TableCode}, IdleEvictionThresholdMinutes={ThresholdMinutes}",
                     tableCode,
-                    TimeSpan.FromTicks(_idleEvictionThresholdTicks * TimeSpan.TicksPerSecond / Stopwatch.Frequency).TotalMinutes);
+                    _idleEvictionThresholdMinutes);
             }
         }
 
