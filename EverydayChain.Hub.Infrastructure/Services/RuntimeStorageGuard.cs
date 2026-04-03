@@ -11,7 +11,7 @@ namespace EverydayChain.Hub.Infrastructure.Services;
 /// </summary>
 public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogger<RuntimeStorageGuard> logger) : IRuntimeStorageGuard
 {
-    /// <summary>单表内存估算默认每条字节数。</summary>
+    /// <summary>单表内存估算默认每条字节数（单位：Byte）。</summary>
     private const double DefaultBytesPerEntryEstimate = 1024d;
 
     /// <summary>单表内存告警默认阈值（MB）。</summary>
@@ -133,7 +133,7 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         }
 
         logger.LogWarning(
-            "{Scene}触发单表内存水位告警。TableCode={TableCode}, EntryCount={EntryCount}, EstimatedMemoryMb={EstimatedMemoryMb:F2}, WarningThresholdMb={WarningThresholdMb}",
+            "场景【{Scene}】触发单表内存水位告警。TableCode={TableCode}, EntryCount={EntryCount}, EstimatedMemoryMb={EstimatedMemoryMb:F2}, WarningThresholdMb={WarningThresholdMb}",
             scene,
             tableCode,
             entryCount,
@@ -274,7 +274,8 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     /// <returns>估算内存（MB）。</returns>
     private static double EstimateTableMemoryMb(int entryCount)
     {
-        // 保守估算：每条约 1KB，用于触发预警而非精确计量。
+        // 保守估算：按每条记录约 1KB（1024 Byte）计算，适用于键+字段字典常见场景。
+        // 该值用于告警预估而非精确计量；若单条字段显著增多或大字段占比提升，应结合实测调整。
         var estimatedBytes = entryCount * DefaultBytesPerEntryEstimate;
         return estimatedBytes / 1024d / 1024d;
     }

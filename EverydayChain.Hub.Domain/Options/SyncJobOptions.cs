@@ -35,7 +35,7 @@ public class SyncJobOptions
     /// <summary>是否启用单表内存水位监控（可填写项：true、false）。</summary>
     public bool EnableTableMemoryMonitoring { get; set; } = true;
 
-    /// <summary>单表内存水位告警阈值（MB，可填写范围：0~65536 之间的整数；0 表示关闭阈值告警，建议值 256）。</summary>
+    /// <summary>单表内存水位告警阈值（MB，可填写范围：[0, 65536] 的整数；0 表示关闭阈值告警；65536 用于约束配置上限并避免异常大值；建议值 256）。</summary>
     public long TableMemoryWarningThresholdMb { get; set; } = 256;
 
     /// <summary>单表配置集合。</summary>
