@@ -6,7 +6,10 @@ namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
 /// SyncWindowCalculator 时间窗口计算器回归测试套件。
-/// 覆盖场景：正常窗口、时钟回拨冻结、DST 非法时刻顺延、UTC 输入拒绝。
+/// 覆盖场景：正常窗口计算、时钟回拨冻结、UTC 输入拒绝、Unspecified Kind 兼容性、时钟扰动组合场景。
+/// 备注：DST 非法时刻顺延属于运行时行为（依赖当前系统时区是否为存在夏令时的时区），
+/// 在 Linux CI 环境（UTC 时区）下无法稳定注入，故相关测试从当前套件排除，
+/// 如需验证应在含夏令时配置的环境（如 Windows 本地开发机）下专项运行。
 /// </summary>
 public class SyncWindowCalculatorTests
 {

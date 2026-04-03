@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using EverydayChain.Hub.Application.Repositories;
 using EverydayChain.Hub.Application.Services;
 using EverydayChain.Hub.Domain.Options;
@@ -50,7 +51,7 @@ public class SyncBackgroundWorker(
     /// <param name="stoppingToken">取消令牌。</param>
     private async Task RunOnceAsync(CancellationToken stoppingToken)
     {
-        var roundStart = DateTime.Now;
+        var sw = Stopwatch.StartNew();
         var tableSyncTimeoutSeconds = _syncJobOptions.TableSyncTimeoutSeconds;
         IReadOnlyList<SyncBatchResult> results;
 
@@ -106,7 +107,7 @@ public class SyncBackgroundWorker(
         }
 
         // 输出整轮汇总指标，便于在分钟级发现整体异常趋势。
-        var roundElapsed = DateTime.Now - roundStart;
+        sw.Stop();
         var totalTables = results.Count;
         var failedTables = results.Count(r => r.FailureRate > 0);
         var successTables = totalTables - failedTables;
@@ -131,7 +132,7 @@ public class SyncBackgroundWorker(
                 totalDelete,
                 maxLagMinutes,
                 maxBacklogMinutes,
-                (long)roundElapsed.TotalMilliseconds);
+                sw.ElapsedMilliseconds);
         }
         else
         {
@@ -144,7 +145,7 @@ public class SyncBackgroundWorker(
                 totalDelete,
                 maxLagMinutes,
                 maxBacklogMinutes,
-                (long)roundElapsed.TotalMilliseconds);
+                sw.ElapsedMilliseconds);
         }
 
         // 每轮同步结束后驱逐空闲表内存缓存，避免长期不活跃表占用内存。

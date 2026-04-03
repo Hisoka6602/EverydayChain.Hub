@@ -489,7 +489,8 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     {
         try
         {
-            var timestamp = DateTime.Now.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
+            // 含毫秒精度，避免高频写入场景下同秒内文件名冲突。
+            var timestamp = DateTime.Now.ToString("yyyyMMddHHmmssfff", CultureInfo.InvariantCulture);
             var archiveFilePath = $"{activeFilePath}.{timestamp}.json.gz";
             // 使用 GZip 压缩 .bak 文件到归档。
             using (var inputStream = File.OpenRead(backupFilePath))
@@ -522,6 +523,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
 
     /// <summary>
     /// 清理超出保留数量的最旧压缩归档文件。
+    /// 按文件最后写入时间升序排序，确保最旧的文件最先被清理，不依赖文件名字典序。
     /// </summary>
     /// <param name="tableCode">表编码。</param>
     /// <param name="activeFilePath">当前活跃文件路径（用于匹配归档前缀）。</param>
@@ -530,9 +532,10 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         try
         {
             var archivePattern = $"{Path.GetFileName(activeFilePath)}.*.json.gz";
+            // 按文件最后写入时间升序排序，确保最旧文件最先被清理。
             var archives = Directory
                 .GetFiles(_targetStoreDirectoryPath, archivePattern)
-                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(f => new FileInfo(f).LastWriteTime)
                 .ToList();
             var excessCount = archives.Count - _targetStoreArchiveMaxCount;
             if (excessCount <= 0)

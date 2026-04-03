@@ -141,21 +141,36 @@ header "配置文件有效性检查"
 
 if command -v python3 &>/dev/null; then
     if python3 -c "
-import json, re, sys
+import json, sys
 
 with open('$APPSETTINGS_FILE', 'r', encoding='utf-8') as f:
     content = f.read()
 
-# 剥离行注释（// ...），但保留字符串内容。
+# 剥离行注释（// ...），正确追踪转义字符避免误判字符串边界。
 def strip_comments(text):
     result = []
     in_string = False
     i = 0
     while i < len(text):
         c = text[i]
-        if c == '\"' and (i == 0 or text[i-1] != '\\\\'):
-            in_string = not in_string
-        if not in_string and c == '/' and i+1 < len(text) and text[i+1] == '/':
+        if in_string:
+            result.append(c)
+            if c == '\\\\':
+                # 转义字符：跳过下一个字符，不改变 in_string 状态。
+                i += 1
+                if i < len(text):
+                    result.append(text[i])
+            elif c == '\\\"':
+                in_string = False
+            i += 1
+            continue
+        if c == '\\\"':
+            in_string = True
+            result.append(c)
+            i += 1
+            continue
+        if c == '/' and i + 1 < len(text) and text[i + 1] == '/':
+            # 行注释：跳过直到换行。
             while i < len(text) and text[i] != '\\n':
                 i += 1
             continue
@@ -194,8 +209,8 @@ else
         fi
     done < <(find "$LOG_DIR" -name "*.log" -print0 2>/dev/null)
 
-    # 检查最近是否有活跃日志写入
-    RECENT_LOG=$(find "$LOG_DIR" -name "*.log" -newer <(date -d "-${LOG_ACTIVE_HOURS} hours" +%Y%m%d%H%M 2>/dev/null || date -v-${LOG_ACTIVE_HOURS}H +%Y%m%d%H%M) 2>/dev/null | head -1 || true)
+    # 检查最近是否有活跃日志写入（-mmin 使用分钟数，避免 -newer 依赖临时文件的可移植性问题）。
+    RECENT_LOG=$(find "$LOG_DIR" -name "*.log" -mmin "-$((LOG_ACTIVE_HOURS * 60))" 2>/dev/null | head -1 || true)
     if [ -n "$RECENT_LOG" ]; then
         ok "日志目录最近 ${LOG_ACTIVE_HOURS} 小时内有活跃写入"
     else
