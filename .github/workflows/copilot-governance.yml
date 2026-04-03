@@ -63,6 +63,7 @@ jobs:
           fi
 
           python3 - <<'PY'
+          import json
           import pathlib
           import re
           import subprocess
@@ -88,6 +89,22 @@ jobs:
           )
           if not config_comment_rule_pattern.search(instructions_text):
               print("错误：.github/copilot-instructions.md 缺少“所有配置项必须有中文注释”的强制约束。")
+              sys.exit(1)
+          
+          config_file_comment_rule_pattern = re.compile(
+              r"配置文件（如\s*`?appsettings\*\.json`?）的每一项都需要注释",
+              re.DOTALL,
+          )
+          if not config_file_comment_rule_pattern.search(instructions_text):
+              print("错误：.github/copilot-instructions.md 缺少“配置文件每一项都需要注释”的强制约束。")
+              sys.exit(1)
+
+          array_sample_rule_pattern = re.compile(
+              r"配置项为集合类型（数组）.*?至少.*?一个示例元素",
+              re.DOTALL,
+          )
+          if not array_sample_rule_pattern.search(instructions_text):
+              print("错误：.github/copilot-instructions.md 缺少“集合配置项至少一个示例元素”的强制约束。")
               sys.exit(1)
           
           polly_rule_pattern = re.compile(
@@ -215,6 +232,52 @@ jobs:
           if second_person_violations:
               print("错误：发现注释中包含第二人称（你/你们）：")
               for item in sorted(set(second_person_violations)):
+                  print(f" - {item}")
+              sys.exit(1)
+
+          config_comment_violations = []
+          config_array_sample_violations = []
+          config_files = [path for path in candidate_files if re.match(r".*/appsettings.*\.json$", path.as_posix())]
+          for config_path in config_files:
+              relative = config_path.as_posix()
+              try:
+                  content = config_path.read_text(encoding="utf-8")
+              except UnicodeDecodeError:
+                  continue
+              try:
+                  data = json.loads(content)
+              except json.JSONDecodeError:
+                  continue
+
+              def walk(node, current_path):
+                  if isinstance(node, dict):
+                      keys = [key for key in node.keys() if not key.endswith("__Comment")]
+                      for key in keys:
+                          comment_key = f"{key}__Comment"
+                          if comment_key not in node:
+                              full_path = ".".join(current_path + [key]) if current_path else key
+                              config_comment_violations.append(f"{relative}: 路径 {full_path} 缺少同级注释键 {comment_key}")
+                      for child_key in keys:
+                          walk(node[child_key], current_path + [child_key])
+                  elif isinstance(node, list):
+                      if len(node) == 0:
+                          full_path = ".".join(current_path) if current_path else "<root>"
+                          config_array_sample_violations.append(f"{relative}: 集合 {full_path} 不能为空，至少需要一个示例元素")
+                          return
+                      for item in node:
+                          walk(item, current_path)
+
+              walk(data, [])
+
+          if config_comment_violations:
+              print("错误：发现配置文件存在未注释项（需使用同级 __Comment 键）：")
+              for item in config_comment_violations:
+                  print(f" - {item}")
+              sys.exit(1)
+
+          if config_array_sample_violations:
+              print("错误：发现集合配置项缺少示例元素：")
+              for item in config_array_sample_violations:
                   print(f" - {item}")
               sys.exit(1)
 
