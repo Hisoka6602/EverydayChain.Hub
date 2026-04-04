@@ -23,6 +23,12 @@ public class SyncBackgroundWorker(
     /// <summary>最近一次迭代开始时的高精度时间戳（Stopwatch Ticks），供看门狗卡死检测使用。</summary>
     private long _lastIterationTicks = Stopwatch.GetTimestamp();
 
+    /// <summary>看门狗检查间隔下限（秒）：避免检查过于频繁导致额外开销。</summary>
+    private const int WatchdogMinCheckIntervalSeconds = 30;
+
+    /// <summary>看门狗检查间隔上限（秒）：避免检查间隔过长导致响应迟滞。</summary>
+    private const int WatchdogMaxCheckIntervalSeconds = 300;
+
     /// <summary>
     /// 后台循环入口，启动看门狗监视任务后进入主轮询循环。
     /// </summary>
@@ -69,8 +75,8 @@ public class SyncBackgroundWorker(
     /// <param name="ct">取消令牌，服务停止时退出检测循环。</param>
     private async Task MonitorWatchdogAsync(int watchdogTimeoutSeconds, int pollingIntervalSeconds, CancellationToken ct)
     {
-        // 检查间隔为超时时间的 1/3，限制在 [30, 300] 秒范围内，避免过于频繁或稀疏的检测。
-        var checkIntervalSeconds = Math.Clamp(watchdogTimeoutSeconds / 3, 30, 300);
+        // 检查间隔为超时时间的 1/3，限制在 [WatchdogMinCheckIntervalSeconds, WatchdogMaxCheckIntervalSeconds] 范围内，避免过于频繁或稀疏的检测。
+        var checkIntervalSeconds = Math.Clamp(watchdogTimeoutSeconds / 3, WatchdogMinCheckIntervalSeconds, WatchdogMaxCheckIntervalSeconds);
 
         while (!ct.IsCancellationRequested)
         {

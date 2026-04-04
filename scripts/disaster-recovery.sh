@@ -54,6 +54,19 @@ ok()     { green "[OK]    $*"; }
 warn()   { yellow "[WARN]  $*"; }
 error()  { red   "[ERROR] $*" >&2; }
 
+# 从归档文件名中提取表编码。
+# 文件名格式：sync-target-store.<TableCode>.<timestamp>.json.gz（至少 4 个点分隔段）。
+# 验证段数量后提取第 2 段（index 1）作为 TableCode；格式非法时返回空字符串。
+extract_table_code_from_archive() {
+    local filename="$1"
+    local seg_count; seg_count=$(echo "$filename" | awk -F'.' '{print NF}')
+    if [ "$seg_count" -lt 4 ]; then
+        echo ""
+        return 1
+    fi
+    echo "$filename" | awk -F'.' '{print $2}'
+}
+
 # dry-run 安全执行函数：dry-run 时仅打印命令，不实际执行。
 safe_exec() {
     if $DRY_RUN; then
@@ -156,9 +169,15 @@ do_snapshot_restore() {
     declare -A latest_per_table
     for archive in "${archives[@]}"; do
         local filename; filename="$(basename "$archive")"
-        # 文件名格式：sync-target-store.<TableCode>.<timestamp>.json.gz
-        # 提取 TableCode（第2段）
-        local table_code; table_code=$(echo "$filename" | awk -F'.' '{print $2}')
+        # 使用验证函数提取 TableCode，格式非法时跳过该文件。
+        local table_code; table_code=$(extract_table_code_from_archive "$filename") || {
+            warn "  文件名格式非法，跳过：$archive"
+            continue
+        }
+        if [ -z "$table_code" ]; then
+            warn "  无法从文件名提取 TableCode，跳过：$archive"
+            continue
+        fi
         if [ -z "${latest_per_table[$table_code]+_}" ] || \
            [[ "$archive" > "${latest_per_table[$table_code]}" ]]; then
             latest_per_table[$table_code]="$archive"
@@ -181,8 +200,18 @@ do_snapshot_restore() {
             ok "    已备份当前快照：$backup_file"
         fi
 
-        # 解压归档到目标快照路径
-        safe_exec "gunzip -c '$archive' > '${target_file}.tmp' && mv '${target_file}.tmp' '$target_file'"
+        # 解压归档到目标快照路径；解压失败时清理临时文件并报错。
+        if $DRY_RUN; then
+            yellow "[DRY-RUN] gunzip -c '$archive' > '${target_file}.tmp' && mv '${target_file}.tmp' '$target_file'"
+        else
+            if gunzip -c "$archive" > "${target_file}.tmp"; then
+                mv "${target_file}.tmp" "$target_file"
+            else
+                rm -f "${target_file}.tmp"
+                error "    解压归档失败，已清理临时文件：${target_file}.tmp"
+                continue
+            fi
+        fi
         ok "    已从归档恢复快照：$target_file"
     done
 
@@ -245,7 +274,15 @@ do_archive_cleanup() {
     declare -A table_archives
     for archive in "${all_archives[@]}"; do
         local filename; filename="$(basename "$archive")"
-        local table_code; table_code=$(echo "$filename" | awk -F'.' '{print $2}')
+        # 使用验证函数提取 TableCode，格式非法时跳过该文件。
+        local table_code; table_code=$(extract_table_code_from_archive "$filename") || {
+            warn "  文件名格式非法，跳过：$archive"
+            continue
+        }
+        if [ -z "$table_code" ]; then
+            warn "  无法从文件名提取 TableCode，跳过：$archive"
+            continue
+        fi
         table_archives[$table_code]+="$archive"$'\n'
     done
 
