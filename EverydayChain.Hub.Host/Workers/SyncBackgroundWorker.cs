@@ -68,7 +68,7 @@ public class SyncBackgroundWorker(
     }
 
     /// <summary>
-    /// 看门狗监视任务：定期检查主循环心跳，若超过阈值未推进则输出 Critical 日志。
+    /// 看门狗监视任务：定期检查主循环心跳，若超过阈值未推进则输出 Critical 日志（带节流，避免持续卡死时刷屏）。
     /// </summary>
     /// <param name="watchdogTimeoutSeconds">看门狗超时阈值（秒）。</param>
     /// <param name="pollingIntervalSeconds">主循环轮询间隔（秒），作为心跳缓冲窗口。</param>
@@ -77,6 +77,8 @@ public class SyncBackgroundWorker(
     {
         // 检查间隔为超时时间的 1/3，限制在 [WatchdogMinCheckIntervalSeconds, WatchdogMaxCheckIntervalSeconds] 范围内，避免过于频繁或稀疏的检测。
         var checkIntervalSeconds = Math.Clamp(watchdogTimeoutSeconds / 3, WatchdogMinCheckIntervalSeconds, WatchdogMaxCheckIntervalSeconds);
+        // 上次输出 Critical 日志时的 Stopwatch Ticks；0 表示尚未告警，心跳恢复后重置为 0。
+        var lastAlertTicks = 0L;
 
         while (!ct.IsCancellationRequested)
         {
@@ -96,10 +98,24 @@ public class SyncBackgroundWorker(
             var threshold = (double)(watchdogTimeoutSeconds + pollingIntervalSeconds);
             if (elapsedSeconds > threshold)
             {
-                logger.LogCritical(
-                    "同步后台任务疑似卡死，已超过看门狗超时阈值，建议立即重启服务。ElapsedSeconds={ElapsedSeconds:F0}, WatchdogThresholdSeconds={WatchdogThresholdSeconds}",
-                    elapsedSeconds,
-                    threshold);
+                // 节流：距离上次告警不足检查间隔时跳过，避免持续卡死期间 Critical 日志刷屏挤占磁盘/IO。
+                // 首次触发时 lastAlertTicks 为 0，timeSinceLastAlert 为 MaxValue，立即告警。
+                var timeSinceLastAlert = lastAlertTicks == 0L
+                    ? double.MaxValue
+                    : (Stopwatch.GetTimestamp() - lastAlertTicks) / (double)Stopwatch.Frequency;
+                if (timeSinceLastAlert >= checkIntervalSeconds)
+                {
+                    logger.LogCritical(
+                        "同步后台任务疑似卡死，已超过看门狗超时阈值，建议立即重启服务。ElapsedSeconds={ElapsedSeconds:F0}, WatchdogThresholdSeconds={WatchdogThresholdSeconds}",
+                        elapsedSeconds,
+                        threshold);
+                    lastAlertTicks = Stopwatch.GetTimestamp();
+                }
+            }
+            else
+            {
+                // 心跳恢复，重置节流状态，下次触发时立即告警。
+                lastAlertTicks = 0L;
             }
         }
     }

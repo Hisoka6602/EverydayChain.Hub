@@ -12,11 +12,13 @@
 #   full-reset         清空检查点与全部快照（完全重置，需 --confirm 参数确认）
 #
 # 选项：
-#   --data-dir <路径>   数据目录路径（默认：脚本同级目录下的 data/）
-#   --backup-dir <路径> 备份目标目录（默认：data/backup/）
-#   --table-code <名称> 指定表编码（用于 snapshot-restore 操作）
-#   --dry-run           仅输出将要执行的操作，不实际修改任何文件
-#   --confirm           确认执行高危操作（full-reset 必填）
+#   --data-dir <路径>        数据目录路径（默认：脚本同级目录下的 data/）
+#   --backup-dir <路径>      备份目标目录（默认：data/backup/）
+#   --table-code <名称>      指定表编码（用于 snapshot-restore 操作）
+#   --checkpoint-file <路径> 检查点文件完整路径（默认：data/sync-checkpoints.json；可覆盖非默认 CheckpointFilePath 配置）
+#   --target-prefix <前缀>   快照文件名前缀（默认：sync-target-store；可覆盖非默认 TargetStoreFilePath 配置）
+#   --dry-run                仅输出将要执行的操作，不实际修改任何文件
+#   --confirm                确认执行高危操作（full-reset 必填）
 #
 # 退出码：
 #   0   操作成功或 dry-run 输出完成
@@ -44,6 +46,9 @@ BACKUP_DIR="$DATA_DIR/backup"
 TABLE_CODE=""
 DRY_RUN=false
 CONFIRM=false
+# 以下两项可由命令行参数覆盖，用于支持非默认配置路径。
+CUSTOM_CHECKPOINT_FILE=""
+CUSTOM_TARGET_PREFIX=""
 
 # -----------------------------------------------------------------------
 # 工具函数
@@ -69,12 +74,18 @@ extract_table_code_from_archive() {
     echo "$filename" | awk -F'.' '{print $2}'
 }
 
-# dry-run 安全执行函数：dry-run 时仅打印命令，不实际执行。
+# dry-run 安全执行函数：以"命令 + 参数"形式调用（禁止传入拼接后的命令字符串）。
+# dry-run 时打印转义后的命令预览，不实际执行；非 dry-run 时直接执行传入的命令与参数，避免 eval 注入。
 safe_exec() {
     if $DRY_RUN; then
-        yellow "[DRY-RUN] $*"
+        local rendered="" arg
+        for arg in "$@"; do
+            [ -n "$rendered" ] && rendered+=" "
+            rendered+="$(printf '%q' "$arg")"
+        done
+        yellow "[DRY-RUN] $rendered"
     else
-        eval "$@"
+        "$@"
     fi
 }
 
@@ -92,11 +103,13 @@ shift
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --data-dir)    DATA_DIR="$2";    shift 2 ;;
-        --backup-dir)  BACKUP_DIR="$2";  shift 2 ;;
-        --table-code)  TABLE_CODE="$2";  shift 2 ;;
-        --dry-run)     DRY_RUN=true;     shift ;;
-        --confirm)     CONFIRM=true;     shift ;;
+        --data-dir)         DATA_DIR="$2";              shift 2 ;;
+        --backup-dir)       BACKUP_DIR="$2";            shift 2 ;;
+        --table-code)       TABLE_CODE="$2";            shift 2 ;;
+        --checkpoint-file)  CUSTOM_CHECKPOINT_FILE="$2"; shift 2 ;;
+        --target-prefix)    CUSTOM_TARGET_PREFIX="$2";  shift 2 ;;
+        --dry-run)          DRY_RUN=true;               shift ;;
+        --confirm)          CONFIRM=true;               shift ;;
         *)
             error "未知选项：$1"
             exit 1
@@ -104,7 +117,10 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-readonly CHECKPOINT_FILE="$DATA_DIR/$CHECKPOINT_FILENAME"
+# 检查点文件路径：优先使用 --checkpoint-file 参数，否则使用 DATA_DIR 下的默认文件名。
+CHECKPOINT_FILE="${CUSTOM_CHECKPOINT_FILE:-$DATA_DIR/$CHECKPOINT_FILENAME}"
+# 快照文件名前缀：优先使用 --target-prefix 参数，否则使用默认前缀常量。
+EFFECTIVE_TARGET_PREFIX="${CUSTOM_TARGET_PREFIX:-$TARGET_STORE_PREFIX}"
 
 # -----------------------------------------------------------------------
 # 前置检查：数据目录必须存在
@@ -131,11 +147,15 @@ do_checkpoint_reset() {
     # 先备份
     local ts; ts=$(date +%Y%m%d%H%M%S)
     local backup_file="$CHECKPOINT_FILE.bak.$ts"
-    safe_exec "cp '$CHECKPOINT_FILE' '$backup_file'"
+    safe_exec cp -- "$CHECKPOINT_FILE" "$backup_file"
     ok "已备份检查点文件：$backup_file"
 
-    # 清空（写入空 JSON 对象）
-    safe_exec "echo '{}' > '$CHECKPOINT_FILE'"
+    # 清空（写入空 JSON 对象）；使用 printf 替代 echo 以避免跨平台差异。
+    if $DRY_RUN; then
+        yellow "[DRY-RUN] printf '{}' > $(printf '%q' "$CHECKPOINT_FILE")"
+    else
+        printf '{}' > "$CHECKPOINT_FILE"
+    fi
     ok "已清空检查点文件：$CHECKPOINT_FILE"
     warn "请重启服务，服务将从各表 StartTimeLocal 重新全量同步。"
 }
@@ -153,9 +173,9 @@ do_snapshot_restore() {
     # 确定待恢复的表编码列表
     local pattern
     if [ -n "$TABLE_CODE" ]; then
-        pattern="$DATA_DIR/${TARGET_STORE_PREFIX}.${TABLE_CODE}.*.json.gz"
+        pattern="$DATA_DIR/${EFFECTIVE_TARGET_PREFIX}.${TABLE_CODE}.*.json.gz"
     else
-        pattern="$DATA_DIR/${TARGET_STORE_PREFIX}.*.*.json.gz"
+        pattern="$DATA_DIR/${EFFECTIVE_TARGET_PREFIX}.*.*.json.gz"
     fi
 
     shopt -s nullglob
@@ -181,14 +201,14 @@ do_snapshot_restore() {
             continue
         fi
         if [ -z "${latest_per_table[$table_code]+_}" ] || \
-           [[ "$archive" > "${latest_per_table[$table_code]}" ]]; then
+           [[ "$archive" -nt "${latest_per_table[$table_code]}" ]]; then
             latest_per_table[$table_code]="$archive"
         fi
     done
 
     for table_code in "${!latest_per_table[@]}"; do
         local archive="${latest_per_table[$table_code]}"
-        local target_file="$DATA_DIR/${TARGET_STORE_PREFIX}.${table_code}.json"
+        local target_file="$DATA_DIR/${EFFECTIVE_TARGET_PREFIX}.${table_code}.json"
 
         info "  表：$table_code"
         info "    归档文件：$archive"
@@ -198,7 +218,7 @@ do_snapshot_restore() {
         if [ -f "$target_file" ]; then
             local ts; ts=$(date +%Y%m%d%H%M%S)
             local backup_file="${target_file}.before-restore.$ts"
-            safe_exec "cp '$target_file' '$backup_file'"
+            safe_exec cp -- "$target_file" "$backup_file"
             ok "    已备份当前快照：$backup_file"
         fi
 
@@ -230,7 +250,7 @@ do_snapshot_backup() {
     local dest_dir="$BACKUP_DIR/$ts"
 
     shopt -s nullglob
-    local snapshots=("$DATA_DIR"/${TARGET_STORE_PREFIX}.*.json)
+    local snapshots=("$DATA_DIR"/${EFFECTIVE_TARGET_PREFIX}.*.json)
     local checkpoint_exists=false
     [ -f "$CHECKPOINT_FILE" ] && checkpoint_exists=true
     shopt -u nullglob
@@ -240,15 +260,15 @@ do_snapshot_backup() {
         return 0
     fi
 
-    safe_exec "mkdir -p '$dest_dir'"
+    safe_exec mkdir -p -- "$dest_dir"
 
     for snap in "${snapshots[@]}"; do
-        safe_exec "cp '$snap' '$dest_dir/'"
+        safe_exec cp -- "$snap" "$dest_dir/"
         ok "  已备份：$(basename "$snap") -> $dest_dir/"
     done
 
     if $checkpoint_exists; then
-        safe_exec "cp '$CHECKPOINT_FILE' '$dest_dir/'"
+        safe_exec cp -- "$CHECKPOINT_FILE" "$dest_dir/"
         ok "  已备份：$CHECKPOINT_FILENAME -> $dest_dir/"
     fi
 
@@ -264,7 +284,7 @@ do_archive_cleanup() {
     info "操作：archive-cleanup（清理最旧压缩归档，每表保留最多 $max_count 个）"
 
     shopt -s nullglob
-    local all_archives=("$DATA_DIR"/${TARGET_STORE_PREFIX}.*.*.json.gz)
+    local all_archives=("$DATA_DIR"/${EFFECTIVE_TARGET_PREFIX}.*.*.json.gz)
     shopt -u nullglob
 
     if [ ${#all_archives[@]} -eq 0 ]; then
@@ -303,7 +323,7 @@ do_archive_cleanup() {
 
         info "  表 $table_code：共 $count 个归档，清理最旧 $excess 个。"
         for (( i=0; i<excess; i++ )); do
-            safe_exec "rm -f '${sorted_archives[$i]}'"
+            safe_exec rm -f -- "${sorted_archives[$i]}"
             ok "    已删除：${sorted_archives[$i]}"
         done
     done
@@ -328,17 +348,21 @@ do_full_reset() {
 
     # 清空检查点
     if [ -f "$CHECKPOINT_FILE" ]; then
-        safe_exec "echo '{}' > '$CHECKPOINT_FILE'"
+        if $DRY_RUN; then
+            yellow "[DRY-RUN] printf '{}' > $(printf '%q' "$CHECKPOINT_FILE")"
+        else
+            printf '{}' > "$CHECKPOINT_FILE"
+        fi
         ok "已清空检查点文件：$CHECKPOINT_FILE"
     fi
 
     # 清空全部快照
     shopt -s nullglob
-    local snapshots=("$DATA_DIR"/${TARGET_STORE_PREFIX}.*.json)
+    local snapshots=("$DATA_DIR"/${EFFECTIVE_TARGET_PREFIX}.*.json)
     shopt -u nullglob
 
     for snap in "${snapshots[@]}"; do
-        safe_exec "rm -f '$snap'"
+        safe_exec rm -f -- "$snap"
         ok "已删除快照：$snap"
     done
 
