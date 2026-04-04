@@ -30,7 +30,9 @@ set -euo pipefail
 # -----------------------------------------------------------------------
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly BASE_DIR="$(dirname "$SCRIPT_DIR")"
+# 检查点文件名（需与 SyncJobOptions.CheckpointFilePath 默认值保持一致）。
 readonly CHECKPOINT_FILENAME="sync-checkpoints.json"
+# 目标快照文件名前缀（需与 SyncUpsertRepository 中的文件命名规则保持一致）。
 readonly TARGET_STORE_PREFIX="sync-target-store"
 
 # -----------------------------------------------------------------------
