@@ -22,13 +22,59 @@ EXECUTE=false
 TABLE_CODE="SortingTaskTrace"
 RECORD_DIR="$BASE_DIR/drill-records"
 
+print_usage() {
+    local output="${1:-stderr}"
+    local usage_text
+    usage_text=$(cat <<EOF
+用法：bash scripts/stability-drill.sh [--execute] [--table-code <表编码>] [--record-dir <目录>] [--help]
+
+选项：
+  --execute            执行真实动作；默认仅 dry-run 验证流程
+  --table-code <名称>  指定快照恢复演练所用表编码（默认：SortingTaskTrace）
+  --record-dir <目录>  演练记录目录（默认：仓库根目录 drill-records/）
+  --help               输出帮助说明
+EOF
+)
+    if [ "$output" = "stdout" ]; then
+        printf "%s\n" "$usage_text"
+    else
+        printf "%s\n" "$usage_text" >&2
+    fi
+}
+
+validate_option_value() {
+    local option_name="$1"
+    local option_value="${2:-}"
+    if [ -z "$option_value" ] || [[ "$option_value" == --* ]]; then
+        echo "[ERROR] 参数 ${option_name} 缺少有效值或误传了其他选项。" >&2
+        print_usage
+        exit 1
+    fi
+}
+
 while [ $# -gt 0 ]; do
     case "$1" in
-        --execute) EXECUTE=true; shift ;;
-        --table-code) TABLE_CODE="$2"; shift 2 ;;
-        --record-dir) RECORD_DIR="$2"; shift 2 ;;
+        --execute)
+            EXECUTE=true
+            shift
+            ;;
+        --table-code)
+            validate_option_value "--table-code" "${2:-}"
+            TABLE_CODE="$2"
+            shift 2
+            ;;
+        --record-dir)
+            validate_option_value "--record-dir" "${2:-}"
+            RECORD_DIR="$2"
+            shift 2
+            ;;
+        --help)
+            print_usage stdout
+            exit 0
+            ;;
         *)
             echo "[ERROR] 未知参数：$1" >&2
+            print_usage
             exit 1
             ;;
     esac
