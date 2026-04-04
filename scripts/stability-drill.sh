@@ -35,6 +35,7 @@ while [ $# -gt 0 ]; do
 done
 
 mkdir -p "$RECORD_DIR"
+mkdir -p "$BASE_DIR/data"
 TS="$(date +%Y%m%d%H%M%S)"
 RECORD_FILE="$RECORD_DIR/stability-drill-$TS.log"
 
@@ -51,7 +52,11 @@ fi
     echo
 
     echo "1) 一键体检"
-    bash "$SCRIPT_DIR/health-check.sh" || true
+    if bash "$SCRIPT_DIR/health-check.sh"; then
+        echo "[INFO] 一键体检结果：通过"
+    else
+        echo "[WARN] 一键体检结果：未通过（已记录，演练继续执行）"
+    fi
     echo
 
     echo "2) 灾难恢复演练：检查点重置"
