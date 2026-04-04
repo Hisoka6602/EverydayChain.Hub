@@ -85,7 +85,7 @@ public class SyncExecutionService(
                 }
 
                 // 步骤2：写入暂存并执行幂等合并。
-                await stagingRepository.BulkInsertAsync(context.BatchId, pageNo, readResult.Rows, context.NormalizedExcludedColumns, ct);
+                await stagingRepository.BulkInsertAsync(context.BatchId, pageNo, readResult.Rows, ct);
                 SyncMergeResult mergeResult;
                 Exception? mergeException = null;
                 try
@@ -97,7 +97,6 @@ public class SyncExecutionService(
                         CursorColumn = context.Definition.CursorColumn,
                         UniqueKeys = context.Definition.UniqueKeys,
                         Rows = stagingRows,
-                        NormalizedExcludedColumns = context.NormalizedExcludedColumns,
                     }, ct);
                 }
                 catch (Exception ex)

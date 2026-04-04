@@ -2,6 +2,7 @@ namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
 /// 幂等合并请求。
+/// 传入的行数据应已由源端完成列过滤，合并仓储不再重复过滤。
 /// </summary>
 public class SyncMergeRequest
 {
@@ -14,9 +15,6 @@ public class SyncMergeRequest
     /// <summary>唯一键集合。</summary>
     public IReadOnlyList<string> UniqueKeys { get; set; } = Array.Empty<string>();
 
-    /// <summary>待合并行。</summary>
+    /// <summary>待合并行（应已完成列过滤）。</summary>
     public IReadOnlyList<IReadOnlyDictionary<string, object?>> Rows { get; set; } = Array.Empty<IReadOnlyDictionary<string, object?>>();
-
-    /// <summary>规范化后的排除列集合。</summary>
-    public IReadOnlySet<string> NormalizedExcludedColumns { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 }

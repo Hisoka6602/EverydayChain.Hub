@@ -16,18 +16,9 @@ public class SyncDeletionLogRepository : ISyncDeletionLogRepository
     public Task WriteDeletionsAsync(IReadOnlyList<SyncDeletionLog> logs, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var stagedLogs = new List<SyncDeletionLog>(logs.Count);
         foreach (var log in logs)
         {
-            ct.ThrowIfCancellationRequested();
-            stagedLogs.Add(CloneLog(log));
-        }
-
-        ct.ThrowIfCancellationRequested();
-        foreach (var log in stagedLogs)
-        {
-            ct.ThrowIfCancellationRequested();
-            _logs.Enqueue(log);
+            _logs.Enqueue(CloneLog(log));
         }
 
         return Task.CompletedTask;

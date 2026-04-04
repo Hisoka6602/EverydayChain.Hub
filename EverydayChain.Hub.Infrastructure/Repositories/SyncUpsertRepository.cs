@@ -26,6 +26,8 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     private readonly ConcurrentDictionary<string, long> _tableLastAccessTimestamps = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>目标端持久化文件访问锁。</summary>
     private static readonly SemaphoreSlim TargetStoreFileLock = new(1, 1);
+    /// <summary>持久化序列化配置（可读格式，全局复用避免重复分配）。</summary>
+    private static readonly JsonSerializerOptions PersistSerializerOptions = new() { WriteIndented = true };
     /// <summary>日志组件。</summary>
     private readonly ILogger<SyncUpsertRepository> _logger;
     /// <summary>目标端持久化文件路径。</summary>
@@ -129,9 +131,8 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         foreach (var row in request.Rows)
         {
             ct.ThrowIfCancellationRequested();
-            var filteredRow = SyncColumnFilter.FilterExcludedColumns(row, request.NormalizedExcludedColumns);
-
-            var rowKey = SyncBusinessKeyBuilder.Build(filteredRow, request.UniqueKeys);
+            // 行数据已由源端在读取阶段完成列过滤，此处直接使用，不重复过滤。
+            var rowKey = SyncBusinessKeyBuilder.Build(row, request.UniqueKeys);
             if (string.IsNullOrWhiteSpace(rowKey))
             {
                 continue;
@@ -139,25 +140,25 @@ public class SyncUpsertRepository : ISyncUpsertRepository
 
             if (!targetTable.TryGetValue(rowKey, out var existedRow))
             {
-                targetTable[rowKey] = CloneRow(filteredRow);
+                targetTable[rowKey] = CloneRow(row);
                 result.InsertCount++;
                 changedOperations[rowKey] = SyncChangeOperationType.Insert;
-                UpdateLastCursor(result, filteredRow, request.CursorColumn);
+                UpdateLastCursor(result, row, request.CursorColumn);
                 hasChanges = true;
                 continue;
             }
 
-            if (AreRowsEqual(existedRow, filteredRow))
+            if (AreRowsEqual(existedRow, row))
             {
                 result.SkipCount++;
-                UpdateLastCursor(result, filteredRow, request.CursorColumn);
+                UpdateLastCursor(result, row, request.CursorColumn);
                 continue;
             }
 
-            targetTable[rowKey] = CloneRow(filteredRow);
+            targetTable[rowKey] = CloneRow(row);
             result.UpdateCount++;
             changedOperations[rowKey] = SyncChangeOperationType.Update;
-            UpdateLastCursor(result, filteredRow, request.CursorColumn);
+            UpdateLastCursor(result, row, request.CursorColumn);
             hasChanges = true;
         }
 
@@ -432,10 +433,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
             Directory.CreateDirectory(_targetStoreDirectoryPath);
         }
 
-        var json = JsonSerializer.Serialize(tableRows, new JsonSerializerOptions
-        {
-            WriteIndented = true,
-        });
+        var json = JsonSerializer.Serialize(tableRows, PersistSerializerOptions);
         var tableStoreFilePath = BuildPerTableStoreFilePath(tableCode);
         var tempFilePath = $"{tableStoreFilePath}.tmp";
         var backupFilePath = $"{tableStoreFilePath}.bak";

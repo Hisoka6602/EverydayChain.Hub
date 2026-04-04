@@ -6,14 +6,13 @@ namespace EverydayChain.Hub.Application.Repositories;
 public interface ISyncStagingRepository
 {
     /// <summary>
-    /// 批量写入暂存。
+    /// 批量写入暂存（行数据应由调用方在源端完成列过滤后传入）。
     /// </summary>
     /// <param name="batchId">批次编号。</param>
     /// <param name="pageNo">页码。</param>
     /// <param name="rows">数据行。</param>
-    /// <param name="normalizedExcludedColumns">规范化后的排除列集合。</param>
     /// <param name="ct">取消令牌。</param>
-    Task BulkInsertAsync(string batchId, int pageNo, IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, IReadOnlySet<string> normalizedExcludedColumns, CancellationToken ct);
+    Task BulkInsertAsync(string batchId, int pageNo, IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, CancellationToken ct);
 
     /// <summary>
     /// 读取暂存页数据。

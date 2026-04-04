@@ -16,18 +16,9 @@ public class SyncChangeLogRepository : ISyncChangeLogRepository
     public Task WriteChangesAsync(IReadOnlyList<SyncChangeLog> changes, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var stagedChanges = new List<SyncChangeLog>(changes.Count);
         foreach (var change in changes)
         {
-            ct.ThrowIfCancellationRequested();
-            stagedChanges.Add(CloneChange(change));
-        }
-
-        ct.ThrowIfCancellationRequested();
-        foreach (var change in stagedChanges)
-        {
-            ct.ThrowIfCancellationRequested();
-            _changes.Enqueue(change);
+            _changes.Enqueue(CloneChange(change));
         }
 
         return Task.CompletedTask;

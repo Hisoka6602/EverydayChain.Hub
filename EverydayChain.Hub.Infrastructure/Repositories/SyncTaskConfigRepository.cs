@@ -12,49 +12,84 @@ namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
 /// 同步配置仓储实现。
+/// 所有表定义在构造时一次性解析并索引到字典，后续查询为 O(1) 访问，不重复遍历配置列表。
 /// </summary>
-public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, ILogger<SyncTaskConfigRepository> logger) : ISyncTaskConfigRepository
+public class SyncTaskConfigRepository : ISyncTaskConfigRepository
 {
     /// <summary>时间偏移或 UTC 标记检测正则。</summary>
     private static readonly Regex UtcOrOffsetRegex = new(@"(?:Z|[+\-]\d{2}:\d{2}|[+\-]\d{4})\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>同步配置快照。</summary>
-    private readonly SyncJobOptions _options = syncJobOptions.Value;
+    private readonly SyncJobOptions _options;
+
+    /// <summary>最大并行表数量（已应用默认值）。</summary>
+    private readonly int _maxParallelTables;
+
+    /// <summary>按表编码的定义字典（忽略大小写），启动时一次性构建，后续 O(1) 查询。</summary>
+    private readonly IReadOnlyDictionary<string, SyncTableDefinition> _definitionIndex;
+
+    /// <summary>已启用的表定义列表，启动时一次性构建。</summary>
+    private readonly IReadOnlyList<SyncTableDefinition> _enabledDefinitions;
+
+    /// <summary>
+    /// 初始化同步配置仓储，在构造阶段完成所有表定义的解析与验证。
+    /// </summary>
+    /// <param name="syncJobOptions">同步任务配置。</param>
+    /// <param name="logger">日志记录器。</param>
+    public SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, ILogger<SyncTaskConfigRepository> logger)
+    {
+        _options = syncJobOptions.Value;
+        _maxParallelTables = _options.MaxParallelTables > 0 ? _options.MaxParallelTables : 1;
+
+        // 启动时一次性解析并验证所有表定义，后续查询无需重复解析。
+        var index = new Dictionary<string, SyncTableDefinition>(StringComparer.OrdinalIgnoreCase);
+        var enabled = new List<SyncTableDefinition>();
+        foreach (var table in _options.Tables)
+        {
+            var definition = MapDefinition(table, logger);
+            index[table.TableCode] = definition;
+            if (table.Enabled)
+            {
+                enabled.Add(definition);
+            }
+        }
+
+        _definitionIndex = index;
+        _enabledDefinitions = enabled;
+    }
 
     /// <inheritdoc/>
     public Task<SyncTableDefinition> GetByTableCodeAsync(string tableCode, CancellationToken ct)
     {
-        var table = _options.Tables.FirstOrDefault(x => string.Equals(x.TableCode, tableCode, StringComparison.OrdinalIgnoreCase));
-        if (table is null)
+        if (_definitionIndex.TryGetValue(tableCode, out var definition))
         {
-            throw new InvalidOperationException($"未找到同步表配置: {tableCode}");
+            return Task.FromResult(definition);
         }
 
-        return Task.FromResult(MapDefinition(table));
+        throw new InvalidOperationException($"未找到同步表配置: {tableCode}");
     }
 
     /// <inheritdoc/>
     public Task<IReadOnlyList<SyncTableDefinition>> ListEnabledAsync(CancellationToken ct)
     {
-        var definitions = _options.Tables.Where(x => x.Enabled).Select(MapDefinition).ToList();
-        return Task.FromResult<IReadOnlyList<SyncTableDefinition>>(definitions);
+        return Task.FromResult(_enabledDefinitions);
     }
 
     /// <inheritdoc/>
     public Task<int> GetMaxParallelTablesAsync(CancellationToken ct)
     {
-        var maxParallelTables = _options.MaxParallelTables > 0 ? _options.MaxParallelTables : 1;
-        return Task.FromResult(maxParallelTables);
+        return Task.FromResult(_maxParallelTables);
     }
 
     /// <summary>
     /// 映射单表配置到领域定义。
     /// </summary>
     /// <param name="table">单表配置。</param>
+    /// <param name="logger">日志记录器。</param>
     /// <returns>领域定义。</returns>
-    private SyncTableDefinition MapDefinition(SyncTableOptions table)
+    private SyncTableDefinition MapDefinition(SyncTableOptions table, ILogger logger)
     {
-        var startTimeLocal = ParseLocalTime(table.StartTimeLocal, table.TableCode);
+        var startTimeLocal = ParseLocalTime(table.StartTimeLocal, table.TableCode, logger);
         ValidateExcludedColumns(table);
         var globalPollingIntervalSeconds = _options.PollingIntervalSeconds > 0 ? _options.PollingIntervalSeconds : 60;
         var effectivePageSize = table.PageSize > 0 ? table.PageSize : 5000;
@@ -127,8 +162,9 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
     /// </summary>
     /// <param name="localTimeText">时间文本。</param>
     /// <param name="tableCode">表编码。</param>
+    /// <param name="logger">日志记录器。</param>
     /// <returns>本地时间。</returns>
-    private DateTime ParseLocalTime(string localTimeText, string tableCode)
+    private static DateTime ParseLocalTime(string localTimeText, string tableCode, ILogger logger)
     {
         if (string.IsNullOrWhiteSpace(localTimeText))
         {

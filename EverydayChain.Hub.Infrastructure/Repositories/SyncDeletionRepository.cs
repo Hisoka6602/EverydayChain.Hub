@@ -41,11 +41,8 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
         };
 
         var candidateBag = new System.Collections.Concurrent.ConcurrentBag<SyncDeletionCandidate>();
-        var segments = targetRows
-            .Select((row, index) => new { row, index })
-            .GroupBy(item => item.index / segmentSize)
-            .Select(group => group.Select(item => item.row).ToList())
-            .ToList();
+        // 使用 .NET 6+ Chunk 直接分段，避免生成中间匿名对象和多次 GroupBy 遍历。
+        var segments = targetRows.Chunk(segmentSize);
         await Parallel.ForEachAsync(segments, parallelOptions, (segmentRows, token) =>
         {
             foreach (var row in segmentRows)

@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using EverydayChain.Hub.Application.Repositories;
-using EverydayChain.Hub.SharedKernel.Utilities;
 using EverydayChain.Hub.Domain.Sync;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
@@ -14,15 +13,12 @@ public class SyncStagingRepository : ISyncStagingRepository
     private readonly ConcurrentDictionary<string, IReadOnlyList<IReadOnlyDictionary<string, object?>>> _staging = new();
 
     /// <inheritdoc/>
-    public Task BulkInsertAsync(string batchId, int pageNo, IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, IReadOnlySet<string> normalizedExcludedColumns, CancellationToken ct)
+    public Task BulkInsertAsync(string batchId, int pageNo, IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, CancellationToken ct)
     {
         var storageKey = BuildStorageKey(batchId, pageNo);
+        // 行数据已由源端（OracleSourceReader）完成列过滤，此处仅需按需复制以保证隔离性。
         var pageRows = rows
-            .Select(row =>
-            {
-                var filteredRow = SyncColumnFilter.FilterExcludedColumns(row, normalizedExcludedColumns);
-                return new Dictionary<string, object?>(filteredRow);
-            })
+            .Select(row => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>(row))
             .ToList();
         _staging[storageKey] = pageRows;
         return Task.CompletedTask;

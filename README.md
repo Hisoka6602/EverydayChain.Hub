@@ -1,10 +1,12 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 补充稳定性改造清单剩余交付支撑，新增演练自动化脚本与监控告警规则基线文档，便于推进“长稳压测（含故障注入）”与“告警规则/演练留档”落地。
-- 新增 `scripts/stability-drill.sh` 稳定性演练脚本，支持 dry-run/真实执行两种模式，并自动生成演练记录文件，统一串联体检与灾备动作。
-- 新增 `监控告警规则基线清单.md`，沉淀日志关键字告警、指标阈值告警与演练留档验收口径，便于对接监控平台后快速落地。
-
+- 代码质量审查修复：消除性能问题与过度设计。
+- `SyncChangeLogRepository` / `SyncDeletionLogRepository`：移除两轮遍历（暂存再写入）的过度设计，改为单轮直接克隆入队，减少多余内存分配与重复取消令牌检查。
+- `SyncTaskConfigRepository`：构造阶段一次性解析全部表定义并建立字典索引，`GetByTableCodeAsync` 由 O(n) 线性扫描变为 O(1) 字典查询，同时将配置校验提前到启动阶段（快速失败）。
+- 移除三重列过滤冗余：`OracleSourceReader` 读取时已应用 `ExcludedColumns` 过滤，`SyncStagingRepository.BulkInsertAsync` 与 `SyncUpsertRepository.MergeFromStagingAsync` 不再重复过滤；同步移除 `ISyncStagingRepository.BulkInsertAsync` 的冗余 `normalizedExcludedColumns` 参数及 `SyncMergeRequest.NormalizedExcludedColumns` 属性。
+- `SyncUpsertRepository.SaveTableRowsWithoutLockAsync`：持久化序列化配置（`JsonSerializerOptions`）提升为静态字段，避免每次写入均分配新实例。
+- `SyncDeletionRepository.DetectDeletedKeysAsync`：用 .NET 8 `Enumerable.Chunk()` 替换复杂 LINQ 分段（`Select + GroupBy + Select.ToList`），消除中间匿名对象与多次分配。
 ## 解决方案文件树与职责
 ```text
 .
@@ -172,18 +174,18 @@
 - `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断），弹性参数来自 `DangerZoneOptions`。
 - `IRuntimeStorageGuard.cs` + `RuntimeStorageGuard.cs`：运行期存储守护服务，负责启动阶段的磁盘空间、目录权限、关键文件可读写自检，并在检查点/目标快照写入前执行磁盘阈值校验与告警阻断；同时提供单表内存水位监控与节流告警能力。
 - `SortingTaskTraceWriter.cs`：按分表后缀分组写入，并将执行结果回传给调谐器。
-- `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，校验 `StartTimeLocal` 禁止 `Z` 与 offset，校验 `ExcludedColumns` 不得与 `UniqueKeys`、`CursorColumn`、软删除关键列冲突，并解析优先级与多表并发上限。
+- `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，构造阶段一次性解析并建立字典索引（O(1) 查询），校验 `StartTimeLocal` 禁止 `Z` 与 offset，校验 `ExcludedColumns` 不得与 `UniqueKeys`、`CursorColumn`、软删除关键列冲突，并解析优先级与多表并发上限。
 - `OracleOptions.cs`：远端 Oracle 连接配置实体，定义连接字符串、默认 Schema、只读开关、命令超时与分页上限。
 - `OracleSourceReader.cs`：源端读取器 Oracle 实现，使用参数化 SQL 执行真实只读查询，支持分页增量读取、业务键读取、`ExcludedColumns` 过滤，并在异常场景输出错误日志。
-- `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
-- `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并在合并比较/写入阶段过滤 `ExcludedColumns`；支持目标键删除能力（软删/硬删）、目标端文件按表分片落地（原子替换）、空闲驱逐机制与 GZip 压缩归档策略。
-- `SyncDeletionRepository.cs`：删除同步仓储基础实现，支持窗口内源端键集合与目标键集合差异识别，并按策略执行删除。
+- `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存；行数据由源端（`OracleSourceReader`）完成列过滤后传入，暂存层不再重复过滤。
+- `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过（行数据由源端预过滤，不再重复调用列过滤）；支持目标键删除能力（软删/硬删）、目标端文件按表分片落地（原子替换）、空闲驱逐机制与 GZip 压缩归档策略；持久化序列化配置为静态字段复用。
+- `SyncDeletionRepository.cs`：删除同步仓储基础实现，支持窗口内源端键集合与目标键集合差异识别；分段并行比对改用 `Enumerable.Chunk()` 简化实现，并按策略执行删除。
 - `ShardTableResolver.cs`：分表解析仓储实现，按逻辑表枚举物理分表并解析分表月份后缀。
 - `ShardRetentionRepository.cs`：分表保留期仓储实现，在危险动作隔离器保护下执行分表删除并输出审计日志，且可基于系统元数据生成可回放回滚 DDL。
 - `SyncCheckpointRepository.cs`：检查点文件持久化实现，读写日志均以 Information 级落盘；写入改为临时文件 + File.Replace/Move 原子替换，防止崩溃产生半写 JSON。
 - `SyncBatchRepository.cs`：同步批次仓储基础实现，支持 `Pending/InProgress/Completed/Failed` 状态流转与最近失败批次查询。
-- `SyncChangeLogRepository.cs`：同步变更日志仓储基础实现，支持批量写入审计记录。
-- `SyncDeletionLogRepository.cs`：同步删除日志仓储基础实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
+- `SyncChangeLogRepository.cs`：同步变更日志仓储基础实现，支持批量写入审计记录（单轮克隆入队，取消令牌仅在入口处检查）。
+- `SyncDeletionLogRepository.cs`：同步删除日志仓储基础实现，支持批量写入删除审计记录（含 DryRun 执行标记；单轮克隆入队）。
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖。
 - `202603280001_InitialHubSchema.cs`：基础表结构迁移。
 - `nlog.config`：NLog 日志配置，输出至控制台与滚动日志文件（按日切割，单文件上限 100 MB，保留 30 天）。
