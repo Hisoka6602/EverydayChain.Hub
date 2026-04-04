@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# =============================================================================
+# EverydayChain.Hub 稳定性演练脚本
+# 用途：标准化执行年度/季度稳定性演练动作，并自动产出演练记录文件。
+# 用法：bash scripts/stability-drill.sh [--execute] [--table-code <表编码>] [--record-dir <目录>]
+#
+# 选项：
+#   --execute            执行真实动作；默认仅 dry-run 验证流程
+#   --table-code <名称>  指定快照恢复演练所用表编码（默认：SortingTaskTrace）
+#   --record-dir <目录>  演练记录目录（默认：仓库根目录 drill-records/）
+#
+# 输出：
+#   drill-records/stability-drill-<时间戳>.log
+# =============================================================================
+
+set -euo pipefail
+
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly BASE_DIR="$(dirname "$SCRIPT_DIR")"
+
+EXECUTE=false
+TABLE_CODE="SortingTaskTrace"
+RECORD_DIR="$BASE_DIR/drill-records"
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --execute) EXECUTE=true; shift ;;
+        --table-code) TABLE_CODE="$2"; shift 2 ;;
+        --record-dir) RECORD_DIR="$2"; shift 2 ;;
+        *)
+            echo "[ERROR] 未知参数：$1" >&2
+            exit 1
+            ;;
+    esac
+done
+
+mkdir -p "$RECORD_DIR"
+TS="$(date +%Y%m%d%H%M%S)"
+RECORD_FILE="$RECORD_DIR/stability-drill-$TS.log"
+
+MODE_FLAG="--dry-run"
+if $EXECUTE; then
+    MODE_FLAG=""
+fi
+
+{
+    echo "=== EverydayChain.Hub 稳定性演练记录 ==="
+    echo "时间：$(date '+%Y-%m-%d %H:%M:%S')"
+    echo "模式：$($EXECUTE && echo '真实执行' || echo 'DryRun 验证')"
+    echo "快照恢复演练表：$TABLE_CODE"
+    echo
+
+    echo "1) 一键体检"
+    bash "$SCRIPT_DIR/health-check.sh" || true
+    echo
+
+    echo "2) 灾难恢复演练：检查点重置"
+    bash "$SCRIPT_DIR/disaster-recovery.sh" checkpoint-reset $MODE_FLAG
+    echo
+
+    echo "3) 灾难恢复演练：快照备份"
+    bash "$SCRIPT_DIR/disaster-recovery.sh" snapshot-backup $MODE_FLAG
+    echo
+
+    echo "4) 灾难恢复演练：快照恢复"
+    bash "$SCRIPT_DIR/disaster-recovery.sh" snapshot-restore --table-code "$TABLE_CODE" $MODE_FLAG
+    echo
+
+    echo "5) 灾难恢复演练：归档清理"
+    bash "$SCRIPT_DIR/disaster-recovery.sh" archive-cleanup $MODE_FLAG
+    echo
+
+    echo "=== 演练结束 ==="
+} | tee "$RECORD_FILE"
+
+echo "[OK] 演练记录已生成：$RECORD_FILE"

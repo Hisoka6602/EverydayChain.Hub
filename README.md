@@ -1,8 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- P2-5.1 补充：SyncBackgroundWorker 新增看门狗卡死检测机制（`MonitorWatchdogAsync`），主循环超过 `WatchdogTimeoutSeconds` 阈值未推进时输出 Critical 日志；新增 `WatchdogTimeoutSeconds` 配置项（0 表示关闭，建议值 1800 秒）。
-- P2-5.2 补充：新增 `scripts/disaster-recovery.sh` 灾难恢复脚本（checkpoint-reset、snapshot-restore、snapshot-backup、archive-cleanup、full-reset，全部支持 dry-run）；新增 `值班处置手册.md`（9 类告警处置步骤、优先级定义、升级规则、应急联系、演练记录模板）。
+- 执行“持续运行一年稳定性改造清单”全仓审计，确认 P0/P1/P2 代码项已落地，当前剩余项聚焦“长稳压测（含故障注入）”与“监控告警规则/演练留档”。
+- 新增 `scripts/stability-drill.sh` 稳定性演练脚本，支持 dry-run/真实执行两种模式，并自动生成演练记录文件，统一串联体检与灾备动作。
+- 新增 `监控告警规则基线清单.md`，沉淀日志关键字告警、指标阈值告警与演练留档验收口径，便于对接监控平台后快速落地。
 
 ## 解决方案文件树与职责
 ```text
@@ -11,6 +12,7 @@
 ├── README.md
 ├── EFCore手动迁移操作指南.md
 ├── 持续运行一年稳定性改造清单.md
+├── 监控告警规则基线清单.md
 ├── 年度维护清单.md
 ├── 值班处置手册.md
 ├── 当前程序能力与缺陷分析.md
@@ -18,7 +20,8 @@
 ├── Oracle到SQLServer同步实施计划.md
 ├── scripts
 │   ├── health-check.sh
-│   └── disaster-recovery.sh
+│   ├── disaster-recovery.sh
+│   └── stability-drill.sh
 ├── .github
 │   ├── copilot-instructions.md
 │   └── workflows
@@ -140,6 +143,8 @@
 - `.github/workflows/copilot-governance.yml`：执行规则自动校验，并强制规则文件与工作流联动修改。
 - `scripts/health-check.sh`：一键体检脚本，检查磁盘空间、目录权限、关键文件可读写、配置文件格式、日志健康状态、进程存活与压缩归档文件状态，可集成到监控或定时任务。
 - `scripts/disaster-recovery.sh`：灾难恢复脚本，支持检查点重置（checkpoint-reset）、快照从归档恢复（snapshot-restore）、快照备份（snapshot-backup）、归档清理（archive-cleanup）与完全重置（full-reset）；全部操作支持 --dry-run 预览模式。
+- `scripts/stability-drill.sh`：稳定性演练脚本，串联体检与灾备动作（checkpoint-reset、snapshot-backup、snapshot-restore、archive-cleanup），支持 dry-run 与真实执行并自动生成演练记录。
+- `监控告警规则基线清单.md`：监控告警规则基线文档，定义日志关键字告警、指标阈值告警与演练留档验收口径，用于补齐稳定性清单剩余交付项。
 - `年度维护清单.md`：月度/季度/年度例行巡检项标准化清单，包含磁盘治理、日志审查、数据一致性、配置审核、灾难恢复演练、容量规划、安全审计等条目及快速异常处理参考表。
 - `值班处置手册.md`：日常值班与告警应急处置手册，覆盖 9 类告警的处置步骤（卡死检测、磁盘不足、内存水位、整轮超时、熔断、检查点损坏、快照损坏、归档失败、进程停止），定义 P0~P3 优先级与升级规则，含处置记录与演练记录模板。
 - `SyncTableDefinition.cs` / `SyncWindow.cs` / `SyncCheckpoint.cs` / `SyncBatchResult.cs`：定义同步链路执行、窗口与结果统计的核心领域模型。
@@ -193,7 +198,6 @@
 - `Oracle到SQLServer同步实施计划.md`：按 PR 拆分同步架构落地步骤的进度跟踪文档。
 
 ## 可继续完善内容（本次 PR 后续行动项）
-- 长稳压测（含故障注入：Oracle 断连、时钟扰动、磁盘压满）验证，对照清单验收标准确认达标。
-- 监控告警规则落地（与运维平台对接后在独立 PR 中推进）。
-- 值班处置手册演练并留档（参考 `值班处置手册.md` 第七节）。
-
+- 执行长稳压测（含故障注入：Oracle 断连、时钟扰动、磁盘压满），并产出验收报告。
+- 将 `监控告警规则基线清单.md` 规则落地到实际监控平台并验证通知链路。
+- 使用 `scripts/stability-drill.sh --execute` 完成至少一次真实演练并归档记录，回填 `值班处置手册.md` 第七节。
