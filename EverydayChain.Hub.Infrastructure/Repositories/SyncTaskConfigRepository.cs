@@ -25,7 +25,7 @@ public class SyncTaskConfigRepository : ISyncTaskConfigRepository
     /// <summary>最大并行表数量（已应用默认值）。</summary>
     private readonly int _maxParallelTables;
 
-    /// <summary>按表编码的定义字典（忽略大小写），启动时一次性构建，后续 O(1) 查询。</summary>
+    /// <summary>按表编码的定义字典（使用 <see cref="StringComparer.OrdinalIgnoreCase"/> 忽略大小写），启动时一次性构建，后续 O(1) 查询。</summary>
     private readonly IReadOnlyDictionary<string, SyncTableDefinition> _definitionIndex;
 
     /// <summary>已启用的表定义列表，启动时一次性构建。</summary>
