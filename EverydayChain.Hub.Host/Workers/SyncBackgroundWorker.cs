@@ -9,6 +9,7 @@ namespace EverydayChain.Hub.Host.Workers;
 
 /// <summary>
 /// 同步后台任务，按轮询配置触发同步编排，并在每轮结束后执行空闲表内存驱逐。
+/// 内置看门狗机制：当主循环超过配置阈值未推进时，输出 Critical 日志提示运维检查并重启服务。
 /// </summary>
 public class SyncBackgroundWorker(
     ISyncOrchestrator syncOrchestrator,
@@ -19,15 +20,28 @@ public class SyncBackgroundWorker(
     /// <summary>同步任务配置快照。</summary>
     private readonly SyncJobOptions _syncJobOptions = syncJobOptions.Value;
 
+    /// <summary>最近一次迭代开始时的高精度时间戳（Stopwatch Ticks），供看门狗卡死检测使用。</summary>
+    private long _lastIterationTicks = Stopwatch.GetTimestamp();
+
     /// <summary>
-    /// 后台循环入口。
+    /// 后台循环入口，启动看门狗监视任务后进入主轮询循环。
     /// </summary>
     /// <param name="stoppingToken">取消令牌。</param>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var pollingIntervalSeconds = _syncJobOptions.PollingIntervalSeconds > 0 ? _syncJobOptions.PollingIntervalSeconds : 60;
+        var watchdogTimeoutSeconds = _syncJobOptions.WatchdogTimeoutSeconds;
+
+        // 若配置了看门狗超时，启动独立监视任务；否则使用已完成任务占位，避免空值判断。
+        var watchdogTask = watchdogTimeoutSeconds > 0
+            ? MonitorWatchdogAsync(watchdogTimeoutSeconds, pollingIntervalSeconds, stoppingToken)
+            : Task.CompletedTask;
+
         while (!stoppingToken.IsCancellationRequested)
         {
+            // 更新迭代心跳时间戳，看门狗依此判断主循环是否正常推进。
+            Interlocked.Exchange(ref _lastIterationTicks, Stopwatch.GetTimestamp());
+
             try
             {
                 await RunOnceAsync(stoppingToken);
@@ -42,6 +56,45 @@ public class SyncBackgroundWorker(
             }
 
             await Task.Delay(TimeSpan.FromSeconds(pollingIntervalSeconds), stoppingToken);
+        }
+
+        await watchdogTask;
+    }
+
+    /// <summary>
+    /// 看门狗监视任务：定期检查主循环心跳，若超过阈值未推进则输出 Critical 日志。
+    /// </summary>
+    /// <param name="watchdogTimeoutSeconds">看门狗超时阈值（秒）。</param>
+    /// <param name="pollingIntervalSeconds">主循环轮询间隔（秒），作为心跳缓冲窗口。</param>
+    /// <param name="ct">取消令牌，服务停止时退出检测循环。</param>
+    private async Task MonitorWatchdogAsync(int watchdogTimeoutSeconds, int pollingIntervalSeconds, CancellationToken ct)
+    {
+        // 检查间隔为超时时间的 1/3，限制在 [30, 300] 秒范围内，避免过于频繁或稀疏的检测。
+        var checkIntervalSeconds = Math.Clamp(watchdogTimeoutSeconds / 3, 30, 300);
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(checkIntervalSeconds), ct);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+
+            var lastTicks = Interlocked.Read(ref _lastIterationTicks);
+            var elapsedSeconds = (Stopwatch.GetTimestamp() - lastTicks) / (double)Stopwatch.Frequency;
+
+            // 允许额外一个完整轮询间隔作为缓冲，避免在正常延迟期间产生误报。
+            var threshold = (double)(watchdogTimeoutSeconds + pollingIntervalSeconds);
+            if (elapsedSeconds > threshold)
+            {
+                logger.LogCritical(
+                    "同步后台任务疑似卡死，已超过看门狗超时阈值，建议立即重启服务。ElapsedSeconds={ElapsedSeconds:F0}, WatchdogThresholdSeconds={WatchdogThresholdSeconds}",
+                    elapsedSeconds,
+                    threshold);
+            }
         }
     }
 

@@ -53,6 +53,9 @@ public class SyncJobOptions
     /// <summary>单轮同步整体超时时间（单位：秒，可填写范围：[0, 86400]；当前用于限制一次 RunAllEnabledTableSyncAsync 的整轮执行时长；0 表示关闭超时保护；建议值 600）。</summary>
     public int TableSyncTimeoutSeconds { get; set; } = 600;
 
+    /// <summary>后台任务看门狗超时时间（单位：秒，可填写范围：[0, 86400]；0 表示关闭看门狗检测；建议值 1800）。主循环超过此阈值未推进时，输出 Critical 日志提示运维检查并重启服务。</summary>
+    public int WatchdogTimeoutSeconds { get; set; } = 1800;
+
     /// <summary>单表配置集合。</summary>
     public List<SyncTableOptions> Tables { get; set; } = [];
 }

@@ -1,11 +1,8 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- P0-3.2：SyncUpsertRepository 新增目标快照文件轮转压缩归档策略：每次写入后将旧版本 GZip 压缩归档（`.{timestamp}.json.gz`），自动清理超出 `TargetStoreArchiveMaxCount` 数量的最旧归档文件；新增 `TargetStoreArchiveMaxCount` 配置项。
-- P0-3.4：创建 EverydayChain.Hub.Tests 测试项目，添加 SyncWindowCalculator 时间窗口回归测试套件（12 个用例，覆盖正常窗口、时钟回拨冻结、UTC 输入拒绝、Unspecified Kind 兼容性、时钟扰动组合场景）。
-- P1-4.2：SyncBackgroundWorker 新增整轮同步汇总指标日志（TotalTables、SuccessTables、FailedTables、OverallFailureRate、TotalRead/Insert/Update/Delete、MaxLagMinutes、MaxBacklogMinutes、RoundElapsedMs），支持在分钟级感知整体异常趋势。
-- P2-5.1：SyncBackgroundWorker 新增表级超时保护机制，通过链式 CancellationTokenSource 限制整轮同步最大耗时；超时自动取消并记录 Error 日志；新增 `TableSyncTimeoutSeconds` 配置项（0 表示关闭）。
-- P2-5.2：新增 `scripts/health-check.sh` 一键体检脚本（磁盘空间、目录权限、关键文件可读写、配置格式、日志健康、进程存活、归档文件状态）；新增 `年度维护清单.md`（月度/季度/年度巡检项、快速异常处理参考表）。
+- P2-5.1 补充：SyncBackgroundWorker 新增看门狗卡死检测机制（`MonitorWatchdogAsync`），主循环超过 `WatchdogTimeoutSeconds` 阈值未推进时输出 Critical 日志；新增 `WatchdogTimeoutSeconds` 配置项（0 表示关闭，建议值 1800 秒）。
+- P2-5.2 补充：新增 `scripts/disaster-recovery.sh` 灾难恢复脚本（checkpoint-reset、snapshot-restore、snapshot-backup、archive-cleanup、full-reset，全部支持 dry-run）；新增 `值班处置手册.md`（9 类告警处置步骤、优先级定义、升级规则、应急联系、演练记录模板）。
 
 ## 解决方案文件树与职责
 ```text
@@ -15,11 +12,13 @@
 ├── EFCore手动迁移操作指南.md
 ├── 持续运行一年稳定性改造清单.md
 ├── 年度维护清单.md
+├── 值班处置手册.md
 ├── 当前程序能力与缺陷分析.md
 ├── Oracle到SQLServer同步架构设计.md
 ├── Oracle到SQLServer同步实施计划.md
 ├── scripts
-│   └── health-check.sh
+│   ├── health-check.sh
+│   └── disaster-recovery.sh
 ├── .github
 │   ├── copilot-instructions.md
 │   └── workflows
@@ -140,7 +139,9 @@
 - `.github/copilot-instructions.md`：定义仓库级 Copilot 强制约束，覆盖时间语义、结构规范、文档联动与交付门禁。
 - `.github/workflows/copilot-governance.yml`：执行规则自动校验，并强制规则文件与工作流联动修改。
 - `scripts/health-check.sh`：一键体检脚本，检查磁盘空间、目录权限、关键文件可读写、配置文件格式、日志健康状态、进程存活与压缩归档文件状态，可集成到监控或定时任务。
+- `scripts/disaster-recovery.sh`：灾难恢复脚本，支持检查点重置（checkpoint-reset）、快照从归档恢复（snapshot-restore）、快照备份（snapshot-backup）、归档清理（archive-cleanup）与完全重置（full-reset）；全部操作支持 --dry-run 预览模式。
 - `年度维护清单.md`：月度/季度/年度例行巡检项标准化清单，包含磁盘治理、日志审查、数据一致性、配置审核、灾难恢复演练、容量规划、安全审计等条目及快速异常处理参考表。
+- `值班处置手册.md`：日常值班与告警应急处置手册，覆盖 9 类告警的处置步骤（卡死检测、磁盘不足、内存水位、整轮超时、熔断、检查点损坏、快照损坏、归档失败、进程停止），定义 P0~P3 优先级与升级规则，含处置记录与演练记录模板。
 - `SyncTableDefinition.cs` / `SyncWindow.cs` / `SyncCheckpoint.cs` / `SyncBatchResult.cs`：定义同步链路执行、窗口与结果统计的核心领域模型。
 - `SyncBatch.cs` / `SyncChangeLog.cs` / `SyncDeletionLog.cs`：定义批次状态跟踪、变更审计与删除审计的数据模型。
 - `SyncBusinessKeyBuilder.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：同步业务键构建共享组件，按 `UniqueKeys` 配置将行数据拼接为 `|` 分隔的业务键文本，供 Upsert 与删除识别阶段统一调用。
@@ -181,7 +182,7 @@
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖。
 - `202603280001_InitialHubSchema.cs`：基础表结构迁移。
 - `nlog.config`：NLog 日志配置，输出至控制台与滚动日志文件（按日切割，单文件上限 100 MB，保留 30 天）。
-- `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
+- `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
 - `EverydayChain.Hub.Tests/Services/SyncWindowCalculatorTests.cs`：SyncWindowCalculator 时间窗口回归测试套件（12 个测试用例，覆盖正常窗口、时钟回拨冻结、UTC 拒绝、Unspecified Kind 兼容、时钟扰动组合场景）。
 - `EFCore手动迁移操作指南.md`：提供手工迁移、脚本导出、回滚、排障流程。
@@ -193,6 +194,6 @@
 
 ## 可继续完善内容（本次 PR 后续行动项）
 - 长稳压测（含故障注入：Oracle 断连、时钟扰动、磁盘压满）验证，对照清单验收标准确认达标。
-- 值班处置手册与监控告警规则落地（与运维对接后在独立 PR 中推进）。
-- 回滚方案与备份恢复演练（参考年度维护清单 Y1 灾难恢复演练）。
+- 监控告警规则落地（与运维平台对接后在独立 PR 中推进）。
+- 值班处置手册演练并留档（参考 `值班处置手册.md` 第七节）。
 
