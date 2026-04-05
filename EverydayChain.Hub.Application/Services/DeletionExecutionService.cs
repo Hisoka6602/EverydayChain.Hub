@@ -56,11 +56,11 @@ public class DeletionExecutionService(
         var deletionLogs = new List<SyncDeletionLog>(uniqueCandidates.Count);
         var changeLogs = new List<SyncChangeLog>(uniqueCandidates.Count);
         var executed = !context.Definition.DeletionDryRun && context.Definition.DeletionPolicy != DeletionPolicy.Disabled;
+        var nowLocal = DateTime.Now;
         foreach (var candidate in uniqueCandidates)
         {
             ct.ThrowIfCancellationRequested();
             var snapshot = JsonSerializer.Serialize(candidate.TargetSnapshot, SnapshotSerializerOptions);
-            var nowLocal = DateTime.Now;
             deletionLogs.Add(new SyncDeletionLog
             {
                 BatchId = context.BatchId,

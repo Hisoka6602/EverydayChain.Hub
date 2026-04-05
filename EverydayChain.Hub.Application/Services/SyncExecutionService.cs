@@ -323,6 +323,7 @@ public class SyncExecutionService(
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows,
         IReadOnlyDictionary<string, SyncChangeOperationType> changedOperations)
     {
+        var nowLocal = DateTime.Now;
         foreach (var row in rows)
         {
             var businessKey = SyncBusinessKeyBuilder.Build(row, context.Definition.UniqueKeys);
@@ -345,7 +346,7 @@ public class SyncExecutionService(
                 BusinessKey = businessKey,
                 BeforeSnapshot = null,
                 AfterSnapshot = BuildSnapshot(row),
-                ChangedTimeLocal = DateTime.Now,
+                ChangedTimeLocal = nowLocal,
             });
         }
     }
