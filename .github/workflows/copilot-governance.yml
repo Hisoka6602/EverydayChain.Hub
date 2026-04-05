@@ -68,6 +68,7 @@ jobs:
           import re
           import subprocess
           import sys
+          import xml.etree.ElementTree as ET
 
           instructions_path = pathlib.Path(".github/copilot-instructions.md")
           instructions_text = instructions_path.read_text(encoding="utf-8")
@@ -172,7 +173,6 @@ jobs:
               sys.exit(1)
 
           # 校验 nlog.config 中 archiveAboveSize 不超过 10 MB（10485760 字节）
-          import xml.etree.ElementTree as ET
           nlog_configs = list(pathlib.Path(".").rglob("nlog.config"))
           for nlog_path in nlog_configs:
               if any(part in ignored_dirs for part in nlog_path.parts):
@@ -181,7 +181,8 @@ jobs:
                   tree = ET.parse(nlog_path)
               except ET.ParseError:
                   continue
-              for target in tree.iter():
+              ns = "http://www.nlog-project.org/schemas/NLog.xsd"
+              for target in tree.findall(f".//{{{ns}}}target") + tree.findall(".//target"):
                   archive_size_str = target.get("archiveAboveSize")
                   if archive_size_str is not None:
                       try:
