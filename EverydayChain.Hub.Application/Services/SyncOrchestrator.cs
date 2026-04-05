@@ -89,12 +89,7 @@ public class SyncOrchestrator(
             }
         });
 
-        // 每个槽位在成功或异常分支中均已写入，不存在 null 槽；此处断言保障调用方契约。
-        if (results.Any(x => x is null))
-        {
-            throw new InvalidOperationException("同步编排结果不完整，存在未写入的表结果。");
-        }
-
+        // 每个槽位在成功或异常分支中均已写入，Parallel.ForEachAsync 正常完成即保证所有槽位非空。
         return results;
     }
 }

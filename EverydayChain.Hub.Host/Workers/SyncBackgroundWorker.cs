@@ -182,17 +182,30 @@ public class SyncBackgroundWorker(
         }
 
         // 输出整轮汇总指标，便于在分钟级发现整体异常趋势。
+        // 单次遍历同时完成计数、求和与求最大值，避免热路径对同一集合进行多次扫描。
         sw.Stop();
-        var totalTables = results.Count;
-        var failedTables = results.Count(r => r.FailureRate > 0);
+        var totalTables = 0;
+        var failedTables = 0;
+        var totalRead = 0;
+        var totalInsert = 0;
+        var totalUpdate = 0;
+        var totalDelete = 0;
+        var maxLagMinutes = 0d;
+        var maxBacklogMinutes = 0d;
+        foreach (var r in results)
+        {
+            totalTables++;
+            if (r.FailureRate > 0) failedTables++;
+            totalRead += r.ReadCount;
+            totalInsert += r.InsertCount;
+            totalUpdate += r.UpdateCount;
+            totalDelete += r.DeleteCount;
+            if (r.LagMinutes > maxLagMinutes) maxLagMinutes = r.LagMinutes;
+            if (r.BacklogMinutes > maxBacklogMinutes) maxBacklogMinutes = r.BacklogMinutes;
+        }
+
         var successTables = totalTables - failedTables;
-        var totalRead = results.Sum(r => r.ReadCount);
-        var totalInsert = results.Sum(r => r.InsertCount);
-        var totalUpdate = results.Sum(r => r.UpdateCount);
-        var totalDelete = results.Sum(r => r.DeleteCount);
         var overallFailureRate = totalTables > 0 ? (double)failedTables / totalTables : 0d;
-        var maxLagMinutes = results.Count > 0 ? results.Max(r => r.LagMinutes) : 0d;
-        var maxBacklogMinutes = results.Count > 0 ? results.Max(r => r.BacklogMinutes) : 0d;
         if (failedTables > 0)
         {
             logger.LogWarning(
