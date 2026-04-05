@@ -173,25 +173,36 @@ jobs:
               sys.exit(1)
 
           # 校验 nlog.config 中 archiveAboveSize 不超过 10 MB（10485760 字节）
+          # 注意：此处提前声明 _nlog_ignored_dirs 以避免依赖后续定义的 ignored_dirs
+          _nlog_ignored_dirs = {"bin", "obj", ".git"}
           nlog_configs = list(pathlib.Path(".").rglob("nlog.config"))
           for nlog_path in nlog_configs:
-              if any(part in ignored_dirs for part in nlog_path.parts):
+              if any(part in _nlog_ignored_dirs for part in nlog_path.parts):
                   continue
               try:
                   tree = ET.parse(nlog_path)
-              except ET.ParseError:
-                  continue
+              except ET.ParseError as exc:
+                  print(f"错误：{nlog_path.as_posix()} 解析失败（{exc}），请修复后重新提交。")
+                  sys.exit(1)
               ns = "http://www.nlog-project.org/schemas/NLog.xsd"
               for target in tree.findall(f".//{{{ns}}}target") + tree.findall(".//target"):
+                  target_type = target.get("xsi:type") or target.get("{http://www.w3.org/2001/XMLSchema-instance}type") or target.get("type", "")
+                  if target_type.lower() != "file":
+                      continue
                   archive_size_str = target.get("archiveAboveSize")
-                  if archive_size_str is not None:
-                      try:
-                          archive_size = int(archive_size_str)
-                      except ValueError:
-                          continue
-                      if archive_size > 10485760:
-                          print(f"错误：{nlog_path.as_posix()} 的 archiveAboveSize={archive_size} 超过 10 MB 上限（10485760）。")
-                          sys.exit(1)
+                  if archive_size_str is None:
+                      target_name = target.get("name", "<未命名>")
+                      print(f"错误：{nlog_path.as_posix()} 的 File target '{target_name}' 缺少 archiveAboveSize 属性，必须设置且不超过 10 MB（10485760）。")
+                      sys.exit(1)
+                  try:
+                      archive_size = int(archive_size_str)
+                  except ValueError:
+                      target_name = target.get("name", "<未命名>")
+                      print(f"错误：{nlog_path.as_posix()} 的 File target '{target_name}' archiveAboveSize 值非整数：{archive_size_str}。")
+                      sys.exit(1)
+                  if archive_size > 10485760:
+                      print(f"错误：{nlog_path.as_posix()} 的 archiveAboveSize={archive_size} 超过 10 MB 上限（10485760）。")
+                      sys.exit(1)
 
           banned_patterns = [
               r"\bDateTime\.UtcNow\b",
