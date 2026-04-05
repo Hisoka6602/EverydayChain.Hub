@@ -16,10 +16,17 @@ public class SyncDeletionLogRepository : ISyncDeletionLogRepository
     public Task WriteDeletionsAsync(IReadOnlyList<SyncDeletionLog> logs, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+        var stagedLogs = new List<SyncDeletionLog>(logs.Count);
         foreach (var log in logs)
         {
             ct.ThrowIfCancellationRequested();
-            _logs.Enqueue(CloneLog(log));
+            stagedLogs.Add(CloneLog(log));
+        }
+
+        // 克隆阶段完成后，不再检查取消令牌，确保批次整体原子性入队。
+        foreach (var log in stagedLogs)
+        {
+            _logs.Enqueue(log);
         }
 
         return Task.CompletedTask;
