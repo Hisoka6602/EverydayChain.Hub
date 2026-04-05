@@ -1,9 +1,10 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 修复 `SyncBackgroundWorker.RunOnceAsync` 整轮统计汇总时对 `results` 集合的 9 次重复遍历，合并为 1 次单循环，减少热路径 CPU 开销。
-- 移除 `SyncOrchestrator.RunAllEnabledTableSyncAsync` 中 `Parallel.ForEachAsync` 完成后多余的 `results.Any(x => x is null)` 断言（逻辑保证已在注释说明，运行时永不触发）。
-- 修复 `SyncColumnFilter.NormalizeColumns` 中重复的 `x.Trim()` 内联逻辑，改为复用 `NormalizeColumnName` 方法，消除同义代码重复。
+- 修复 `DeletionExecutionService.ExecuteDeletionAsync` 中 `DateTime.Now` 在循环内重复调用的性能问题，将时间戳提升至循环外统一获取一次，确保同一批次内所有删除日志时间戳一致。
+- 修复 `SyncExecutionService.AppendChangeLogs` 中 `DateTime.Now` 在循环内重复调用的性能问题，将时间戳提升至循环外统一获取一次，确保同一页变更日志时间戳一致。
+- 优化 `SyncChangeLogRepository.WriteChangesAsync`：去除多余的两阶段克隆（先全部克隆到中间 `List`，再全部入队），改为单次遍历边克隆边入队，减少不必要的中间集合分配。
+- 优化 `SyncDeletionLogRepository.WriteDeletionsAsync`：同上，去除多余两阶段克隆，改为单次遍历直接入队。
 
 ## 解决方案文件树与职责
 ```text

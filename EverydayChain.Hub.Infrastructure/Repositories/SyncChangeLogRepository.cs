@@ -23,10 +23,9 @@ public class SyncChangeLogRepository : ISyncChangeLogRepository
             stagedChanges.Add(CloneChange(change));
         }
 
-        ct.ThrowIfCancellationRequested();
+        // 克隆阶段完成后，不再检查取消令牌，确保批次整体原子性入队。
         foreach (var change in stagedChanges)
         {
-            ct.ThrowIfCancellationRequested();
             _changes.Enqueue(change);
         }
 
