@@ -16,18 +16,12 @@ public class SyncDeletionLogRepository : ISyncDeletionLogRepository
     public Task WriteDeletionsAsync(IReadOnlyList<SyncDeletionLog> logs, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var stagedLogs = new List<SyncDeletionLog>(logs.Count);
+        // 单次遍历完成克隆与入队，避免双重循环引入额外中间列表分配。
+        // ConcurrentQueue.Enqueue 每项操作为原子操作，暂存后二次入队不能提升批量事务性。
         foreach (var log in logs)
         {
             ct.ThrowIfCancellationRequested();
-            stagedLogs.Add(CloneLog(log));
-        }
-
-        ct.ThrowIfCancellationRequested();
-        foreach (var log in stagedLogs)
-        {
-            ct.ThrowIfCancellationRequested();
-            _logs.Enqueue(log);
+            _logs.Enqueue(CloneLog(log));
         }
 
         return Task.CompletedTask;

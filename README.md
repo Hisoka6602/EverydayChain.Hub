@@ -1,9 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 修复 `SyncBackgroundWorker.RunOnceAsync` 整轮统计汇总时对 `results` 集合的 9 次重复遍历，合并为 1 次单循环，减少热路径 CPU 开销。
-- 移除 `SyncOrchestrator.RunAllEnabledTableSyncAsync` 中 `Parallel.ForEachAsync` 完成后多余的 `results.Any(x => x is null)` 断言（逻辑保证已在注释说明，运行时永不触发）。
-- 修复 `SyncColumnFilter.NormalizeColumns` 中重复的 `x.Trim()` 内联逻辑，改为复用 `NormalizeColumnName` 方法，消除同义代码重复。
+- 修复 `SyncChangeLogRepository.WriteChangesAsync`：去除双重循环（先暂存再入队），改为单次遍历直接入队，消除无效中间列表分配与冗余 `ct.ThrowIfCancellationRequested()` 调用（性能问题/过度设计）。
+- 修复 `SyncDeletionLogRepository.WriteDeletionsAsync`：同上，逻辑与改法一致。
+- 修复 `RetentionExecutionService.ExecuteRetentionCleanupAsync`：`logger.LogInformation(summary)` 将插值字符串直接作为日志模板，违反结构化日志规范（CA2254）；改为带具名占位符与独立参数的标准调用。
 
 ## 解决方案文件树与职责
 ```text

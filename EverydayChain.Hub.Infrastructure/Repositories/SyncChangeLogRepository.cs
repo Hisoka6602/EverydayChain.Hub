@@ -16,18 +16,12 @@ public class SyncChangeLogRepository : ISyncChangeLogRepository
     public Task WriteChangesAsync(IReadOnlyList<SyncChangeLog> changes, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var stagedChanges = new List<SyncChangeLog>(changes.Count);
+        // 单次遍历完成克隆与入队，避免双重循环引入额外中间列表分配。
+        // ConcurrentQueue.Enqueue 每项操作为原子操作，暂存后二次入队不能提升批量事务性。
         foreach (var change in changes)
         {
             ct.ThrowIfCancellationRequested();
-            stagedChanges.Add(CloneChange(change));
-        }
-
-        ct.ThrowIfCancellationRequested();
-        foreach (var change in stagedChanges)
-        {
-            ct.ThrowIfCancellationRequested();
-            _changes.Enqueue(change);
+            _changes.Enqueue(CloneChange(change));
         }
 
         return Task.CompletedTask;
