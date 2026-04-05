@@ -67,7 +67,7 @@ public static class SyncColumnFilter
 
         return columns
             .Where(static x => !string.IsNullOrWhiteSpace(x))
-            .Select(static x => x.Trim())
+            .Select(static x => NormalizeColumnName(x))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 

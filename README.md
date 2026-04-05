@@ -1,9 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 补充稳定性改造清单剩余交付支撑，新增演练自动化脚本与监控告警规则基线文档，便于推进“长稳压测（含故障注入）”与“告警规则/演练留档”落地。
-- 新增 `scripts/stability-drill.sh` 稳定性演练脚本，支持 dry-run/真实执行两种模式，并自动生成演练记录文件，统一串联体检与灾备动作。
-- 新增 `监控告警规则基线清单.md`，沉淀日志关键字告警、指标阈值告警与演练留档验收口径，便于对接监控平台后快速落地。
+- 修复 `SyncBackgroundWorker.RunOnceAsync` 整轮统计汇总时对 `results` 集合的 9 次重复遍历，合并为 1 次单循环，减少热路径 CPU 开销。
+- 移除 `SyncOrchestrator.RunAllEnabledTableSyncAsync` 中 `Parallel.ForEachAsync` 完成后多余的 `results.Any(x => x is null)` 断言（逻辑保证已在注释说明，运行时永不触发）。
+- 修复 `SyncColumnFilter.NormalizeColumns` 中重复的 `x.Trim()` 内联逻辑，改为复用 `NormalizeColumnName` 方法，消除同义代码重复。
 
 ## 解决方案文件树与职责
 ```text
