@@ -2,7 +2,7 @@
 
 ## 本次更新内容
 - 将 `SyncUpsertRepository` 的目标端落地机制从“持久化完整业务行”改为“轻量幂等状态存储”（业务键 + 行摘要 + 游标 + 软删标记），显著降低本地落地体积。
-- 保留旧版 `data/sync-target-store.json` 全量格式兼容迁移：首次加载时自动转换为轻量状态，并统一按表分片持久化。
+- 不再保留旧版 `data/sync-target-store.json` 全量格式兼容迁移，仅支持轻量状态按表分片持久化格式。
 - 删除识别链路改为基于轻量状态执行窗口过滤与差异识别，不再依赖本地全量业务行快照。
 - 新增 `SyncTargetStateRow` 轻量状态模型，并更新 `ISyncUpsertRepository` 契约到轻量状态读取接口。
 
@@ -178,7 +178,7 @@
 - `OracleOptions.cs`：远端 Oracle 连接配置实体，定义连接字符串、默认 Schema、只读开关、命令超时与分页上限。
 - `OracleSourceReader.cs`：源端读取器 Oracle 实现，使用参数化 SQL 执行真实只读查询，支持分页增量读取、业务键读取、`ExcludedColumns` 过滤，并在异常场景输出错误日志。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
-- `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并在合并阶段过滤 `ExcludedColumns`；目标端持久化改为按表分片的轻量幂等状态（业务键、行摘要、游标、软删标记），保留旧版全量快照兼容迁移；支持目标键删除能力（软删/硬删）、空闲驱逐与 GZip 压缩归档策略。
+- `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并在合并阶段过滤 `ExcludedColumns`；目标端持久化改为按表分片的轻量幂等状态（业务键、行摘要、游标、软删标记），不保留旧版全量快照兼容迁移；支持目标键删除能力（软删/硬删）、空闲驱逐与 GZip 压缩归档策略。
 - `SyncDeletionRepository.cs`：删除同步仓储基础实现，基于轻量幂等状态执行窗口过滤与源端键差异识别，并按策略执行删除。
 - `ShardTableResolver.cs`：分表解析仓储实现，按逻辑表枚举物理分表并解析分表月份后缀。
 - `ShardRetentionRepository.cs`：分表保留期仓储实现，在危险动作隔离器保护下执行分表删除并输出审计日志，且可基于系统元数据生成可回放回滚 DDL。

@@ -34,8 +34,6 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     private static readonly SemaphoreSlim TargetStoreFileLock = new(1, 1);
     /// <summary>日志组件。</summary>
     private readonly ILogger<SyncUpsertRepository> _logger;
-    /// <summary>目标端持久化文件路径。</summary>
-    private readonly string _targetStoreFilePath;
     /// <summary>目标端持久化文件目录。</summary>
     private readonly string _targetStoreDirectoryPath;
     /// <summary>目标端持久化文件名前缀。</summary>
@@ -52,8 +50,6 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     private readonly double _idleEvictionThresholdMinutes;
     /// <summary>目标端文件归档最大保留数量（0 表示关闭）。</summary>
     private readonly int _targetStoreArchiveMaxCount;
-    /// <summary>表编码到游标列名映射（忽略大小写）。</summary>
-    private readonly IReadOnlyDictionary<string, string> _cursorColumnByTableCode;
 
     /// <summary>
     /// 初始化同步幂等合并仓储。
@@ -72,7 +68,6 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         var resolvedTargetStoreFilePath = RuntimeStoragePathResolver.ResolveAbsolutePath(
             opts.TargetStoreFilePath,
             Path.Combine("data", "sync-target-store.json"));
-        _targetStoreFilePath = resolvedTargetStoreFilePath;
         _targetStoreDirectoryPath = ResolveTargetStoreDirectoryPath(resolvedTargetStoreFilePath);
         _targetStoreFileNamePrefix = ResolveTargetStoreFileNamePrefix(resolvedTargetStoreFilePath);
         _targetStoreFileNameExtension = ResolveTargetStoreFileNameExtension(resolvedTargetStoreFilePath);
@@ -81,10 +76,6 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         _idleEvictionThresholdMinutes = thresholdMinutes;
         _idleEvictionThresholdTicks = (long)(TimeSpan.FromMinutes(thresholdMinutes).TotalSeconds * Stopwatch.Frequency);
         _targetStoreArchiveMaxCount = opts.TargetStoreArchiveMaxCount >= 0 ? opts.TargetStoreArchiveMaxCount : 7;
-        _cursorColumnByTableCode = opts.Tables.ToDictionary(
-            table => table.TableCode,
-            table => table.CursorColumn,
-            StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -358,7 +349,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "写入同步目标落地文件失败。Path={TargetStoreFilePath}, TableCode={TableCode}", _targetStoreFilePath, tableCode);
+            _logger.LogError(ex, "写入同步目标落地文件失败。TableCode={TableCode}", tableCode);
             throw;
         }
         finally
@@ -387,36 +378,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
             return DeserializeTableRows(tableJson, tableStoreFilePath, tableCode);
         }
 
-        if (!File.Exists(_targetStoreFilePath))
-        {
-            return new Dictionary<string, SyncTargetStateRow>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        // 兼容旧版全量文件落地格式，迁移后新写入统一落到按表文件。
-        var json = await File.ReadAllTextAsync(_targetStoreFilePath, ct);
-        if (string.IsNullOrWhiteSpace(json))
-        {
-            return new Dictionary<string, SyncTargetStateRow>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        try
-        {
-            var deserialized = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, object?>>>>(json)
-                ?? new Dictionary<string, Dictionary<string, Dictionary<string, object?>>>(StringComparer.OrdinalIgnoreCase);
-            if (!deserialized.TryGetValue(tableCode, out var legacyRows))
-            {
-                return new Dictionary<string, SyncTargetStateRow>(StringComparer.OrdinalIgnoreCase);
-            }
-
-            return ConvertLegacyRowsToTargetStates(tableCode, legacyRows);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "读取同步目标落地文件失败。Path={TargetStoreFilePath}, TableCode={TableCode}", _targetStoreFilePath, tableCode);
-            throw new InvalidOperationException(
-                $"读取同步目标落地文件失败（Path={_targetStoreFilePath}, TableCode={tableCode}）。请检查文件内容是否为有效 JSON，必要时备份后清理该运行期文件再重试。",
-                ex);
-        }
+        return new Dictionary<string, SyncTargetStateRow>(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -659,117 +621,6 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         };
     }
 
-    /// <summary>
-    /// 兼容旧版全量业务行格式，转换为轻量幂等状态。
-    /// </summary>
-    /// <param name="tableCode">表编码。</param>
-    /// <param name="rows">旧版按业务键行数据。</param>
-    /// <returns>轻量幂等状态。</returns>
-    private Dictionary<string, SyncTargetStateRow> ConvertLegacyRowsToTargetStates(string tableCode, Dictionary<string, Dictionary<string, object?>> rows)
-    {
-        var normalizedRows = NormalizeLegacyRows(rows);
-        var targetStates = new Dictionary<string, SyncTargetStateRow>(StringComparer.OrdinalIgnoreCase);
-        _cursorColumnByTableCode.TryGetValue(tableCode, out var cursorColumn);
-        foreach (var pair in normalizedRows)
-        {
-            targetStates[pair.Key] = BuildTargetStateRow(pair.Key, pair.Value, cursorColumn ?? string.Empty);
-        }
-
-        return targetStates;
-    }
-
-    /// <summary>
-    /// 归一化旧版按表数据，避免 JsonElement 影响转换。
-    /// </summary>
-    /// <param name="rows">旧版行数据。</param>
-    /// <returns>归一化结果。</returns>
-    private static Dictionary<string, Dictionary<string, object?>> NormalizeLegacyRows(Dictionary<string, Dictionary<string, object?>> rows)
-    {
-        var normalized = new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var pair in rows)
-        {
-            normalized[pair.Key] = ConvertLegacyPersistedRow(pair.Value);
-        }
-
-        return normalized;
-    }
-
-    /// <summary>
-    /// 将旧版单行持久化数据转换为可比较的 CLR 类型。
-    /// </summary>
-    /// <param name="row">旧版单行数据。</param>
-    /// <returns>转换后的行。</returns>
-    private static Dictionary<string, object?> ConvertLegacyPersistedRow(Dictionary<string, object?> row)
-    {
-        var converted = new Dictionary<string, object?>(row.Count, StringComparer.OrdinalIgnoreCase);
-        foreach (var pair in row)
-        {
-            converted[pair.Key] = pair.Value is JsonElement element ? ConvertJsonElement(element) : pair.Value;
-        }
-
-        return converted;
-    }
-
-    /// <summary>
-    /// 将 JsonElement 转换为常见 CLR 类型。
-    /// </summary>
-    /// <param name="element">JSON 值。</param>
-    /// <returns>转换结果。</returns>
-    private static object? ConvertJsonElement(JsonElement element)
-    {
-        switch (element.ValueKind)
-        {
-            case JsonValueKind.Null:
-            case JsonValueKind.Undefined:
-                return null;
-            case JsonValueKind.True:
-                return true;
-            case JsonValueKind.False:
-                return false;
-            case JsonValueKind.Number:
-                if (element.TryGetInt64(out var longValue))
-                {
-                    return longValue;
-                }
-
-                if (element.TryGetDecimal(out var decimalValue))
-                {
-                    return decimalValue;
-                }
-
-                return element.GetRawText();
-            case JsonValueKind.String:
-                if (element.TryGetDateTime(out var dateTimeValue))
-                {
-                    return EnsureLocalDateTime(dateTimeValue, element.GetString());
-                }
-
-                var stringValue = element.GetString();
-                if (string.IsNullOrWhiteSpace(stringValue))
-                {
-                    return stringValue;
-                }
-
-                if (ContainsOffsetOrZulu(stringValue))
-                {
-                    throw new InvalidOperationException($"不支持包含 Z 或 offset 的时间文本：{stringValue}");
-                }
-
-                if (DateTime.TryParse(
-                        stringValue,
-                        CultureInfo.InvariantCulture,
-                        // 统一按本地时间语义解析无 Kind 文本，避免进入 UTC 语义。
-                        DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces,
-                        out var parsedLocalDateTime))
-                {
-                    return EnsureLocalDateTime(parsedLocalDateTime, stringValue);
-                }
-
-                return stringValue;
-            default:
-                return element.GetRawText();
-        }
-    }
 
     /// <summary>
     /// 构建目标端轻量幂等状态行。
