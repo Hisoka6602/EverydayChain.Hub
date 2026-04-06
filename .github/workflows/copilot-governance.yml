@@ -189,6 +189,46 @@ jobs:
               print("错误：.github/copilot-instructions.md 缺少 Application 持久化抽象目录约束。")
               sys.exit(1)
 
+          unit_of_work_rule_pattern = re.compile(
+              r"IUnitOfWork[\s\S]*?Application/Abstractions/Persistence",
+              re.DOTALL,
+          )
+          if not unit_of_work_rule_pattern.search(instructions_text):
+              print("错误：.github/copilot-instructions.md 缺少 IUnitOfWork 放置约束。")
+              sys.exit(1)
+
+          query_rule_pattern = re.compile(
+              r"Application/Abstractions/Queries",
+              re.DOTALL,
+          )
+          if not query_rule_pattern.search(instructions_text):
+              print("错误：.github/copilot-instructions.md 缺少 Query/Read 抽象放置约束。")
+              sys.exit(1)
+
+          integration_rule_pattern = re.compile(
+              r"Application/Abstractions/Integrations",
+              re.DOTALL,
+          )
+          if not integration_rule_pattern.search(instructions_text):
+              print("错误：.github/copilot-instructions.md 缺少 Integrations 抽象放置约束。")
+              sys.exit(1)
+
+          protocol_rule_pattern = re.compile(
+              r"Infrastructure/Devices/Protocols",
+              re.DOTALL,
+          )
+          if not protocol_rule_pattern.search(instructions_text):
+              print("错误：.github/copilot-instructions.md 缺少协议编解码放置约束。")
+              sys.exit(1)
+
+          no_parallel_migration_rule_pattern = re.compile(
+              r"迁移过程中禁止新旧目录并存",
+              re.DOTALL,
+          )
+          if not no_parallel_migration_rule_pattern.search(instructions_text):
+              print("错误：.github/copilot-instructions.md 缺少迁移禁止新旧并存约束。")
+              sys.exit(1)
+
           # 校验 nlog.config 中 archiveAboveSize 不超过 10 MB（10485760 字节）
           # 注意：此处提前声明 _nlog_ignored_dirs 以避免依赖后续定义的 ignored_dirs
           _nlog_ignored_dirs = {"bin", "obj", ".git"}

@@ -119,3 +119,30 @@
   - Factory：`I{Name}Factory`
   - 协议编解码：`I{Name}FrameCodec`、`I{Name}ProtocolParser`
 - 新增抽象与实现时，必须在 PR 描述明确标注其所在层级与物理目录，确保审查可追溯。
+- 接口分类与放置细化：
+  - 领域仓储接口（围绕聚合与领域持久化边界）定义在 `Domain/Repositories`，实现放在 `Infrastructure/Persistence/Repositories`。
+  - 应用层持久化协作抽象（同步链路编排所需读取/写入/审计/检查点契约）统一定义在 `Application/Abstractions/Persistence`，实现放在 `Infrastructure/Repositories`。
+  - 领域服务接口定义在 `Domain/Services`；纯规则实现在 `Domain`，外部资源依赖实现放在 `Infrastructure`。
+  - 领域策略/规格/规则接口定义在 `Domain/Policies`、`Domain/Specifications`，禁止放到 `Application`。
+  - 领域工厂接口定义在 `Domain/Factories`，用于保障聚合创建不变式。
+  - `IUnitOfWork` 必须统一定义在 `Application/Abstractions/Persistence`，实现放在 `Infrastructure`，禁止多处重复定义。
+  - 查询/读模型接口必须定义在 `Application/Abstractions/Queries`，命名使用 `I{Name}QueryService` 或 `I{Name}ReadService`。
+  - 当前用户/租户/权限等上下文接口定义在 `Application/Abstractions/Security`，实现放在 `Infrastructure/Security`。
+  - 本地化接口定义在 `Application/Abstractions/Localization`，实现放在 `Infrastructure/Localization`。
+  - 文件存储/导入导出接口定义在 `Application/Abstractions/Storage|Import|Export`，实现放在 `Infrastructure/Storage|Import|Export`。
+  - 消息发布/总线接口定义在 `Application/Abstractions/Messaging`，实现放在 `Infrastructure/Messaging`。
+  - 第三方系统网关/客户端接口定义在 `Application/Abstractions/Integrations`，实现放在 `Infrastructure/Integrations`。
+  - 业务设备能力抽象可定义在 `Application/Abstractions/Devices`，实现放在 `Infrastructure/Devices`。
+  - 协议编解码/CRC/报文解析接口只能放在 `Infrastructure/Devices/Protocols/*`，禁止上浮到 `Application` 或 `Domain`。
+- 实现放置细化：
+  - `Domain` 允许：领域规则实现、领域服务实现、规格实现、工厂实现、值对象行为。
+  - `Domain` 禁止：`DbContext`、EF 配置、SQL、Redis、`HttpClient`、文件系统、MQ、驱动协议实现。
+  - `Application` 允许：应用服务、命令/查询处理器、用例编排、DTO 映射等纯应用逻辑。
+  - `Application` 禁止：仓储实现、`DbContext`、SQL 实现、`HttpClient` 实现、Redis 实现、驱动实现、协议编解码实现。
+  - `Infrastructure` 允许：仓储实现、`DbContext`、UnitOfWork、EF 配置、网关实现、缓存实现、文件存储实现、设备驱动、通信适配、协议编解码。
+  - `Host` 只允许：`Program`、Controller、Hub、HostedService 入口、中间件、DI 组装、配置绑定。
+- 目录与迁移门禁细化：
+  - 禁止在 `Application` 新增 `Repositories` 目录承载抽象；必须使用 `Abstractions` 子目录按语义分类。
+  - 迁移过程中禁止新旧目录并存，必须一次性完成接口迁移、实现引用替换、DI 注册替换、旧文件删除。
+  - 若发现同职责重复接口（如 `IOrderRepo` 与 `IOrderRepository`），必须保留一套标准命名并删除另一套。
+  - 任何 PR 新增抽象时，必须在描述中声明“定义层目录 + 实现层目录 + 命名符合项”。
