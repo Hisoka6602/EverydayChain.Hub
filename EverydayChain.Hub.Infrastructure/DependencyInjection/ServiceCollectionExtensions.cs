@@ -86,12 +86,12 @@ public static class ServiceCollectionExtensions {
     private static HashSet<string> BuildManagedLogicalTables(ShardingOptions shardingOptions, SyncJobOptions syncJobOptions)
     {
         var managedTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var table in shardingOptions.ManagedLogicalTables)
+        foreach (var table in shardingOptions.ManagedLogicalTables ?? [])
         {
             TryAddManagedTable(managedTables, table, "Sharding.ManagedLogicalTables");
         }
 
-        foreach (var table in syncJobOptions.Tables.Where(x => x.Enabled))
+        foreach (var table in (syncJobOptions.Tables ?? []).Where(x => x.Enabled))
         {
             TryAddManagedTable(managedTables, table.TargetLogicalTable, $"SyncJob.Tables[{table.TableCode}].TargetLogicalTable");
         }
