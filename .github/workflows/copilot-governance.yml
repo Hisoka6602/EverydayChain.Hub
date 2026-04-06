@@ -48,6 +48,7 @@ jobs:
           echo "本次变更文件："
           echo "$CHANGED_FILES"
 
+          # 约束联动：规则文件变更必须伴随治理工作流变更，防止规则与校验脚本漂移。
           if echo "$CHANGED_FILES" | grep -qx ".github/copilot-instructions.md"; then
             if ! echo "$CHANGED_FILES" | grep -qx ".github/workflows/copilot-governance.yml"; then
               echo "错误：修改 .github/copilot-instructions.md 时必须同步修改 .github/workflows/copilot-governance.yml"
