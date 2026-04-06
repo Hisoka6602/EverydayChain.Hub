@@ -94,4 +94,30 @@ public class ServiceCollectionExtensionsTests
         Assert.Single(tables);
         Assert.Contains("Table_A", tables);
     }
+
+    /// <summary>
+    /// 启用表的逻辑表名为空白时应立即抛出配置异常。
+    /// </summary>
+    [Fact]
+    public void BuildManagedLogicalTables_WithEnabledTableAndBlankTargetLogicalTable_ShouldThrow()
+    {
+        var options = new SyncJobOptions
+        {
+            Tables =
+            [
+                new SyncTableOptions
+                {
+                    TableCode = "T1",
+                    Enabled = true,
+                    TargetLogicalTable = "   "
+                }
+            ]
+        };
+
+        var action = () => ServiceCollectionExtensions.BuildManagedLogicalTables(options);
+
+        var ex = Assert.Throws<InvalidOperationException>(action);
+        Assert.Contains("T1", ex.Message);
+        Assert.Contains("不能为空白", ex.Message);
+    }
 }

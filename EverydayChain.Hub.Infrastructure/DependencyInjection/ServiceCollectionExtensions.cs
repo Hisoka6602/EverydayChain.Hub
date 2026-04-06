@@ -80,6 +80,11 @@ public static class ServiceCollectionExtensions {
         var managedTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var table in (syncJobOptions.Tables ?? []).Where(x => x.Enabled))
         {
+            if (string.IsNullOrWhiteSpace(table.TargetLogicalTable))
+            {
+                throw new InvalidOperationException($"分表配置无效：启用表 {table.TableCode} 的 TargetLogicalTable 不能为空白。");
+            }
+
             LogicalTableNameNormalizer.AddValidated(managedTables, table.TargetLogicalTable, $"SyncJob.Tables[{table.TableCode}].TargetLogicalTable");
         }
 

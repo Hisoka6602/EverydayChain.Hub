@@ -16,4 +16,7 @@ public class ShardingOptions
 
     /// <summary>启动时预创建的未来月份数，默认 1。</summary>
     public int AutoCreateMonthsAhead { get; set; } = 1;
+
+    /// <summary>分表预建并发上限，范围 1-64，默认 4。</summary>
+    public int PreProvisionMaxConcurrency { get; set; } = 4;
 }

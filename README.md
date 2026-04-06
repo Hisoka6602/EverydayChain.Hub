@@ -193,7 +193,7 @@
 - `SyncDeletionLogRepository.cs`：同步删除日志仓储基础实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖，并在启动阶段从启用同步表配置提取逻辑表名集合，完成安全校验与空配置异常拦截。
 - `202603280001_InitialHubSchema.cs`：基础表结构迁移。
-- `nlog.config`：NLog 日志配置，输出至控制台与滚动日志文件（按日切割，单文件上限 100 MB，保留 30 天）。
+- `nlog.config`：NLog 日志配置，输出至控制台与滚动日志文件（按日切割，单文件上限 10 MB，保留 30 天）。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
 - `EverydayChain.Hub.Tests/Services/SyncWindowCalculatorTests.cs`：SyncWindowCalculator 时间窗口回归测试套件（12 个测试用例，覆盖正常窗口、时钟回拨冻结、UTC 拒绝、Unspecified Kind 兼容、时钟扰动组合场景）。
@@ -210,6 +210,4 @@
 - `appsettings.json`：主配置样例，移除分表逻辑表名静态配置，统一由 `SyncJob.Tables.TargetLogicalTable` 提供。
 
 ## 可继续完善内容（本次 PR 后续行动项）
-- 为逻辑表名集合构建补充“重复名称去重后保留 1 项”的单元测试，覆盖大小写混合输入。
-- 评估将逻辑表名规范化与安全校验抽离至共享工具，减少仓储与服务层重复校验逻辑。
 - 在启动日志中输出纳管逻辑表集合快照，便于运维核对多表预建范围。
