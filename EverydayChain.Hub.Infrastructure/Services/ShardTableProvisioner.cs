@@ -104,20 +104,9 @@ END";
             managedTables.Add(trimmed);
         }
 
-        if (managedTables.Count == 0 && !string.IsNullOrWhiteSpace(_options.BaseTableName))
-        {
-            var fallback = _options.BaseTableName.Trim();
-            if (!SqlIdentifierRegex.IsMatch(fallback))
-            {
-                throw new InvalidOperationException($"分表配置无效：BaseTableName 包含非法逻辑表名 '{fallback}'。");
-            }
-
-            managedTables.Add(fallback);
-        }
-
         if (managedTables.Count == 0)
         {
-            throw new InvalidOperationException("分表配置无效：未配置可用逻辑表。");
+            throw new InvalidOperationException("分表配置无效：ManagedLogicalTables 为空，未配置可用逻辑表。");
         }
 
         return managedTables.ToArray();

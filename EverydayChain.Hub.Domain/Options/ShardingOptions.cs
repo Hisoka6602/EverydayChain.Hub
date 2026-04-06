@@ -19,7 +19,7 @@ public class ShardingOptions
 
     /// <summary>
     /// 统一纳管的逻辑表名集合（可填写范围：仅允许字母、数字、下划线）。
-    /// 优先使用该集合；为空时回退 <see cref="BaseTableName"/> 兼容旧配置。
+    /// 分表预建仅使用该集合与启用同步表的目标逻辑表并集。
     /// </summary>
     public HashSet<string> ManagedLogicalTables { get; set; } = [];
 

@@ -1,7 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 分表配置新增 `Sharding.ManagedLogicalTables`，用于声明统一纳管的多逻辑表；为空时回退 `Sharding.BaseTableName` 保持旧配置兼容。
+- 分表配置新增 `Sharding.ManagedLogicalTables`，用于声明统一纳管的多逻辑表；分表预建不再回退旧 `BaseTableName` 逻辑。
 - 启动阶段新增逻辑表自动推导：合并 `Sharding.ManagedLogicalTables` 与 `SyncJob.Tables` 中启用项的 `TargetLogicalTable`，并进行去重、去空白、SQL 标识符安全校验。
 - `ShardTableProvisioner` 改为按“逻辑表 × 月份后缀”组合预建分表，危险建表动作仍统一通过 `IDangerZoneExecutor` 隔离执行。
 - 更新 `appsettings.json` 分表示例，新增 `ManagedLogicalTables` 集合示例并补充中文注释范围说明。
@@ -188,7 +188,7 @@
 - `SyncBatchRepository.cs`：同步批次仓储基础实现，支持 `Pending/InProgress/Completed/Failed` 状态流转与最近失败批次查询。
 - `SyncChangeLogRepository.cs`：同步变更日志仓储基础实现，支持批量写入审计记录。
 - `SyncDeletionLogRepository.cs`：同步删除日志仓储基础实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
-- `ServiceCollectionExtensions.cs`：统一注册基础设施依赖，并在启动阶段合并分表显式配置与启用同步表逻辑表名，完成安全校验与回退处理。
+- `ServiceCollectionExtensions.cs`：统一注册基础设施依赖，并在启动阶段合并分表显式配置与启用同步表逻辑表名，完成安全校验与空配置异常拦截。
 - `202603280001_InitialHubSchema.cs`：基础表结构迁移。
 - `nlog.config`：NLog 日志配置，输出至控制台与滚动日志文件（按日切割，单文件上限 100 MB，保留 30 天）。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
@@ -200,12 +200,12 @@
 - `当前程序能力与缺陷分析.md`：汇总当前程序能力、功能清单、代码缺陷与逻辑 BUG，作为后续修复与优化输入。
 - `Oracle到SQLServer同步架构设计.md`：定义外部 Oracle DB First 只读同步到本地 SQL Server 的详细落地方案。
 - `Oracle到SQLServer同步实施计划.md`：按 PR 拆分同步架构落地步骤的进度跟踪文档。
-- `ShardingOptions.cs`：分表配置模型，新增 `ManagedLogicalTables` 纳管多逻辑表集合并保留 `BaseTableName` 回退兼容。
+- `ShardingOptions.cs`：分表配置模型，新增 `ManagedLogicalTables` 纳管多逻辑表集合并明确其为预建逻辑表来源。
 - `ShardTableProvisioner.cs`：分表预建实现，按纳管逻辑表与后缀笛卡尔组合执行建表，并保持危险动作隔离执行。
 - `AutoMigrationService.cs`：应用启动迁移入口，保持原调用语义，通过分表预建器自动覆盖多逻辑表。
 - `appsettings.json`：主配置样例，新增 `Sharding.ManagedLogicalTables` 示例项与注释约束。
 
 ## 可继续完善内容（本次 PR 后续行动项）
-- 为 `ServiceCollectionExtensions.BuildManagedLogicalTables` 增加单元测试，覆盖非法标识符、回退路径与空配置异常场景。
+- 为 `ServiceCollectionExtensions.BuildManagedLogicalTables` 增加单元测试，覆盖非法标识符与空配置异常场景。
 - 评估将逻辑表名规范化与安全校验抽离至共享工具，减少仓储与服务层重复校验逻辑。
 - 在启动日志中输出纳管逻辑表集合快照，便于运维核对多表预建范围。

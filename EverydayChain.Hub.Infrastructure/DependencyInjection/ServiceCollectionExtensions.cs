@@ -98,12 +98,7 @@ public static class ServiceCollectionExtensions {
 
         if (managedTables.Count == 0)
         {
-            TryAddManagedTable(managedTables, shardingOptions.BaseTableName, "Sharding.BaseTableName");
-        }
-
-        if (managedTables.Count == 0)
-        {
-            throw new InvalidOperationException("分表配置无效：Sharding.ManagedLogicalTables 与启用的 SyncJob.Tables.TargetLogicalTable 均为空，且 Sharding.BaseTableName 未配置。");
+            throw new InvalidOperationException("分表配置无效：Sharding.ManagedLogicalTables 与启用的 SyncJob.Tables.TargetLogicalTable 均为空，无法确定需预建的逻辑表。");
         }
 
         return managedTables;
