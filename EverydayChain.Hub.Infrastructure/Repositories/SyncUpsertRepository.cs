@@ -1,7 +1,10 @@
 using System.Collections.Concurrent;
+using System.Buffers;
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text.Json;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Repositories;
@@ -20,16 +23,19 @@ namespace EverydayChain.Hub.Infrastructure.Repositories;
 /// </summary>
 public class SyncUpsertRepository : ISyncUpsertRepository
 {
+    /// <summary>行摘要序列化配置（紧凑输出）。</summary>
+    private static readonly JsonSerializerOptions DigestSerializerOptions = new()
+    {
+        WriteIndented = false,
+    };
     /// <summary>目标内存表，按表编码分组。</summary>
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, IReadOnlyDictionary<string, object?>>> _targetTables = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, SyncTargetStateRow>> _targetTables = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>各表最后访问时间戳（Stopwatch.GetTimestamp()），用于空闲驱逐判定。</summary>
     private readonly ConcurrentDictionary<string, long> _tableLastAccessTimestamps = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>目标端持久化文件访问锁。</summary>
     private static readonly SemaphoreSlim TargetStoreFileLock = new(1, 1);
     /// <summary>日志组件。</summary>
     private readonly ILogger<SyncUpsertRepository> _logger;
-    /// <summary>目标端持久化文件路径。</summary>
-    private readonly string _targetStoreFilePath;
     /// <summary>目标端持久化文件目录。</summary>
     private readonly string _targetStoreDirectoryPath;
     /// <summary>目标端持久化文件名前缀。</summary>
@@ -64,7 +70,6 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         var resolvedTargetStoreFilePath = RuntimeStoragePathResolver.ResolveAbsolutePath(
             opts.TargetStoreFilePath,
             Path.Combine("data", "sync-target-store.json"));
-        _targetStoreFilePath = resolvedTargetStoreFilePath;
         _targetStoreDirectoryPath = ResolveTargetStoreDirectoryPath(resolvedTargetStoreFilePath);
         _targetStoreFileNamePrefix = ResolveTargetStoreFileNamePrefix(resolvedTargetStoreFilePath);
         _targetStoreFileNameExtension = ResolveTargetStoreFileNameExtension(resolvedTargetStoreFilePath);
@@ -137,27 +142,28 @@ public class SyncUpsertRepository : ISyncUpsertRepository
                 continue;
             }
 
+            var newState = BuildTargetStateRow(rowKey, filteredRow, request.CursorColumn);
             if (!targetTable.TryGetValue(rowKey, out var existedRow))
             {
-                targetTable[rowKey] = CloneRow(filteredRow);
+                targetTable[rowKey] = newState;
                 result.InsertCount++;
                 changedOperations[rowKey] = SyncChangeOperationType.Insert;
-                UpdateLastCursor(result, filteredRow, request.CursorColumn);
+                UpdateLastCursor(result, newState.CursorLocal);
                 hasChanges = true;
                 continue;
             }
 
-            if (AreRowsEqual(existedRow, filteredRow))
+            if (IsStateEqual(existedRow, newState))
             {
                 result.SkipCount++;
-                UpdateLastCursor(result, filteredRow, request.CursorColumn);
+                UpdateLastCursor(result, newState.CursorLocal);
                 continue;
             }
 
-            targetTable[rowKey] = CloneRow(filteredRow);
+            targetTable[rowKey] = newState;
             result.UpdateCount++;
             changedOperations[rowKey] = SyncChangeOperationType.Update;
-            UpdateLastCursor(result, filteredRow, request.CursorColumn);
+            UpdateLastCursor(result, newState.CursorLocal);
             hasChanges = true;
         }
 
@@ -171,7 +177,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ListTargetRowsAsync(string tableCode, CancellationToken ct)
+    public async Task<IReadOnlyList<SyncTargetStateRow>> ListTargetStateRowsAsync(string tableCode, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         await EnsureTableLoadedAsync(tableCode, ct);
@@ -181,8 +187,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
             return [];
         }
 
-        var rows = table.Values.ToList();
-        return rows;
+        return table.Values.ToList();
     }
 
     /// <inheritdoc/>
@@ -207,10 +212,13 @@ public class SyncUpsertRepository : ISyncUpsertRepository
 
             if (deletionPolicy == DeletionPolicy.SoftDelete)
             {
-                var softDeletedRow = new Dictionary<string, object?>(row)
+                var softDeletedRow = new SyncTargetStateRow
                 {
-                    [SyncColumnFilter.SoftDeleteFlagColumn] = true,
-                    [SyncColumnFilter.SoftDeleteTimeColumn] = DateTime.Now,
+                    BusinessKey = row.BusinessKey,
+                    RowDigest = row.RowDigest,
+                    CursorLocal = row.CursorLocal,
+                    IsSoftDeleted = true,
+                    SoftDeletedTimeLocal = DateTime.Now,
                 };
                 table[businessKey] = softDeletedRow;
                 deletedCount++;
@@ -239,27 +247,12 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     /// <param name="left">旧值。</param>
     /// <param name="right">新值。</param>
     /// <returns>一致返回 <c>true</c>。</returns>
-    private static bool AreRowsEqual(IReadOnlyDictionary<string, object?> left, IReadOnlyDictionary<string, object?> right)
+    private static bool IsStateEqual(SyncTargetStateRow left, SyncTargetStateRow right)
     {
-        if (left.Count != right.Count)
-        {
-            return false;
-        }
-
-        foreach (var pair in left)
-        {
-            if (!right.TryGetValue(pair.Key, out var rightValue))
-            {
-                return false;
-            }
-
-            if (!Equals(pair.Value, rightValue))
-            {
-                return false;
-            }
-        }
-
-        return true;
+        return string.Equals(left.RowDigest, right.RowDigest, StringComparison.Ordinal)
+               && Nullable.Equals(left.CursorLocal, right.CursorLocal)
+               && left.IsSoftDeleted == right.IsSoftDeleted
+               && Nullable.Equals(left.SoftDeletedTimeLocal, right.SoftDeletedTimeLocal);
     }
 
     /// <summary>
@@ -268,16 +261,16 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     /// <param name="result">合并结果。</param>
     /// <param name="row">数据行。</param>
     /// <param name="cursorColumn">游标列。</param>
-    private static void UpdateLastCursor(SyncMergeResult result, IReadOnlyDictionary<string, object?> row, string cursorColumn)
+    private static void UpdateLastCursor(SyncMergeResult result, DateTime? cursorLocal)
     {
-        if (!row.TryGetValue(cursorColumn, out var value) || value is not DateTime cursorLocal)
+        if (!cursorLocal.HasValue)
         {
             return;
         }
 
-        if (!result.LastSuccessCursorLocal.HasValue || cursorLocal > result.LastSuccessCursorLocal.Value)
+        if (!result.LastSuccessCursorLocal.HasValue || cursorLocal.Value > result.LastSuccessCursorLocal.Value)
         {
-            result.LastSuccessCursorLocal = cursorLocal;
+            result.LastSuccessCursorLocal = cursorLocal.Value;
         }
     }
 
@@ -286,18 +279,18 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     /// </summary>
     /// <param name="row">原始行。</param>
     /// <returns>克隆结果。</returns>
-    private static IReadOnlyDictionary<string, object?> CloneRow(IReadOnlyDictionary<string, object?> row)
+    private static SyncTargetStateRow CloneRow(SyncTargetStateRow row)
     {
-        return new Dictionary<string, object?>(row);
+        return row with { };
     }
 
     /// <summary>
     /// 创建业务键字典（忽略大小写）。
     /// </summary>
     /// <returns>业务键字典。</returns>
-    private static ConcurrentDictionary<string, IReadOnlyDictionary<string, object?>> CreateBusinessKeyDictionary()
+    private static ConcurrentDictionary<string, SyncTargetStateRow> CreateBusinessKeyDictionary()
     {
-        return new ConcurrentDictionary<string, IReadOnlyDictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
+        return new ConcurrentDictionary<string, SyncTargetStateRow>(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -341,14 +334,14 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     /// <param name="tableCode">表编码。</param>
     /// <param name="table">目标表字典。</param>
     /// <param name="ct">取消令牌。</param>
-    private async Task PersistTableAsync(string tableCode, ConcurrentDictionary<string, IReadOnlyDictionary<string, object?>> table, CancellationToken ct)
+    private async Task PersistTableAsync(string tableCode, ConcurrentDictionary<string, SyncTargetStateRow> table, CancellationToken ct)
     {
         var tableStoreFilePath = BuildPerTableStoreFilePath(tableCode);
         await _runtimeStorageGuard.EnsureWriteSpaceAsync(tableStoreFilePath, $"目标快照写入[{tableCode}]", ct);
-        var persistedTable = new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
+        var persistedTable = new Dictionary<string, SyncTargetStateRow>(StringComparer.OrdinalIgnoreCase);
         foreach (var pair in table)
         {
-            persistedTable[pair.Key] = new Dictionary<string, object?>(pair.Value);
+            persistedTable[pair.Key] = CloneRow(pair.Value);
         }
 
         await TargetStoreFileLock.WaitAsync(ct);
@@ -358,7 +351,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "写入同步目标落地文件失败。Path={TargetStoreFilePath}, TableCode={TableCode}", _targetStoreFilePath, tableCode);
+            _logger.LogError(ex, "写入同步目标落地文件失败。TableCode={TableCode}, TableStoreFilePath={TableStoreFilePath}", tableCode, tableStoreFilePath);
             throw;
         }
         finally
@@ -373,7 +366,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     /// <param name="tableCode">表编码。</param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>指定表持久化数据。</returns>
-    private async Task<Dictionary<string, Dictionary<string, object?>>> LoadTableRowsWithoutLockAsync(string tableCode, CancellationToken ct)
+    private async Task<Dictionary<string, SyncTargetStateRow>> LoadTableRowsWithoutLockAsync(string tableCode, CancellationToken ct)
     {
         var tableStoreFilePath = BuildPerTableStoreFilePath(tableCode);
         if (File.Exists(tableStoreFilePath))
@@ -381,42 +374,13 @@ public class SyncUpsertRepository : ISyncUpsertRepository
             var tableJson = await File.ReadAllTextAsync(tableStoreFilePath, ct);
             if (string.IsNullOrWhiteSpace(tableJson))
             {
-                return new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
+                return new Dictionary<string, SyncTargetStateRow>(StringComparer.OrdinalIgnoreCase);
             }
 
             return DeserializeTableRows(tableJson, tableStoreFilePath, tableCode);
         }
 
-        if (!File.Exists(_targetStoreFilePath))
-        {
-            return new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        // 兼容旧版全量文件落地格式，迁移后新写入统一落到按表文件。
-        var json = await File.ReadAllTextAsync(_targetStoreFilePath, ct);
-        if (string.IsNullOrWhiteSpace(json))
-        {
-            return new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        try
-        {
-            var deserialized = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, object?>>>>(json)
-                ?? new Dictionary<string, Dictionary<string, Dictionary<string, object?>>>(StringComparer.OrdinalIgnoreCase);
-            if (!deserialized.TryGetValue(tableCode, out var legacyRows))
-            {
-                return new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
-            }
-
-            return NormalizeTableRows(legacyRows);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "读取同步目标落地文件失败。Path={TargetStoreFilePath}, TableCode={TableCode}", _targetStoreFilePath, tableCode);
-            throw new InvalidOperationException(
-                $"读取同步目标落地文件失败（Path={_targetStoreFilePath}, TableCode={tableCode}）。请检查文件内容是否为有效 JSON，必要时备份后清理该运行期文件再重试。",
-                ex);
-        }
+        return new Dictionary<string, SyncTargetStateRow>(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -425,7 +389,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     /// <param name="tableCode">表编码。</param>
     /// <param name="tableRows">指定表数据。</param>
     /// <param name="ct">取消令牌。</param>
-    private async Task SaveTableRowsWithoutLockAsync(string tableCode, Dictionary<string, Dictionary<string, object?>> tableRows, CancellationToken ct)
+    private async Task SaveTableRowsWithoutLockAsync(string tableCode, Dictionary<string, SyncTargetStateRow> tableRows, CancellationToken ct)
     {
         if (!Directory.Exists(_targetStoreDirectoryPath))
         {
@@ -608,12 +572,12 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     /// <param name="path">文件路径。</param>
     /// <param name="tableCode">表编码。</param>
     /// <returns>按表数据。</returns>
-    private Dictionary<string, Dictionary<string, object?>> DeserializeTableRows(string json, string path, string tableCode)
+    private Dictionary<string, SyncTargetStateRow> DeserializeTableRows(string json, string path, string tableCode)
     {
         try
         {
-            var deserialized = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, object?>>>(json)
-                ?? new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
+            var deserialized = JsonSerializer.Deserialize<Dictionary<string, SyncTargetStateRow>>(json)
+                ?? new Dictionary<string, SyncTargetStateRow>(StringComparer.OrdinalIgnoreCase);
             return NormalizeTableRows(deserialized);
         }
         catch (Exception ex)
@@ -626,96 +590,258 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     }
 
     /// <summary>
-    /// 归一化按表数据，避免 JsonElement 影响后续比较与游标计算。
+    /// 归一化轻量幂等状态，避免 JsonElement 影响后续比较与游标计算。
     /// </summary>
-    /// <param name="rows">按表数据。</param>
+    /// <param name="rows">按表状态。</param>
     /// <returns>归一化结果。</returns>
-    private static Dictionary<string, Dictionary<string, object?>> NormalizeTableRows(Dictionary<string, Dictionary<string, object?>> rows)
+    private static Dictionary<string, SyncTargetStateRow> NormalizeTableRows(Dictionary<string, SyncTargetStateRow> rows)
     {
-        var normalized = new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
+        var normalized = new Dictionary<string, SyncTargetStateRow>(StringComparer.OrdinalIgnoreCase);
         foreach (var pair in rows)
         {
-            normalized[pair.Key] = ConvertPersistedRow(pair.Value);
+            normalized[pair.Key] = NormalizeTargetStateRow(pair.Key, pair.Value);
         }
 
         return normalized;
     }
 
     /// <summary>
-    /// 将单行持久化数据转换为可比较的 CLR 类型。
+    /// 归一化轻量状态行。
     /// </summary>
-    /// <param name="row">单行数据。</param>
-    /// <returns>转换后的行。</returns>
-    private static Dictionary<string, object?> ConvertPersistedRow(Dictionary<string, object?> row)
+    /// <param name="businessKey">业务键。</param>
+    /// <param name="row">原始状态行。</param>
+    /// <returns>归一化状态行。</returns>
+    private static SyncTargetStateRow NormalizeTargetStateRow(string businessKey, SyncTargetStateRow row)
     {
-        var converted = new Dictionary<string, object?>(row.Count, StringComparer.OrdinalIgnoreCase);
-        foreach (var pair in row)
+        return new SyncTargetStateRow
         {
-            converted[pair.Key] = pair.Value is JsonElement element ? ConvertJsonElement(element) : pair.Value;
-        }
+            BusinessKey = string.IsNullOrWhiteSpace(row.BusinessKey) ? businessKey : row.BusinessKey,
+            RowDigest = row.RowDigest ?? string.Empty,
+            CursorLocal = NormalizeOptionalLocalDateTime(row.CursorLocal, $"状态文件[{businessKey}]游标"),
+            IsSoftDeleted = row.IsSoftDeleted,
+            SoftDeletedTimeLocal = NormalizeOptionalLocalDateTime(row.SoftDeletedTimeLocal, $"状态文件[{businessKey}]软删除时间"),
+        };
+    }
 
-        return converted;
+
+    /// <summary>
+    /// 构建目标端轻量幂等状态行。
+    /// </summary>
+    /// <param name="businessKey">业务键。</param>
+    /// <param name="row">原始业务行。</param>
+    /// <param name="cursorColumn">游标列。</param>
+    /// <returns>轻量状态行。</returns>
+    private static SyncTargetStateRow BuildTargetStateRow(
+        string businessKey,
+        IReadOnlyDictionary<string, object?> row,
+        string cursorColumn)
+    {
+        return new SyncTargetStateRow
+        {
+            BusinessKey = businessKey,
+            RowDigest = ComputeRowDigestHash(row),
+            CursorLocal = TryGetCursorLocal(row, cursorColumn),
+            IsSoftDeleted = IsSoftDeleted(row),
+            SoftDeletedTimeLocal = TryGetSoftDeletedTimeLocal(row),
+        };
     }
 
     /// <summary>
-    /// 将 JsonElement 转换为常见 CLR 类型。
+    /// 计算行摘要哈希（SHA256 十六进制文本）。
     /// </summary>
-    /// <param name="element">JSON 值。</param>
-    /// <returns>转换结果。</returns>
-    private static object? ConvertJsonElement(JsonElement element)
+    /// <param name="row">业务行。</param>
+    /// <returns>摘要文本。</returns>
+    private static string ComputeRowDigestHash(IReadOnlyDictionary<string, object?> row)
     {
-        switch (element.ValueKind)
+        var sortedKeys = row.Keys.ToArray();
+        Array.Sort(sortedKeys, StringComparer.OrdinalIgnoreCase);
+        using var incrementalHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (var key in sortedKeys)
         {
-            case JsonValueKind.Null:
-            case JsonValueKind.Undefined:
-                return null;
-            case JsonValueKind.True:
-                return true;
-            case JsonValueKind.False:
-                return false;
-            case JsonValueKind.Number:
-                if (element.TryGetInt64(out var longValue))
-                {
-                    return longValue;
-                }
-
-                if (element.TryGetDecimal(out var decimalValue))
-                {
-                    return decimalValue;
-                }
-
-                return element.GetRawText();
-            case JsonValueKind.String:
-                if (element.TryGetDateTime(out var dateTimeValue))
-                {
-                    return EnsureLocalDateTime(dateTimeValue, element.GetString());
-                }
-
-                var stringValue = element.GetString();
-                if (string.IsNullOrWhiteSpace(stringValue))
-                {
-                    return stringValue;
-                }
-
-                if (ContainsOffsetOrZulu(stringValue))
-                {
-                    throw new InvalidOperationException($"不支持包含 Z 或 offset 的时间文本：{stringValue}");
-                }
-
-                if (DateTime.TryParse(
-                        stringValue,
-                        CultureInfo.InvariantCulture,
-                        // 统一按本地时间语义解析无 Kind 文本，避免进入 UTC 语义。
-                        DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces,
-                        out var parsedLocalDateTime))
-                {
-                    return EnsureLocalDateTime(parsedLocalDateTime, stringValue);
-                }
-
-                return stringValue;
-            default:
-                return element.GetRawText();
+            AppendLengthPrefixedUtf8(incrementalHash, key);
+            var normalizedValue = NormalizeDigestValue(row[key]);
+            AppendLengthPrefixedUtf8(incrementalHash, ConvertDigestValueToStableText(normalizedValue));
         }
+
+        var hashBytes = incrementalHash.GetHashAndReset();
+        return Convert.ToHexString(hashBytes);
+    }
+
+    /// <summary>
+    /// 将字符串按“长度前缀 + UTF-8 内容”追加到增量哈希，避免分隔符冲突。
+    /// </summary>
+    /// <param name="incrementalHash">增量哈希实例。</param>
+    /// <param name="value">待追加字符串。</param>
+    private static void AppendLengthPrefixedUtf8(IncrementalHash incrementalHash, string value)
+    {
+        var byteCount = System.Text.Encoding.UTF8.GetByteCount(value);
+        Span<byte> lengthPrefix = stackalloc byte[sizeof(int)];
+        BinaryPrimitives.WriteInt32LittleEndian(lengthPrefix, byteCount);
+        incrementalHash.AppendData(lengthPrefix);
+        var buffer = ArrayPool<byte>.Shared.Rent(byteCount);
+        try
+        {
+            var written = System.Text.Encoding.UTF8.GetBytes(value, 0, value.Length, buffer, 0);
+            incrementalHash.AppendData(buffer.AsSpan(0, written));
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    /// <summary>
+    /// 将归一化值转换为稳定文本，避免热路径中频繁创建 JSON 数组对象。
+    /// </summary>
+    /// <param name="value">归一化值。</param>
+    /// <returns>稳定文本。</returns>
+    private static string ConvertDigestValueToStableText(object? value)
+    {
+        if (value is null)
+        {
+            return "null";
+        }
+
+        if (value is string text)
+        {
+            return text;
+        }
+
+        if (value is bool booleanValue)
+        {
+            return booleanValue ? "true" : "false";
+        }
+
+        if (value is IFormattable formattable)
+        {
+            return formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty;
+        }
+
+        return JsonSerializer.Serialize(value, DigestSerializerOptions);
+    }
+
+    /// <summary>
+    /// 归一化摘要计算值。
+    /// </summary>
+    /// <param name="value">原始值。</param>
+    /// <returns>归一化值。</returns>
+    private static object? NormalizeDigestValue(object? value)
+    {
+        if (value is DateTime dateTime)
+        {
+            return EnsureLocalDateTime(dateTime, dateTime.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture))
+                .ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture);
+        }
+
+        return value;
+    }
+
+    /// <summary>
+    /// 尝试提取游标本地时间。
+    /// </summary>
+    /// <param name="row">业务行。</param>
+    /// <param name="cursorColumn">游标列名。</param>
+    /// <returns>游标本地时间。</returns>
+    private static DateTime? TryGetCursorLocal(IReadOnlyDictionary<string, object?> row, string cursorColumn)
+    {
+        if (string.IsNullOrWhiteSpace(cursorColumn))
+        {
+            return null;
+        }
+
+        if (!row.TryGetValue(cursorColumn, out var cursorValue) || cursorValue is null)
+        {
+            return null;
+        }
+
+        if (cursorValue is DateTime cursorDateTime)
+        {
+            return EnsureLocalDateTime(cursorDateTime, cursorDateTime.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture));
+        }
+
+        if (cursorValue is string cursorText)
+        {
+            if (ContainsOffsetOrZulu(cursorText))
+            {
+                throw new InvalidOperationException($"不支持包含 Z 或 offset 的时间文本：{cursorText}");
+            }
+
+            if (DateTime.TryParse(
+                    cursorText,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces,
+                    out var parsedLocalDateTime))
+            {
+                return EnsureLocalDateTime(parsedLocalDateTime, cursorText);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 判断业务行是否为软删除。
+    /// </summary>
+    /// <param name="row">业务行。</param>
+    /// <returns>软删除返回 <c>true</c>。</returns>
+    private static bool IsSoftDeleted(IReadOnlyDictionary<string, object?> row)
+    {
+        return row.TryGetValue(SyncColumnFilter.SoftDeleteFlagColumn, out var flagValue)
+               && flagValue is bool flag
+               && flag;
+    }
+
+    /// <summary>
+    /// 尝试提取软删除本地时间。
+    /// </summary>
+    /// <param name="row">业务行。</param>
+    /// <returns>软删除时间。</returns>
+    private static DateTime? TryGetSoftDeletedTimeLocal(IReadOnlyDictionary<string, object?> row)
+    {
+        if (!row.TryGetValue(SyncColumnFilter.SoftDeleteTimeColumn, out var timeValue) || timeValue is null)
+        {
+            return null;
+        }
+
+        if (timeValue is DateTime dateTime)
+        {
+            return EnsureLocalDateTime(dateTime, dateTime.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture));
+        }
+
+        if (timeValue is string textValue)
+        {
+            if (ContainsOffsetOrZulu(textValue))
+            {
+                throw new InvalidOperationException($"不支持包含 Z 或 offset 的时间文本：{textValue}");
+            }
+
+            if (DateTime.TryParse(
+                    textValue,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces,
+                    out var parsedLocalDateTime))
+            {
+                return EnsureLocalDateTime(parsedLocalDateTime, textValue);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 归一化可空本地时间。
+    /// </summary>
+    /// <param name="value">时间值。</param>
+    /// <param name="name">字段名称。</param>
+    /// <returns>归一化时间。</returns>
+    private static DateTime? NormalizeOptionalLocalDateTime(DateTime? value, string name)
+    {
+        if (!value.HasValue)
+        {
+            return null;
+        }
+
+        return EnsureLocalDateTime(value.Value, name);
     }
 
     /// <summary>
