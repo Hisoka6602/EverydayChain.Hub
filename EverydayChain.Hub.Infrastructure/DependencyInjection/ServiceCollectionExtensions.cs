@@ -73,7 +73,7 @@ public static class ServiceCollectionExtensions {
     /// 构建分表纳管逻辑表集合。
     /// </summary>
     /// <param name="syncJobOptions">同步配置。</param>
-    /// <returns>去重、去空白并通过安全校验后的逻辑表集合。</returns>
+    /// <returns>去重、去空白并通过安全校验后的逻辑表集合（大小写不敏感去重，保留首次出现的原始大小写）。</returns>
     /// <exception cref="InvalidOperationException">配置缺失或包含非法表名时抛出。</exception>
     public static HashSet<string> BuildManagedLogicalTables(SyncJobOptions syncJobOptions)
     {

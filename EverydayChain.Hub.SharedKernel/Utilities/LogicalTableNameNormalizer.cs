@@ -44,6 +44,8 @@ public static class LogicalTableNameNormalizer
     /// <exception cref="InvalidOperationException">表名不满足安全规则时抛出。</exception>
     public static void AddValidated(HashSet<string> target, string? logicalTable, string sourcePath)
     {
+        ArgumentNullException.ThrowIfNull(target);
+
         var normalized = NormalizeOrNull(logicalTable);
         if (normalized is null)
         {

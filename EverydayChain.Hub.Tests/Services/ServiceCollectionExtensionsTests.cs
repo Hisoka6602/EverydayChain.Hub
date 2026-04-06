@@ -92,6 +92,6 @@ public class ServiceCollectionExtensionsTests
         var tables = ServiceCollectionExtensions.BuildManagedLogicalTables(options);
 
         Assert.Single(tables);
-        Assert.Contains("Table_A", tables, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("Table_A", tables);
     }
 }

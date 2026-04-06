@@ -2,6 +2,7 @@ using EverydayChain.Hub.Domain.Options;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using EverydayChain.Hub.SharedKernel.Utilities;
 
 namespace EverydayChain.Hub.Infrastructure.Services;
 
@@ -17,7 +18,7 @@ public class ShardTableProvisioner(
     /// <summary>分表配置快照。</summary>
     private readonly ShardingOptions _options = options.Value;
     /// <summary>纳管逻辑表列表。</summary>
-    private readonly IReadOnlyList<string> _managedLogicalTables = managedLogicalTables;
+    private readonly IReadOnlyList<string> _managedLogicalTables = ValidateManagedLogicalTables(managedLogicalTables);
 
     /// <inheritdoc/>
     public Task EnsureShardTablesAsync(IEnumerable<string> suffixes, CancellationToken cancellationToken)
@@ -79,5 +80,26 @@ END";
             logger.LogInformation("分表自治: 已确认分表存在 {Table}", fullName);
         },
         cancellationToken);
+
+    /// <summary>
+    /// 校验并冻结纳管逻辑表集合，防止运行时注入非法标识符。
+    /// </summary>
+    /// <param name="managedLogicalTables">待校验逻辑表集合。</param>
+    /// <returns>校验通过的只读逻辑表列表。</returns>
+    /// <exception cref="InvalidOperationException">存在空值或非法标识符时抛出。</exception>
+    private static IReadOnlyList<string> ValidateManagedLogicalTables(IReadOnlyList<string> managedLogicalTables)
+    {
+        ArgumentNullException.ThrowIfNull(managedLogicalTables);
+
+        foreach (var logicalTable in managedLogicalTables)
+        {
+            if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(logicalTable))
+            {
+                throw new InvalidOperationException($"分表配置无效：逻辑表名 '{logicalTable}' 非法，仅允许字母、数字、下划线。");
+            }
+        }
+
+        return managedLogicalTables;
+    }
 
 }
