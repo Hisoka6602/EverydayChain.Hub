@@ -21,6 +21,11 @@ namespace EverydayChain.Hub.Infrastructure.Repositories;
 /// </summary>
 public class SyncUpsertRepository : ISyncUpsertRepository
 {
+    /// <summary>行摘要序列化配置（紧凑输出）。</summary>
+    private static readonly JsonSerializerOptions DigestSerializerOptions = new()
+    {
+        WriteIndented = false,
+    };
     /// <summary>目标内存表，按表编码分组。</summary>
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, SyncTargetStateRow>> _targetTables = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>各表最后访问时间戳（Stopwatch.GetTimestamp()），用于空闲驱逐判定。</summary>
@@ -144,16 +149,13 @@ public class SyncUpsertRepository : ISyncUpsertRepository
                 continue;
             }
 
-            var cursorLocal = TryGetCursorLocal(filteredRow, request.CursorColumn);
-            var isSoftDeleted = IsSoftDeleted(filteredRow);
-            var softDeletedTimeLocal = TryGetSoftDeletedTimeLocal(filteredRow);
-            var newState = BuildTargetStateRow(rowKey, filteredRow, request.CursorColumn, cursorLocal, isSoftDeleted, softDeletedTimeLocal);
+            var newState = BuildTargetStateRow(rowKey, filteredRow, request.CursorColumn);
             if (!targetTable.TryGetValue(rowKey, out var existedRow))
             {
                 targetTable[rowKey] = newState;
                 result.InsertCount++;
                 changedOperations[rowKey] = SyncChangeOperationType.Insert;
-                UpdateLastCursor(result, cursorLocal);
+                UpdateLastCursor(result, newState.CursorLocal);
                 hasChanges = true;
                 continue;
             }
@@ -161,14 +163,14 @@ public class SyncUpsertRepository : ISyncUpsertRepository
             if (IsStateEqual(existedRow, newState))
             {
                 result.SkipCount++;
-                UpdateLastCursor(result, cursorLocal);
+                UpdateLastCursor(result, newState.CursorLocal);
                 continue;
             }
 
             targetTable[rowKey] = newState;
             result.UpdateCount++;
             changedOperations[rowKey] = SyncChangeOperationType.Update;
-            UpdateLastCursor(result, cursorLocal);
+            UpdateLastCursor(result, newState.CursorLocal);
             hasChanges = true;
         }
 
@@ -286,14 +288,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     /// <returns>克隆结果。</returns>
     private static SyncTargetStateRow CloneRow(SyncTargetStateRow row)
     {
-        return new SyncTargetStateRow
-        {
-            BusinessKey = row.BusinessKey,
-            RowDigest = row.RowDigest,
-            CursorLocal = row.CursorLocal,
-            IsSoftDeleted = row.IsSoftDeleted,
-            SoftDeletedTimeLocal = row.SoftDeletedTimeLocal,
-        };
+        return row with { };
     }
 
     /// <summary>
@@ -797,7 +792,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         return new SyncTargetStateRow
         {
             BusinessKey = businessKey,
-            RowDigest = ComputeRowDigest(row),
+            RowDigest = ComputeRowDigestHash(row),
             CursorLocal = cursorLocalOverride ?? TryGetCursorLocal(row, cursorColumn),
             IsSoftDeleted = isSoftDeletedOverride ?? IsSoftDeleted(row),
             SoftDeletedTimeLocal = softDeletedTimeLocalOverride ?? TryGetSoftDeletedTimeLocal(row),
@@ -805,20 +800,23 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     }
 
     /// <summary>
-    /// 计算行摘要。
+    /// 计算行摘要哈希（SHA256 十六进制文本）。
     /// </summary>
     /// <param name="row">业务行。</param>
     /// <returns>摘要文本。</returns>
-    private static string ComputeRowDigest(IReadOnlyDictionary<string, object?> row)
+    private static string ComputeRowDigestHash(IReadOnlyDictionary<string, object?> row)
     {
-        var normalizedRow = row
-            .OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                x => x.Key,
-                x => NormalizeDigestValue(x.Value),
-                StringComparer.OrdinalIgnoreCase);
-        var serialized = JsonSerializer.Serialize(normalizedRow);
-        var hashBytes = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(serialized));
+        var sortedPairs = row.OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase);
+        using var incrementalHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (var pair in sortedPairs)
+        {
+            var normalizedValue = NormalizeDigestValue(pair.Value);
+            var payload = JsonSerializer.Serialize(new[] { pair.Key, normalizedValue }, DigestSerializerOptions);
+            var payloadBytes = System.Text.Encoding.UTF8.GetBytes(payload);
+            incrementalHash.AppendData(payloadBytes);
+        }
+
+        var hashBytes = incrementalHash.GetHashAndReset();
         return Convert.ToHexString(hashBytes);
     }
 
