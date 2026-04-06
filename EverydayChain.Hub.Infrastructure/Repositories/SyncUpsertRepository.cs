@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Buffers;
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO.Compression;
@@ -349,7 +351,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "写入同步目标落地文件失败。TableCode={TableCode}", tableCode);
+            _logger.LogError(ex, "写入同步目标落地文件失败。TableCode={TableCode}, TableStoreFilePath={TableStoreFilePath}", tableCode, tableStoreFilePath);
             throw;
         }
         finally
@@ -628,25 +630,19 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     /// <param name="businessKey">业务键。</param>
     /// <param name="row">原始业务行。</param>
     /// <param name="cursorColumn">游标列。</param>
-    /// <param name="cursorLocalOverride">可选游标覆盖值。</param>
-    /// <param name="isSoftDeletedOverride">可选软删除标记覆盖值。</param>
-    /// <param name="softDeletedTimeLocalOverride">可选软删除时间覆盖值。</param>
     /// <returns>轻量状态行。</returns>
     private static SyncTargetStateRow BuildTargetStateRow(
         string businessKey,
         IReadOnlyDictionary<string, object?> row,
-        string cursorColumn,
-        DateTime? cursorLocalOverride = null,
-        bool? isSoftDeletedOverride = null,
-        DateTime? softDeletedTimeLocalOverride = null)
+        string cursorColumn)
     {
         return new SyncTargetStateRow
         {
             BusinessKey = businessKey,
             RowDigest = ComputeRowDigestHash(row),
-            CursorLocal = cursorLocalOverride ?? TryGetCursorLocal(row, cursorColumn),
-            IsSoftDeleted = isSoftDeletedOverride ?? IsSoftDeleted(row),
-            SoftDeletedTimeLocal = softDeletedTimeLocalOverride ?? TryGetSoftDeletedTimeLocal(row),
+            CursorLocal = TryGetCursorLocal(row, cursorColumn),
+            IsSoftDeleted = IsSoftDeleted(row),
+            SoftDeletedTimeLocal = TryGetSoftDeletedTimeLocal(row),
         };
     }
 
@@ -657,18 +653,71 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     /// <returns>摘要文本。</returns>
     private static string ComputeRowDigestHash(IReadOnlyDictionary<string, object?> row)
     {
-        var sortedPairs = row.OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase);
+        var sortedKeys = row.Keys.ToArray();
+        Array.Sort(sortedKeys, StringComparer.OrdinalIgnoreCase);
         using var incrementalHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        foreach (var pair in sortedPairs)
+        foreach (var key in sortedKeys)
         {
-            var normalizedValue = NormalizeDigestValue(pair.Value);
-            var payload = JsonSerializer.Serialize(new[] { pair.Key, normalizedValue }, DigestSerializerOptions);
-            var payloadBytes = System.Text.Encoding.UTF8.GetBytes(payload);
-            incrementalHash.AppendData(payloadBytes);
+            AppendLengthPrefixedUtf8(incrementalHash, key);
+            var normalizedValue = NormalizeDigestValue(row[key]);
+            AppendLengthPrefixedUtf8(incrementalHash, ConvertDigestValueToStableText(normalizedValue));
         }
 
         var hashBytes = incrementalHash.GetHashAndReset();
         return Convert.ToHexString(hashBytes);
+    }
+
+    /// <summary>
+    /// 将字符串按“长度前缀 + UTF-8 内容”追加到增量哈希，避免分隔符冲突。
+    /// </summary>
+    /// <param name="incrementalHash">增量哈希实例。</param>
+    /// <param name="value">待追加字符串。</param>
+    private static void AppendLengthPrefixedUtf8(IncrementalHash incrementalHash, string value)
+    {
+        var byteCount = System.Text.Encoding.UTF8.GetByteCount(value);
+        Span<byte> lengthPrefix = stackalloc byte[sizeof(int)];
+        BinaryPrimitives.WriteInt32LittleEndian(lengthPrefix, byteCount);
+        incrementalHash.AppendData(lengthPrefix);
+        var buffer = ArrayPool<byte>.Shared.Rent(byteCount);
+        try
+        {
+            var written = System.Text.Encoding.UTF8.GetBytes(value, 0, value.Length, buffer, 0);
+            incrementalHash.AppendData(buffer.AsSpan(0, written));
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    /// <summary>
+    /// 将归一化值转换为稳定文本，避免热路径中频繁创建 JSON 数组对象。
+    /// </summary>
+    /// <param name="value">归一化值。</param>
+    /// <returns>稳定文本。</returns>
+    private static string ConvertDigestValueToStableText(object? value)
+    {
+        if (value is null)
+        {
+            return "null";
+        }
+
+        if (value is string text)
+        {
+            return text;
+        }
+
+        if (value is bool booleanValue)
+        {
+            return booleanValue ? "true" : "false";
+        }
+
+        if (value is IFormattable formattable)
+        {
+            return formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty;
+        }
+
+        return JsonSerializer.Serialize(value, DigestSerializerOptions);
     }
 
     /// <summary>
