@@ -57,4 +57,41 @@ public class ServiceCollectionExtensionsTests
         var ex = Assert.Throws<InvalidOperationException>(action);
         Assert.Contains("TargetLogicalTable 为空", ex.Message);
     }
+
+    /// <summary>
+    /// 逻辑表名应按大小写不敏感规则去重。
+    /// </summary>
+    [Fact]
+    public void BuildManagedLogicalTables_WithCaseInsensitiveDuplicates_ShouldDeduplicate()
+    {
+        var options = new SyncJobOptions
+        {
+            Tables =
+            [
+                new SyncTableOptions
+                {
+                    TableCode = "T1",
+                    Enabled = true,
+                    TargetLogicalTable = "Table_A"
+                },
+                new SyncTableOptions
+                {
+                    TableCode = "T2",
+                    Enabled = true,
+                    TargetLogicalTable = "table_a"
+                },
+                new SyncTableOptions
+                {
+                    TableCode = "T3",
+                    Enabled = true,
+                    TargetLogicalTable = "TABLE_A"
+                }
+            ]
+        };
+
+        var tables = ServiceCollectionExtensions.BuildManagedLogicalTables(options);
+
+        Assert.Single(tables);
+        Assert.Contains("Table_A", tables, StringComparer.OrdinalIgnoreCase);
+    }
 }

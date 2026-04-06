@@ -2,7 +2,6 @@ using EverydayChain.Hub.Domain.Options;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using EverydayChain.Hub.Infrastructure.DependencyInjection;
 
 namespace EverydayChain.Hub.Infrastructure.Services;
 
@@ -11,14 +10,14 @@ namespace EverydayChain.Hub.Infrastructure.Services;
 /// </summary>
 public class ShardTableProvisioner(
     IOptions<ShardingOptions> options,
-    IOptions<SyncJobOptions> syncJobOptions,
+    IReadOnlyList<string> managedLogicalTables,
     ILogger<ShardTableProvisioner> logger,
     IDangerZoneExecutor dangerZoneExecutor) : IShardTableProvisioner
 {
     /// <summary>分表配置快照。</summary>
     private readonly ShardingOptions _options = options.Value;
     /// <summary>纳管逻辑表列表。</summary>
-    private readonly IReadOnlyList<string> _managedLogicalTables = ServiceCollectionExtensions.BuildManagedLogicalTables(syncJobOptions.Value).ToArray();
+    private readonly IReadOnlyList<string> _managedLogicalTables = managedLogicalTables;
 
     /// <inheritdoc/>
     public Task EnsureShardTablesAsync(IEnumerable<string> suffixes, CancellationToken cancellationToken)
