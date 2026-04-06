@@ -13,6 +13,9 @@ namespace EverydayChain.Hub.Infrastructure.Persistence;
 /// </summary>
 public class HubDbContext : DbContext
 {
+    /// <summary>分拣任务追踪默认逻辑表名。</summary>
+    private const string SortingTaskTraceLogicalTable = "sorting_task_trace";
+
     /// <summary>分表配置快照，用于动态拼接表名与 Schema。</summary>
     private readonly ShardingOptions _shardingOptions;
 
@@ -35,7 +38,7 @@ public class HubDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         var suffix = TableSuffixScope.CurrentSuffix ?? string.Empty;
-        var tableName = $"{_shardingOptions.BaseTableName}{suffix}";
+        var tableName = $"{SortingTaskTraceLogicalTable}{suffix}";
         modelBuilder.ApplyConfiguration(new SortingTaskTraceEntityTypeConfiguration(tableName, _shardingOptions.Schema));
     }
 }

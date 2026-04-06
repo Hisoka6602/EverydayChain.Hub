@@ -14,15 +14,6 @@ public class ShardingOptions
     /// <summary>目标 Schema，默认 <c>dbo</c>。</summary>
     public string Schema { get; set; } = "dbo";
 
-    /// <summary>分表基础表名，默认 <c>sorting_task_trace</c>。</summary>
-    public string BaseTableName { get; set; } = "sorting_task_trace";
-
-    /// <summary>
-    /// 统一纳管的逻辑表名集合（可填写范围：仅允许字母、数字、下划线）。
-    /// 分表预建仅使用该集合与启用同步表的目标逻辑表并集。
-    /// </summary>
-    public HashSet<string> ManagedLogicalTables { get; set; } = [];
-
     /// <summary>启动时预创建的未来月份数，默认 1。</summary>
     public int AutoCreateMonthsAhead { get; set; } = 1;
 }

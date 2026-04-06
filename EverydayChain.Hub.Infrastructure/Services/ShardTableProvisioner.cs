@@ -2,29 +2,31 @@ using EverydayChain.Hub.Domain.Options;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Text.RegularExpressions;
+using EverydayChain.Hub.Infrastructure.DependencyInjection;
 
 namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
 /// 分表预置服务实现，在 SQL Server 中按需创建分表与索引。
 /// </summary>
-public class ShardTableProvisioner(IOptions<ShardingOptions> options, ILogger<ShardTableProvisioner> logger, IDangerZoneExecutor dangerZoneExecutor) : IShardTableProvisioner
+public class ShardTableProvisioner(
+    IOptions<ShardingOptions> options,
+    IOptions<SyncJobOptions> syncJobOptions,
+    ILogger<ShardTableProvisioner> logger,
+    IDangerZoneExecutor dangerZoneExecutor) : IShardTableProvisioner
 {
-    /// <summary>安全标识符校验正则（仅允许字母、数字、下划线）。</summary>
-    private static readonly Regex SqlIdentifierRegex = new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
-
     /// <summary>分表配置快照。</summary>
     private readonly ShardingOptions _options = options.Value;
+    /// <summary>纳管逻辑表列表。</summary>
+    private readonly IReadOnlyList<string> _managedLogicalTables = ServiceCollectionExtensions.BuildManagedLogicalTables(syncJobOptions.Value).ToArray();
 
     /// <inheritdoc/>
     public Task EnsureShardTablesAsync(IEnumerable<string> suffixes, CancellationToken cancellationToken)
     {
-        var managedTables = GetManagedLogicalTables();
         var tasks = new List<Task>();
         foreach (var suffix in suffixes)
         {
-            foreach (var logicalTable in managedTables)
+            foreach (var logicalTable in _managedLogicalTables)
             {
                 tasks.Add(EnsureShardTableAsync(logicalTable, suffix, cancellationToken));
             }
@@ -36,8 +38,7 @@ public class ShardTableProvisioner(IOptions<ShardingOptions> options, ILogger<Sh
     /// <inheritdoc/>
     public Task EnsureShardTableAsync(string suffix, CancellationToken cancellationToken)
     {
-        var managedTables = GetManagedLogicalTables();
-        var tasks = managedTables.Select(logicalTable => EnsureShardTableAsync(logicalTable, suffix, cancellationToken));
+        var tasks = _managedLogicalTables.Select(logicalTable => EnsureShardTableAsync(logicalTable, suffix, cancellationToken));
         return Task.WhenAll(tasks);
     }
 
@@ -80,35 +81,4 @@ END";
         },
         cancellationToken);
 
-    /// <summary>
-    /// 获取当前纳管逻辑表集合。
-    /// </summary>
-    /// <returns>去重后的逻辑表列表。</returns>
-    /// <exception cref="InvalidOperationException">配置缺失或表名非法时抛出。</exception>
-    private IReadOnlyList<string> GetManagedLogicalTables()
-    {
-        var managedTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var logicalTable in _options.ManagedLogicalTables)
-        {
-            if (string.IsNullOrWhiteSpace(logicalTable))
-            {
-                continue;
-            }
-
-            var trimmed = logicalTable.Trim();
-            if (!SqlIdentifierRegex.IsMatch(trimmed))
-            {
-                throw new InvalidOperationException($"分表配置无效：ManagedLogicalTables 包含非法逻辑表名 '{trimmed}'。");
-            }
-
-            managedTables.Add(trimmed);
-        }
-
-        if (managedTables.Count == 0)
-        {
-            throw new InvalidOperationException("分表配置无效：ManagedLogicalTables 为空，未配置可用逻辑表。");
-        }
-
-        return managedTables.ToArray();
-    }
 }
