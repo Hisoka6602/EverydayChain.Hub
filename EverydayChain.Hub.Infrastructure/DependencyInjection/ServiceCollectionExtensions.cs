@@ -1,30 +1,29 @@
-using EverydayChain.Hub.Application.Repositories;
-using EverydayChain.Hub.Application.Services;
-using EverydayChain.Hub.Domain.Options;
-using EverydayChain.Hub.Infrastructure.Persistence;
-using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
-using EverydayChain.Hub.Infrastructure.Repositories;
-using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
+using EverydayChain.Hub.Domain.Options;
 using Microsoft.Extensions.Configuration;
+using EverydayChain.Hub.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
+using EverydayChain.Hub.Infrastructure.Services;
+using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using EverydayChain.Hub.Infrastructure.Repositories;
+using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 
 namespace EverydayChain.Hub.Infrastructure.DependencyInjection;
 
 /// <summary>
 /// 基础设施层依赖注入扩展，统一向 DI 容器注册所有基础设施服务。
 /// </summary>
-public static class ServiceCollectionExtensions
-{
+public static class ServiceCollectionExtensions {
+
     /// <summary>
     /// 注册基础设施层全部服务，包括 EF Core 工厂、分表服务、调谐器、危险操作执行器与自动迁移托管服务。
     /// </summary>
     /// <param name="services">服务集合。</param>
     /// <param name="configuration">应用配置，用于绑定 Sharding/AutoTune/DangerZone 配置节。</param>
     /// <returns>原服务集合（链式调用）。</returns>
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
-    {
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration) {
         services.Configure<ShardingOptions>(configuration.GetSection(ShardingOptions.SectionName));
         services.Configure<AutoTuneOptions>(configuration.GetSection(AutoTuneOptions.SectionName));
         services.Configure<DangerZoneOptions>(configuration.GetSection(DangerZoneOptions.SectionName));
@@ -34,8 +33,7 @@ public static class ServiceCollectionExtensions
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
 
-        services.AddDbContextFactory<HubDbContext>(options =>
-        {
+        services.AddDbContextFactory<HubDbContext>(options => {
             options.UseSqlServer(shardingOptions.ConnectionString);
             options.ReplaceService<IModelCacheKeyFactory, ShardModelCacheKeyFactory>();
         });
@@ -46,7 +44,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISqlExecutionTuner, SqlExecutionTuner>();
         services.AddSingleton<IShardTableProvisioner, ShardTableProvisioner>();
         services.AddScoped<IAutoMigrationService, AutoMigrationService>();
-        services.AddScoped<ISortingTaskTraceWriter, SortingTaskTraceWriter>();
+        services.AddSingleton<ISortingTaskTraceWriter, SortingTaskTraceWriter>();
         services.AddSingleton<ISyncTaskConfigRepository, SyncTaskConfigRepository>();
         services.AddSingleton<IShardTableResolver, ShardTableResolver>();
         services.AddSingleton<IShardRetentionRepository, ShardRetentionRepository>();
