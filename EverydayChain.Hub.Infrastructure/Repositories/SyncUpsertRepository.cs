@@ -187,7 +187,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
             return [];
         }
 
-        return table.Values.ToList();
+        return table.Values.ToArray();
     }
 
     /// <inheritdoc/>
