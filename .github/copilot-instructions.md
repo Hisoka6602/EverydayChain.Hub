@@ -97,3 +97,25 @@
     
 # 10. Copilot交互
 - 所有Copilot的任务名称、提示、问答、描述都需要使用中文
+
+## 11. DDD 分层接口与实现放置规则（细化强制）
+- 分层依赖方向必须保持：`Host -> Infrastructure -> Application -> Domain`。
+- `Domain` 禁止依赖 `Application`、`Infrastructure`、`Host`；`Application` 禁止依赖 `Infrastructure`、`Host`。
+- 接口归属必须按语义决定，不允许按实现便利性决定。
+- 表达领域能力边界的抽象（领域服务/策略/规格/工厂等）必须定义在 `Domain`。
+- 表达应用编排与外部协作能力的抽象必须定义在 `Application/Abstractions/*`。
+- 表达基础设施内部技术细节（协议编解码、CRC、通信细节）的抽象只能定义在 `Infrastructure` 内部。
+- 当前项目持久化协作抽象统一定义在 `EverydayChain.Hub.Application/Abstractions/Persistence`，禁止新增到 `EverydayChain.Hub.Application/Repositories`。
+- `Host` 仅允许承载启动、DI 组装、后台任务入口、控制器/Hub/中间件；禁止承载仓储实现、网关实现、驱动实现、协议编解码实现。
+- `Domain` 抽象的外部资源实现必须落在 `Infrastructure`；`Application` 抽象的外部资源实现必须落在 `Infrastructure`。
+- 禁止将基础设施实现细节（EF/SQL/Redis/HttpClient/文件系统/驱动协议）泄漏到 `Domain` 或 `Application` 业务抽象中。
+- 同一职责禁止重复抽象与重复实现；迁移时必须同步删除旧接口、旧实现、旧 DI 注册与旧调用。
+- 禁止新增仅做一层透传的服务/仓储实现；已有透传路径必须优先合并到现有实现以降低复杂度。
+- 命名规则强制执行：
+  - Repository：`I{Name}Repository` / `{Name}Repository`
+  - Query/Read：`I{Name}QueryService`、`I{Name}ReadService`
+  - Gateway/Client：`I{Name}Gateway`、`I{Name}Client`
+  - Domain Policy/Specification/Strategy：`I{Name}Policy`、`I{Name}Specification`、`I{Name}Strategy`
+  - Factory：`I{Name}Factory`
+  - 协议编解码：`I{Name}FrameCodec`、`I{Name}ProtocolParser`
+- 新增抽象与实现时，必须在 PR 描述明确标注其所在层级与物理目录，确保审查可追溯。

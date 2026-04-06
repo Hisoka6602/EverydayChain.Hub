@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 同步契约目录按 DDD 规范收敛：`EverydayChain.Hub.Application/Repositories` 已迁移为 `EverydayChain.Hub.Application/Abstractions/Persistence`，并完成全仓引用更新。
 - 修复 `Worker`、`SyncBackgroundWorker`、`RetentionBackgroundWorker` 的轮询延迟取消路径：在 `Task.Delay` 处显式捕获取消异常并正常退出，避免停止阶段抛出未处理取消异常导致流程噪声。
 - 日志落盘策略保持不变：业务日志继续通过 NLog `file` target 落盘，单文件上限维持 10MB 滚动阈值。
 - 分表预建逻辑改为仅从 `SyncJob.Tables` 启用项的 `TargetLogicalTable` 动态推导，支持多逻辑表并行预建。
@@ -66,17 +67,17 @@
 │   ├── Models/SyncDeletionCandidate.cs
 │   ├── Models/SyncKeyReadRequest.cs
 │   ├── Models/SyncTargetStateRow.cs
-│   ├── Repositories/ISyncTaskConfigRepository.cs
-│   ├── Repositories/IOracleSourceReader.cs
-│   ├── Repositories/ISyncStagingRepository.cs
-│   ├── Repositories/ISyncUpsertRepository.cs
-│   ├── Repositories/ISyncCheckpointRepository.cs
-│   ├── Repositories/ISyncBatchRepository.cs
-│   ├── Repositories/ISyncChangeLogRepository.cs
-│   ├── Repositories/ISyncDeletionRepository.cs
-│   ├── Repositories/ISyncDeletionLogRepository.cs
-│   ├── Repositories/IShardTableResolver.cs
-│   ├── Repositories/IShardRetentionRepository.cs
+│   ├── Abstractions/Persistence/ISyncTaskConfigRepository.cs
+│   ├── Abstractions/Persistence/IOracleSourceReader.cs
+│   ├── Abstractions/Persistence/ISyncStagingRepository.cs
+│   ├── Abstractions/Persistence/ISyncUpsertRepository.cs
+│   ├── Abstractions/Persistence/ISyncCheckpointRepository.cs
+│   ├── Abstractions/Persistence/ISyncBatchRepository.cs
+│   ├── Abstractions/Persistence/ISyncChangeLogRepository.cs
+│   ├── Abstractions/Persistence/ISyncDeletionRepository.cs
+│   ├── Abstractions/Persistence/ISyncDeletionLogRepository.cs
+│   ├── Abstractions/Persistence/IShardTableResolver.cs
+│   ├── Abstractions/Persistence/IShardRetentionRepository.cs
 │   ├── Services/ISyncOrchestrator.cs
 │   ├── Services/ISyncWindowCalculator.cs
 │   ├── Services/ISyncExecutionService.cs
@@ -165,8 +166,8 @@
 - `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Worker`、`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`RetentionJob`、`Oracle` 等），供 Host/Infrastructure 绑定读取。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
 - `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs` + `SyncTargetStateRow.cs`：同步执行、删除识别与轻量幂等状态存储的数据契约模型。
-- `ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。
-- `IShardTableResolver.cs` / `IShardRetentionRepository.cs`：定义分表识别与分表清理执行契约（含分表完整回滚脚本生成）。
+- `Application/Abstractions/Persistence/ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。
+- `Application/Abstractions/Persistence/IShardTableResolver.cs` / `IShardRetentionRepository.cs`：定义分表识别与分表清理执行契约（含分表完整回滚脚本生成）。
 - `ISyncOrchestrator.cs` / `SyncOrchestrator.cs`：同步任务编排入口，负责读取配置、加载检查点、计算窗口，并基于优先级与并发上限执行多表同步。
 - `ISyncWindowCalculator.cs` / `SyncWindowCalculator.cs`：根据 `CursorColumn + StartTimeLocal` 与检查点计算本地增量窗口，并对时钟回拨与 DST 非法本地时刻执行窗口边界保护。
 - `IDeletionExecutionService.cs` / `DeletionExecutionService.cs`：执行删除识别、删除策略应用（含 DryRun）并生成删除审计与删除变更日志。
