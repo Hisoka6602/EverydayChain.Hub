@@ -20,7 +20,7 @@ public class SyncJobOptions
     /// <summary>检查点文件路径（为空时使用应用基目录下 sync-checkpoints.json）。</summary>
     public string CheckpointFilePath { get; set; } = string.Empty;
 
-    /// <summary>目标端同步数据落地文件路径（为空时使用应用基目录下 data/sync-target-store.json）。</summary>
+    /// <summary>目标端轻量幂等状态文件路径（为空时使用应用基目录下 data/sync-target-store.json；按表分片写入）。</summary>
     public string TargetStoreFilePath { get; set; } = string.Empty;
 
     /// <summary>启动自检最小可用磁盘空间（MB，建议范围：0~10240；0 表示关闭启动阶段磁盘空间校验）。</summary>

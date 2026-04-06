@@ -17,12 +17,12 @@ public interface ISyncUpsertRepository
     Task<SyncMergeResult> MergeFromStagingAsync(SyncMergeRequest request, CancellationToken ct);
 
     /// <summary>
-    /// 列出目标端当前数据行。
+    /// 列出目标端轻量幂等状态。
     /// </summary>
     /// <param name="tableCode">表编码。</param>
     /// <param name="ct">取消令牌。</param>
-    /// <returns>数据行集合。</returns>
-    Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ListTargetRowsAsync(string tableCode, CancellationToken ct);
+    /// <returns>轻量状态集合。</returns>
+    Task<IReadOnlyList<SyncTargetStateRow>> ListTargetStateRowsAsync(string tableCode, CancellationToken ct);
 
     /// <summary>
     /// 按业务键集合删除目标数据。

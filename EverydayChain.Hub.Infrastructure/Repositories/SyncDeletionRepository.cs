@@ -30,7 +30,7 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
             UniqueKeys = request.UniqueKeys,
         }, ct);
 
-        var targetRows = await upsertRepository.ListTargetRowsAsync(request.TableCode, ct);
+        var targetRows = await upsertRepository.ListTargetStateRowsAsync(request.TableCode, ct);
         var candidates = new List<SyncDeletionCandidate>();
         var segmentSize = request.CompareSegmentSize > 0 ? request.CompareSegmentSize : DefaultCompareSegmentSize;
         var maxParallelism = request.CompareMaxParallelism > 0 ? request.CompareMaxParallelism : DefaultCompareMaxParallelism;
@@ -52,12 +52,12 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
             {
                 token.ThrowIfCancellationRequested();
 
-                if (!IsRowWithinWindow(row, request.CursorColumn, request.Window))
+                if (!IsRowWithinWindow(row, request.Window))
                 {
                     continue;
                 }
 
-                var businessKey = SyncBusinessKeyBuilder.Build(row, request.UniqueKeys);
+                var businessKey = row.BusinessKey;
                 if (string.IsNullOrWhiteSpace(businessKey) || sourceKeys.Contains(businessKey))
                 {
                     continue;
@@ -66,7 +66,14 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
                 candidateBag.Add(new SyncDeletionCandidate
                 {
                     BusinessKey = businessKey,
-                    TargetSnapshot = new Dictionary<string, object?>(row),
+                    TargetSnapshot = new Dictionary<string, object?>
+                    {
+                        [nameof(SyncTargetStateRow.BusinessKey)] = row.BusinessKey,
+                        [nameof(SyncTargetStateRow.RowDigest)] = row.RowDigest,
+                        [nameof(SyncTargetStateRow.CursorLocal)] = row.CursorLocal,
+                        [nameof(SyncTargetStateRow.IsSoftDeleted)] = row.IsSoftDeleted,
+                        [nameof(SyncTargetStateRow.SoftDeletedTimeLocal)] = row.SoftDeletedTimeLocal,
+                    },
                     SourceEvidence = MissingSourceEvidenceMessage,
                 });
             }
@@ -81,17 +88,17 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
     /// <summary>
     /// 判断目标数据行是否在同步窗口内。
     /// </summary>
-    /// <param name="row">目标数据行。</param>
-    /// <param name="cursorColumn">游标列名。</param>
+    /// <param name="row">目标状态行。</param>
     /// <param name="window">同步窗口。</param>
     /// <returns>在窗口内返回 <c>true</c>。</returns>
-    private static bool IsRowWithinWindow(IReadOnlyDictionary<string, object?> row, string cursorColumn, SyncWindow window)
+    private static bool IsRowWithinWindow(SyncTargetStateRow row, SyncWindow window)
     {
-        if (!row.TryGetValue(cursorColumn, out var cursorValue) || cursorValue is not DateTime cursorLocal)
+        if (!row.CursorLocal.HasValue)
         {
             return false;
         }
 
+        var cursorLocal = row.CursorLocal.Value;
         if (cursorLocal.Kind == DateTimeKind.Unspecified)
         {
             cursorLocal = DateTime.SpecifyKind(cursorLocal, DateTimeKind.Local);

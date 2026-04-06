@@ -1,10 +1,10 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 修复 `DeletionExecutionService.ExecuteDeletionAsync` 中 `DateTime.Now` 在循环内重复调用的性能问题，将时间戳提升至循环外统一获取一次，确保同一批次内所有删除日志时间戳一致。
-- 修复 `SyncExecutionService.AppendChangeLogs` 中 `DateTime.Now` 在循环内重复调用的性能问题，将时间戳提升至循环外统一获取一次，确保同一页变更日志时间戳一致。
-- 优化 `SyncChangeLogRepository.WriteChangesAsync`：去除多余的两阶段克隆（先全部克隆到中间 `List`，再全部入队），改为单次遍历边克隆边入队，减少不必要的中间集合分配。
-- 优化 `SyncDeletionLogRepository.WriteDeletionsAsync`：同上，去除多余两阶段克隆，改为单次遍历直接入队。
+- 将 `SyncUpsertRepository` 的目标端落地机制从“持久化完整业务行”改为“轻量幂等状态存储”（业务键 + 行摘要 + 游标 + 软删标记），显著降低本地落地体积。
+- 保留旧版 `data/sync-target-store.json` 全量格式兼容迁移：首次加载时自动转换为轻量状态，并统一按表分片持久化。
+- 删除识别链路改为基于轻量状态执行窗口过滤与差异识别，不再依赖本地全量业务行快照。
+- 新增 `SyncTargetStateRow` 轻量状态模型，并更新 `ISyncUpsertRepository` 契约到轻量状态读取接口。
 
 ## 解决方案文件树与职责
 ```text
@@ -61,6 +61,7 @@
 │   ├── Models/SyncDeletionExecutionResult.cs
 │   ├── Models/SyncDeletionCandidate.cs
 │   ├── Models/SyncKeyReadRequest.cs
+│   ├── Models/SyncTargetStateRow.cs
 │   ├── Repositories/ISyncTaskConfigRepository.cs
 │   ├── Repositories/IOracleSourceReader.cs
 │   ├── Repositories/ISyncStagingRepository.cs
@@ -156,7 +157,7 @@
 - `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs` / `SyncTablePriority.cs`：同步模式、删除策略、滞后控制、批次状态、变更操作类型与调度优先级枚举，均含中文 XML 注释与 `Description`。
 - `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Worker`、`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`RetentionJob`、`Oracle` 等），供 Host/Infrastructure 绑定读取。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
-- `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs`：同步执行、删除识别与删除执行的数据契约模型。
+- `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs` + `SyncTargetStateRow.cs`：同步执行、删除识别与轻量幂等状态存储的数据契约模型。
 - `ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。
 - `IShardTableResolver.cs` / `IShardRetentionRepository.cs`：定义分表识别与分表清理执行契约（含分表完整回滚脚本生成）。
 - `ISyncOrchestrator.cs` / `SyncOrchestrator.cs`：同步任务编排入口，负责读取配置、加载检查点、计算窗口，并基于优先级与并发上限执行多表同步。
@@ -177,8 +178,8 @@
 - `OracleOptions.cs`：远端 Oracle 连接配置实体，定义连接字符串、默认 Schema、只读开关、命令超时与分页上限。
 - `OracleSourceReader.cs`：源端读取器 Oracle 实现，使用参数化 SQL 执行真实只读查询，支持分页增量读取、业务键读取、`ExcludedColumns` 过滤，并在异常场景输出错误日志。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
-- `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并在合并比较/写入阶段过滤 `ExcludedColumns`；支持目标键删除能力（软删/硬删）、目标端文件按表分片落地（原子替换）、空闲驱逐机制与 GZip 压缩归档策略。
-- `SyncDeletionRepository.cs`：删除同步仓储基础实现，支持窗口内源端键集合与目标键集合差异识别，并按策略执行删除。
+- `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并在合并阶段过滤 `ExcludedColumns`；目标端持久化改为按表分片的轻量幂等状态（业务键、行摘要、游标、软删标记），保留旧版全量快照兼容迁移；支持目标键删除能力（软删/硬删）、空闲驱逐与 GZip 压缩归档策略。
+- `SyncDeletionRepository.cs`：删除同步仓储基础实现，基于轻量幂等状态执行窗口过滤与源端键差异识别，并按策略执行删除。
 - `ShardTableResolver.cs`：分表解析仓储实现，按逻辑表枚举物理分表并解析分表月份后缀。
 - `ShardRetentionRepository.cs`：分表保留期仓储实现，在危险动作隔离器保护下执行分表删除并输出审计日志，且可基于系统元数据生成可回放回滚 DDL。
 - `SyncCheckpointRepository.cs`：检查点文件持久化实现，读写日志均以 Information 级落盘；写入改为临时文件 + File.Replace/Move 原子替换，防止崩溃产生半写 JSON。
