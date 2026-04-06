@@ -101,7 +101,7 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         }
 
         var uniqueKeys = SyncColumnFilter.NormalizeColumns(table.UniqueKeys);
-        var conflictsWithUniqueKeys = uniqueKeys.Where(excludedColumns.Contains).ToList();
+        var conflictsWithUniqueKeys = uniqueKeys.Intersect(excludedColumns, StringComparer.OrdinalIgnoreCase).ToList();
         if (conflictsWithUniqueKeys.Count > 0)
         {
             throw new InvalidOperationException(
@@ -114,7 +114,9 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             throw new InvalidOperationException($"表 {table.TableCode} 的 ExcludedColumns 禁止包含 CursorColumn：{table.CursorColumn}。");
         }
 
-        var conflictsWithSoftDeleteColumns = SyncColumnFilter.NormalizedSoftDeleteColumns.Where(excludedColumns.Contains).ToList();
+        var conflictsWithSoftDeleteColumns = SyncColumnFilter.NormalizedSoftDeleteColumns
+            .Intersect(excludedColumns, StringComparer.OrdinalIgnoreCase)
+            .ToList();
         if (conflictsWithSoftDeleteColumns.Count > 0)
         {
             throw new InvalidOperationException(
