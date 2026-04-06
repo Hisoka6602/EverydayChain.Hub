@@ -171,6 +171,11 @@ public class SyncCheckpointRepository(
         }
 
         var data = JsonSerializer.Deserialize<Dictionary<string, SyncCheckpoint>>(json) ?? new Dictionary<string, SyncCheckpoint>(StringComparer.OrdinalIgnoreCase);
+        if (data.Comparer == StringComparer.OrdinalIgnoreCase)
+        {
+            return data;
+        }
+
         return new Dictionary<string, SyncCheckpoint>(data, StringComparer.OrdinalIgnoreCase);
     }
 }

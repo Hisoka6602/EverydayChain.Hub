@@ -52,6 +52,8 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     private readonly double _idleEvictionThresholdMinutes;
     /// <summary>目标端文件归档最大保留数量（0 表示关闭）。</summary>
     private readonly int _targetStoreArchiveMaxCount;
+    /// <summary>非法文件名字符缓存。</summary>
+    private static readonly char[] InvalidFileNameChars = Path.GetInvalidFileNameChars();
 
     /// <summary>
     /// 初始化同步幂等合并仓储。
@@ -124,7 +126,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         TouchTableAccessTime(request.TableCode);
         var targetTable = _targetTables.GetOrAdd(request.TableCode, _ => CreateBusinessKeyDictionary());
         await _runtimeStorageGuard.ReportTableMemoryAsync(request.TableCode, targetTable.Count, "目标快照合并前", ct);
-        var changedOperations = new Dictionary<string, SyncChangeOperationType>(StringComparer.OrdinalIgnoreCase);
+        var changedOperations = new Dictionary<string, SyncChangeOperationType>(request.Rows.Count, StringComparer.OrdinalIgnoreCase);
         var result = new SyncMergeResult
         {
             ChangedOperations = changedOperations,
@@ -552,11 +554,10 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     /// <returns>替换结果。</returns>
     private static string ReplaceInvalidFileNameChars(string value)
     {
-        var invalidChars = Path.GetInvalidFileNameChars().ToHashSet();
         var chars = value.ToCharArray();
         for (var i = 0; i < chars.Length; i++)
         {
-            if (invalidChars.Contains(chars[i]))
+            if (Array.IndexOf(InvalidFileNameChars, chars[i]) >= 0)
             {
                 chars[i] = '_';
             }
