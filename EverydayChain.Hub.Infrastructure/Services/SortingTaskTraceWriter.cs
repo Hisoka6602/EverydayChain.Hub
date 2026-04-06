@@ -32,11 +32,11 @@ public class SortingTaskTraceWriter(
 
             // 步骤2：从调谐器获取当前批量写入窗口，分批执行写入。
             var batchSize = Math.Max(1, tuner.CurrentBatchSize);
-            var list = group.ToList();
-            for (var i = 0; i < list.Count; i += batchSize)
+            var items = group.ToArray();
+            for (var i = 0; i < items.Length; i += batchSize)
             {
-                var count = Math.Min(batchSize, list.Count - i);
-                var chunk = list.GetRange(i, count);
+                var count = Math.Min(batchSize, items.Length - i);
+                var chunk = new ArraySegment<Domain.Aggregates.SortingTaskTraceAggregate.SortingTaskTraceEntity>(items, i, count);
                 var stopwatch = Stopwatch.StartNew();
                 var success = true;
                 try
