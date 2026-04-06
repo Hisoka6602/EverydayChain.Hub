@@ -11,7 +11,7 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.14" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="xunit" Version="2.5.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
@@ -22,6 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\EverydayChain.Hub.Infrastructure\EverydayChain.Hub.Infrastructure.csproj" />
     <ProjectReference Include="..\EverydayChain.Hub.Application\EverydayChain.Hub.Application.csproj" />
     <ProjectReference Include="..\EverydayChain.Hub.Domain\EverydayChain.Hub.Domain.csproj" />
   </ItemGroup>

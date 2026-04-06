@@ -9,6 +9,7 @@ using EverydayChain.Hub.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using EverydayChain.Hub.Infrastructure.Repositories;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
+using EverydayChain.Hub.SharedKernel.Utilities;
 
 namespace EverydayChain.Hub.Infrastructure.DependencyInjection;
 
@@ -16,7 +17,6 @@ namespace EverydayChain.Hub.Infrastructure.DependencyInjection;
 /// 基础设施层依赖注入扩展，统一向 DI 容器注册所有基础设施服务。
 /// </summary>
 public static class ServiceCollectionExtensions {
-
     /// <summary>
     /// 注册基础设施层全部服务，包括 EF Core 工厂、分表服务、调谐器、危险操作执行器与自动迁移托管服务。
     /// </summary>
@@ -32,6 +32,8 @@ public static class ServiceCollectionExtensions {
         services.Configure<OracleOptions>(configuration.GetSection(OracleOptions.SectionName));
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
+        var syncOptions = configuration.GetSection(SyncJobOptions.SectionName).Get<SyncJobOptions>() ?? new SyncJobOptions();
+        var managedLogicalTables = BuildManagedLogicalTables(syncOptions).ToArray();
 
         services.AddDbContextFactory<HubDbContext>(options => {
             options.UseSqlServer(shardingOptions.ConnectionString);
@@ -42,6 +44,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IDangerZoneExecutor, DangerZoneExecutor>();
         services.AddSingleton<IRuntimeStorageGuard, RuntimeStorageGuard>();
         services.AddSingleton<ISqlExecutionTuner, SqlExecutionTuner>();
+        services.AddSingleton<IReadOnlyList<string>>(managedLogicalTables);
         services.AddSingleton<IShardTableProvisioner, ShardTableProvisioner>();
         services.AddScoped<IAutoMigrationService, AutoMigrationService>();
         services.AddSingleton<ISortingTaskTraceWriter, SortingTaskTraceWriter>();
@@ -64,5 +67,32 @@ public static class ServiceCollectionExtensions {
         services.AddHostedService<AutoMigrationHostedService>();
 
         return services;
+    }
+
+    /// <summary>
+    /// 构建分表纳管逻辑表集合。
+    /// </summary>
+    /// <param name="syncJobOptions">同步配置。</param>
+    /// <returns>去重、去空白并通过安全校验后的逻辑表集合（大小写不敏感去重，保留首次出现的原始大小写）。</returns>
+    /// <exception cref="InvalidOperationException">配置缺失或包含非法表名时抛出。</exception>
+    public static HashSet<string> BuildManagedLogicalTables(SyncJobOptions syncJobOptions)
+    {
+        var managedTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var table in (syncJobOptions.Tables ?? []).Where(x => x.Enabled))
+        {
+            if (string.IsNullOrWhiteSpace(table.TargetLogicalTable))
+            {
+                throw new InvalidOperationException($"分表配置无效：启用表 {table.TableCode} 的 TargetLogicalTable 不能为空白。");
+            }
+
+            LogicalTableNameNormalizer.AddValidated(managedTables, table.TargetLogicalTable, $"SyncJob.Tables[{table.TableCode}].TargetLogicalTable");
+        }
+
+        if (managedTables.Count == 0)
+        {
+            throw new InvalidOperationException("分表配置无效：启用的 SyncJob.Tables.TargetLogicalTable 为空，无法确定需预建的逻辑表。");
+        }
+
+        return managedTables;
     }
 }
