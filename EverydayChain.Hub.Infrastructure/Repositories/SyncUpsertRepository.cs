@@ -53,7 +53,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     /// <summary>目标端文件归档最大保留数量（0 表示关闭）。</summary>
     private readonly int _targetStoreArchiveMaxCount;
     /// <summary>非法文件名字符缓存。</summary>
-    private static readonly char[] InvalidFileNameChars = Path.GetInvalidFileNameChars();
+    private static readonly HashSet<char> InvalidFileNameChars = new(Path.GetInvalidFileNameChars());
 
     /// <summary>
     /// 初始化同步幂等合并仓储。
@@ -557,7 +557,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         var chars = value.ToCharArray();
         for (var i = 0; i < chars.Length; i++)
         {
-            if (Array.IndexOf(InvalidFileNameChars, chars[i]) >= 0)
+            if (InvalidFileNameChars.Contains(chars[i]))
             {
                 chars[i] = '_';
             }
