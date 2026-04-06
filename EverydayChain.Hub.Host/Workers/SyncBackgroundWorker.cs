@@ -43,28 +43,40 @@ public class SyncBackgroundWorker(
             ? MonitorWatchdogAsync(watchdogTimeoutSeconds, pollingIntervalSeconds, stoppingToken)
             : Task.CompletedTask;
 
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            // 更新迭代心跳时间戳，看门狗依此判断主循环是否正常推进。
-            Interlocked.Exchange(ref _lastIterationTicks, Stopwatch.GetTimestamp());
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                // 更新迭代心跳时间戳，看门狗依此判断主循环是否正常推进。
+                Interlocked.Exchange(ref _lastIterationTicks, Stopwatch.GetTimestamp());
 
-            try
-            {
-                await RunOnceAsync(stoppingToken);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                return;
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "同步后台任务执行失败。");
-            }
+                try
+                {
+                    await RunOnceAsync(stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "同步后台任务执行失败。");
+                }
 
-            await Task.Delay(TimeSpan.FromSeconds(pollingIntervalSeconds), stoppingToken);
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(pollingIntervalSeconds), stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+            }
         }
-
-        await watchdogTask;
+        finally
+        {
+            await watchdogTask;
+        }
     }
 
     /// <summary>

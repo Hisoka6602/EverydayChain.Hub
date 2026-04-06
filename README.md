@@ -1,6 +1,8 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 修复 `Worker`、`SyncBackgroundWorker`、`RetentionBackgroundWorker` 的轮询延迟取消路径：在 `Task.Delay` 处显式捕获取消异常并正常退出，避免停止阶段抛出未处理取消异常导致流程噪声。
+- 日志落盘策略保持不变：业务日志继续通过 NLog `file` target 落盘，单文件上限维持 10MB 滚动阈值。
 - 分表预建逻辑改为仅从 `SyncJob.Tables` 启用项的 `TargetLogicalTable` 动态推导，支持多逻辑表并行预建。
 - 启动阶段新增逻辑表名集合构建与校验：去重、去空白、仅允许字母/数字/下划线，空集合直接抛出可读配置异常。
 - `ShardTableProvisioner` 改为按“逻辑表 × 月份后缀”组合预建分表，危险建表动作仍统一通过 `IDangerZoneExecutor` 隔离执行。
@@ -210,4 +212,5 @@
 - `appsettings.json`：主配置样例，移除分表逻辑表名静态配置，统一由 `SyncJob.Tables.TargetLogicalTable` 提供。
 
 ## 可继续完善内容（本次 PR 后续行动项）
+- 对“全仓一键体检并自动修复”的大范围需求，建议拆分为多批次 PR（性能热点、规则一致性、接口收敛、文档治理）逐项推进并逐项验收。
 - 在启动日志中输出纳管逻辑表集合快照，便于运维核对多表预建范围。

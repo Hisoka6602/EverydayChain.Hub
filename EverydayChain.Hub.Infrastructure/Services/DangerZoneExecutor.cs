@@ -49,18 +49,61 @@ public class DangerZoneExecutor : IDangerZoneExecutor
 
     /// <inheritdoc/>
     public Task ExecuteAsync(string operationName, Func<CancellationToken, Task> action, CancellationToken cancellationToken) =>
-        ExecuteAsync<object?>(operationName, async token =>
-        {
-            await action(token);
-            return null;
-        }, cancellationToken);
+        ExecuteWithLoggingAsync(operationName, action, cancellationToken);
 
     /// <inheritdoc/>
-    public async Task<T> ExecuteAsync<T>(string operationName, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken)
+    public Task<T> ExecuteAsync<T>(string operationName, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken) =>
+        ExecuteWithLoggingAsync(operationName, action, cancellationToken);
+
+    /// <summary>
+    /// 执行危险操作并统一记录异常日志。
+    /// </summary>
+    /// <param name="operationName">操作名称。</param>
+    /// <param name="action">执行动作。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    private async Task ExecuteWithLoggingAsync(string operationName, Func<CancellationToken, Task> action, CancellationToken cancellationToken)
     {
         try
         {
-            return await _pipeline.ExecuteAsync(async token => await action(token), cancellationToken);
+            await _pipeline.ExecuteAsync(
+                static (Func<CancellationToken, Task> callback, CancellationToken token) => new ValueTask(callback(token)),
+                action,
+                cancellationToken);
+        }
+        catch (BrokenCircuitException ex)
+        {
+            _logger.LogError(ex, "危险操作隔离器触发熔断，操作名: {OperationName}", operationName);
+            throw;
+        }
+        catch (TimeoutRejectedException ex)
+        {
+            _logger.LogError(ex, "危险操作隔离器触发超时，操作名: {OperationName}", operationName);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "危险操作隔离器执行出现未预期异常，操作名: {OperationName}", operationName);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 执行危险操作并统一记录异常日志（带返回值）。
+    /// </summary>
+    /// <typeparam name="T">返回值类型。</typeparam>
+    /// <param name="operationName">操作名称。</param>
+    /// <param name="action">执行动作。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>执行结果。</returns>
+    private async Task<T> ExecuteWithLoggingAsync<T>(string operationName, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // 使用 Polly 的 state 参数重载传入 action，并以 static lambda + ValueTask 适配签名，避免额外闭包分配。
+            return await _pipeline.ExecuteAsync(
+                static (Func<CancellationToken, Task<T>> callback, CancellationToken token) => new ValueTask<T>(callback(token)),
+                action,
+                cancellationToken);
         }
         catch (BrokenCircuitException ex)
         {
