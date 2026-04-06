@@ -338,7 +338,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     {
         var tableStoreFilePath = BuildPerTableStoreFilePath(tableCode);
         await _runtimeStorageGuard.EnsureWriteSpaceAsync(tableStoreFilePath, $"目标快照写入[{tableCode}]", ct);
-        var persistedTable = new Dictionary<string, SyncTargetStateRow>(StringComparer.OrdinalIgnoreCase);
+        var persistedTable = new Dictionary<string, SyncTargetStateRow>(table.Count, StringComparer.OrdinalIgnoreCase);
         foreach (var pair in table)
         {
             persistedTable[pair.Key] = CloneRow(pair.Value);
