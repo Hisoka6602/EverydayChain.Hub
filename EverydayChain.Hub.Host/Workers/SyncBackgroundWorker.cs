@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Services;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Domain.Sync;

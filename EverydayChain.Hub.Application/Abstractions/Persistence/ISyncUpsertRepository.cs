@@ -1,7 +1,7 @@
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Enums;
 
-namespace EverydayChain.Hub.Application.Repositories;
+namespace EverydayChain.Hub.Application.Abstractions.Persistence;
 
 /// <summary>
 /// 同步幂等合并仓储接口。

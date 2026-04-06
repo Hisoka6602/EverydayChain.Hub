@@ -1,4 +1,4 @@
-namespace EverydayChain.Hub.Application.Repositories;
+namespace EverydayChain.Hub.Application.Abstractions.Persistence;
 
 /// <summary>
 /// 分表保留期仓储接口。

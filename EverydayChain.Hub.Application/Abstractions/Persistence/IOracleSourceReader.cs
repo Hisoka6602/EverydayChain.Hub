@@ -1,6 +1,6 @@
 using EverydayChain.Hub.Application.Models;
 
-namespace EverydayChain.Hub.Application.Repositories;
+namespace EverydayChain.Hub.Application.Abstractions.Persistence;
 
 /// <summary>
 /// Oracle 源端读取器接口。

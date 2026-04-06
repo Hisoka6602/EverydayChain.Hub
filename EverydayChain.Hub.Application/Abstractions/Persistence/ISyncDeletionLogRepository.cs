@@ -1,6 +1,6 @@
 using EverydayChain.Hub.Domain.Sync;
 
-namespace EverydayChain.Hub.Application.Repositories;
+namespace EverydayChain.Hub.Application.Abstractions.Persistence;
 
 /// <summary>
 /// 同步删除日志仓储接口。
