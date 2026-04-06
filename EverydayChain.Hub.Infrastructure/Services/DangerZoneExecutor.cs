@@ -49,14 +49,30 @@ public class DangerZoneExecutor : IDangerZoneExecutor
 
     /// <inheritdoc/>
     public Task ExecuteAsync(string operationName, Func<CancellationToken, Task> action, CancellationToken cancellationToken) =>
-        _pipeline.ExecuteAsync(action, cancellationToken).AsTask();
+        ExecuteWithLoggingAsync(operationName, action, cancellationToken);
 
     /// <inheritdoc/>
     public async Task<T> ExecuteAsync<T>(string operationName, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken)
     {
+        T result = default!;
+        await ExecuteWithLoggingAsync(operationName, async token =>
+        {
+            result = await action(token);
+        }, cancellationToken);
+        return result;
+    }
+
+    /// <summary>
+    /// 执行危险操作并统一记录异常日志。
+    /// </summary>
+    /// <param name="operationName">操作名称。</param>
+    /// <param name="action">执行动作。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    private async Task ExecuteWithLoggingAsync(string operationName, Func<CancellationToken, Task> action, CancellationToken cancellationToken)
+    {
         try
         {
-            return await _pipeline.ExecuteAsync(action, cancellationToken);
+            await _pipeline.ExecuteAsync(static (callback, token) => new ValueTask(callback(token)), action, cancellationToken);
         }
         catch (BrokenCircuitException ex)
         {
