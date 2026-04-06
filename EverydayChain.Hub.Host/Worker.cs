@@ -48,7 +48,14 @@ public class Worker(ILogger<Worker> logger, ISortingTaskTraceWriter sortingTaskT
                 logger.LogError(ex, "后台任务写入失败，将在下次循环重试。");
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(_workerOptions.PollingIntervalSeconds), stoppingToken);
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(_workerOptions.PollingIntervalSeconds), stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
         }
     }
 }

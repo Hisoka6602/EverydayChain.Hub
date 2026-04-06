@@ -58,7 +58,14 @@ public class RetentionBackgroundWorker(
                 logger.LogError(ex, "保留期后台任务执行失败。");
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(pollingIntervalSeconds), stoppingToken);
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(pollingIntervalSeconds), stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
         }
     }
 }

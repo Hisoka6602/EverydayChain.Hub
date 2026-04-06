@@ -61,7 +61,14 @@ public class SyncBackgroundWorker(
                 logger.LogError(ex, "同步后台任务执行失败。");
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(pollingIntervalSeconds), stoppingToken);
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(pollingIntervalSeconds), stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
         }
 
         await watchdogTask;

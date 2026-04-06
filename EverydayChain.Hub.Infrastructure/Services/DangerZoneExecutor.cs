@@ -49,18 +49,14 @@ public class DangerZoneExecutor : IDangerZoneExecutor
 
     /// <inheritdoc/>
     public Task ExecuteAsync(string operationName, Func<CancellationToken, Task> action, CancellationToken cancellationToken) =>
-        ExecuteAsync<object?>(operationName, async token =>
-        {
-            await action(token);
-            return null;
-        }, cancellationToken);
+        _pipeline.ExecuteAsync(action, cancellationToken).AsTask();
 
     /// <inheritdoc/>
     public async Task<T> ExecuteAsync<T>(string operationName, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken)
     {
         try
         {
-            return await _pipeline.ExecuteAsync(async token => await action(token), cancellationToken);
+            return await _pipeline.ExecuteAsync(action, cancellationToken);
         }
         catch (BrokenCircuitException ex)
         {
