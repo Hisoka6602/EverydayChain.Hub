@@ -3,6 +3,7 @@ using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using SortingTaskTraceEntity = EverydayChain.Hub.Domain.Aggregates.SortingTaskTraceAggregate.SortingTaskTraceEntity;
 
 namespace EverydayChain.Hub.Infrastructure.Services;
 
@@ -16,7 +17,7 @@ public class SortingTaskTraceWriter(
     ILogger<SortingTaskTraceWriter> logger) : ISortingTaskTraceWriter
 {
     /// <inheritdoc/>
-    public async Task WriteAsync(IReadOnlyCollection<Domain.Aggregates.SortingTaskTraceAggregate.SortingTaskTraceEntity> traces, CancellationToken cancellationToken)
+    public async Task WriteAsync(IReadOnlyCollection<SortingTaskTraceEntity> traces, CancellationToken cancellationToken)
     {
         if (traces.Count == 0)
         {
@@ -36,7 +37,7 @@ public class SortingTaskTraceWriter(
             for (var i = 0; i < items.Length; i += batchSize)
             {
                 var count = Math.Min(batchSize, items.Length - i);
-                var chunk = new ArraySegment<Domain.Aggregates.SortingTaskTraceAggregate.SortingTaskTraceEntity>(items, i, count);
+                var chunk = new ArraySegment<SortingTaskTraceEntity>(items, i, count);
                 var stopwatch = Stopwatch.StartNew();
                 var success = true;
                 try
