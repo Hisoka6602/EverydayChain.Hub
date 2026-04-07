@@ -7,6 +7,7 @@ using EverydayChain.Hub.Infrastructure.Repositories;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using EverydayChain.Hub.Tests.Services;
+using EverydayChain.Hub.Infrastructure.Services;
 
 namespace EverydayChain.Hub.Tests.Repositories;
 
@@ -109,6 +110,7 @@ public class SqlServerSyncUpsertRepositoryTests
             syncOptions,
             shardingOptions,
             new MonthShardSuffixResolver(),
+            new NoopShardTableProvisioner(),
             new PassThroughDangerZoneExecutor(),
             NullLogger<SqlServerSyncUpsertRepository>.Instance);
     }
@@ -145,9 +147,10 @@ public class SqlServerSyncUpsertRepositoryTests
         IOptions<SyncJobOptions> syncJobOptions,
         IOptions<ShardingOptions> shardingOptions,
         IShardSuffixResolver shardSuffixResolver,
+        IShardTableProvisioner shardTableProvisioner,
         Infrastructure.Services.IDangerZoneExecutor dangerZoneExecutor,
         Microsoft.Extensions.Logging.ILogger<SqlServerSyncUpsertRepository> logger)
-        : SqlServerSyncUpsertRepository(syncJobOptions, shardingOptions, shardSuffixResolver, dangerZoneExecutor, logger)
+        : SqlServerSyncUpsertRepository(syncJobOptions, shardingOptions, shardSuffixResolver, shardTableProvisioner, dangerZoneExecutor, logger)
     {
         /// <summary>内存状态表。</summary>
         private readonly Dictionary<string, string> _states = new(StringComparer.OrdinalIgnoreCase);
@@ -210,6 +213,24 @@ public class SqlServerSyncUpsertRepositoryTests
             }
 
             return Task.FromResult(count);
+        }
+    }
+
+    /// <summary>
+    /// 空实现分表预置器。
+    /// </summary>
+    private sealed class NoopShardTableProvisioner : IShardTableProvisioner
+    {
+        /// <inheritdoc/>
+        public Task EnsureShardTableAsync(string suffix, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public Task EnsureShardTablesAsync(IEnumerable<string> suffixes, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
         }
     }
 }

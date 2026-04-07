@@ -1,3 +1,4 @@
+using EverydayChain.Hub.Domain.Abstractions;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -7,8 +8,15 @@ namespace EverydayChain.Hub.Domain.Aggregates.WmsPickToWcsAggregate;
 /// WMS 下发至 WCS 的分拣任务表实体。
 /// </summary>
 [Table("IDX_PICKTOWCS2")]
-public class WmsPickToWcsEntity
+public class WmsPickToWcsEntity : IEntity<long>
 {
+    /// <summary>
+    /// 自增主键。
+    /// </summary>
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
+
     /// <summary>
     /// 波次ID。
     /// </summary>
@@ -138,7 +146,7 @@ public class WmsPickToWcsEntity
     /// </summary>
     [Column("R_SYSID")]
     [StringLength(30)]
-    public string? UniqueId { get; set; }
+    public string UniqueId { get; set; } = string.Empty;
 
     /// <summary>
     /// 长，单位厘米。

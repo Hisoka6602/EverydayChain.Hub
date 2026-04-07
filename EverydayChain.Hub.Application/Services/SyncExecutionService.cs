@@ -29,6 +29,8 @@ public class SyncExecutionService(
     private const string FailBatchStatusUpdateErrorLogTemplate = "更新同步失败批次状态异常。TableCode={TableCode}, BatchId={BatchId}";
     /// <summary>批次取消状态更新异常日志模板。</summary>
     private const string FailBatchOnCancelErrorLogTemplate = "在处理同步批次取消时更新批次失败。TableCode={TableCode}, BatchId={BatchId}";
+    /// <summary>“读取到数据但目标端0写入（全部跳过）”告警采样间隔（有效值范围：1~1000，建议值：100）。</summary>
+    private const int FullySkippedPageWarningInterval = 100;
 
     /// <summary>快照序列化配置。</summary>
     private static readonly JsonSerializerOptions SnapshotSerializerOptions = new()
@@ -48,7 +50,6 @@ public class SyncExecutionService(
         var skipCount = 0;
         DateTime? lastSuccessCursorLocal = context.Checkpoint.LastSuccessCursorLocal;
         var pendingChanges = new List<SyncChangeLog>();
-
         try
         {
             await batchRepository.CreateBatchAsync(new SyncBatch
@@ -81,6 +82,19 @@ public class SyncExecutionService(
                 var readResult = await oracleSourceReader.ReadIncrementalPageAsync(readRequest, ct);
                 if (readResult.Rows.Count == 0)
                 {
+                    if (pageNo == 1)
+                    {
+                        var uniqueKeysText = BuildUniqueKeysText(context.Definition.UniqueKeys);
+                        logger.LogWarning(
+                            "同步源端读取为空。TableCode={TableCode}, SourceSchema={SourceSchema}, SourceTable={SourceTable}, CursorColumn={CursorColumn}, WindowStartLocal={WindowStartLocal}, WindowEndLocal={WindowEndLocal}, UniqueKeys={UniqueKeys}",
+                            context.Definition.TableCode,
+                            context.Definition.SourceSchema,
+                            context.Definition.SourceTable,
+                            context.Definition.CursorColumn,
+                            context.Window.WindowStartLocal,
+                            context.Window.WindowEndLocal,
+                            uniqueKeysText);
+                    }
                     break;
                 }
 
@@ -132,6 +146,27 @@ public class SyncExecutionService(
                 insertCount += mergeResult.InsertCount;
                 updateCount += mergeResult.UpdateCount;
                 skipCount += mergeResult.SkipCount;
+                if (mergeResult.InsertCount == 0 && mergeResult.UpdateCount == 0 && mergeResult.SkipCount == readResult.Rows.Count)
+                {
+                    var shouldLogFullySkippedPageWarning = pageNo == 1 || pageNo % FullySkippedPageWarningInterval == 0;
+                    if (shouldLogFullySkippedPageWarning)
+                    {
+                        var uniqueKeysText = BuildUniqueKeysText(context.Definition.UniqueKeys);
+                        logger.LogWarning(
+                            "同步读取到数据但目标端0写入（全部跳过，按页采样输出）。"
+                            + "TableCode={TableCode}, BatchId={BatchId}, SourceSchema={SourceSchema}, SourceTable={SourceTable}, "
+                            + "PageNo={PageNo}, ReadRows={ReadRows}, SkipRows={SkipRows}, UniqueKeys={UniqueKeys}, WarningInterval={WarningInterval}",
+                            context.Definition.TableCode,
+                            context.BatchId,
+                            context.Definition.SourceSchema,
+                            context.Definition.SourceTable,
+                            pageNo,
+                            readResult.Rows.Count,
+                            mergeResult.SkipCount,
+                            uniqueKeysText,
+                            FullySkippedPageWarningInterval);
+                    }
+                }
                 AppendChangeLogs(context, pendingChanges, readResult.Rows, mergeResult.ChangedOperations);
                 if (mergeResult.LastSuccessCursorLocal.HasValue)
                 {
@@ -233,6 +268,14 @@ public class SyncExecutionService(
                 context.Window.WindowStartLocal,
                 context.Window.WindowEndLocal,
                 context.Checkpoint.LastSuccessCursorLocal);
+            logger.LogError(
+                "同步批次失败诊断信息。TableCode={TableCode}, BatchId={BatchId}, SourceSchema={SourceSchema}, SourceTable={SourceTable}, CursorColumn={CursorColumn}, UniqueKeys={UniqueKeys}",
+                context.Definition.TableCode,
+                context.BatchId,
+                context.Definition.SourceSchema,
+                context.Definition.SourceTable,
+                context.Definition.CursorColumn,
+                BuildUniqueKeysText(context.Definition.UniqueKeys));
 
             using var errorCheckpointCts = new CancellationTokenSource(TimeSpan.FromSeconds(ErrorCheckpointSaveTimeoutSeconds));
             await TryMarkBatchFailedAsync(
@@ -257,6 +300,16 @@ public class SyncExecutionService(
             }
             throw;
         }
+    }
+
+    /// <summary>
+    /// 构建唯一键文本。
+    /// </summary>
+    /// <param name="uniqueKeys">唯一键集合。</param>
+    /// <returns>用于日志输出的唯一键文本。</returns>
+    private static string BuildUniqueKeysText(IReadOnlyList<string> uniqueKeys)
+    {
+        return uniqueKeys.Count == 0 ? "未配置" : string.Join(",", uniqueKeys);
     }
 
     /// <summary>

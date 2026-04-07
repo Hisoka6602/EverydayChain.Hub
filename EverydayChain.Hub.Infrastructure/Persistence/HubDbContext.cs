@@ -70,8 +70,11 @@ public class HubDbContext : DbContext
     {
         var builder = modelBuilder.Entity<WmsSplitPickToLightCartonEntity>();
         builder.ToTable(tableName, _shardingOptions.Schema);
-        builder.HasKey(x => x.CartonNo);
+        builder.HasKey(x => x.Id).IsClustered();
+        builder.Property(x => x.Id).ValueGeneratedOnAdd();
         builder.Property(x => x.CartonNo).IsRequired().HasMaxLength(30);
+        builder.HasIndex(x => x.CartonNo).IsUnique();
+        builder.HasIndex(x => x.AddTime);
         builder.Property(x => x.LengthCm).HasColumnType("decimal(18,8)");
         builder.Property(x => x.WidthCm).HasColumnType("decimal(18,8)");
         builder.Property(x => x.HeightCm).HasColumnType("decimal(18,8)");
@@ -88,8 +91,11 @@ public class HubDbContext : DbContext
     {
         var builder = modelBuilder.Entity<WmsPickToWcsEntity>();
         builder.ToTable(tableName, _shardingOptions.Schema);
-        builder.HasKey(x => x.UniqueId);
+        builder.HasKey(x => x.Id).IsClustered();
+        builder.Property(x => x.Id).ValueGeneratedOnAdd();
         builder.Property(x => x.UniqueId).IsRequired().HasMaxLength(30);
+        builder.HasIndex(x => x.UniqueId).IsUnique();
+        builder.HasIndex(x => x.AddTime);
         builder.Property(x => x.MinUnitQuantity).HasColumnType("decimal(18,8)");
         builder.Property(x => x.LengthCm).HasColumnType("decimal(18,8)");
         builder.Property(x => x.WidthCm).HasColumnType("decimal(18,8)");

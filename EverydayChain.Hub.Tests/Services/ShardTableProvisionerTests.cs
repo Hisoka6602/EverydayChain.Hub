@@ -77,7 +77,7 @@ public class ShardTableProvisionerTests
     }
 
     /// <summary>
-    /// WMS 表模板应保留主键与高精度小数列类型。
+    /// WMS 表模板应保留 Id 自增主键、倒序聚簇定义与高精度小数列类型。
     /// </summary>
     [Fact]
     public void WmsPickToWcsTemplate_ShouldContainPrimaryKeyAndDecimalColumns()
@@ -90,8 +90,9 @@ public class ShardTableProvisionerTests
             "IDX_PICKTOWCS2_202604",
             "[dbo].[IDX_PICKTOWCS2_202604]");
 
+        Assert.Contains("[Id] bigint IDENTITY(1,1) NOT NULL", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("PRIMARY KEY CLUSTERED ([Id] DESC)", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("[R_SYSID] nvarchar(30) NOT NULL", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("PRIMARY KEY ([R_SYSID])", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("[LENGTH] decimal(18,8) NULL", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("[WIDTH] decimal(18,8) NULL", sql, StringComparison.OrdinalIgnoreCase);
     }

@@ -1,14 +1,11 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 同步落库重构：删除旧的内存+文件快照路径，新增 `SqlServerSyncUpsertRepository`，基于 `TableCode/TargetLogicalTable` 执行 SQL Server 真实 UPSERT。
-- 幂等语义保持：仍以 `UniqueKeys + CursorColumn` 计算行摘要与游标，保持 Insert/Update/Skip 统计口径不变。
-- 危险动作隔离：目标表 UPSERT、跨分表迁移删除、状态表软删/硬删统一通过 `DangerZoneExecutor` 执行。
-- 配置收敛：移除 `Oracle.DefaultSchema`，`SourceSchema` 改为必填，缺失时直接抛配置异常。
-- 配置语义补充：`SyncJob.Tables[*].Delete` 与 `SyncJob.Tables[*].Retention` 明确仅对本地 SQL Server 目标端生效。
-- 分表策略纠偏：启动预建仅保留后缀分表，不再自动预建无后缀基础表；新增 `20260407154000_AddSyncTargetStateAndShardStrategyGuard` 迁移创建同步状态表。
-- 分表策略要求：不兼容旧无后缀基础表；同步链路仅支持后缀分表写入。
-- 测试补充：新增 UPSERT 统计行为测试、`SourceSchema` 缺失异常测试、仅后缀预建测试。
+- 修复同步写入根因：`WmsPickToWcs` 的 `UniqueKeys` 调整为 `R_SYSID`，避免因业务键配置不稳定导致目标表长期无有效写入。
+- 聚合模型统一：`Aggregates` 目录全部实体统一继承 `IEntity<long>`，新增 `Id` 自增主键模型。
+- 主键策略升级：聚合表主键统一为 `Id`，并在基表迁移与分表建表模板中强制为倒序聚簇主键。
+- 迁移历史重建：删除旧迁移并重新生成 `RebuildInitialHubSchema` 初始化迁移。
+- EF Core 写入性能优化：`SortingTaskTraceWriter` 关闭自动变更检测并按批次清理跟踪器，降低大批量写入的跟踪开销。
 
 ## 解决方案文件树与职责
 ```text
@@ -118,9 +115,8 @@
 │   ├── Persistence/Sharding/IShardSuffixResolver.cs
 │   ├── Persistence/Sharding/MonthShardSuffixResolver.cs
 │   ├── Persistence/Sharding/ShardModelCacheKeyFactory.cs
-│   ├── Migrations/20260407125614_RebuildInitialHubSchema.cs
-│   ├── Migrations/20260407125614_RebuildInitialHubSchema.Designer.cs
-│   ├── Migrations/20260407154000_AddSyncTargetStateAndShardStrategyGuard.cs
+│   ├── Migrations/20260407180035_RebuildInitialHubSchema.cs
+│   ├── Migrations/20260407180035_RebuildInitialHubSchema.Designer.cs
 │   ├── Migrations/HubDbContextModelSnapshot.cs
 │   └── Services
 │       ├── IDangerZoneExecutor.cs
@@ -205,8 +201,7 @@
 - `SyncChangeLogRepository.cs`：同步变更日志仓储基础实现，支持批量写入审计记录。
 - `SyncDeletionLogRepository.cs`：同步删除日志仓储基础实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖，并在启动阶段从启用同步表配置提取逻辑表名集合，完成安全校验与空配置异常拦截。
-- `20260407125614_RebuildInitialHubSchema.cs`：重建后的基础表结构迁移（覆盖 `sorting_task_trace`、`IDX_PICKTOLIGHT_CARTON1`、`IDX_PICKTOWCS2`）。
-- `20260407154000_AddSyncTargetStateAndShardStrategyGuard.cs`：新增 `sync_target_state` 状态表迁移，支撑幂等状态与删除同步。
+- `20260407180035_RebuildInitialHubSchema.cs`：重建后的基础表结构迁移（覆盖 `sorting_task_trace`、`IDX_PICKTOLIGHT_CARTON1`、`IDX_PICKTOWCS2`），并将三张聚合表主键统一为 `Id` 倒序聚簇索引。
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
 - `nlog.config`：NLog 日志配置，输出至控制台与滚动日志文件（按日切割，单文件上限 10 MB，保留 30 天）。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。

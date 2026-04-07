@@ -1,3 +1,4 @@
+using EverydayChain.Hub.Domain.Abstractions;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -7,8 +8,15 @@ namespace EverydayChain.Hub.Domain.Aggregates.WmsSplitPickToLightCartonAggregate
 /// WMS 下发至亮灯拆零箱任务表实体。
 /// </summary>
 [Table("IDX_PICKTOLIGHT_CARTON1")]
-public class WmsSplitPickToLightCartonEntity
+public class WmsSplitPickToLightCartonEntity : IEntity<long>
 {
+    /// <summary>
+    /// 自增主键。
+    /// </summary>
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
+
     /// <summary>
     /// 订单号。
     /// </summary>
@@ -28,7 +36,7 @@ public class WmsSplitPickToLightCartonEntity
     /// </summary>
     [Column("CARTONNO")]
     [StringLength(30)]
-    public string? CartonNo { get; set; }
+    public string CartonNo { get; set; } = string.Empty;
 
     /// <summary>
     /// 分拣位置。
