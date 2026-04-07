@@ -5,6 +5,7 @@
 - 幂等语义保持：仍以 `UniqueKeys + CursorColumn` 计算行摘要与游标，保持 Insert/Update/Skip 统计口径不变。
 - 危险动作隔离：目标表 UPSERT、跨分表迁移删除、状态表软删/硬删统一通过 `DangerZoneExecutor` 执行。
 - 配置收敛：移除 `Oracle.DefaultSchema`，`SourceSchema` 改为必填，缺失时直接抛配置异常。
+- 配置语义补充：`SyncJob.Tables[*].Delete` 与 `SyncJob.Tables[*].Retention` 明确仅对本地 SQL Server 目标端生效。
 - 分表策略纠偏：启动预建仅保留后缀分表，不再自动预建无后缀基础表；新增 `20260407154000_AddSyncTargetStateAndShardStrategyGuard` 迁移创建同步状态表。
 - 兼容策略：历史无后缀基础表可保留不删，但同步链路后续不再依赖；新写入统一进入后缀分表。
 - 测试补充：新增 UPSERT 统计行为测试、`SourceSchema` 缺失异常测试、仅后缀预建测试。
