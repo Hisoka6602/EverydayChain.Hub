@@ -1,19 +1,19 @@
-using System.Buffers;
-using System.Buffers.Binary;
-using System.Globalization;
-using System.Security.Cryptography;
 using System.Text;
+using System.Buffers;
 using System.Text.Json;
-using EverydayChain.Hub.Application.Abstractions.Persistence;
-using EverydayChain.Hub.Application.Models;
-using EverydayChain.Hub.Domain.Enums;
-using EverydayChain.Hub.Domain.Options;
-using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
-using EverydayChain.Hub.Infrastructure.Services;
-using EverydayChain.Hub.SharedKernel.Utilities;
+using System.Globalization;
+using System.Buffers.Binary;
 using Microsoft.Data.SqlClient;
+using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using EverydayChain.Hub.Domain.Enums;
+using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.SharedKernel.Utilities;
+using EverydayChain.Hub.Infrastructure.Services;
+using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
@@ -25,17 +25,16 @@ public class SqlServerSyncUpsertRepository(
     IOptions<ShardingOptions> shardingOptions,
     IShardSuffixResolver shardSuffixResolver,
     IDangerZoneExecutor dangerZoneExecutor,
-    ILogger<SqlServerSyncUpsertRepository> logger) : ISyncUpsertRepository
-{
+    ILogger<SqlServerSyncUpsertRepository> logger) : ISyncUpsertRepository {
+
     /// <summary>状态表名。</summary>
     private const string SyncTargetStateTableName = "sync_target_state";
-    
+
     /// <summary>状态表固定 Schema。</summary>
     private const string SyncTargetStateSchema = "dbo";
 
     /// <summary>行摘要序列化配置（紧凑输出）。</summary>
-    private static readonly JsonSerializerOptions DigestSerializerOptions = new()
-    {
+    private static readonly JsonSerializerOptions DigestSerializerOptions = new() {
         WriteIndented = false,
     };
 
@@ -49,10 +48,8 @@ public class SqlServerSyncUpsertRepository(
     private readonly IReadOnlyDictionary<string, SyncTableOptions> _tableOptionsMap = BuildTableOptionsMap(syncJobOptions.Value);
 
     /// <inheritdoc/>
-    public Task<SyncMergeResult> MergeFromStagingAsync(SyncMergeRequest request, CancellationToken ct)
-    {
-        if (request.UniqueKeys.Count == 0)
-        {
+    public Task<SyncMergeResult> MergeFromStagingAsync(SyncMergeRequest request, CancellationToken ct) {
+        if (request.UniqueKeys.Count == 0) {
             throw new InvalidOperationException($"同步表 {request.TableCode} 未配置 UniqueKeys，无法执行幂等合并。");
         }
 
@@ -63,8 +60,7 @@ public class SqlServerSyncUpsertRepository(
     }
 
     /// <inheritdoc/>
-    public Task<IReadOnlyList<SyncTargetStateRow>> ListTargetStateRowsAsync(string tableCode, CancellationToken ct)
-    {
+    public Task<IReadOnlyList<SyncTargetStateRow>> ListTargetStateRowsAsync(string tableCode, CancellationToken ct) {
         return dangerZoneExecutor.ExecuteAsync(
             $"sqlserver-upsert-list-state-{tableCode}",
             token => ListTargetStateRowsCoreAsync(tableCode, token),
@@ -72,10 +68,8 @@ public class SqlServerSyncUpsertRepository(
     }
 
     /// <inheritdoc/>
-    public Task<int> DeleteByBusinessKeysAsync(string tableCode, IReadOnlyList<string> businessKeys, DeletionPolicy deletionPolicy, CancellationToken ct)
-    {
-        if (businessKeys.Count == 0 || deletionPolicy == DeletionPolicy.Disabled)
-        {
+    public Task<int> DeleteByBusinessKeysAsync(string tableCode, IReadOnlyList<string> businessKeys, DeletionPolicy deletionPolicy, CancellationToken ct) {
+        if (businessKeys.Count == 0 || deletionPolicy == DeletionPolicy.Disabled) {
             return Task.FromResult(0);
         }
 
@@ -91,20 +85,16 @@ public class SqlServerSyncUpsertRepository(
     /// <param name="request">合并请求。</param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>合并结果。</returns>
-    protected virtual async Task<SyncMergeResult> MergeCoreAsync(SyncMergeRequest request, CancellationToken ct)
-    {
-        if (request.UniqueKeys.Count == 0)
-        {
+    protected virtual async Task<SyncMergeResult> MergeCoreAsync(SyncMergeRequest request, CancellationToken ct) {
+        if (request.UniqueKeys.Count == 0) {
             throw new InvalidOperationException($"同步表 {request.TableCode} 未配置 UniqueKeys，无法执行幂等合并。");
         }
 
         var changedOperations = new Dictionary<string, SyncChangeOperationType>(StringComparer.OrdinalIgnoreCase);
-        var result = new SyncMergeResult
-        {
+        var result = new SyncMergeResult {
             ChangedOperations = changedOperations,
         };
-        if (request.Rows.Count == 0)
-        {
+        if (request.Rows.Count == 0) {
             return result;
         }
 
@@ -112,25 +102,22 @@ public class SqlServerSyncUpsertRepository(
         var targetLogicalTable = ResolveTargetLogicalTable(request.TableCode, tableOptions);
         var uniqueKeySet = new HashSet<string>(request.UniqueKeys, StringComparer.OrdinalIgnoreCase);
         var entries = BuildMergeEntries(request, targetLogicalTable);
-        if (entries.Count == 0)
-        {
+        if (entries.Count == 0) {
             return result;
         }
 
         await using var connection = new SqlConnection(_shardingOptions.ConnectionString);
         await connection.OpenAsync(ct);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(ct);
-        try
-        {
+        try {
+            await EnsureSyncTargetStateTableExistsAsync(connection, transaction, ct);
             var distinctBusinessKeys = GetDistinctBusinessKeys(entries);
             var states = await LoadStateMapAsync(connection, transaction, request.TableCode, distinctBusinessKeys, ct);
-            foreach (var entry in entries)
-            {
+            foreach (var entry in entries) {
                 ct.ThrowIfCancellationRequested();
                 UpdateLastCursor(result, entry.State.CursorLocal);
 
-                if (!states.TryGetValue(entry.BusinessKey, out var existingState))
-                {
+                if (!states.TryGetValue(entry.BusinessKey, out var existingState)) {
                     await UpsertTargetRowAsync(connection, transaction, entry.TargetLogicalTable, entry.ShardSuffix, entry.Row, request.UniqueKeys, uniqueKeySet, ct);
                     await UpsertStateAsync(connection, transaction, request.TableCode, entry, ct);
                     states[entry.BusinessKey] = new PersistedState(
@@ -146,14 +133,12 @@ public class SqlServerSyncUpsertRepository(
                     continue;
                 }
 
-                if (IsPersistedStateEqual(existingState, entry.State, entry.ShardSuffix))
-                {
+                if (IsPersistedStateEqual(existingState, entry.State, entry.ShardSuffix)) {
                     result.SkipCount++;
                     continue;
                 }
 
-                if (!string.Equals(existingState.ShardSuffix, entry.ShardSuffix, StringComparison.OrdinalIgnoreCase))
-                {
+                if (!string.Equals(existingState.ShardSuffix, entry.ShardSuffix, StringComparison.OrdinalIgnoreCase)) {
                     await DeleteTargetRowByBusinessKeyAsync(
                         connection,
                         transaction,
@@ -181,16 +166,13 @@ public class SqlServerSyncUpsertRepository(
             await transaction.CommitAsync(ct);
             return result;
         }
-        catch (Exception ex)
-        {
+        catch (Exception ex) {
             logger.LogError(ex, "SQL Server 幂等合并失败。TableCode={TableCode}", request.TableCode);
-            try
-            {
+            try {
                 // 事务回滚属于一致性收敛动作；在超时或手动取消场景下，仍优先完成回滚以避免半提交状态。
                 await transaction.RollbackAsync(CancellationToken.None);
             }
-            catch (Exception rollbackException)
-            {
+            catch (Exception rollbackException) {
                 logger.LogError(rollbackException, "SQL Server 幂等合并事务回滚失败。TableCode={TableCode}", request.TableCode);
             }
 
@@ -204,11 +186,11 @@ public class SqlServerSyncUpsertRepository(
     /// <param name="tableCode">表编码。</param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>状态集合。</returns>
-    protected virtual async Task<IReadOnlyList<SyncTargetStateRow>> ListTargetStateRowsCoreAsync(string tableCode, CancellationToken ct)
-    {
+    protected virtual async Task<IReadOnlyList<SyncTargetStateRow>> ListTargetStateRowsCoreAsync(string tableCode, CancellationToken ct) {
         var states = new List<SyncTargetStateRow>();
         await using var connection = new SqlConnection(_shardingOptions.ConnectionString);
         await connection.OpenAsync(ct);
+        await EnsureSyncTargetStateTableExistsAsync(connection, transaction: null, ct);
         await using var command = connection.CreateCommand();
         command.CommandText = $@"
 SELECT [BusinessKey], [RowDigest], [CursorLocal], [IsSoftDeleted], [SoftDeletedTimeLocal]
@@ -216,10 +198,8 @@ FROM {GetSyncStateTableFullName()}
 WHERE [TableCode]=@tableCode;";
         command.Parameters.AddWithValue("@tableCode", tableCode);
         await using var reader = await command.ExecuteReaderAsync(ct);
-        while (await reader.ReadAsync(ct))
-        {
-            states.Add(new SyncTargetStateRow
-            {
+        while (await reader.ReadAsync(ct)) {
+            states.Add(new SyncTargetStateRow {
                 BusinessKey = reader.GetString(0),
                 RowDigest = reader.GetString(1),
                 CursorLocal = reader.IsDBNull(2) ? null : reader.GetDateTime(2),
@@ -239,39 +219,32 @@ WHERE [TableCode]=@tableCode;";
     /// <param name="deletionPolicy">删除策略。</param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>删除数量。</returns>
-    protected virtual async Task<int> DeleteByBusinessKeysCoreAsync(string tableCode, IReadOnlyList<string> businessKeys, DeletionPolicy deletionPolicy, CancellationToken ct)
-    {
+    protected virtual async Task<int> DeleteByBusinessKeysCoreAsync(string tableCode, IReadOnlyList<string> businessKeys, DeletionPolicy deletionPolicy, CancellationToken ct) {
         var tableOptions = ResolveTableOptions(tableCode);
-        if (tableOptions.UniqueKeys.Count == 0)
-        {
+        if (tableOptions.UniqueKeys.Count == 0) {
             throw new InvalidOperationException($"同步表 {tableCode} 未配置 UniqueKeys，无法执行删除。");
         }
 
         await using var connection = new SqlConnection(_shardingOptions.ConnectionString);
         await connection.OpenAsync(ct);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(ct);
-        try
-        {
+        try {
             var distinctBusinessKeys = GetDistinctBusinessKeys(businessKeys);
             var stateMap = await LoadStateMapAsync(connection, transaction, tableCode, distinctBusinessKeys, ct);
             var deletedCount = 0;
-            foreach (var businessKey in distinctBusinessKeys)
-            {
+            foreach (var businessKey in distinctBusinessKeys) {
                 ct.ThrowIfCancellationRequested();
-                if (!stateMap.TryGetValue(businessKey, out var state))
-                {
+                if (!stateMap.TryGetValue(businessKey, out var state)) {
                     continue;
                 }
 
-                if (deletionPolicy == DeletionPolicy.SoftDelete)
-                {
+                if (deletionPolicy == DeletionPolicy.SoftDelete) {
                     await MarkSoftDeletedStateAsync(connection, transaction, tableCode, businessKey, ct);
                     deletedCount++;
                     continue;
                 }
 
-                if (deletionPolicy == DeletionPolicy.HardDelete)
-                {
+                if (deletionPolicy == DeletionPolicy.HardDelete) {
                     await DeleteTargetRowByBusinessKeyAsync(
                         connection,
                         transaction,
@@ -288,16 +261,13 @@ WHERE [TableCode]=@tableCode;";
             await transaction.CommitAsync(ct);
             return deletedCount;
         }
-        catch (Exception ex)
-        {
+        catch (Exception ex) {
             logger.LogError(ex, "SQL Server 目标端删除失败。TableCode={TableCode}, DeletionPolicy={DeletionPolicy}", tableCode, deletionPolicy);
-            try
-            {
+            try {
                 // 事务回滚属于一致性收敛动作；在超时或手动取消场景下，仍优先完成回滚以避免半提交状态。
                 await transaction.RollbackAsync(CancellationToken.None);
             }
-            catch (Exception rollbackException)
-            {
+            catch (Exception rollbackException) {
                 logger.LogError(rollbackException, "SQL Server 目标端删除事务回滚失败。TableCode={TableCode}, DeletionPolicy={DeletionPolicy}", tableCode, deletionPolicy);
             }
 
@@ -311,15 +281,12 @@ WHERE [TableCode]=@tableCode;";
     /// <param name="request">合并请求。</param>
     /// <param name="targetLogicalTable">目标逻辑表。</param>
     /// <returns>合并条目列表。</returns>
-    private List<MergeEntry> BuildMergeEntries(SyncMergeRequest request, string targetLogicalTable)
-    {
+    private List<MergeEntry> BuildMergeEntries(SyncMergeRequest request, string targetLogicalTable) {
         var entries = new List<MergeEntry>(request.Rows.Count);
-        foreach (var row in request.Rows)
-        {
+        foreach (var row in request.Rows) {
             var filteredRow = SyncColumnFilter.FilterExcludedColumns(row, request.NormalizedExcludedColumns);
             var businessKey = SyncBusinessKeyBuilder.Build(filteredRow, request.UniqueKeys);
-            if (string.IsNullOrWhiteSpace(businessKey))
-            {
+            if (string.IsNullOrWhiteSpace(businessKey)) {
                 continue;
             }
 
@@ -350,25 +317,21 @@ WHERE [TableCode]=@tableCode;";
         SqlTransaction transaction,
         string tableCode,
         IReadOnlyList<string> businessKeys,
-        CancellationToken ct)
-    {
+        CancellationToken ct) {
         var stateMap = new Dictionary<string, PersistedState>(StringComparer.OrdinalIgnoreCase);
-        if (businessKeys.Count == 0)
-        {
+        if (businessKeys.Count == 0) {
             return stateMap;
         }
 
         // SQL Server 单条语句参数上限为 2100；本查询除业务键参数外还包含 tableCode 参数，因此分块上限取 900。
         const int chunkSize = 900;
-        for (var index = 0; index < businessKeys.Count; index += chunkSize)
-        {
+        for (var index = 0; index < businessKeys.Count; index += chunkSize) {
             ct.ThrowIfCancellationRequested();
             var chunkLength = Math.Min(chunkSize, businessKeys.Count - index);
             await using var command = connection.CreateCommand();
             command.Transaction = transaction;
             var parameterNames = new List<string>(chunkLength);
-            for (var i = 0; i < chunkLength; i++)
-            {
+            for (var i = 0; i < chunkLength; i++) {
                 var businessKey = businessKeys[index + i];
                 var parameterName = $"@businessKey{i}";
                 parameterNames.Add(parameterName);
@@ -382,8 +345,7 @@ FROM {GetSyncStateTableFullName()}
 WHERE [TableCode]=@tableCode
   AND [BusinessKey] IN ({string.Join(", ", parameterNames)});";
             await using var reader = await command.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct))
-            {
+            while (await reader.ReadAsync(ct)) {
                 var persisted = new PersistedState(
                     reader.GetString(0),
                     reader.GetString(1),
@@ -397,6 +359,41 @@ WHERE [TableCode]=@tableCode
         }
 
         return stateMap;
+    }
+
+    /// <summary>
+    /// 确保幂等状态表存在。
+    /// </summary>
+    /// <remarks>
+    /// 线上若存在“迁移历史被重置 / 部分迁移缺失”场景，状态表可能未被创建。
+    /// 此处进行幂等兜底，避免同步任务因 208 异常中断。
+    /// </remarks>
+    /// <param name="connection">数据库连接。</param>
+    /// <param name="transaction">事务对象（可空）。</param>
+    /// <param name="ct">取消令牌。</param>
+    private async Task EnsureSyncTargetStateTableExistsAsync(SqlConnection connection, SqlTransaction? transaction, CancellationToken ct) {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $@"
+IF OBJECT_ID(N'{GetSyncStateTableFullName()}', N'U') IS NULL
+BEGIN
+    CREATE TABLE {GetSyncStateTableFullName()} (
+        [TableCode] NVARCHAR(128) NOT NULL,
+        [BusinessKey] NVARCHAR(512) NOT NULL,
+        [RowDigest] NVARCHAR(128) NOT NULL,
+        [CursorLocal] DATETIME2 NULL,
+        [IsSoftDeleted] BIT NOT NULL,
+        [SoftDeletedTimeLocal] DATETIME2 NULL,
+        [ShardSuffix] NVARCHAR(32) NOT NULL,
+        [TargetLogicalTable] NVARCHAR(128) NOT NULL,
+        [UpdatedTimeLocal] DATETIME2 NOT NULL,
+        CONSTRAINT [PK_sync_target_state] PRIMARY KEY ([TableCode], [BusinessKey])
+    );
+
+    CREATE INDEX [IX_sync_target_state_TableCode_CursorLocal]
+    ON {GetSyncStateTableFullName()} ([TableCode], [CursorLocal]);
+END;";
+        await command.ExecuteNonQueryAsync(ct);
     }
 
     /// <summary>
@@ -418,8 +415,7 @@ WHERE [TableCode]=@tableCode
         IReadOnlyDictionary<string, object?> row,
         IReadOnlyList<string> uniqueKeys,
         IReadOnlySet<string> uniqueKeySet,
-        CancellationToken ct)
-    {
+        CancellationToken ct) {
         var fullTableName = BuildTargetTableFullName(targetLogicalTable, shardSuffix);
         var orderedColumns = row.Keys
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -431,8 +427,7 @@ WHERE [TableCode]=@tableCode
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         var selectAssignments = new List<string>(orderedColumns.Length);
-        for (var index = 0; index < orderedColumns.Length; index++)
-        {
+        for (var index = 0; index < orderedColumns.Length; index++) {
             var column = orderedColumns[index];
             var parameterName = $"@p{index}";
             selectAssignments.Add($"{parameterName} AS [{column}]");
@@ -475,16 +470,14 @@ WHEN NOT MATCHED THEN
         string shardSuffix,
         IReadOnlyList<string> uniqueKeys,
         string businessKey,
-        CancellationToken ct)
-    {
+        CancellationToken ct) {
         EnsureIdentifiersSafe(uniqueKeys);
         var keyValues = ParseBusinessKey(uniqueKeys, businessKey);
         var fullTableName = BuildTargetTableFullName(targetLogicalTable, shardSuffix);
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         var whereClauses = new List<string>(uniqueKeys.Count);
-        for (var index = 0; index < uniqueKeys.Count; index++)
-        {
+        for (var index = 0; index < uniqueKeys.Count; index++) {
             var key = uniqueKeys[index];
             var parameterName = $"@k{index}";
             whereClauses.Add($"[{EscapeIdentifier(key)}] = {parameterName}");
@@ -508,8 +501,7 @@ WHEN NOT MATCHED THEN
         SqlTransaction transaction,
         string tableCode,
         MergeEntry entry,
-        CancellationToken ct)
-    {
+        CancellationToken ct) {
         var nowLocal = DateTime.Now;
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
@@ -563,8 +555,7 @@ WHEN NOT MATCHED THEN
         SqlTransaction transaction,
         string tableCode,
         string businessKey,
-        CancellationToken ct)
-    {
+        CancellationToken ct) {
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = $@"
@@ -594,8 +585,7 @@ WHERE [TableCode]=@tableCode
         SqlTransaction transaction,
         string tableCode,
         string businessKey,
-        CancellationToken ct)
-    {
+        CancellationToken ct) {
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = $@"DELETE FROM {GetSyncStateTableFullName()} WHERE [TableCode]=@tableCode AND [BusinessKey]=@businessKey;";
@@ -609,10 +599,8 @@ WHERE [TableCode]=@tableCode
     /// </summary>
     /// <param name="tableCode">表编码。</param>
     /// <returns>表配置。</returns>
-    private SyncTableOptions ResolveTableOptions(string tableCode)
-    {
-        if (_tableOptionsMap.TryGetValue(tableCode, out var tableOptions))
-        {
+    private SyncTableOptions ResolveTableOptions(string tableCode) {
+        if (_tableOptionsMap.TryGetValue(tableCode, out var tableOptions)) {
             return tableOptions;
         }
 
@@ -625,12 +613,10 @@ WHERE [TableCode]=@tableCode
     /// <param name="tableCode">表编码。</param>
     /// <param name="tableOptions">表配置。</param>
     /// <returns>目标逻辑表。</returns>
-    private static string ResolveTargetLogicalTable(string tableCode, SyncTableOptions tableOptions)
-    {
+    private static string ResolveTargetLogicalTable(string tableCode, SyncTableOptions tableOptions) {
         var targetLogicalTable = LogicalTableNameNormalizer.NormalizeOrNull(tableOptions.TargetLogicalTable)
             ?? throw new InvalidOperationException($"同步表 {tableCode} 未配置 TargetLogicalTable。");
-        if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(targetLogicalTable))
-        {
+        if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(targetLogicalTable)) {
             throw new InvalidOperationException($"同步表 {tableCode} 配置的 TargetLogicalTable 非法：{targetLogicalTable}。");
         }
 
@@ -642,8 +628,7 @@ WHERE [TableCode]=@tableCode
     /// </summary>
     /// <param name="options">同步配置。</param>
     /// <returns>映射字典。</returns>
-    private static IReadOnlyDictionary<string, SyncTableOptions> BuildTableOptionsMap(SyncJobOptions options)
-    {
+    private static IReadOnlyDictionary<string, SyncTableOptions> BuildTableOptionsMap(SyncJobOptions options) {
         return (options.Tables ?? [])
             .Where(table => !string.IsNullOrWhiteSpace(table.TableCode))
             .GroupBy(table => table.TableCode, StringComparer.OrdinalIgnoreCase)
@@ -659,14 +644,11 @@ WHERE [TableCode]=@tableCode
     /// </remarks>
     /// <param name="entries">合并条目。</param>
     /// <returns>去重后的业务键数组。</returns>
-    private static IReadOnlyList<string> GetDistinctBusinessKeys(IReadOnlyList<MergeEntry> entries)
-    {
+    private static IReadOnlyList<string> GetDistinctBusinessKeys(IReadOnlyList<MergeEntry> entries) {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var result = new List<string>(entries.Count);
-        foreach (var entry in entries)
-        {
-            if (seen.Add(entry.BusinessKey))
-            {
+        foreach (var entry in entries) {
+            if (seen.Add(entry.BusinessKey)) {
                 result.Add(entry.BusinessKey);
             }
         }
@@ -679,19 +661,15 @@ WHERE [TableCode]=@tableCode
     /// </summary>
     /// <param name="businessKeys">业务键集合。</param>
     /// <returns>去重后的业务键数组。</returns>
-    private static IReadOnlyList<string> GetDistinctBusinessKeys(IReadOnlyList<string> businessKeys)
-    {
+    private static IReadOnlyList<string> GetDistinctBusinessKeys(IReadOnlyList<string> businessKeys) {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var result = new List<string>(businessKeys.Count);
-        foreach (var businessKey in businessKeys)
-        {
-            if (string.IsNullOrWhiteSpace(businessKey))
-            {
+        foreach (var businessKey in businessKeys) {
+            if (string.IsNullOrWhiteSpace(businessKey)) {
                 continue;
             }
 
-            if (seen.Add(businessKey))
-            {
+            if (seen.Add(businessKey)) {
                 result.Add(businessKey);
             }
         }
@@ -703,8 +681,7 @@ WHERE [TableCode]=@tableCode
     /// 构建状态表全限定名。
     /// </summary>
     /// <returns>全限定表名。</returns>
-    private string GetSyncStateTableFullName()
-    {
+    private string GetSyncStateTableFullName() {
         return $"[{EscapeIdentifier(SyncTargetStateSchema)}].[{EscapeIdentifier(SyncTargetStateTableName)}]";
     }
 
@@ -714,8 +691,7 @@ WHERE [TableCode]=@tableCode
     /// <param name="targetLogicalTable">目标逻辑表。</param>
     /// <param name="shardSuffix">分表后缀。</param>
     /// <returns>全限定表名。</returns>
-    private string BuildTargetTableFullName(string targetLogicalTable, string shardSuffix)
-    {
+    private string BuildTargetTableFullName(string targetLogicalTable, string shardSuffix) {
         var physicalTable = $"{targetLogicalTable}{shardSuffix}";
         return $"[{EscapeIdentifier(_shardingOptions.Schema)}].[{EscapeIdentifier(physicalTable)}]";
     }
@@ -725,8 +701,7 @@ WHERE [TableCode]=@tableCode
     /// </summary>
     /// <param name="cursorLocal">游标时间。</param>
     /// <returns>后缀文本。</returns>
-    private string ResolveShardSuffix(DateTime? cursorLocal)
-    {
+    private string ResolveShardSuffix(DateTime? cursorLocal) {
         var effectiveCursorLocal = cursorLocal ?? DateTime.Now;
         var cursorWithOffset = new DateTimeOffset(EnsureLocalDateTime(effectiveCursorLocal, "游标时间"));
         return shardSuffixResolver.Resolve(cursorWithOffset);
@@ -738,17 +713,14 @@ WHERE [TableCode]=@tableCode
     /// <param name="uniqueKeys">唯一键集合。</param>
     /// <param name="businessKey">业务键文本。</param>
     /// <returns>键值映射。</returns>
-    private static IReadOnlyDictionary<string, object?> ParseBusinessKey(IReadOnlyList<string> uniqueKeys, string businessKey)
-    {
+    private static IReadOnlyDictionary<string, object?> ParseBusinessKey(IReadOnlyList<string> uniqueKeys, string businessKey) {
         var values = businessKey.Split('|');
-        if (values.Length != uniqueKeys.Count)
-        {
+        if (values.Length != uniqueKeys.Count) {
             throw new InvalidOperationException($"业务键与 UniqueKeys 数量不匹配。BusinessKey={businessKey}, UniqueKeys={string.Join(",", uniqueKeys)}");
         }
 
         var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        for (var index = 0; index < uniqueKeys.Count; index++)
-        {
+        for (var index = 0; index < uniqueKeys.Count; index++) {
             result[uniqueKeys[index]] = values[index];
         }
 
@@ -760,12 +732,9 @@ WHERE [TableCode]=@tableCode
     /// </summary>
     /// <param name="uniqueKeys">唯一键集合。</param>
     /// <param name="row">行数据。</param>
-    private static void EnsureUniqueKeysPresent(IReadOnlyList<string> uniqueKeys, IReadOnlyDictionary<string, object?> row)
-    {
-        foreach (var uniqueKey in uniqueKeys)
-        {
-            if (!row.ContainsKey(uniqueKey))
-            {
+    private static void EnsureUniqueKeysPresent(IReadOnlyList<string> uniqueKeys, IReadOnlyDictionary<string, object?> row) {
+        foreach (var uniqueKey in uniqueKeys) {
+            if (!row.ContainsKey(uniqueKey)) {
                 throw new InvalidOperationException($"行数据缺少唯一键列：{uniqueKey}");
             }
         }
@@ -775,12 +744,9 @@ WHERE [TableCode]=@tableCode
     /// 校验标识符集合安全性。
     /// </summary>
     /// <param name="identifiers">标识符集合。</param>
-    private static void EnsureIdentifiersSafe(IEnumerable<string> identifiers)
-    {
-        foreach (var identifier in identifiers)
-        {
-            if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(identifier))
-            {
+    private static void EnsureIdentifiersSafe(IEnumerable<string> identifiers) {
+        foreach (var identifier in identifiers) {
+            if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(identifier)) {
                 throw new InvalidOperationException($"检测到非法 SQL 标识符：{identifier}");
             }
         }
@@ -791,10 +757,8 @@ WHERE [TableCode]=@tableCode
     /// </summary>
     /// <param name="identifier">原始标识符。</param>
     /// <returns>转义结果。</returns>
-    private static string EscapeIdentifier(string identifier)
-    {
-        if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(identifier))
-        {
+    private static string EscapeIdentifier(string identifier) {
+        if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(identifier)) {
             throw new InvalidOperationException($"检测到非法 SQL 标识符：{identifier}");
         }
 
@@ -808,8 +772,7 @@ WHERE [TableCode]=@tableCode
     /// <param name="newState">新状态。</param>
     /// <param name="newShardSuffix">新后缀。</param>
     /// <returns>一致返回 <c>true</c>。</returns>
-    private static bool IsPersistedStateEqual(PersistedState persistedState, SyncTargetStateRow newState, string newShardSuffix)
-    {
+    private static bool IsPersistedStateEqual(PersistedState persistedState, SyncTargetStateRow newState, string newShardSuffix) {
         return string.Equals(persistedState.RowDigest, newState.RowDigest, StringComparison.Ordinal)
                && Nullable.Equals(persistedState.CursorLocal, newState.CursorLocal)
                && persistedState.IsSoftDeleted == newState.IsSoftDeleted
@@ -822,15 +785,12 @@ WHERE [TableCode]=@tableCode
     /// </summary>
     /// <param name="result">合并结果。</param>
     /// <param name="cursorLocal">游标时间。</param>
-    private static void UpdateLastCursor(SyncMergeResult result, DateTime? cursorLocal)
-    {
-        if (!cursorLocal.HasValue)
-        {
+    private static void UpdateLastCursor(SyncMergeResult result, DateTime? cursorLocal) {
+        if (!cursorLocal.HasValue) {
             return;
         }
 
-        if (!result.LastSuccessCursorLocal.HasValue || cursorLocal.Value > result.LastSuccessCursorLocal.Value)
-        {
+        if (!result.LastSuccessCursorLocal.HasValue || cursorLocal.Value > result.LastSuccessCursorLocal.Value) {
             result.LastSuccessCursorLocal = cursorLocal.Value;
         }
     }
@@ -845,10 +805,8 @@ WHERE [TableCode]=@tableCode
     private static SyncTargetStateRow BuildTargetStateRow(
         string businessKey,
         IReadOnlyDictionary<string, object?> row,
-        string cursorColumn)
-    {
-        return new SyncTargetStateRow
-        {
+        string cursorColumn) {
+        return new SyncTargetStateRow {
             BusinessKey = businessKey,
             RowDigest = ComputeRowDigestHash(row),
             CursorLocal = TryGetCursorLocal(row, cursorColumn),
@@ -862,13 +820,11 @@ WHERE [TableCode]=@tableCode
     /// </summary>
     /// <param name="row">业务行。</param>
     /// <returns>摘要文本。</returns>
-    private static string ComputeRowDigestHash(IReadOnlyDictionary<string, object?> row)
-    {
+    private static string ComputeRowDigestHash(IReadOnlyDictionary<string, object?> row) {
         var sortedKeys = row.Keys.ToArray();
         Array.Sort(sortedKeys, StringComparer.OrdinalIgnoreCase);
         using var incrementalHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        foreach (var key in sortedKeys)
-        {
+        foreach (var key in sortedKeys) {
             AppendLengthPrefixedUtf8(incrementalHash, key);
             var normalizedValue = NormalizeDigestValue(row[key]);
             AppendLengthPrefixedUtf8(incrementalHash, ConvertDigestValueToStableText(normalizedValue));
@@ -883,20 +839,17 @@ WHERE [TableCode]=@tableCode
     /// </summary>
     /// <param name="incrementalHash">增量哈希实例。</param>
     /// <param name="value">待追加字符串。</param>
-    private static void AppendLengthPrefixedUtf8(IncrementalHash incrementalHash, string value)
-    {
+    private static void AppendLengthPrefixedUtf8(IncrementalHash incrementalHash, string value) {
         var byteCount = Encoding.UTF8.GetByteCount(value);
         Span<byte> lengthPrefix = stackalloc byte[sizeof(int)];
         BinaryPrimitives.WriteInt32LittleEndian(lengthPrefix, byteCount);
         incrementalHash.AppendData(lengthPrefix);
         var buffer = ArrayPool<byte>.Shared.Rent(byteCount);
-        try
-        {
+        try {
             var written = Encoding.UTF8.GetBytes(value, 0, value.Length, buffer, 0);
             incrementalHash.AppendData(buffer.AsSpan(0, written));
         }
-        finally
-        {
+        finally {
             ArrayPool<byte>.Shared.Return(buffer);
         }
     }
@@ -906,25 +859,20 @@ WHERE [TableCode]=@tableCode
     /// </summary>
     /// <param name="value">归一化值。</param>
     /// <returns>稳定文本。</returns>
-    private static string ConvertDigestValueToStableText(object? value)
-    {
-        if (value is null)
-        {
+    private static string ConvertDigestValueToStableText(object? value) {
+        if (value is null) {
             return "null";
         }
 
-        if (value is string text)
-        {
+        if (value is string text) {
             return text;
         }
 
-        if (value is bool booleanValue)
-        {
+        if (value is bool booleanValue) {
             return booleanValue ? "true" : "false";
         }
 
-        if (value is IFormattable formattable)
-        {
+        if (value is IFormattable formattable) {
             return formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty;
         }
 
@@ -936,10 +884,8 @@ WHERE [TableCode]=@tableCode
     /// </summary>
     /// <param name="value">原始值。</param>
     /// <returns>归一化值。</returns>
-    private static object? NormalizeDigestValue(object? value)
-    {
-        if (value is DateTime dateTime)
-        {
+    private static object? NormalizeDigestValue(object? value) {
+        if (value is DateTime dateTime) {
             return EnsureLocalDateTime(dateTime, dateTime.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture))
                 .ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture);
         }
@@ -952,20 +898,16 @@ WHERE [TableCode]=@tableCode
     /// </summary>
     /// <param name="value">原始值。</param>
     /// <returns>参数值。</returns>
-    private static object ConvertToDbValue(object? value)
-    {
-        if (value is null)
-        {
+    private static object ConvertToDbValue(object? value) {
+        if (value is null) {
             return DBNull.Value;
         }
 
-        if (value is DateTime dateTime)
-        {
+        if (value is DateTime dateTime) {
             return EnsureLocalDateTime(dateTime, dateTime.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture));
         }
 
-        if (value is DateTimeOffset dateTimeOffset)
-        {
+        if (value is DateTimeOffset dateTimeOffset) {
             return EnsureLocalDateTime(dateTimeOffset.DateTime, dateTimeOffset.ToString("O"));
         }
 
@@ -978,27 +920,21 @@ WHERE [TableCode]=@tableCode
     /// <param name="row">业务行。</param>
     /// <param name="cursorColumn">游标列名。</param>
     /// <returns>游标本地时间。</returns>
-    private static DateTime? TryGetCursorLocal(IReadOnlyDictionary<string, object?> row, string cursorColumn)
-    {
-        if (string.IsNullOrWhiteSpace(cursorColumn))
-        {
+    private static DateTime? TryGetCursorLocal(IReadOnlyDictionary<string, object?> row, string cursorColumn) {
+        if (string.IsNullOrWhiteSpace(cursorColumn)) {
             return null;
         }
 
-        if (!row.TryGetValue(cursorColumn, out var cursorValue) || cursorValue is null)
-        {
+        if (!row.TryGetValue(cursorColumn, out var cursorValue) || cursorValue is null) {
             return null;
         }
 
-        if (cursorValue is DateTime cursorDateTime)
-        {
+        if (cursorValue is DateTime cursorDateTime) {
             return EnsureLocalDateTime(cursorDateTime, cursorDateTime.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture));
         }
 
-        if (cursorValue is string cursorText)
-        {
-            if (ContainsOffsetOrZulu(cursorText))
-            {
+        if (cursorValue is string cursorText) {
+            if (ContainsOffsetOrZulu(cursorText)) {
                 throw new InvalidOperationException($"不支持包含 Z 或 offset 的时间文本：{cursorText}");
             }
 
@@ -1006,8 +942,7 @@ WHERE [TableCode]=@tableCode
                     cursorText,
                     CultureInfo.InvariantCulture,
                     DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces,
-                    out var parsedLocalDateTime))
-            {
+                    out var parsedLocalDateTime)) {
                 return EnsureLocalDateTime(parsedLocalDateTime, cursorText);
             }
         }
@@ -1020,8 +955,7 @@ WHERE [TableCode]=@tableCode
     /// </summary>
     /// <param name="row">业务行。</param>
     /// <returns>软删除返回 <c>true</c>。</returns>
-    private static bool IsSoftDeleted(IReadOnlyDictionary<string, object?> row)
-    {
+    private static bool IsSoftDeleted(IReadOnlyDictionary<string, object?> row) {
         return row.TryGetValue(SyncColumnFilter.SoftDeleteFlagColumn, out var flagValue)
                && flagValue is bool flag
                && flag;
@@ -1032,22 +966,17 @@ WHERE [TableCode]=@tableCode
     /// </summary>
     /// <param name="row">业务行。</param>
     /// <returns>软删除时间。</returns>
-    private static DateTime? TryGetSoftDeletedTimeLocal(IReadOnlyDictionary<string, object?> row)
-    {
-        if (!row.TryGetValue(SyncColumnFilter.SoftDeleteTimeColumn, out var timeValue) || timeValue is null)
-        {
+    private static DateTime? TryGetSoftDeletedTimeLocal(IReadOnlyDictionary<string, object?> row) {
+        if (!row.TryGetValue(SyncColumnFilter.SoftDeleteTimeColumn, out var timeValue) || timeValue is null) {
             return null;
         }
 
-        if (timeValue is DateTime dateTime)
-        {
+        if (timeValue is DateTime dateTime) {
             return EnsureLocalDateTime(dateTime, dateTime.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture));
         }
 
-        if (timeValue is string textValue)
-        {
-            if (ContainsOffsetOrZulu(textValue))
-            {
+        if (timeValue is string textValue) {
+            if (ContainsOffsetOrZulu(textValue)) {
                 throw new InvalidOperationException($"不支持包含 Z 或 offset 的时间文本：{textValue}");
             }
 
@@ -1055,8 +984,7 @@ WHERE [TableCode]=@tableCode
                     textValue,
                     CultureInfo.InvariantCulture,
                     DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces,
-                    out var parsedLocalDateTime))
-            {
+                    out var parsedLocalDateTime)) {
                 return EnsureLocalDateTime(parsedLocalDateTime, textValue);
             }
         }
@@ -1070,15 +998,12 @@ WHERE [TableCode]=@tableCode
     /// <param name="value">时间值。</param>
     /// <param name="originalText">原始文本。</param>
     /// <returns>本地语义时间值。</returns>
-    private static DateTime EnsureLocalDateTime(DateTime value, string? originalText)
-    {
-        if (value.Kind == DateTimeKind.Unspecified)
-        {
+    private static DateTime EnsureLocalDateTime(DateTime value, string? originalText) {
+        if (value.Kind == DateTimeKind.Unspecified) {
             return DateTime.SpecifyKind(value, DateTimeKind.Local);
         }
 
-        if (value.Kind == DateTimeKind.Local)
-        {
+        if (value.Kind == DateTimeKind.Local) {
             return value;
         }
 
@@ -1090,36 +1015,29 @@ WHERE [TableCode]=@tableCode
     /// </summary>
     /// <param name="value">时间文本。</param>
     /// <returns>包含则返回 <c>true</c>。</returns>
-    private static bool ContainsOffsetOrZulu(string value)
-    {
-        if (value.EndsWith("Z", StringComparison.Ordinal))
-        {
+    private static bool ContainsOffsetOrZulu(string value) {
+        if (value.EndsWith("Z", StringComparison.Ordinal)) {
             return true;
         }
 
         var separatorIndex = value.IndexOf('T', StringComparison.Ordinal);
-        if (separatorIndex < 0)
-        {
+        if (separatorIndex < 0) {
             separatorIndex = value.IndexOf(' ', StringComparison.Ordinal);
         }
 
-        if (separatorIndex < 0 || separatorIndex >= value.Length - 1)
-        {
+        if (separatorIndex < 0 || separatorIndex >= value.Length - 1) {
             return false;
         }
 
         var timePart = value[(separatorIndex + 1)..];
-        for (var i = 0; i < timePart.Length; i++)
-        {
+        for (var i = 0; i < timePart.Length; i++) {
             var current = timePart[i];
-            if (current != '+' && current != '-')
-            {
+            if (current != '+' && current != '-') {
                 continue;
             }
 
             var remainLength = timePart.Length - i;
-            if (remainLength < 6)
-            {
+            if (remainLength < 6) {
                 continue;
             }
 
@@ -1128,13 +1046,11 @@ WHERE [TableCode]=@tableCode
                                         && timePart[i + 3] == ':'
                                         && char.IsDigit(timePart[i + 4])
                                         && char.IsDigit(timePart[i + 5]);
-            if (!hasValidOffsetPattern)
-            {
+            if (!hasValidOffsetPattern) {
                 continue;
             }
 
-            if (remainLength == 6 || !char.IsDigit(timePart[i + 6]))
-            {
+            if (remainLength == 6 || !char.IsDigit(timePart[i + 6])) {
                 return true;
             }
         }
