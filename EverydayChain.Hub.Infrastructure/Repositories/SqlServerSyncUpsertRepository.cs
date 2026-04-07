@@ -24,6 +24,7 @@ public class SqlServerSyncUpsertRepository(
     IOptions<SyncJobOptions> syncJobOptions,
     IOptions<ShardingOptions> shardingOptions,
     IShardSuffixResolver shardSuffixResolver,
+    IShardTableProvisioner shardTableProvisioner,
     IDangerZoneExecutor dangerZoneExecutor,
     ILogger<SqlServerSyncUpsertRepository> logger) : ISyncUpsertRepository {
 
@@ -104,6 +105,14 @@ public class SqlServerSyncUpsertRepository(
         var entries = BuildMergeEntries(request, targetLogicalTable);
         if (entries.Count == 0) {
             return result;
+        }
+        var requiredSuffixes = entries
+            .Select(x => x.ShardSuffix)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (requiredSuffixes.Length > 0) {
+            await shardTableProvisioner.EnsureShardTablesAsync(requiredSuffixes, ct);
         }
 
         await using var connection = new SqlConnection(_shardingOptions.ConnectionString);
@@ -702,9 +711,17 @@ WHERE [TableCode]=@tableCode
     /// <param name="cursorLocal">游标时间。</param>
     /// <returns>后缀文本。</returns>
     private string ResolveShardSuffix(DateTime? cursorLocal) {
-        var effectiveCursorLocal = cursorLocal ?? DateTime.Now;
+        var nowLocal = DateTimeOffset.Now;
+        var bootstrapSuffixes = AutoMigrationService.BuildBootstrapSuffixes(shardSuffixResolver, nowLocal, _shardingOptions.AutoCreateMonthsAhead);
+        var effectiveCursorLocal = cursorLocal ?? nowLocal.LocalDateTime;
         var cursorWithOffset = new DateTimeOffset(EnsureLocalDateTime(effectiveCursorLocal, "游标时间"));
-        return shardSuffixResolver.Resolve(cursorWithOffset);
+        var cursorSuffix = shardSuffixResolver.Resolve(cursorWithOffset);
+        if (bootstrapSuffixes.Contains(cursorSuffix, StringComparer.OrdinalIgnoreCase)) {
+            return cursorSuffix;
+        }
+
+        // 分表归档策略按“当前已预建窗口”收敛；超出窗口的历史数据回灌到当前分表，避免写入不存在的历史分表。
+        return bootstrapSuffixes[0];
     }
 
     /// <summary>
