@@ -36,7 +36,7 @@ public class WmsSplitPickToLightCartonEntity : IEntity<long>
     /// </summary>
     [Column("CARTONNO")]
     [StringLength(30)]
-    public string? CartonNo { get; set; }
+    public string CartonNo { get; set; } = string.Empty;
 
     /// <summary>
     /// 分拣位置。
