@@ -73,7 +73,7 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                     SKU = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     LOCATION = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     ZJFLAG = table.Column<string>(type: "nvarchar(1)", maxLength: 1, nullable: true),
-                    SKUQTY1 = table.Column<decimal>(type: "NUMBER(18,8)", nullable: true),
+                    SKUQTY1 = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
                     ALLNUM = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     ALLNUM1 = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     LENGTH = table.Column<decimal>(type: "decimal(18,8)", nullable: true),

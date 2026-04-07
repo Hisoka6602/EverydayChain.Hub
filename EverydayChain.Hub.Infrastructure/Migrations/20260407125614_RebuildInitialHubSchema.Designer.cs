@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EverydayChain.Hub.Infrastructure.Migrations
 {
     [DbContext(typeof(HubDbContext))]
-    [Migration("20260407125003_RebuildInitialHubSchema")]
+    [Migration("20260407125614_RebuildInitialHubSchema")]
     partial class RebuildInitialHubSchema
     {
         /// <inheritdoc />
@@ -135,7 +135,7 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                         .HasColumnName("LOCATION");
 
                     b.Property<decimal?>("MinUnitQuantity")
-                        .HasColumnType("NUMBER(18,8)")
+                        .HasColumnType("decimal(18,8)")
                         .HasColumnName("SKUQTY1");
 
                     b.Property<DateTime?>("OpenTime")

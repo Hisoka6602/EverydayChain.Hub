@@ -132,7 +132,7 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                         .HasColumnName("LOCATION");
 
                     b.Property<decimal?>("MinUnitQuantity")
-                        .HasColumnType("NUMBER(18,8)")
+                        .HasColumnType("decimal(18,8)")
                         .HasColumnName("SKUQTY1");
 
                     b.Property<DateTime?>("OpenTime")
