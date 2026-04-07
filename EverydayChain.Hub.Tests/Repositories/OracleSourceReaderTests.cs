@@ -1,6 +1,9 @@
 using System.Reflection;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Repositories;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using EverydayChain.Hub.Tests.Services;
 
 namespace EverydayChain.Hub.Tests.Repositories;
 
@@ -121,6 +124,28 @@ public class OracleSourceReaderTests
         };
 
         var action = () => InvokeBuildConnectionString(options);
+        var exception = Assert.Throws<TargetInvocationException>(action);
+        Assert.IsType<InvalidOperationException>(exception.InnerException);
+    }
+
+    /// <summary>
+    /// SourceSchema 为空时应抛出配置异常（不再回退 Oracle.DefaultSchema）。
+    /// </summary>
+    [Fact]
+    public void ResolveSourceSchema_WhenSourceSchemaBlank_ShouldThrow()
+    {
+        var reader = new OracleSourceReader(
+            Options.Create(new OracleOptions
+            {
+                ConnectionString = "Data Source=10.0.0.1:1521/ORCL;User Id=u;Password=p;",
+                Database = "ORCL"
+            }),
+            new PassThroughDangerZoneExecutor(),
+            NullLogger<OracleSourceReader>.Instance);
+        var method = typeof(OracleSourceReader).GetMethod("ResolveSourceSchema", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+
+        var action = () => method!.Invoke(reader, [""]);
         var exception = Assert.Throws<TargetInvocationException>(action);
         Assert.IsType<InvalidOperationException>(exception.InnerException);
     }

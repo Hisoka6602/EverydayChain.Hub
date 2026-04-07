@@ -46,11 +46,23 @@ public class AutoMigrationService(
 
         // 步骤2：解析当前及未来分表后缀，预创建分表结构。
         var localNow = DateTimeOffset.Now;
-        var suffixes = resolver.ResolveBootstrapSuffixes(localNow, _options.AutoCreateMonthsAhead)
-            .Append(string.Empty)
+        var suffixes = BuildBootstrapSuffixes(resolver, localNow, _options.AutoCreateMonthsAhead);
+        await shardTableProvisioner.EnsureShardTablesAsync(suffixes, cancellationToken);
+    }
+
+    /// <summary>
+    /// 构建启动预建分表后缀集合（仅包含显式后缀分表，不包含无后缀基础表）。
+    /// </summary>
+    /// <param name="suffixResolver">后缀解析器。</param>
+    /// <param name="localNow">当前本地时间。</param>
+    /// <param name="monthsAhead">未来预建月数。</param>
+    /// <returns>后缀列表。</returns>
+    internal static IReadOnlyList<string> BuildBootstrapSuffixes(IShardSuffixResolver suffixResolver, DateTimeOffset localNow, int monthsAhead)
+    {
+        return suffixResolver.ResolveBootstrapSuffixes(localNow, monthsAhead)
+            .Where(suffix => !string.IsNullOrWhiteSpace(suffix))
             .Distinct(StringComparer.Ordinal)
             .ToList();
-        await shardTableProvisioner.EnsureShardTablesAsync(suffixes, cancellationToken);
     }
 
     /// <summary>

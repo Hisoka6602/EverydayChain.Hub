@@ -57,7 +57,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IShardRetentionRepository, ShardRetentionRepository>();
         services.AddSingleton<IOracleSourceReader, OracleSourceReader>();
         services.AddSingleton<ISyncStagingRepository, SyncStagingRepository>();
-        services.AddSingleton<ISyncUpsertRepository, SyncUpsertRepository>();
+        services.AddSingleton<ISyncUpsertRepository, SqlServerSyncUpsertRepository>();
         services.AddSingleton<ISyncCheckpointRepository, SyncCheckpointRepository>();
         services.AddSingleton<ISyncBatchRepository, SyncBatchRepository>();
         services.AddSingleton<ISyncChangeLogRepository, SyncChangeLogRepository>();

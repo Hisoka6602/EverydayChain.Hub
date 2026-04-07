@@ -286,7 +286,7 @@ public class OracleSourceReader(
     /// </summary>
     /// <param name="sourceSchema">请求 Schema。</param>
     /// <returns>生效 Schema。</returns>
-    /// <exception cref="InvalidOperationException">当请求值与默认配置均为空时抛出。</exception>
+    /// <exception cref="InvalidOperationException">当请求值为空时抛出。</exception>
     private string ResolveSourceSchema(string sourceSchema)
     {
         if (!string.IsNullOrWhiteSpace(sourceSchema))
@@ -294,12 +294,7 @@ public class OracleSourceReader(
             return sourceSchema;
         }
 
-        if (!string.IsNullOrWhiteSpace(_options.DefaultSchema))
-        {
-            return _options.DefaultSchema;
-        }
-
-        throw new InvalidOperationException("SourceSchema 为空且 Oracle.DefaultSchema 未配置。");
+        throw new InvalidOperationException("SourceSchema 不能为空，请在 SyncJob.Tables 中为当前表显式配置 SourceSchema。");
     }
 
     /// <summary>
@@ -463,11 +458,6 @@ public class OracleSourceReader(
         if (!string.IsNullOrWhiteSpace(sourceSchema))
         {
             return sourceSchema;
-        }
-
-        if (!string.IsNullOrWhiteSpace(_options.DefaultSchema))
-        {
-            return _options.DefaultSchema;
         }
 
         return "未配置";

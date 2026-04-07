@@ -34,11 +34,4 @@ public interface ISyncUpsertRepository
     /// <returns>删除数量。</returns>
     Task<int> DeleteByBusinessKeysAsync(string tableCode, IReadOnlyList<string> businessKeys, DeletionPolicy deletionPolicy, CancellationToken ct);
 
-    /// <summary>
-    /// 驱逐已长期空闲的表内存缓存（仅卸载内存，不影响持久化文件）。
-    /// </summary>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>被驱逐的表数量。</returns>
-    Task<int> EvictIdleTablesAsync(CancellationToken ct);
-
 }

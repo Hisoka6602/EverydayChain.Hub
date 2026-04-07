@@ -23,13 +23,6 @@ public class OracleOptions
     /// </summary>
     public string DatabaseMode { get; set; } = "Auto";
 
-    /// <summary>
-    /// 默认源端 Schema（Oracle 有效 Schema 名称）。
-    /// 仅用于拼接查询对象名（如 <c>SCHEMA.TABLE</c>），不参与 Oracle 网络连接目标选择。
-    /// 因此不能替代 <see cref="Database"/>。
-    /// </summary>
-    public string DefaultSchema { get; set; } = string.Empty;
-
     /// <summary>是否强制只读（true 表示仅允许执行 SELECT 语句）。</summary>
     public bool ReadOnly { get; set; } = true;
 
