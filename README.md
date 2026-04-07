@@ -1,6 +1,8 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 自动迁移入口新增“连接安全参数快照”日志（不脱敏）：启动迁移前输出完整 ConnectionString 及 DataSource、InitialCatalog、Encrypt、TrustServerCertificate、IntegratedSecurity、ConnectTimeout，辅助定位 SQL Server pre-login 握手失败与 TLS/证书配置不匹配问题。
+- 启动自动迁移异常诊断增强：当 EF Core `RetryLimitExceededException` 内层为 SQL Server `SqlException(10054)` 时，输出面向运维的握手失败排查指引（TLS 兼容、Encrypt/TrustServerCertificate、网络中断、数据库重启/高负载）及 `ClientConnectionId`，便于快速定位根因。
 - 同步契约目录按 DDD 规范收敛：`EverydayChain.Hub.Application/Repositories` 已迁移为 `EverydayChain.Hub.Application/Abstractions/Persistence`，并完成全仓引用更新。
 - 修复 `Worker`、`SyncBackgroundWorker`、`RetentionBackgroundWorker` 的轮询延迟取消路径：在 `Task.Delay` 处显式捕获取消异常并正常退出，避免停止阶段抛出未处理取消异常导致流程噪声。
 - 日志落盘策略保持不变：业务日志继续通过 NLog `file` target 落盘，单文件上限维持 10MB 滚动阈值。
@@ -214,6 +216,8 @@
 - `appsettings.json`：主配置样例，移除分表逻辑表名静态配置，统一由 `SyncJob.Tables.TargetLogicalTable` 提供。
 
 ## 可继续完善内容（本次 PR 后续行动项）
+- 增加 `Sharding` 配置级“连接握手预检”开关，在执行 `Migrate` 前进行一次可观测的只连接不迁移探测，并将失败分类写入统一指标。
+- 在 `DangerZoneExecutor` 中补充按异常类型的统一诊断标签（如网络抖动、认证失败、超时）并输出结构化字段，降低跨环境排障成本。
 - 对“全仓一键体检并自动修复”的大范围需求，建议拆分为多批次 PR（性能热点、规则一致性、接口收敛、文档治理）逐项推进并逐项验收。
 - 在启动日志中输出纳管逻辑表集合快照，便于运维核对多表预建范围。
 - 为 `DangerZone` 增加“按操作名配置超时映射”能力（如 `OperationTimeoutOverrides`），避免未来新增长耗时动作时需要再次改动代码。
