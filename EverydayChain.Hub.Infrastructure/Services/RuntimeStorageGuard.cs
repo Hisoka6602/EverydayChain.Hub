@@ -32,11 +32,6 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         syncJobOptions.Value.CheckpointFilePath,
         "sync-checkpoints.json");
 
-    /// <summary>目标端快照文件绝对路径。</summary>
-    private readonly string _targetStoreFilePath = RuntimeStoragePathResolver.ResolveAbsolutePath(
-        syncJobOptions.Value.TargetStoreFilePath,
-        Path.Combine("data", "sync-target-store.json"));
-
     /// <summary>运行期配置。</summary>
     private readonly SyncJobOptions _options = syncJobOptions.Value;
 
@@ -97,18 +92,14 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         ct.ThrowIfCancellationRequested();
         var startupMinFreeSpaceMb = NormalizeStartupMinFreeSpaceMb();
         EnsureDirectoryWritable(_checkpointFilePath, "检查点目录");
-        EnsureDirectoryWritable(_targetStoreFilePath, "目标快照目录");
         EnsureFileReadableAndWritable(_checkpointFilePath, "检查点文件");
-        EnsureFileReadableAndWritable(_targetStoreFilePath, "目标快照文件");
         if (startupMinFreeSpaceMb > 0)
         {
             EnsureDiskFreeSpace(_checkpointFilePath, startupMinFreeSpaceMb, "启动自检-检查点路径");
-            EnsureDiskFreeSpace(_targetStoreFilePath, startupMinFreeSpaceMb, "启动自检-目标快照路径");
         }
         logger.LogInformation(
-            "运行期存储启动自检通过。CheckpointPath={CheckpointPath}, TargetStorePath={TargetStorePath}, MinFreeSpaceMb={MinFreeSpaceMb}",
+            "运行期存储启动自检通过。CheckpointPath={CheckpointPath}, MinFreeSpaceMb={MinFreeSpaceMb}",
             _checkpointFilePath,
-            _targetStoreFilePath,
             startupMinFreeSpaceMb);
         return Task.CompletedTask;
     }

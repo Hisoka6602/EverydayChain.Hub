@@ -20,9 +20,6 @@ public class SyncJobOptions
     /// <summary>检查点文件路径（为空时使用应用基目录下 sync-checkpoints.json）。</summary>
     public string CheckpointFilePath { get; set; } = string.Empty;
 
-    /// <summary>目标端轻量幂等状态文件路径（为空时使用应用基目录下 data/sync-target-store.json；按表分片写入）。</summary>
-    public string TargetStoreFilePath { get; set; } = string.Empty;
-
     /// <summary>启动自检最小可用磁盘空间（MB，建议范围：0~10240；0 表示关闭启动阶段磁盘空间校验）。</summary>
     public long StartupMinFreeSpaceMb { get; set; } = 500;
 
@@ -40,15 +37,6 @@ public class SyncJobOptions
 
     /// <summary>单表内存告警节流间隔（秒，可填写范围：[0, 86400] 的整数；0 表示不节流；建议值 300）。</summary>
     public int TableMemoryWarningLogIntervalSeconds { get; set; } = 300;
-
-    /// <summary>是否启用空闲表内存驱逐（可填写项：true、false；true 时空闲超过阈值的表将从内存卸载，需要时重新按需加载）。</summary>
-    public bool EnableIdleEviction { get; set; } = true;
-
-    /// <summary>单表内存空闲驱逐阈值（分钟，可填写范围：[1, 1440]；空闲超过该时间后将被从内存卸载；建议值 30）。</summary>
-    public int IdleEvictionThresholdMinutes { get; set; } = 30;
-
-    /// <summary>目标端快照文件归档最大保留数量（可填写范围：[0, 100]；0 表示关闭压缩归档；超出保留数量的最旧归档自动删除；建议值 7）。</summary>
-    public int TargetStoreArchiveMaxCount { get; set; } = 7;
 
     /// <summary>单轮同步整体超时时间（单位：秒，可填写范围：[0, 86400]；当前用于限制一次 RunAllEnabledTableSyncAsync 的整轮执行时长；0 表示关闭超时保护；建议值 600）。</summary>
     public int TableSyncTimeoutSeconds { get; set; } = 600;

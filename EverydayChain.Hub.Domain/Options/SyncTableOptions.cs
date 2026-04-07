@@ -44,9 +44,9 @@ public class SyncTableOptions
     /// <summary>排除列集合。</summary>
     public List<string> ExcludedColumns { get; set; } = [];
 
-    /// <summary>删除同步配置。</summary>
+    /// <summary>删除同步配置（仅作用于本地 SQL Server 目标端）。</summary>
     public SyncDeleteOptions Delete { get; set; } = new();
 
-    /// <summary>保留期治理配置。</summary>
+    /// <summary>保留期治理配置（仅作用于本地 SQL Server 目标端）。</summary>
     public SyncRetentionOptions Retention { get; set; } = new();
 }

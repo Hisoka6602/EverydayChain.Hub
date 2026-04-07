@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Services;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Domain.Sync;
@@ -8,12 +7,11 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Host.Workers;
 
 /// <summary>
-/// 同步后台任务，按轮询配置触发同步编排，并在每轮结束后执行空闲表内存驱逐。
+/// 同步后台任务，按轮询配置触发同步编排。
 /// 内置看门狗机制：当主循环超过配置阈值未推进时，输出 Critical 日志提示运维检查并重启服务。
 /// </summary>
 public class SyncBackgroundWorker(
     ISyncOrchestrator syncOrchestrator,
-    ISyncUpsertRepository upsertRepository,
     IOptions<SyncJobOptions> syncJobOptions,
     ILogger<SyncBackgroundWorker> logger) : BackgroundService
 {
@@ -248,7 +246,5 @@ public class SyncBackgroundWorker(
                 sw.ElapsedMilliseconds);
         }
 
-        // 每轮同步结束后驱逐空闲表内存缓存，避免长期不活跃表占用内存。
-        await upsertRepository.EvictIdleTablesAsync(stoppingToken);
     }
 }
