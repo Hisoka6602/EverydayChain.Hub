@@ -113,12 +113,12 @@ public class AutoMigrationService(
         }
 
         logger.LogWarning(
-            "自动迁移将创建缺失数据库。DataSource={DataSource}, InitialCatalog={InitialCatalog}",
+            "自动迁移检测到缺失数据库，即将执行创建操作。DataSource={DataSource}, InitialCatalog={InitialCatalog}",
             builder.DataSource,
             builder.InitialCatalog);
         await databaseCreator.CreateAsync(cancellationToken);
         logger.LogInformation(
-            "自动迁移: 检测到目标数据库不存在并已自动创建。DataSource={DataSource}, InitialCatalog={InitialCatalog}",
+            "自动迁移检测到目标数据库不存在并已自动创建。DataSource={DataSource}, InitialCatalog={InitialCatalog}",
             builder.DataSource,
             builder.InitialCatalog);
     }
