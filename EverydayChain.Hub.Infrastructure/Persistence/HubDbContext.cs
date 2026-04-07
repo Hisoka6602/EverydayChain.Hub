@@ -1,4 +1,6 @@
 using EverydayChain.Hub.Domain.Aggregates.SortingTaskTraceAggregate;
+using EverydayChain.Hub.Domain.Aggregates.WmsPickToWcsAggregate;
+using EverydayChain.Hub.Domain.Aggregates.WmsSplitPickToLightCartonAggregate;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence.EntityConfigurations;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
@@ -15,6 +17,10 @@ public class HubDbContext : DbContext
 {
     /// <summary>分拣任务追踪默认逻辑表名。</summary>
     private const string SortingTaskTraceLogicalTable = "sorting_task_trace";
+    /// <summary>WMS 下发至亮灯拆零箱任务默认逻辑表名。</summary>
+    private const string WmsSplitPickToLightCartonLogicalTable = "IDX_PICKTOLIGHT_CARTON1";
+    /// <summary>WMS 下发至 WCS 分拣任务默认逻辑表名。</summary>
+    private const string WmsPickToWcsLogicalTable = "IDX_PICKTOWCS2";
 
     /// <summary>分表配置快照，用于动态拼接表名与 Schema。</summary>
     private readonly ShardingOptions _shardingOptions;
@@ -33,12 +39,61 @@ public class HubDbContext : DbContext
     /// 分拣任务追踪实体集，实际映射到当前作用域对应的分表。
     /// </summary>
     public DbSet<SortingTaskTraceEntity> SortingTaskTraces => Set<SortingTaskTraceEntity>();
+    /// <summary>
+    /// WMS 下发至亮灯拆零箱任务实体集，实际映射到当前作用域对应的分表。
+    /// </summary>
+    public DbSet<WmsSplitPickToLightCartonEntity> WmsSplitPickToLightCartons => Set<WmsSplitPickToLightCartonEntity>();
+    /// <summary>
+    /// WMS 下发至 WCS 分拣任务实体集，实际映射到当前作用域对应的分表。
+    /// </summary>
+    public DbSet<WmsPickToWcsEntity> WmsPickToWcsTasks => Set<WmsPickToWcsEntity>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         var suffix = TableSuffixScope.CurrentSuffix ?? string.Empty;
-        var tableName = $"{SortingTaskTraceLogicalTable}{suffix}";
-        modelBuilder.ApplyConfiguration(new SortingTaskTraceEntityTypeConfiguration(tableName, _shardingOptions.Schema));
+        var sortingTaskTraceTableName = $"{SortingTaskTraceLogicalTable}{suffix}";
+        var wmsSplitPickToLightCartonTableName = $"{WmsSplitPickToLightCartonLogicalTable}{suffix}";
+        var wmsPickToWcsTableName = $"{WmsPickToWcsLogicalTable}{suffix}";
+
+        modelBuilder.ApplyConfiguration(new SortingTaskTraceEntityTypeConfiguration(sortingTaskTraceTableName, _shardingOptions.Schema));
+        ConfigureWmsSplitPickToLightCartonEntity(modelBuilder, wmsSplitPickToLightCartonTableName);
+        ConfigureWmsPickToWcsEntity(modelBuilder, wmsPickToWcsTableName);
+    }
+
+    /// <summary>
+    /// 配置 <see cref="WmsSplitPickToLightCartonEntity"/> 的动态分表映射。
+    /// </summary>
+    /// <param name="modelBuilder">模型构建器。</param>
+    /// <param name="tableName">目标表名（已拼接后缀）。</param>
+    private void ConfigureWmsSplitPickToLightCartonEntity(ModelBuilder modelBuilder, string tableName)
+    {
+        var builder = modelBuilder.Entity<WmsSplitPickToLightCartonEntity>();
+        builder.ToTable(tableName, _shardingOptions.Schema);
+        builder.HasKey(x => x.CartonNo);
+        builder.Property(x => x.CartonNo).IsRequired().HasMaxLength(30);
+        builder.Property(x => x.LengthCm).HasColumnType("decimal(18,8)");
+        builder.Property(x => x.WidthCm).HasColumnType("decimal(18,8)");
+        builder.Property(x => x.HeightCm).HasColumnType("decimal(18,8)");
+        builder.Property(x => x.VolumeCubicCm).HasColumnType("decimal(18,8)");
+        builder.Property(x => x.GrossWeightGram).HasColumnType("decimal(18,8)");
+    }
+
+    /// <summary>
+    /// 配置 <see cref="WmsPickToWcsEntity"/> 的动态分表映射。
+    /// </summary>
+    /// <param name="modelBuilder">模型构建器。</param>
+    /// <param name="tableName">目标表名（已拼接后缀）。</param>
+    private void ConfigureWmsPickToWcsEntity(ModelBuilder modelBuilder, string tableName)
+    {
+        var builder = modelBuilder.Entity<WmsPickToWcsEntity>();
+        builder.ToTable(tableName, _shardingOptions.Schema);
+        builder.HasKey(x => x.UniqueId);
+        builder.Property(x => x.UniqueId).IsRequired().HasMaxLength(30);
+        builder.Property(x => x.LengthCm).HasColumnType("decimal(18,8)");
+        builder.Property(x => x.WidthCm).HasColumnType("decimal(18,8)");
+        builder.Property(x => x.HeightCm).HasColumnType("decimal(18,8)");
+        builder.Property(x => x.VolumeCubicCm).HasColumnType("decimal(18,8)");
+        builder.Property(x => x.GrossWeightGram).HasColumnType("decimal(18,8)");
     }
 }

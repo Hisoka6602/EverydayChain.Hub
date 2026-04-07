@@ -1,7 +1,9 @@
 using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.Infrastructure.Persistence;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using EverydayChain.Hub.Infrastructure.Services;
+using Microsoft.EntityFrameworkCore;
 
 namespace EverydayChain.Hub.Tests.Services;
 
@@ -20,6 +22,7 @@ public class ShardTableProvisionerTests
         var action = () => _ = new ShardTableProvisioner(
             options,
             Array.Empty<string>(),
+            CreateDbContextFactory(),
             NullLogger<ShardTableProvisioner>.Instance,
             new PassThroughDangerZoneExecutor());
 
@@ -41,9 +44,41 @@ public class ShardTableProvisionerTests
         var provisioner = new ShardTableProvisioner(
             options,
             ["sorting_task_trace"],
+            CreateDbContextFactory(),
             NullLogger<ShardTableProvisioner>.Instance,
             new PassThroughDangerZoneExecutor());
 
         await provisioner.EnsureShardTablesAsync([], CancellationToken.None);
+    }
+
+    /// <summary>
+    /// 创建测试用 DbContext 工厂。
+    /// </summary>
+    /// <returns>HubDbContext 工厂实例。</returns>
+    private static IDbContextFactory<HubDbContext> CreateDbContextFactory()
+    {
+        var contextOptions = new DbContextOptionsBuilder<HubDbContext>()
+            .UseSqlServer("Server=localhost;Database=EverydayChainHub_UnitTest;User Id=sa;Password=Passw0rd!;TrustServerCertificate=True;")
+            .Options;
+        var shardingOptions = Options.Create(new ShardingOptions
+        {
+            Schema = "dbo"
+        });
+
+        return new TestHubDbContextFactory(contextOptions, shardingOptions);
+    }
+
+    /// <summary>
+    /// HubDbContext 测试工厂。
+    /// </summary>
+    private sealed class TestHubDbContextFactory(
+        DbContextOptions<HubDbContext> contextOptions,
+        IOptions<ShardingOptions> shardingOptions) : IDbContextFactory<HubDbContext>
+    {
+        /// <inheritdoc/>
+        public HubDbContext CreateDbContext()
+        {
+            return new HubDbContext(contextOptions, shardingOptions);
+        }
     }
 }

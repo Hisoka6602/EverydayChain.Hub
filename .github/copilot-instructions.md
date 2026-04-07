@@ -36,6 +36,7 @@
 - 配置文件（如 `appsettings*.json`）的每一项都需要注释，注释方式参考 `https://github.com/Hisoka6602/Zeye.NarrowBeltSorter/blob/master/Zeye.NarrowBeltSorter.Host/appsettings.json`（JSON 注释风格）。
 - 若配置项为集合类型（数组），至少需要提供一个示例元素。
 - 全局禁止复制粘贴式重复代码；发现同义工具代码需提取集中。
+- 自动迁移与分表建表必须按“每个逻辑表对应实体模型”生成字段与索引，禁止复用其他实体模板创建异构业务表结构。
 - 小工具类优先简洁、高性能、高复用。
 - 可使用 `var` 的位置优先使用 `var`（不降低可读性前提下）。
 - 禁止使用 `[Obsolete]` 维持旧实现；已过时代码必须删除并迁移到新实现。
