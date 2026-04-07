@@ -29,6 +29,9 @@ public class SqlServerSyncUpsertRepository(
 {
     /// <summary>状态表名。</summary>
     private const string SyncTargetStateTableName = "sync_target_state";
+    
+    /// <summary>状态表固定 Schema。</summary>
+    private const string SyncTargetStateSchema = "dbo";
 
     /// <summary>行摘要序列化配置（紧凑输出）。</summary>
     private static readonly JsonSerializerOptions DigestSerializerOptions = new()
@@ -249,9 +252,10 @@ WHERE [TableCode]=@tableCode;";
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(ct);
         try
         {
-            var stateMap = await LoadStateMapAsync(connection, transaction, tableCode, businessKeys, ct);
+            var distinctBusinessKeys = GetDistinctBusinessKeys(businessKeys);
+            var stateMap = await LoadStateMapAsync(connection, transaction, tableCode, distinctBusinessKeys, ct);
             var deletedCount = 0;
-            foreach (var businessKey in businessKeys)
+            foreach (var businessKey in distinctBusinessKeys)
             {
                 ct.ThrowIfCancellationRequested();
                 if (!stateMap.TryGetValue(businessKey, out var state))
@@ -338,7 +342,7 @@ WHERE [TableCode]=@tableCode;";
     /// <param name="connection">数据库连接。</param>
     /// <param name="transaction">事务对象。</param>
     /// <param name="tableCode">表编码。</param>
-    /// <param name="businessKeys">业务键集合（允许重复，方法内部将按首次出现顺序去重）。</param>
+    /// <param name="businessKeys">已去重业务键集合（按首次出现顺序）。</param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>状态映射。</returns>
     private async Task<Dictionary<string, PersistedState>> LoadStateMapAsync(
@@ -348,25 +352,24 @@ WHERE [TableCode]=@tableCode;";
         IReadOnlyList<string> businessKeys,
         CancellationToken ct)
     {
-        var distinctBusinessKeys = GetDistinctBusinessKeys(businessKeys);
         var stateMap = new Dictionary<string, PersistedState>(StringComparer.OrdinalIgnoreCase);
-        if (distinctBusinessKeys.Count == 0)
+        if (businessKeys.Count == 0)
         {
             return stateMap;
         }
 
         // SQL Server 单条语句参数上限为 2100；本查询除业务键参数外还包含 tableCode 参数，因此分块上限取 900。
         const int chunkSize = 900;
-        for (var index = 0; index < distinctBusinessKeys.Count; index += chunkSize)
+        for (var index = 0; index < businessKeys.Count; index += chunkSize)
         {
             ct.ThrowIfCancellationRequested();
-            var chunkLength = Math.Min(chunkSize, distinctBusinessKeys.Count - index);
+            var chunkLength = Math.Min(chunkSize, businessKeys.Count - index);
             await using var command = connection.CreateCommand();
             command.Transaction = transaction;
             var parameterNames = new List<string>(chunkLength);
             for (var i = 0; i < chunkLength; i++)
             {
-                var businessKey = distinctBusinessKeys[index + i];
+                var businessKey = businessKeys[index + i];
                 var parameterName = $"@businessKey{i}";
                 parameterNames.Add(parameterName);
                 command.Parameters.AddWithValue(parameterName, businessKey);
@@ -474,6 +477,7 @@ WHEN NOT MATCHED THEN
         string businessKey,
         CancellationToken ct)
     {
+        EnsureIdentifiersSafe(uniqueKeys);
         var keyValues = ParseBusinessKey(uniqueKeys, businessKey);
         var fullTableName = BuildTargetTableFullName(targetLogicalTable, shardSuffix);
         await using var command = connection.CreateCommand();
@@ -483,7 +487,7 @@ WHEN NOT MATCHED THEN
         {
             var key = uniqueKeys[index];
             var parameterName = $"@k{index}";
-            whereClauses.Add($"[{key}] = {parameterName}");
+            whereClauses.Add($"[{EscapeIdentifier(key)}] = {parameterName}");
             command.Parameters.AddWithValue(parameterName, ConvertToDbValue(keyValues[key]));
         }
 
@@ -701,7 +705,7 @@ WHERE [TableCode]=@tableCode
     /// <returns>全限定表名。</returns>
     private string GetSyncStateTableFullName()
     {
-        return $"[{EscapeIdentifier(_shardingOptions.Schema)}].[{EscapeIdentifier(SyncTargetStateTableName)}]";
+        return $"[{EscapeIdentifier(SyncTargetStateSchema)}].[{EscapeIdentifier(SyncTargetStateTableName)}]";
     }
 
     /// <summary>
