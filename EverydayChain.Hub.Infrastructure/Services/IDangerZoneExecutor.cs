@@ -10,8 +10,13 @@ public interface IDangerZoneExecutor
     /// </summary>
     /// <param name="operationName">操作名称，用于日志区分。</param>
     /// <param name="action">待执行的异步委托。</param>
+    /// <param name="timeoutSecondsOverride">本次操作超时覆盖值（秒），为空时使用默认配置。</param>
     /// <param name="cancellationToken">取消令牌。</param>
-    Task ExecuteAsync(string operationName, Func<CancellationToken, Task> action, CancellationToken cancellationToken);
+    Task ExecuteAsync(
+        string operationName,
+        Func<CancellationToken, Task> action,
+        int? timeoutSecondsOverride = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 在隔离策略保护下执行有返回值的异步操作。
@@ -19,7 +24,12 @@ public interface IDangerZoneExecutor
     /// <typeparam name="T">返回值类型。</typeparam>
     /// <param name="operationName">操作名称，用于日志区分。</param>
     /// <param name="action">待执行的异步委托。</param>
+    /// <param name="timeoutSecondsOverride">本次操作超时覆盖值（秒），为空时使用默认配置。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>操作执行结果。</returns>
-    Task<T> ExecuteAsync<T>(string operationName, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken);
+    Task<T> ExecuteAsync<T>(
+        string operationName,
+        Func<CancellationToken, Task<T>> action,
+        int? timeoutSecondsOverride = null,
+        CancellationToken cancellationToken = default);
 }

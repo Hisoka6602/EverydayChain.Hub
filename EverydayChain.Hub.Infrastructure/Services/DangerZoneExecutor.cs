@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Polly;
 using Polly.CircuitBreaker;
 using Polly.Timeout;
+using System.Collections.Concurrent;
 
 namespace EverydayChain.Hub.Infrastructure.Services;
 
@@ -14,8 +15,14 @@ namespace EverydayChain.Hub.Infrastructure.Services;
 /// </summary>
 public class DangerZoneExecutor : IDangerZoneExecutor
 {
-    /// <summary>Polly 弹性管道：超时 → 重试 → 熔断。</summary>
-    private readonly ResiliencePipeline _pipeline;
+    /// <summary>默认超时（秒）。</summary>
+    private readonly int _defaultTimeoutSeconds;
+
+    /// <summary>弹性参数快照。</summary>
+    private readonly DangerZoneOptions _options;
+
+    /// <summary>Polly 弹性管道缓存（key=超时秒数）。</summary>
+    private readonly ConcurrentDictionary<int, ResiliencePipeline> _pipelines = [];
 
     /// <summary>日志记录器。</summary>
     private readonly ILogger<DangerZoneExecutor> _logger;
@@ -28,32 +35,26 @@ public class DangerZoneExecutor : IDangerZoneExecutor
     public DangerZoneExecutor(IOptions<DangerZoneOptions> options, ILogger<DangerZoneExecutor> logger)
     {
         _logger = logger;
-        var opt = options.Value;
-        _pipeline = new ResiliencePipelineBuilder()
-            .AddTimeout(TimeSpan.FromSeconds(opt.TimeoutSeconds))
-            .AddRetry(new()
-            {
-                MaxRetryAttempts = opt.MaxRetryAttempts,
-                BackoffType = DelayBackoffType.Exponential,
-                Delay = TimeSpan.FromSeconds(opt.RetryBaseDelaySeconds)
-            })
-            .AddCircuitBreaker(new CircuitBreakerStrategyOptions
-            {
-                FailureRatio = opt.CircuitBreakerFailureRatio,
-                MinimumThroughput = opt.CircuitBreakerMinimumThroughput,
-                SamplingDuration = TimeSpan.FromMinutes(opt.CircuitBreakerSamplingDurationMinutes),
-                BreakDuration = TimeSpan.FromSeconds(opt.CircuitBreakerBreakDurationSeconds)
-            })
-            .Build();
+        _options = options.Value;
+        _defaultTimeoutSeconds = Math.Max(1, _options.TimeoutSeconds);
+        _pipelines[_defaultTimeoutSeconds] = BuildPipeline(_defaultTimeoutSeconds);
     }
 
     /// <inheritdoc/>
-    public Task ExecuteAsync(string operationName, Func<CancellationToken, Task> action, CancellationToken cancellationToken) =>
-        ExecuteWithLoggingAsync(operationName, action, cancellationToken);
+    public Task ExecuteAsync(
+        string operationName,
+        Func<CancellationToken, Task> action,
+        int? timeoutSecondsOverride = null,
+        CancellationToken cancellationToken = default) =>
+        ExecuteWithLoggingAsync(operationName, action, timeoutSecondsOverride, cancellationToken);
 
     /// <inheritdoc/>
-    public Task<T> ExecuteAsync<T>(string operationName, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken) =>
-        ExecuteWithLoggingAsync(operationName, action, cancellationToken);
+    public Task<T> ExecuteAsync<T>(
+        string operationName,
+        Func<CancellationToken, Task<T>> action,
+        int? timeoutSecondsOverride = null,
+        CancellationToken cancellationToken = default) =>
+        ExecuteWithLoggingAsync(operationName, action, timeoutSecondsOverride, cancellationToken);
 
     /// <summary>
     /// 执行危险操作并统一记录异常日志。
@@ -61,11 +62,16 @@ public class DangerZoneExecutor : IDangerZoneExecutor
     /// <param name="operationName">操作名称。</param>
     /// <param name="action">执行动作。</param>
     /// <param name="cancellationToken">取消令牌。</param>
-    private async Task ExecuteWithLoggingAsync(string operationName, Func<CancellationToken, Task> action, CancellationToken cancellationToken)
+    private async Task ExecuteWithLoggingAsync(
+        string operationName,
+        Func<CancellationToken, Task> action,
+        int? timeoutSecondsOverride,
+        CancellationToken cancellationToken)
     {
+        var pipeline = GetPipeline(timeoutSecondsOverride);
         try
         {
-            await _pipeline.ExecuteAsync(
+            await pipeline.ExecuteAsync(
                 static (Func<CancellationToken, Task> callback, CancellationToken token) => new ValueTask(callback(token)),
                 action,
                 cancellationToken);
@@ -95,12 +101,17 @@ public class DangerZoneExecutor : IDangerZoneExecutor
     /// <param name="action">执行动作。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>执行结果。</returns>
-    private async Task<T> ExecuteWithLoggingAsync<T>(string operationName, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken)
+    private async Task<T> ExecuteWithLoggingAsync<T>(
+        string operationName,
+        Func<CancellationToken, Task<T>> action,
+        int? timeoutSecondsOverride,
+        CancellationToken cancellationToken)
     {
+        var pipeline = GetPipeline(timeoutSecondsOverride);
         try
         {
             // 使用 Polly 的 state 参数重载传入 action，并以 static lambda + ValueTask 适配签名，避免额外闭包分配。
-            return await _pipeline.ExecuteAsync(
+            return await pipeline.ExecuteAsync(
                 static (Func<CancellationToken, Task<T>> callback, CancellationToken token) => new ValueTask<T>(callback(token)),
                 action,
                 cancellationToken);
@@ -121,4 +132,30 @@ public class DangerZoneExecutor : IDangerZoneExecutor
             throw;
         }
     }
+
+    /// <summary>按超时值获取弹性管道，若不存在则动态构建并缓存。</summary>
+    private ResiliencePipeline GetPipeline(int? timeoutSecondsOverride)
+    {
+        var timeoutSeconds = Math.Max(1, timeoutSecondsOverride ?? _defaultTimeoutSeconds);
+        return _pipelines.GetOrAdd(timeoutSeconds, BuildPipeline);
+    }
+
+    /// <summary>构建指定超时值的弹性管道。</summary>
+    private ResiliencePipeline BuildPipeline(int timeoutSeconds) =>
+        new ResiliencePipelineBuilder()
+            .AddTimeout(TimeSpan.FromSeconds(timeoutSeconds))
+            .AddRetry(new()
+            {
+                MaxRetryAttempts = _options.MaxRetryAttempts,
+                BackoffType = DelayBackoffType.Exponential,
+                Delay = TimeSpan.FromSeconds(_options.RetryBaseDelaySeconds)
+            })
+            .AddCircuitBreaker(new CircuitBreakerStrategyOptions
+            {
+                FailureRatio = _options.CircuitBreakerFailureRatio,
+                MinimumThroughput = _options.CircuitBreakerMinimumThroughput,
+                SamplingDuration = TimeSpan.FromMinutes(_options.CircuitBreakerSamplingDurationMinutes),
+                BreakDuration = TimeSpan.FromSeconds(_options.CircuitBreakerBreakDurationSeconds)
+            })
+            .Build();
 }

@@ -8,13 +8,21 @@ namespace EverydayChain.Hub.Tests.Services;
 internal sealed class PassThroughDangerZoneExecutor : IDangerZoneExecutor
 {
     /// <inheritdoc />
-    public Task ExecuteAsync(string operationName, Func<CancellationToken, Task> action, CancellationToken cancellationToken)
+    public Task ExecuteAsync(
+        string operationName,
+        Func<CancellationToken, Task> action,
+        int? timeoutSecondsOverride = null,
+        CancellationToken cancellationToken = default)
     {
         return action(cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task<T> ExecuteAsync<T>(string operationName, Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken)
+    public Task<T> ExecuteAsync<T>(
+        string operationName,
+        Func<CancellationToken, Task<T>> action,
+        int? timeoutSecondsOverride = null,
+        CancellationToken cancellationToken = default)
     {
         return action(cancellationToken);
     }
