@@ -44,7 +44,7 @@ public class SortingTaskTraceWriterTests
     /// 相同月份重复写入应仅首次触发幂等建表，后续走缓存不重复检查。
     /// </summary>
     [Fact]
-    public async Task WriteAsync_WithRepeatedMonthWrites_ShouldInvokeEnsureOnlyOnce()
+    public async Task WriteAsync_WithRepeatedMonthWrites_ShouldCacheAndInvokeEnsureOnlyOnce()
     {
         var provisioner = new RecordingShardTableProvisioner();
         var writer = new SortingTaskTraceWriter(

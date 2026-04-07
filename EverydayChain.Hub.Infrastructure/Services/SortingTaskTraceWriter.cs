@@ -18,7 +18,7 @@ public class SortingTaskTraceWriter(
     ISqlExecutionTuner tuner,
     ILogger<SortingTaskTraceWriter> logger) : ISortingTaskTraceWriter
 {
-    /// <summary>已完成建表检查的后缀集合，避免同进程重复触发建表检查。</summary>
+    /// <summary>已完成建表检查的后缀集合，仅在当前进程生命周期内生效，用于避免同进程重复触发建表检查。</summary>
     private readonly ConcurrentDictionary<string, byte> _ensuredSuffixes = new(StringComparer.Ordinal);
 
     /// <inheritdoc/>
@@ -35,7 +35,15 @@ public class SortingTaskTraceWriter(
         {
             if (_ensuredSuffixes.TryAdd(group.Key, 0))
             {
-                await shardTableProvisioner.EnsureShardTableAsync(group.Key, cancellationToken);
+                try
+                {
+                    await shardTableProvisioner.EnsureShardTableAsync(group.Key, cancellationToken);
+                }
+                catch
+                {
+                    _ensuredSuffixes.TryRemove(group.Key, out var removedMarker);
+                    throw;
+                }
             }
             using var _ = TableSuffixScope.Use(group.Key);
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
