@@ -7,7 +7,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
 using EverydayChain.Hub.Application.Models;
-using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using EverydayChain.Hub.Domain.Options;
@@ -52,6 +52,8 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     private readonly double _idleEvictionThresholdMinutes;
     /// <summary>目标端文件归档最大保留数量（0 表示关闭）。</summary>
     private readonly int _targetStoreArchiveMaxCount;
+    /// <summary>非法文件名字符缓存。</summary>
+    private static readonly HashSet<char> InvalidFileNameChars = new(Path.GetInvalidFileNameChars());
 
     /// <summary>
     /// 初始化同步幂等合并仓储。
@@ -124,7 +126,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
         TouchTableAccessTime(request.TableCode);
         var targetTable = _targetTables.GetOrAdd(request.TableCode, _ => CreateBusinessKeyDictionary());
         await _runtimeStorageGuard.ReportTableMemoryAsync(request.TableCode, targetTable.Count, "目标快照合并前", ct);
-        var changedOperations = new Dictionary<string, SyncChangeOperationType>(StringComparer.OrdinalIgnoreCase);
+        var changedOperations = new Dictionary<string, SyncChangeOperationType>(request.Rows.Count, StringComparer.OrdinalIgnoreCase);
         var result = new SyncMergeResult
         {
             ChangedOperations = changedOperations,
@@ -187,7 +189,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
             return [];
         }
 
-        return table.Values.ToList();
+        return table.Values.ToArray();
     }
 
     /// <inheritdoc/>
@@ -338,7 +340,7 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     {
         var tableStoreFilePath = BuildPerTableStoreFilePath(tableCode);
         await _runtimeStorageGuard.EnsureWriteSpaceAsync(tableStoreFilePath, $"目标快照写入[{tableCode}]", ct);
-        var persistedTable = new Dictionary<string, SyncTargetStateRow>(StringComparer.OrdinalIgnoreCase);
+        var persistedTable = new Dictionary<string, SyncTargetStateRow>(table.Count, StringComparer.OrdinalIgnoreCase);
         foreach (var pair in table)
         {
             persistedTable[pair.Key] = CloneRow(pair.Value);
@@ -552,11 +554,10 @@ public class SyncUpsertRepository : ISyncUpsertRepository
     /// <returns>替换结果。</returns>
     private static string ReplaceInvalidFileNameChars(string value)
     {
-        var invalidChars = Path.GetInvalidFileNameChars().ToHashSet();
         var chars = value.ToCharArray();
         for (var i = 0; i < chars.Length; i++)
         {
-            if (invalidChars.Contains(chars[i]))
+            if (InvalidFileNameChars.Contains(chars[i]))
             {
                 chars[i] = '_';
             }

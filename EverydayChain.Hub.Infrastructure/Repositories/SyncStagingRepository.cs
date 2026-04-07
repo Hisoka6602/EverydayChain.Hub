@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using EverydayChain.Hub.Domain.Sync;
 

@@ -1,6 +1,6 @@
 using EverydayChain.Hub.Domain.Sync;
 
-namespace EverydayChain.Hub.Application.Repositories;
+namespace EverydayChain.Hub.Application.Abstractions.Persistence;
 
 /// <summary>
 /// 同步任务配置仓储接口。

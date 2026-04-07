@@ -1,5 +1,5 @@
 using EverydayChain.Hub.Application.Models;
-using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using EverydayChain.Hub.Domain.Sync;
@@ -41,16 +41,15 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
         };
 
         var candidateBag = new System.Collections.Concurrent.ConcurrentBag<SyncDeletionCandidate>();
-        var segments = targetRows
-            .Select((row, index) => new { row, index })
-            .GroupBy(item => item.index / segmentSize)
-            .Select(group => group.Select(item => item.row).ToList())
-            .ToList();
-        await Parallel.ForEachAsync(segments, parallelOptions, (segmentRows, token) =>
+        var segmentCount = (targetRows.Count + segmentSize - 1) / segmentSize;
+        await Parallel.ForAsync(0, segmentCount, parallelOptions, (segmentIndex, token) =>
         {
-            foreach (var row in segmentRows)
+            var startIndex = segmentIndex * segmentSize;
+            var endExclusive = Math.Min(startIndex + segmentSize, targetRows.Count);
+            for (var rowIndex = startIndex; rowIndex < endExclusive; rowIndex++)
             {
                 token.ThrowIfCancellationRequested();
+                var row = targetRows[rowIndex];
 
                 if (!IsRowWithinWindow(row, request.Window))
                 {
@@ -77,6 +76,7 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
                     SourceEvidence = MissingSourceEvidenceMessage,
                 });
             }
+
             return ValueTask.CompletedTask;
         });
 

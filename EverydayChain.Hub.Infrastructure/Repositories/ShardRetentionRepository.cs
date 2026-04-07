@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.Data.SqlClient;

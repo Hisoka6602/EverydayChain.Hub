@@ -1,6 +1,6 @@
 using System.Text.Json;
 using EverydayChain.Hub.Application.Models;
-using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Enums;
 using Microsoft.Extensions.Logging;
 using EverydayChain.Hub.Domain.Sync;
@@ -40,11 +40,20 @@ public class DeletionExecutionService(
             CompareMaxParallelism = context.Definition.DeletionCompareMaxParallelism,
         }, ct);
 
-        var uniqueCandidates = candidates
-            .GroupBy(x => x.BusinessKey, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.First())
-            .ToList();
-        var businessKeys = uniqueCandidates.Select(x => x.BusinessKey).ToList();
+        var uniqueCandidates = new List<SyncDeletionCandidate>(candidates.Count);
+        var businessKeys = new List<string>(candidates.Count);
+        var uniqueBusinessKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var candidate in candidates)
+        {
+            if (!uniqueBusinessKeys.Add(candidate.BusinessKey))
+            {
+                continue;
+            }
+
+            uniqueCandidates.Add(candidate);
+            businessKeys.Add(candidate.BusinessKey);
+        }
+
         var deletedCount = await deletionRepository.ApplyDeletionAsync(new SyncDeletionApplyRequest
         {
             TableCode = context.Definition.TableCode,
@@ -61,7 +70,6 @@ public class DeletionExecutionService(
         foreach (var candidate in uniqueCandidates)
         {
             ct.ThrowIfCancellationRequested();
-            var snapshot = JsonSerializer.Serialize(candidate.TargetSnapshot, SnapshotSerializerOptions);
             deletionLogs.Add(new SyncDeletionLog
             {
                 BatchId = context.BatchId,
@@ -75,6 +83,7 @@ public class DeletionExecutionService(
             });
             if (executed)
             {
+                var snapshot = JsonSerializer.Serialize(candidate.TargetSnapshot, SnapshotSerializerOptions);
                 changeLogs.Add(new SyncChangeLog
                 {
                     BatchId = context.BatchId,

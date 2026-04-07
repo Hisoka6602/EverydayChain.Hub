@@ -3,6 +3,7 @@ using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using SortingTaskTraceEntity = EverydayChain.Hub.Domain.Aggregates.SortingTaskTraceAggregate.SortingTaskTraceEntity;
 
 namespace EverydayChain.Hub.Infrastructure.Services;
 
@@ -16,7 +17,7 @@ public class SortingTaskTraceWriter(
     ILogger<SortingTaskTraceWriter> logger) : ISortingTaskTraceWriter
 {
     /// <inheritdoc/>
-    public async Task WriteAsync(IReadOnlyCollection<Domain.Aggregates.SortingTaskTraceAggregate.SortingTaskTraceEntity> traces, CancellationToken cancellationToken)
+    public async Task WriteAsync(IReadOnlyCollection<SortingTaskTraceEntity> traces, CancellationToken cancellationToken)
     {
         if (traces.Count == 0)
         {
@@ -32,11 +33,11 @@ public class SortingTaskTraceWriter(
 
             // 步骤2：从调谐器获取当前批量写入窗口，分批执行写入。
             var batchSize = Math.Max(1, tuner.CurrentBatchSize);
-            var list = group.ToList();
-            for (var i = 0; i < list.Count; i += batchSize)
+            var items = group.ToArray();
+            for (var i = 0; i < items.Length; i += batchSize)
             {
-                var count = Math.Min(batchSize, list.Count - i);
-                var chunk = list.GetRange(i, count);
+                var count = Math.Min(batchSize, items.Length - i);
+                var chunk = new ArraySegment<SortingTaskTraceEntity>(items, i, count);
                 var stopwatch = Stopwatch.StartNew();
                 var success = true;
                 try

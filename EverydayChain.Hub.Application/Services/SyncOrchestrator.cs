@@ -1,5 +1,5 @@
 using EverydayChain.Hub.Application.Models;
-using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.Extensions.Logging;
@@ -52,7 +52,7 @@ public class SyncOrchestrator(
     {
         var definitions = await configRepository.ListEnabledAsync(ct);
         var orderedDefinitions = definitions
-            .OrderByDescending(x => x.Priority == SyncTablePriority.High)
+            .OrderByDescending(x => x.Priority)
             .ThenBy(x => x.TableCode, StringComparer.OrdinalIgnoreCase)
             .Select((definition, index) => (definition, index))
             .ToList();

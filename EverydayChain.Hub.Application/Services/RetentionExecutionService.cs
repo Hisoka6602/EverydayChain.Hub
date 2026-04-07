@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 using Microsoft.Extensions.Logging;
 
 namespace EverydayChain.Hub.Application.Services;
@@ -17,19 +17,20 @@ public class RetentionExecutionService(
     {
         var nowLocal = DateTime.Now;
         var enabledTables = await taskConfigRepository.ListEnabledAsync(ct);
-        var retentionTables = enabledTables.Where(x => x.RetentionEnabled).ToList();
-        if (retentionTables.Count == 0)
-        {
-            return "未配置启用保留期治理的表。";
-        }
-
         var scannedCount = 0;
         var deletedCount = 0;
         var dryRunCount = 0;
         var failedCount = 0;
-        foreach (var table in retentionTables)
+        var hasRetentionTable = false;
+        foreach (var table in enabledTables)
         {
             ct.ThrowIfCancellationRequested();
+            if (!table.RetentionEnabled)
+            {
+                continue;
+            }
+
+            hasRetentionTable = true;
             try
             {
                 var physicalTables = await shardTableResolver.ListPhysicalTablesAsync(table.TargetLogicalTable, ct);
@@ -72,6 +73,11 @@ public class RetentionExecutionService(
                 failedCount++;
                 logger.LogError(ex, "分表保留期执行失败。TableCode={TableCode}, TargetLogicalTable={TargetLogicalTable}", table.TableCode, table.TargetLogicalTable);
             }
+        }
+
+        if (!hasRetentionTable)
+        {
+            return "未配置启用保留期治理的表。";
         }
 
         var summary = $"RetentionCleanup完成。Scanned={scannedCount}, Deleted={deletedCount}, DryRun={dryRunCount}, Failed={failedCount}";

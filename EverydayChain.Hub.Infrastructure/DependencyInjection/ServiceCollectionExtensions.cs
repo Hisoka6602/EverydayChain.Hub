@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using EverydayChain.Hub.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 using EverydayChain.Hub.Infrastructure.Services;
-using EverydayChain.Hub.Application.Repositories;
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using EverydayChain.Hub.Infrastructure.Repositories;
