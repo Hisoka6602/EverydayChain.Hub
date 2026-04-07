@@ -41,11 +41,11 @@ public class SortingTaskTraceWriter(
                 }
                 catch
                 {
-                    _ensuredSuffixes.TryRemove(group.Key, out var removedMarker);
+                    _ensuredSuffixes.TryRemove(group.Key, out _);
                     throw;
                 }
             }
-            using var _ = TableSuffixScope.Use(group.Key);
+            using var suffixScope = TableSuffixScope.Use(group.Key);
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
             // 步骤2：从调谐器获取当前批量写入窗口，分批执行写入。
