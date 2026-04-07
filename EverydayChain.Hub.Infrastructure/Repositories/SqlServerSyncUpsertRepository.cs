@@ -113,7 +113,8 @@ public class SqlServerSyncUpsertRepository(
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(ct);
         try
         {
-            var states = await LoadStateMapAsync(connection, transaction, request.TableCode, entries.Select(x => x.BusinessKey).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(), ct);
+            var distinctBusinessKeys = GetDistinctBusinessKeys(entries);
+            var states = await LoadStateMapAsync(connection, transaction, request.TableCode, distinctBusinessKeys, ct);
             foreach (var entry in entries)
             {
                 ct.ThrowIfCancellationRequested();
@@ -174,7 +175,15 @@ public class SqlServerSyncUpsertRepository(
         catch (Exception ex)
         {
             logger.LogError(ex, "SQL Server 幂等合并失败。TableCode={TableCode}", request.TableCode);
-            await transaction.RollbackAsync(ct);
+            try
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+            }
+            catch (Exception rollbackException)
+            {
+                logger.LogError(rollbackException, "SQL Server 幂等合并事务回滚失败。TableCode={TableCode}", request.TableCode);
+            }
+
             throw;
         }
     }
@@ -271,7 +280,15 @@ WHERE [TableCode]=@tableCode;";
         catch (Exception ex)
         {
             logger.LogError(ex, "SQL Server 目标端删除失败。TableCode={TableCode}, DeletionPolicy={DeletionPolicy}", tableCode, deletionPolicy);
-            await transaction.RollbackAsync(ct);
+            try
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+            }
+            catch (Exception rollbackException)
+            {
+                logger.LogError(rollbackException, "SQL Server 目标端删除事务回滚失败。TableCode={TableCode}, DeletionPolicy={DeletionPolicy}", tableCode, deletionPolicy);
+            }
+
             throw;
         }
     }
@@ -334,20 +351,21 @@ WHERE [TableCode]=@tableCode;";
         for (var index = 0; index < businessKeys.Count; index += chunkSize)
         {
             ct.ThrowIfCancellationRequested();
-            var chunk = businessKeys.Skip(index).Take(chunkSize).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            if (chunk.Length == 0)
+            var chunkLength = Math.Min(chunkSize, businessKeys.Count - index);
+            if (chunkLength <= 0)
             {
                 continue;
             }
 
             await using var command = connection.CreateCommand();
             command.Transaction = transaction;
-            var parameterNames = new List<string>(chunk.Length);
-            for (var i = 0; i < chunk.Length; i++)
+            var parameterNames = new List<string>(chunkLength);
+            for (var i = 0; i < chunkLength; i++)
             {
+                var businessKey = businessKeys[index + i];
                 var parameterName = $"@businessKey{i}";
                 parameterNames.Add(parameterName);
-                command.Parameters.AddWithValue(parameterName, chunk[i]);
+                command.Parameters.AddWithValue(parameterName, businessKey);
             }
 
             command.Parameters.AddWithValue("@tableCode", tableCode);
@@ -400,6 +418,7 @@ WHERE [TableCode]=@tableCode
             .ToArray();
         EnsureIdentifiersSafe(orderedColumns);
         EnsureUniqueKeysPresent(uniqueKeys, row);
+        var uniqueKeySet = new HashSet<string>(uniqueKeys, StringComparer.OrdinalIgnoreCase);
 
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
@@ -414,7 +433,7 @@ WHERE [TableCode]=@tableCode
 
         var uniquePredicates = uniqueKeys.Select(key => $"target.[{key}] = source.[{key}]").ToArray();
         var updateColumns = orderedColumns
-            .Where(column => !uniqueKeys.Contains(column, StringComparer.OrdinalIgnoreCase))
+            .Where(column => !uniqueKeySet.Contains(column))
             .Select(column => $"target.[{column}] = source.[{column}]")
             .ToArray();
         var insertColumns = string.Join(", ", orderedColumns.Select(column => $"[{column}]"));
@@ -620,6 +639,26 @@ WHERE [TableCode]=@tableCode
             .Where(table => !string.IsNullOrWhiteSpace(table.TableCode))
             .GroupBy(table => table.TableCode, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 提取并去重业务键集合（保持输入顺序）。
+    /// </summary>
+    /// <param name="entries">合并条目。</param>
+    /// <returns>去重后的业务键数组。</returns>
+    private static IReadOnlyList<string> GetDistinctBusinessKeys(IReadOnlyList<MergeEntry> entries)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<string>(entries.Count);
+        foreach (var entry in entries)
+        {
+            if (seen.Add(entry.BusinessKey))
+            {
+                result.Add(entry.BusinessKey);
+            }
+        }
+
+        return result;
     }
 
     /// <summary>
