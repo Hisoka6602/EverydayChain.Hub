@@ -32,7 +32,7 @@ public class SortingTaskTraceWriterTests
             Channel = "C1",
             StationCode = "S1",
             Status = "Created",
-            CreatedAt = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero)
+            CreatedAt = new DateTimeOffset(new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Local))
         };
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WriteAsync([trace], CancellationToken.None));
@@ -41,10 +41,10 @@ public class SortingTaskTraceWriterTests
     }
 
     /// <summary>
-    /// 相同月份重复写入应重复触发幂等建表，且不阻断写入流程入口。
+    /// 相同月份重复写入应仅首次触发幂等建表，后续走缓存不重复检查。
     /// </summary>
     [Fact]
-    public async Task WriteAsync_WithRepeatedMonthWrites_ShouldInvokeEnsureEachTime()
+    public async Task WriteAsync_WithRepeatedMonthWrites_ShouldInvokeEnsureOnlyOnce()
     {
         var provisioner = new RecordingShardTableProvisioner();
         var writer = new SortingTaskTraceWriter(
@@ -60,14 +60,53 @@ public class SortingTaskTraceWriterTests
             Channel = "C2",
             StationCode = "S2",
             Status = "Created",
-            CreatedAt = new DateTimeOffset(2026, 4, 15, 0, 0, 0, TimeSpan.Zero)
+            CreatedAt = new DateTimeOffset(new DateTime(2026, 4, 15, 0, 0, 0, DateTimeKind.Local))
         };
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WriteAsync([trace], CancellationToken.None));
         await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WriteAsync([trace], CancellationToken.None));
 
+        Assert.Single(provisioner.EnsuredSuffixes);
+        Assert.Equal("_202604", provisioner.EnsuredSuffixes[0]);
+    }
+
+    /// <summary>
+    /// 跨月份写入应分别触发各月份首次建表检查。
+    /// </summary>
+    [Fact]
+    public async Task WriteAsync_WithDifferentMonthWrites_ShouldInvokeEnsurePerSuffix()
+    {
+        var provisioner = new RecordingShardTableProvisioner();
+        var writer = new SortingTaskTraceWriter(
+            new ThrowingDbContextFactory(),
+            new MonthShardSuffixResolver(),
+            provisioner,
+            new PassThroughSqlExecutionTuner(),
+            NullLogger<SortingTaskTraceWriter>.Instance);
+
+        var aprilTrace = new SortingTaskTraceEntity
+        {
+            BusinessNo = "B3",
+            Channel = "C3",
+            StationCode = "S3",
+            Status = "Created",
+            CreatedAt = new DateTimeOffset(new DateTime(2026, 4, 30, 23, 0, 0, DateTimeKind.Local))
+        };
+        var mayTrace = new SortingTaskTraceEntity
+        {
+            BusinessNo = "B4",
+            Channel = "C4",
+            StationCode = "S4",
+            Status = "Created",
+            CreatedAt = new DateTimeOffset(new DateTime(2026, 5, 1, 0, 1, 0, DateTimeKind.Local))
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WriteAsync([aprilTrace], CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WriteAsync([mayTrace], CancellationToken.None));
+
         Assert.Equal(2, provisioner.EnsuredSuffixes.Count);
-        Assert.All(provisioner.EnsuredSuffixes, suffix => Assert.Equal("_202604", suffix));
+        Assert.Contains("_202604", provisioner.EnsuredSuffixes);
+        Assert.Contains("_202605", provisioner.EnsuredSuffixes);
     }
 
     /// <summary>

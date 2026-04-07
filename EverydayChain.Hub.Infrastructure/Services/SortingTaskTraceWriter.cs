@@ -3,6 +3,7 @@ using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Collections.Concurrent;
 using SortingTaskTraceEntity = EverydayChain.Hub.Domain.Aggregates.SortingTaskTraceAggregate.SortingTaskTraceEntity;
 
 namespace EverydayChain.Hub.Infrastructure.Services;
@@ -17,6 +18,9 @@ public class SortingTaskTraceWriter(
     ISqlExecutionTuner tuner,
     ILogger<SortingTaskTraceWriter> logger) : ISortingTaskTraceWriter
 {
+    /// <summary>已完成建表检查的后缀集合，避免同进程重复触发建表检查。</summary>
+    private readonly ConcurrentDictionary<string, byte> _ensuredSuffixes = new(StringComparer.Ordinal);
+
     /// <inheritdoc/>
     public async Task WriteAsync(IReadOnlyCollection<SortingTaskTraceEntity> traces, CancellationToken cancellationToken)
     {
@@ -29,7 +33,10 @@ public class SortingTaskTraceWriter(
         var grouped = traces.GroupBy(x => shardSuffixResolver.Resolve(x.CreatedAt));
         foreach (var group in grouped)
         {
-            await shardTableProvisioner.EnsureShardTableAsync(group.Key, cancellationToken);
+            if (_ensuredSuffixes.TryAdd(group.Key, 0))
+            {
+                await shardTableProvisioner.EnsureShardTableAsync(group.Key, cancellationToken);
+            }
             using var _ = TableSuffixScope.Use(group.Key);
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
