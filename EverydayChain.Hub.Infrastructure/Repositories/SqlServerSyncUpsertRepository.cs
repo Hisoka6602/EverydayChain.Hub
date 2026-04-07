@@ -90,6 +90,11 @@ public class SqlServerSyncUpsertRepository(
     /// <returns>合并结果。</returns>
     protected virtual async Task<SyncMergeResult> MergeCoreAsync(SyncMergeRequest request, CancellationToken ct)
     {
+        if (request.UniqueKeys.Count == 0)
+        {
+            throw new InvalidOperationException($"同步表 {request.TableCode} 未配置 UniqueKeys，无法执行幂等合并。");
+        }
+
         var changedOperations = new Dictionary<string, SyncChangeOperationType>(StringComparer.OrdinalIgnoreCase);
         var result = new SyncMergeResult
         {
@@ -102,6 +107,7 @@ public class SqlServerSyncUpsertRepository(
 
         var tableOptions = ResolveTableOptions(request.TableCode);
         var targetLogicalTable = ResolveTargetLogicalTable(request.TableCode, tableOptions);
+        var uniqueKeySet = new HashSet<string>(request.UniqueKeys, StringComparer.OrdinalIgnoreCase);
         var entries = BuildMergeEntries(request, targetLogicalTable);
         if (entries.Count == 0)
         {
@@ -122,7 +128,7 @@ public class SqlServerSyncUpsertRepository(
 
                 if (!states.TryGetValue(entry.BusinessKey, out var existingState))
                 {
-                    await UpsertTargetRowAsync(connection, transaction, entry.TargetLogicalTable, entry.ShardSuffix, entry.Row, request.UniqueKeys, ct);
+                    await UpsertTargetRowAsync(connection, transaction, entry.TargetLogicalTable, entry.ShardSuffix, entry.Row, request.UniqueKeys, uniqueKeySet, ct);
                     await UpsertStateAsync(connection, transaction, request.TableCode, entry, ct);
                     states[entry.BusinessKey] = new PersistedState(
                         entry.BusinessKey,
@@ -155,7 +161,7 @@ public class SqlServerSyncUpsertRepository(
                         ct);
                 }
 
-                await UpsertTargetRowAsync(connection, transaction, entry.TargetLogicalTable, entry.ShardSuffix, entry.Row, request.UniqueKeys, ct);
+                await UpsertTargetRowAsync(connection, transaction, entry.TargetLogicalTable, entry.ShardSuffix, entry.Row, request.UniqueKeys, uniqueKeySet, ct);
                 await UpsertStateAsync(connection, transaction, request.TableCode, entry, ct);
                 states[entry.BusinessKey] = new PersistedState(
                     entry.BusinessKey,
@@ -177,6 +183,7 @@ public class SqlServerSyncUpsertRepository(
             logger.LogError(ex, "SQL Server 幂等合并失败。TableCode={TableCode}", request.TableCode);
             try
             {
+                // 事务回滚属于一致性收敛动作；在超时或手动取消场景下，仍优先完成回滚以避免半提交状态。
                 await transaction.RollbackAsync(CancellationToken.None);
             }
             catch (Exception rollbackException)
@@ -282,6 +289,7 @@ WHERE [TableCode]=@tableCode;";
             logger.LogError(ex, "SQL Server 目标端删除失败。TableCode={TableCode}, DeletionPolicy={DeletionPolicy}", tableCode, deletionPolicy);
             try
             {
+                // 事务回滚属于一致性收敛动作；在超时或手动取消场景下，仍优先完成回滚以避免半提交状态。
                 await transaction.RollbackAsync(CancellationToken.None);
             }
             catch (Exception rollbackException)
@@ -330,7 +338,7 @@ WHERE [TableCode]=@tableCode;";
     /// <param name="connection">数据库连接。</param>
     /// <param name="transaction">事务对象。</param>
     /// <param name="tableCode">表编码。</param>
-    /// <param name="businessKeys">业务键集合。</param>
+    /// <param name="businessKeys">业务键集合（允许重复，方法内部将按首次出现顺序去重）。</param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>状态映射。</returns>
     private async Task<Dictionary<string, PersistedState>> LoadStateMapAsync(
@@ -340,29 +348,25 @@ WHERE [TableCode]=@tableCode;";
         IReadOnlyList<string> businessKeys,
         CancellationToken ct)
     {
+        var distinctBusinessKeys = GetDistinctBusinessKeys(businessKeys);
         var stateMap = new Dictionary<string, PersistedState>(StringComparer.OrdinalIgnoreCase);
-        if (businessKeys.Count == 0)
+        if (distinctBusinessKeys.Count == 0)
         {
             return stateMap;
         }
 
         // SQL Server 单条语句参数上限为 2100；本查询除业务键参数外还包含 tableCode 参数，因此分块上限取 900。
         const int chunkSize = 900;
-        for (var index = 0; index < businessKeys.Count; index += chunkSize)
+        for (var index = 0; index < distinctBusinessKeys.Count; index += chunkSize)
         {
             ct.ThrowIfCancellationRequested();
-            var chunkLength = Math.Min(chunkSize, businessKeys.Count - index);
-            if (chunkLength <= 0)
-            {
-                continue;
-            }
-
+            var chunkLength = Math.Min(chunkSize, distinctBusinessKeys.Count - index);
             await using var command = connection.CreateCommand();
             command.Transaction = transaction;
             var parameterNames = new List<string>(chunkLength);
             for (var i = 0; i < chunkLength; i++)
             {
-                var businessKey = businessKeys[index + i];
+                var businessKey = distinctBusinessKeys[index + i];
                 var parameterName = $"@businessKey{i}";
                 parameterNames.Add(parameterName);
                 command.Parameters.AddWithValue(parameterName, businessKey);
@@ -401,6 +405,7 @@ WHERE [TableCode]=@tableCode
     /// <param name="shardSuffix">分表后缀。</param>
     /// <param name="row">数据行。</param>
     /// <param name="uniqueKeys">唯一键集合。</param>
+    /// <param name="uniqueKeySet">由 <paramref name="uniqueKeys"/> 预构建的查找缓存，用于热路径 O(1) 判断更新列。</param>
     /// <param name="ct">取消令牌。</param>
     private async Task UpsertTargetRowAsync(
         SqlConnection connection,
@@ -409,6 +414,7 @@ WHERE [TableCode]=@tableCode
         string shardSuffix,
         IReadOnlyDictionary<string, object?> row,
         IReadOnlyList<string> uniqueKeys,
+        IReadOnlySet<string> uniqueKeySet,
         CancellationToken ct)
     {
         var fullTableName = BuildTargetTableFullName(targetLogicalTable, shardSuffix);
@@ -418,7 +424,6 @@ WHERE [TableCode]=@tableCode
             .ToArray();
         EnsureIdentifiersSafe(orderedColumns);
         EnsureUniqueKeysPresent(uniqueKeys, row);
-        var uniqueKeySet = new HashSet<string>(uniqueKeys, StringComparer.OrdinalIgnoreCase);
 
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
@@ -644,6 +649,10 @@ WHERE [TableCode]=@tableCode
     /// <summary>
     /// 提取并去重业务键集合（保持输入顺序）。
     /// </summary>
+    /// <remarks>
+    /// 该方法用于在批次开始阶段完成一次性去重，避免在分块查询状态时重复执行 LINQ 链式分配与遍历。
+    /// 保持输入顺序可保证分块参数顺序稳定，便于问题排查与性能观测结果对齐。
+    /// </remarks>
     /// <param name="entries">合并条目。</param>
     /// <returns>去重后的业务键数组。</returns>
     private static IReadOnlyList<string> GetDistinctBusinessKeys(IReadOnlyList<MergeEntry> entries)
@@ -655,6 +664,31 @@ WHERE [TableCode]=@tableCode
             if (seen.Add(entry.BusinessKey))
             {
                 result.Add(entry.BusinessKey);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// 提取并去重业务键集合（保持输入顺序）。
+    /// </summary>
+    /// <param name="businessKeys">业务键集合。</param>
+    /// <returns>去重后的业务键数组。</returns>
+    private static IReadOnlyList<string> GetDistinctBusinessKeys(IReadOnlyList<string> businessKeys)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<string>(businessKeys.Count);
+        foreach (var businessKey in businessKeys)
+        {
+            if (string.IsNullOrWhiteSpace(businessKey))
+            {
+                continue;
+            }
+
+            if (seen.Add(businessKey))
+            {
+                result.Add(businessKey);
             }
         }
 
