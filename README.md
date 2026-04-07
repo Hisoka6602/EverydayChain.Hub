@@ -7,7 +7,7 @@
 - 配置收敛：移除 `Oracle.DefaultSchema`，`SourceSchema` 改为必填，缺失时直接抛配置异常。
 - 配置语义补充：`SyncJob.Tables[*].Delete` 与 `SyncJob.Tables[*].Retention` 明确仅对本地 SQL Server 目标端生效。
 - 分表策略纠偏：启动预建仅保留后缀分表，不再自动预建无后缀基础表；新增 `20260407154000_AddSyncTargetStateAndShardStrategyGuard` 迁移创建同步状态表。
-- 兼容策略：历史无后缀基础表可保留不删，但同步链路后续不再依赖；新写入统一进入后缀分表。
+- 分表策略要求：不兼容旧无后缀基础表；同步链路仅支持后缀分表写入。
 - 测试补充：新增 UPSERT 统计行为测试、`SourceSchema` 缺失异常测试、仅后缀预建测试。
 
 ## 解决方案文件树与职责
@@ -206,7 +206,7 @@
 - `SyncDeletionLogRepository.cs`：同步删除日志仓储基础实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖，并在启动阶段从启用同步表配置提取逻辑表名集合，完成安全校验与空配置异常拦截。
 - `20260407125614_RebuildInitialHubSchema.cs`：重建后的基础表结构迁移（覆盖 `sorting_task_trace`、`IDX_PICKTOLIGHT_CARTON1`、`IDX_PICKTOWCS2`）。
-- `20260407154000_AddSyncTargetStateAndShardStrategyGuard.cs`：新增 `sync_target_state` 状态表迁移，支撑幂等状态与删除兼容。
+- `20260407154000_AddSyncTargetStateAndShardStrategyGuard.cs`：新增 `sync_target_state` 状态表迁移，支撑幂等状态与删除同步。
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
 - `nlog.config`：NLog 日志配置，输出至控制台与滚动日志文件（按日切割，单文件上限 10 MB，保留 30 天）。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
