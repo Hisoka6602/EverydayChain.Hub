@@ -48,6 +48,9 @@ public class SyncExecutionService(
         var skipCount = 0;
         DateTime? lastSuccessCursorLocal = context.Checkpoint.LastSuccessCursorLocal;
         var pendingChanges = new List<SyncChangeLog>();
+        var uniqueKeysText = context.Definition.UniqueKeys.Count == 0
+            ? "未配置"
+            : string.Join(",", context.Definition.UniqueKeys);
 
         try
         {
@@ -81,6 +84,18 @@ public class SyncExecutionService(
                 var readResult = await oracleSourceReader.ReadIncrementalPageAsync(readRequest, ct);
                 if (readResult.Rows.Count == 0)
                 {
+                    if (pageNo == 1)
+                    {
+                        logger.LogWarning(
+                            "同步源端读取为空。TableCode={TableCode}, SourceSchema={SourceSchema}, SourceTable={SourceTable}, CursorColumn={CursorColumn}, WindowStartLocal={WindowStartLocal}, WindowEndLocal={WindowEndLocal}, UniqueKeys={UniqueKeys}",
+                            context.Definition.TableCode,
+                            context.Definition.SourceSchema,
+                            context.Definition.SourceTable,
+                            context.Definition.CursorColumn,
+                            context.Window.WindowStartLocal,
+                            context.Window.WindowEndLocal,
+                            uniqueKeysText);
+                    }
                     break;
                 }
 
@@ -132,6 +147,19 @@ public class SyncExecutionService(
                 insertCount += mergeResult.InsertCount;
                 updateCount += mergeResult.UpdateCount;
                 skipCount += mergeResult.SkipCount;
+                if (mergeResult.InsertCount == 0 && mergeResult.UpdateCount == 0 && mergeResult.SkipCount == readResult.Rows.Count)
+                {
+                    logger.LogWarning(
+                        "同步读取到数据但目标端0写入（全部跳过）。TableCode={TableCode}, BatchId={BatchId}, SourceSchema={SourceSchema}, SourceTable={SourceTable}, PageNo={PageNo}, ReadRows={ReadRows}, SkipRows={SkipRows}, UniqueKeys={UniqueKeys}",
+                        context.Definition.TableCode,
+                        context.BatchId,
+                        context.Definition.SourceSchema,
+                        context.Definition.SourceTable,
+                        pageNo,
+                        readResult.Rows.Count,
+                        mergeResult.SkipCount,
+                        uniqueKeysText);
+                }
                 AppendChangeLogs(context, pendingChanges, readResult.Rows, mergeResult.ChangedOperations);
                 if (mergeResult.LastSuccessCursorLocal.HasValue)
                 {
@@ -233,6 +261,14 @@ public class SyncExecutionService(
                 context.Window.WindowStartLocal,
                 context.Window.WindowEndLocal,
                 context.Checkpoint.LastSuccessCursorLocal);
+            logger.LogError(
+                "同步批次失败诊断信息。TableCode={TableCode}, BatchId={BatchId}, SourceSchema={SourceSchema}, SourceTable={SourceTable}, CursorColumn={CursorColumn}, UniqueKeys={UniqueKeys}",
+                context.Definition.TableCode,
+                context.BatchId,
+                context.Definition.SourceSchema,
+                context.Definition.SourceTable,
+                context.Definition.CursorColumn,
+                uniqueKeysText);
 
             using var errorCheckpointCts = new CancellationTokenSource(TimeSpan.FromSeconds(ErrorCheckpointSaveTimeoutSeconds));
             await TryMarkBatchFailedAsync(
