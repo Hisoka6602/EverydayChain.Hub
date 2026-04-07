@@ -32,7 +32,7 @@ public class AutoMigrationServiceTests
     private sealed class StubShardSuffixResolver(IReadOnlyList<string> bootstrapSuffixes) : IShardSuffixResolver
     {
         /// <inheritdoc/>
-        public string ResolveForTimestamp(DateTimeOffset timestamp)
+        public string Resolve(DateTimeOffset timestamp)
         {
             return "_202604";
         }

@@ -132,7 +132,7 @@ public class SqlServerSyncUpsertRepositoryTests
                 {
                     ["CARTONNO"] = businessKey,
                     ["PAYLOAD"] = payload,
-                    ["ADDTIME"] = DateTime.Now
+                    ["ADDTIME"] = new DateTime(2026, 4, 7, 10, 0, 0, DateTimeKind.Local)
                 }
             ]
         };

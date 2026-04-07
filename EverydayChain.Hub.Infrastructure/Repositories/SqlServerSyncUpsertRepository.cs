@@ -110,7 +110,7 @@ public class SqlServerSyncUpsertRepository(
 
         await using var connection = new SqlConnection(_shardingOptions.ConnectionString);
         await connection.OpenAsync(ct);
-        await using var transaction = await connection.BeginTransactionAsync(ct);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(ct);
         try
         {
             var states = await LoadStateMapAsync(connection, transaction, request.TableCode, entries.Select(x => x.BusinessKey).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(), ct);
@@ -230,7 +230,7 @@ WHERE [TableCode]=@tableCode;";
 
         await using var connection = new SqlConnection(_shardingOptions.ConnectionString);
         await connection.OpenAsync(ct);
-        await using var transaction = await connection.BeginTransactionAsync(ct);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(ct);
         try
         {
             var stateMap = await LoadStateMapAsync(connection, transaction, tableCode, businessKeys, ct);
@@ -651,7 +651,7 @@ WHERE [TableCode]=@tableCode
     {
         var effectiveCursorLocal = cursorLocal ?? DateTime.Now;
         var cursorWithOffset = new DateTimeOffset(EnsureLocalDateTime(effectiveCursorLocal, "游标时间"));
-        return shardSuffixResolver.ResolveForTimestamp(cursorWithOffset);
+        return shardSuffixResolver.Resolve(cursorWithOffset);
     }
 
     /// <summary>

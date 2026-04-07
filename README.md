@@ -1,19 +1,13 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 新增 Oracle 配置示例说明：当源端 SQL 为 `SELECT * FROM WMS_USER_431.IDX_PICKTOLIGHT_CARTON1` 时，`DefaultSchema` 应配置为 `WMS_USER_431`；`Database` 仍需填写实际 ServiceName/SID（如 `ORCL`），不能填 Schema。
-- 明确 `DefaultSchema` 与 `Database` 职责边界：`Database` 用于 Oracle 连接目标（ServiceName/SID），`DefaultSchema` 仅用于查询对象名前缀（`SCHEMA.TABLE`），两者不可互相替代。
-- 新增 `Oracle.DatabaseMode`（`Auto`/`ServiceName`/`Sid`）配置，支持在 `Data Source=host:port` 场景显式指定按 ServiceName（`/`）或 SID（`:`）拼接库名，避免 `ORA-12514`/库名模式误配。
-- Oracle 异常重试策略优化：将 `ORA-12154`、`ORA-12514` 识别为“不可重试配置类错误”，通过 `NonRetryableDangerZoneException` 快速失败，避免无意义重试与熔断噪音。
-- 危险隔离器策略增强：`DangerZoneExecutor` 的重试与熔断统计统一排除 `NonRetryableDangerZoneException`，确保仅对可恢复故障执行弹性策略。
-- 敏感信息收敛：`AutoMigrationService` 启动连接快照不再输出明文连接串，避免 SQL 密码出现在日志中。
-- 修复分表建表时序：`SortingTaskTraceWriter` 在写入前增加按后缀幂等建表兜底，避免“先写后建”导致写入失败。
-- 修复分表纳管覆盖：`ServiceCollectionExtensions` 固定纳管 `sorting_task_trace`，同时继续纳管启用同步表的 `TargetLogicalTable`。
-- 扩展 Oracle 连接配置：新增 `Oracle.Database`，支持在连接串中独立配置 ServiceName/SID。
-- `SyncJob.Tables` 配置样例补齐 `IDX_PICKTOLIGHT_CARTON1` 与 `IDX_PICKTOWCS2` 两张业务表，便于自动迁移与自动分表验证。
-- 删除旧迁移历史并重建初始迁移为 `20260407125614_RebuildInitialHubSchema`。
-- `ShardTableProvisioner` 的列类型解析改为优先读取显式列类型，未显式时回退至 EF 关系映射类型，避免长度/精度丢失。
-- 新增 `ShardTableProvisionerTests` 回归用例，覆盖 `sorting_task_trace` 与 `IDX_PICKTOWCS2` 的列类型、主键、索引 SQL 生成断言。
+- 同步落库重构：删除旧的内存+文件快照路径，新增 `SqlServerSyncUpsertRepository`，基于 `TableCode/TargetLogicalTable` 执行 SQL Server 真实 UPSERT。
+- 幂等语义保持：仍以 `UniqueKeys + CursorColumn` 计算行摘要与游标，保持 Insert/Update/Skip 统计口径不变。
+- 危险动作隔离：目标表 UPSERT、跨分表迁移删除、状态表软删/硬删统一通过 `DangerZoneExecutor` 执行。
+- 配置收敛：移除 `Oracle.DefaultSchema`，`SourceSchema` 改为必填，缺失时直接抛配置异常。
+- 分表策略纠偏：启动预建仅保留后缀分表，不再自动预建无后缀基础表；新增 `20260407154000_AddSyncTargetStateAndShardStrategyGuard` 迁移创建同步状态表。
+- 兼容策略：历史无后缀基础表可保留不删，但同步链路后续不再依赖；新写入统一进入后缀分表。
+- 测试补充：新增 UPSERT 统计行为测试、`SourceSchema` 缺失异常测试、仅后缀预建测试。
 
 ## 解决方案文件树与职责
 ```text
@@ -108,7 +102,7 @@
 │   ├── Repositories/SyncTaskConfigRepository.cs
 │   ├── Repositories/OracleSourceReader.cs
 │   ├── Repositories/SyncStagingRepository.cs
-│   ├── Repositories/SyncUpsertRepository.cs
+│   ├── Repositories/SqlServerSyncUpsertRepository.cs
 │   ├── Repositories/SyncDeletionRepository.cs
 │   ├── Repositories/ShardTableResolver.cs
 │   ├── Repositories/ShardRetentionRepository.cs
@@ -125,6 +119,7 @@
 │   ├── Persistence/Sharding/ShardModelCacheKeyFactory.cs
 │   ├── Migrations/20260407125614_RebuildInitialHubSchema.cs
 │   ├── Migrations/20260407125614_RebuildInitialHubSchema.Designer.cs
+│   ├── Migrations/20260407154000_AddSyncTargetStateAndShardStrategyGuard.cs
 │   ├── Migrations/HubDbContextModelSnapshot.cs
 │   └── Services
 │       ├── IDangerZoneExecutor.cs
@@ -143,7 +138,9 @@
 ├── EverydayChain.Hub.Tests
 │   ├── EverydayChain.Hub.Tests.csproj
 │   ├── Repositories/OracleSourceReaderTests.cs
+│   ├── Repositories/SqlServerSyncUpsertRepositoryTests.cs
 │   └── Services
+│       ├── AutoMigrationServiceTests.cs
 │       ├── ServiceCollectionExtensionsTests.cs
 │       ├── ShardTableProvisionerTests.cs
 │       ├── SortingTaskTraceWriterTests.cs
@@ -188,7 +185,7 @@
 - `TableSuffixScope.cs` + `ShardModelCacheKeyFactory.cs`：保证不同后缀下 EF Model 能正确缓存隔离。
 - `MonthShardSuffixResolver.cs`：按月份生成分表后缀（如 `_202603`）。
 - `IShardTableProvisioner.cs` + `ShardTableProvisioner.cs`：在 SQL Server 中按需创建分表与索引（不存在才建）。
-- `AutoMigrationService.cs` + `AutoMigrationHostedService.cs`：应用启动时自动建库、自动识别并执行待迁移项，同时完成分表预创建。
+ - `AutoMigrationService.cs` + `AutoMigrationHostedService.cs`：应用启动时自动建库、自动识别并执行待迁移项，同时仅预建后缀分表。
 - `SqlExecutionTuner.cs`：基于失败率和耗时进行批量窗口升降调谐；采样窗口大小与失败率阈值均来自 `AutoTuneOptions`。
 - `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断），弹性参数来自 `DangerZoneOptions`。
 - `NonRetryableDangerZoneException.cs`：危险隔离器“不可重试异常”标记类型，用于识别配置类确定性失败并快速失败。
@@ -198,7 +195,7 @@
 - `OracleOptions.cs`：远端 Oracle 连接配置实体，定义连接字符串、连接库名（ServiceName/SID，决定连接目标）、默认 Schema（仅决定 SQL 对象前缀）、只读开关、命令超时与分页上限。
 - `OracleSourceReader.cs`：源端读取器 Oracle 实现，使用参数化 SQL 执行真实只读查询，支持分页增量读取、业务键读取、`ExcludedColumns` 过滤，并在异常场景输出错误日志；支持 `Oracle.DatabaseMode` 控制库名拼接语义（ServiceName/SID）。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
-- `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并在合并阶段过滤 `ExcludedColumns`；目标端持久化改为按表分片的轻量幂等状态（业务键、行摘要、游标、软删标记），不保留旧版全量快照兼容迁移；支持目标键删除能力（软删/硬删）、空闲驱逐与 GZip 压缩归档策略。
+- `SqlServerSyncUpsertRepository.cs`：SQL Server 真实落库实现，按目标逻辑表+后缀分表执行 UPSERT，并同步维护 `sync_target_state` 轻量幂等状态（业务键、行摘要、游标、软删标记、后缀）。
 - `SyncDeletionRepository.cs`：删除同步仓储基础实现，基于轻量幂等状态执行窗口过滤与源端键差异识别，并按策略执行删除。
 - `ShardTableResolver.cs`：分表解析仓储实现，按逻辑表枚举物理分表并解析分表月份后缀。
 - `ShardRetentionRepository.cs`：分表保留期仓储实现，在危险动作隔离器保护下执行分表删除并输出审计日志，且可基于系统元数据生成可回放回滚 DDL。
@@ -208,15 +205,18 @@
 - `SyncDeletionLogRepository.cs`：同步删除日志仓储基础实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖，并在启动阶段从启用同步表配置提取逻辑表名集合，完成安全校验与空配置异常拦截。
 - `20260407125614_RebuildInitialHubSchema.cs`：重建后的基础表结构迁移（覆盖 `sorting_task_trace`、`IDX_PICKTOLIGHT_CARTON1`、`IDX_PICKTOWCS2`）。
+- `20260407154000_AddSyncTargetStateAndShardStrategyGuard.cs`：新增 `sync_target_state` 状态表迁移，支撑幂等状态与删除兼容。
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
 - `nlog.config`：NLog 日志配置，输出至控制台与滚动日志文件（按日切割，单文件上限 10 MB，保留 30 天）。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
 - `EverydayChain.Hub.Tests/Services/SyncWindowCalculatorTests.cs`：SyncWindowCalculator 时间窗口回归测试套件（12 个测试用例，覆盖正常窗口、时钟回拨冻结、UTC 拒绝、Unspecified Kind 兼容、时钟扰动组合场景）。
+- `EverydayChain.Hub.Tests/Services/AutoMigrationServiceTests.cs`：分表预建后缀策略测试，断言启动预建不再包含无后缀基础表。
 - `EverydayChain.Hub.Tests/Services/ServiceCollectionExtensionsTests.cs`：逻辑表名构建测试，覆盖非法标识符与空启用集合异常场景。
 - `EverydayChain.Hub.Tests/Services/SortingTaskTraceWriterTests.cs`：分表写入器兜底建表测试，覆盖首次写入先建表与同月重复写入幂等建表触发场景。
 - `EverydayChain.Hub.Tests/Services/ShardTableProvisionerTests.cs`：分表模板回归测试，覆盖并发上限钳制、空纳管拦截、实体模型到 DDL 的类型/主键/索引映射断言。
 - `EverydayChain.Hub.Tests/Repositories/OracleSourceReaderTests.cs`：Oracle 连接串构建测试，覆盖空连接串、空库名、EZCONNECT（斜杠/SID）覆写与复杂描述符拦截分支。
+- `EverydayChain.Hub.Tests/Repositories/SqlServerSyncUpsertRepositoryTests.cs`：SQL Server 落库仓储契约测试，覆盖插入/更新/跳过统计与 UniqueKeys 缺失异常。
 - `EFCore手动迁移操作指南.md`：提供手工迁移、脚本导出、回滚、排障流程。
 - `持续运行一年稳定性改造清单.md`：面向"连续运行一年"目标的稳定性改造清单，按 P0/P1/P2 组织改造优先级、待确认项与验收标准。
 - `年度维护清单.md`：月度/季度/年度例行巡检清单，覆盖磁盘、日志、数据一致性、配置审核、依赖升级、灾难恢复与安全审计。
@@ -229,7 +229,7 @@
 - `appsettings.json`：主配置样例，移除分表逻辑表名静态配置，统一由 `SyncJob.Tables.TargetLogicalTable` 提供。
 
 ### Oracle 配置速查（针对 `SELECT * FROM WMS_USER_431.IDX_PICKTOLIGHT_CARTON1`）
-- `Oracle.DefaultSchema = WMS_USER_431`（因为表前缀 Schema 是 `WMS_USER_431`）。
+- `SyncJob.Tables[*].SourceSchema = WMS_USER_431`（源端 Schema 改为逐表必填）。
 - `Oracle.Database = <真实 ServiceName 或 SID>`（例如 `ORCL`，以 DBA 提供为准）。
 - `Oracle.DatabaseMode`：
   - 已知 `Database` 是 ServiceName：`ServiceName`
@@ -238,10 +238,10 @@
 - `Oracle.ConnectionString` 保持 `Data Source=host:port;User Id=...;Password=...;`（由系统按 `DatabaseMode` + `Database` 拼接库名）。
 
 ## 可继续完善内容（本次 PR 后续行动项）
-- 在启动日志中输出 `Database`、`DatabaseMode`、`DefaultSchema` 的“职责分层快照”，帮助运维快速判断是连接目标问题还是对象命名问题。
+- 在启动日志中输出 `Database`、`DatabaseMode` 与每张表 `SourceSchema` 的“职责分层快照”，帮助运维快速定位配置问题。
 - 增加 `Oracle.DatabaseMode` 的启动期连通性探测（按 ServiceName/SID 双模式探测并输出建议），降低现场试错成本。
 - 增加 Oracle 启动预检（如 `SELECT SYS_CONTEXT('USERENV','SERVICE_NAME') FROM DUAL`）并将实际服务名回显到日志，提前识别 `ServiceName/SID` 配置错误。
 - 增加 `OracleSourceReader` 针对 `ORA-12154/ORA-12514` 的单元测试，验证“不可重试异常”分支在分页读取与业务键读取均生效。
 - 为 `Oracle.Database` 增加配置有效性启动自检（例如库名为空白字符串、Data Source 复杂描述符不支持覆盖时提前阻断）。
-- 为分表写入兜底建表补充并发场景测试（同后缀并发首写仅一次建表检查）与异常回退重试路径验证。
+- 为 SQL Server UPSERT 落库补充真实数据库集成测试（跨分表迁移更新、硬删回收、事务回滚重试）。
 - 在启动日志中输出纳管逻辑表集合快照，便于运维核对多表预建范围。
