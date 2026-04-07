@@ -72,7 +72,7 @@ public class AutoMigrationService(
     }
 
     /// <summary>
-    /// 在目标库不存在时自动创建数据库，确保新库可直接执行迁移。
+    /// 在目标库不存在时自动创建数据库，确保新库可执行后续迁移。
     /// </summary>
     /// <param name="dbContext">数据库上下文。</param>
     /// <param name="cancellationToken">取消令牌。</param>
@@ -87,7 +87,7 @@ public class AutoMigrationService(
     }
 
     /// <summary>
-    /// 输出待应用迁移清单，便于识别新迁移是否已纳入执行。
+    /// 输出待应用迁移清单，用于识别新迁移是否已纳入执行。
     /// </summary>
     /// <param name="dbContext">数据库上下文。</param>
     /// <param name="cancellationToken">取消令牌。</param>
