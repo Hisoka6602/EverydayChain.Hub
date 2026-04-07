@@ -1,6 +1,8 @@
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EverydayChain.Hub.Infrastructure.Services;
 
@@ -10,17 +12,15 @@ namespace EverydayChain.Hub.Infrastructure.Services;
 public class AutoMigrationHostedService(
     IServiceScopeFactory scopeFactory,
     IRuntimeStorageGuard runtimeStorageGuard,
-    ILogger<AutoMigrationHostedService> logger) : IHostedService
-{
+    ILogger<AutoMigrationHostedService> logger) : IHostedService {
+
     /// <summary>
     /// 应用启动时调用，创建作用域并执行 <see cref="IAutoMigrationService.RunAsync"/>。
     /// </summary>
     /// <param name="cancellationToken">取消令牌。</param>
-    public async Task StartAsync(CancellationToken cancellationToken)
-    {
+    public async Task StartAsync(CancellationToken cancellationToken) {
         var currentStage = "启动初始化阶段";
-        try
-        {
+        try {
             logger.LogInformation("启动自动迁移与分表自治流程。");
             currentStage = "启动自检阶段";
             await runtimeStorageGuard.EnsureStartupHealthyAsync(cancellationToken);
@@ -29,8 +29,15 @@ public class AutoMigrationHostedService(
             currentStage = "自动迁移阶段";
             await autoMigrationService.RunAsync(cancellationToken);
         }
-        catch (Exception ex)
-        {
+        catch (RetryLimitExceededException ex) when (TryGetSqlException(ex) is { Number: 10054 } sqlException) {
+            logger.LogError(
+                ex,
+                "自动迁移阶段数据库握手失败（SqlError={SqlError}）。常见原因：1) SQL Server TLS 版本与客户端不兼容；2) Encrypt/TrustServerCertificate 配置不匹配；3) 网络设备或防火墙中断连接；4) SQL Server 负载过高或重启中。请优先核对连接串中的 Encrypt 与 TrustServerCertificate，并在数据库主机上检查错误日志。ClientConnectionId={ClientConnectionId}",
+                sqlException.Number,
+                sqlException.ClientConnectionId);
+            throw;
+        }
+        catch (Exception ex) {
             logger.LogError(ex, "自动迁移与分表自治流程在{Stage}发生异常，应用启动终止。", currentStage);
             throw;
         }
@@ -41,4 +48,17 @@ public class AutoMigrationHostedService(
     /// </summary>
     /// <param name="cancellationToken">取消令牌。</param>
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    private static SqlException? TryGetSqlException(Exception exception) {
+        var current = exception;
+        while (current is not null) {
+            if (current is SqlException sqlException) {
+                return sqlException;
+            }
+
+            current = current.InnerException;
+        }
+
+        return null;
+    }
 }
