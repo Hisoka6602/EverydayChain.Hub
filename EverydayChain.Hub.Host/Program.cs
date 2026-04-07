@@ -1,9 +1,9 @@
-using EverydayChain.Hub.Host;
-using EverydayChain.Hub.Domain.Options;
-using EverydayChain.Hub.Host.Workers;
-using EverydayChain.Hub.Infrastructure.DependencyInjection;
 using NLog;
+using EverydayChain.Hub.Host;
 using NLog.Extensions.Logging;
+using EverydayChain.Hub.Host.Workers;
+using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.Infrastructure.DependencyInjection;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Logging.ClearProviders();
@@ -13,14 +13,21 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<Worker>();
 builder.Services.AddHostedService<SyncBackgroundWorker>();
 builder.Services.AddHostedService<RetentionBackgroundWorker>();
-
+#if !DEBUG
+var isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+var isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+if (isWindows) {
+    builder.Services.AddWindowsService();
+}
+else if (isLinux) {
+    builder.Services.AddSystemd();
+}
+#endif
 var host = builder.Build();
-try
-{
+try {
     host.Run();
 }
-finally
-{
+finally {
     // 确保应用退出时 NLog 将所有缓冲日志全部落盘后再释放资源。
     LogManager.Shutdown();
 }
