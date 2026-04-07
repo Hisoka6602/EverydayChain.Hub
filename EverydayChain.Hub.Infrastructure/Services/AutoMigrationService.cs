@@ -21,6 +21,8 @@ public class AutoMigrationService(
     IOptions<DangerZoneOptions> dangerZoneOptions,
     IDangerZoneExecutor dangerZoneExecutor,
     ILogger<AutoMigrationService> logger) : IAutoMigrationService {
+    /// <summary>迁移基线固定 Schema。</summary>
+    private const string ExpectedMigrationSchema = "dbo";
 
     /// <summary>分表配置快照。</summary>
     private readonly ShardingOptions _options = shardingOptions.Value;
@@ -31,6 +33,7 @@ public class AutoMigrationService(
     /// <inheritdoc/>
     public async Task RunAsync(CancellationToken cancellationToken) {
         LogConnectionSecuritySnapshot();
+        ValidateMigrationSchemaOrThrow();
 
         // 步骤1：通过隔离器执行 EF Core 基础 Migration。
         await dangerZoneExecutor.ExecuteAsync("auto-migrate-base", async token => {
@@ -48,6 +51,24 @@ public class AutoMigrationService(
             .Distinct(StringComparer.Ordinal)
             .ToList();
         await shardTableProvisioner.EnsureShardTablesAsync(suffixes, cancellationToken);
+    }
+
+    /// <summary>
+    /// 校验迁移与运行时 Schema 一致性，不满足时阻断启动。
+    /// </summary>
+    /// <exception cref="InvalidOperationException">当 Schema 不是 dbo 时抛出。</exception>
+    private void ValidateMigrationSchemaOrThrow() {
+        if (string.Equals(_options.Schema, ExpectedMigrationSchema, StringComparison.OrdinalIgnoreCase)) {
+            return;
+        }
+
+        logger.LogError(
+            "自动迁移配置阻断：当前 Sharding.Schema={ConfiguredSchema}，但初始迁移固定使用 {ExpectedSchema}。请将 Sharding.Schema 调整为 {ExpectedSchema}，避免迁移与运行时访问 Schema 不一致。",
+            _options.Schema,
+            ExpectedMigrationSchema,
+            ExpectedMigrationSchema);
+        throw new InvalidOperationException(
+            $"自动迁移配置无效：当前 Sharding.Schema={_options.Schema}，初始迁移固定使用 {ExpectedMigrationSchema}。");
     }
 
     /// <summary>
@@ -82,8 +103,24 @@ public class AutoMigrationService(
             return;
         }
 
+        var builder = new SqlConnectionStringBuilder(_options.ConnectionString);
+        if (!_dangerZoneOptions.AllowAutoCreateDatabase) {
+            logger.LogError(
+                "自动迁移阻断：检测到目标数据库不存在且 DangerZone.AllowAutoCreateDatabase=false。DataSource={DataSource}, InitialCatalog={InitialCatalog}",
+                builder.DataSource,
+                builder.InitialCatalog);
+            throw new InvalidOperationException("自动迁移阻断：目标数据库不存在，且未启用自动建库。");
+        }
+
+        logger.LogWarning(
+            "自动迁移将创建缺失数据库。DataSource={DataSource}, InitialCatalog={InitialCatalog}",
+            builder.DataSource,
+            builder.InitialCatalog);
         await databaseCreator.CreateAsync(cancellationToken);
-        logger.LogInformation("自动迁移: 检测到目标数据库不存在，已自动创建数据库。");
+        logger.LogInformation(
+            "自动迁移: 检测到目标数据库不存在并已自动创建。DataSource={DataSource}, InitialCatalog={InitialCatalog}",
+            builder.DataSource,
+            builder.InitialCatalog);
     }
 
     /// <summary>
