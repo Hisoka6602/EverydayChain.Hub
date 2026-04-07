@@ -11,10 +11,23 @@ public class OracleOptions
     /// <summary>远端 Oracle 连接字符串（Oracle 标准连接字符串，建议启用连接池并通过密钥注入密码）。</summary>
     public string ConnectionString { get; set; } = string.Empty;
 
-    /// <summary>连接库名（可填写 Oracle ServiceName 或 SID；为空时按 ConnectionString 原样连接）。</summary>
+    /// <summary>
+    /// 连接库名（可填写 Oracle ServiceName 或 SID；为空时按 ConnectionString 原样连接）。
+    /// 注意：该值用于“连到哪个 Oracle 实例/服务”，不是 Schema 名。
+    /// </summary>
     public string Database { get; set; } = string.Empty;
 
-    /// <summary>默认源端 Schema（Oracle 有效 Schema 名称）。</summary>
+    /// <summary>
+    /// 连接库名模式（可选值：ServiceName、Sid、Auto）。
+    /// Auto：对 host:port 优先按 ServiceName（/）拼接；Sid：强制按 SID（:）拼接。
+    /// </summary>
+    public string DatabaseMode { get; set; } = "Auto";
+
+    /// <summary>
+    /// 默认源端 Schema（Oracle 有效 Schema 名称）。
+    /// 仅用于拼接查询对象名（如 <c>SCHEMA.TABLE</c>），不参与 Oracle 网络连接目标选择。
+    /// 因此不能替代 <see cref="Database"/>。
+    /// </summary>
     public string DefaultSchema { get; set; } = string.Empty;
 
     /// <summary>是否强制只读（true 表示仅允许执行 SELECT 语句）。</summary>

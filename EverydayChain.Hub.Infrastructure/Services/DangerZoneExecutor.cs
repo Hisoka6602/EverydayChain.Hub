@@ -150,12 +150,14 @@ public class DangerZoneExecutor : IDangerZoneExecutor
             .AddTimeout(TimeSpan.FromSeconds(timeoutSeconds))
             .AddRetry(new()
             {
+                ShouldHandle = new PredicateBuilder().Handle<Exception>(ex => ex is not NonRetryableDangerZoneException),
                 MaxRetryAttempts = _options.MaxRetryAttempts,
                 BackoffType = DelayBackoffType.Exponential,
                 Delay = TimeSpan.FromSeconds(_options.RetryBaseDelaySeconds)
             })
             .AddCircuitBreaker(new CircuitBreakerStrategyOptions
             {
+                ShouldHandle = new PredicateBuilder().Handle<Exception>(ex => ex is not NonRetryableDangerZoneException),
                 FailureRatio = _options.CircuitBreakerFailureRatio,
                 MinimumThroughput = _options.CircuitBreakerMinimumThroughput,
                 SamplingDuration = TimeSpan.FromMinutes(_options.CircuitBreakerSamplingDurationMinutes),
