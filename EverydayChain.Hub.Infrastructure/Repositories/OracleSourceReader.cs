@@ -31,6 +31,8 @@ public class OracleSourceReader(
 
     /// <summary>Oracle 配置快照。</summary>
     private readonly OracleOptions _options = oracleOptions.Value;
+    /// <summary>生效连接字符串。</summary>
+    private readonly string _effectiveConnectionString = BuildConnectionString(oracleOptions.Value);
 
     /// <inheritdoc/>
     public async Task<SyncReadResult> ReadIncrementalPageAsync(SyncReadRequest request, CancellationToken ct)
@@ -51,7 +53,7 @@ public class OracleSourceReader(
                     var limit = offset + pageSize;
                     var sql = BuildReadPageSql(request, sourceSchema);
 
-                    await using var connection = new OracleConnection(_options.ConnectionString);
+                    await using var connection = new OracleConnection(_effectiveConnectionString);
                     await connection.OpenAsync(token);
                     await using var command = connection.CreateCommand();
                     command.BindByName = true;
@@ -120,7 +122,7 @@ public class OracleSourceReader(
                 $"OracleKeyRead:{request.TableCode}",
                 async token =>
                 {
-                    await using var connection = new OracleConnection(_options.ConnectionString);
+                    await using var connection = new OracleConnection(_effectiveConnectionString);
                     await connection.OpenAsync(token);
                     await using var command = connection.CreateCommand();
                     command.BindByName = true;
@@ -288,10 +290,75 @@ public class OracleSourceReader(
     /// <exception cref="InvalidOperationException">当连接字符串为空时抛出。</exception>
     private void ValidateConnectionOptions()
     {
-        if (string.IsNullOrWhiteSpace(_options.ConnectionString))
+        if (string.IsNullOrWhiteSpace(_effectiveConnectionString))
         {
             throw new InvalidOperationException("Oracle.ConnectionString 不能为空。");
         }
+    }
+
+    /// <summary>
+    /// 构建生效连接字符串。
+    /// </summary>
+    /// <param name="options">Oracle 配置。</param>
+    /// <returns>生效连接字符串。</returns>
+    /// <exception cref="InvalidOperationException">当连接字符串为空或无法按库名重写 Data Source 时抛出。</exception>
+    private static string BuildConnectionString(OracleOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.ConnectionString))
+        {
+            return string.Empty;
+        }
+
+        if (string.IsNullOrWhiteSpace(options.Database))
+        {
+            return options.ConnectionString;
+        }
+
+        var builder = new OracleConnectionStringBuilder(options.ConnectionString);
+        if (string.IsNullOrWhiteSpace(builder.DataSource))
+        {
+            throw new InvalidOperationException("Oracle.ConnectionString 缺少 Data Source，无法应用 Oracle.Database。");
+        }
+
+        builder.DataSource = OverrideOracleDatabase(builder.DataSource, options.Database);
+        return builder.ConnectionString;
+    }
+
+    /// <summary>
+    /// 以 EZCONNECT 形式重写 Data Source 中的库名。
+    /// </summary>
+    /// <param name="dataSource">原始 Data Source。</param>
+    /// <param name="database">目标库名（ServiceName 或 SID）。</param>
+    /// <returns>重写后的 Data Source。</returns>
+    /// <exception cref="InvalidOperationException">当 Data Source 非 EZCONNECT 形式且无法安全重写时抛出。</exception>
+    private static string OverrideOracleDatabase(string dataSource, string database)
+    {
+        var trimmedDataSource = dataSource.Trim();
+        var trimmedDatabase = database.Trim();
+        if (string.IsNullOrWhiteSpace(trimmedDatabase))
+        {
+            return trimmedDataSource;
+        }
+
+        if (trimmedDataSource.StartsWith('('))
+        {
+            throw new InvalidOperationException("Oracle.ConnectionString 使用复杂 Data Source 描述符时，不支持通过 Oracle.Database 覆写库名。");
+        }
+
+        var slashIndex = trimmedDataSource.LastIndexOf('/');
+        if (slashIndex >= 0)
+        {
+            return $"{trimmedDataSource[..slashIndex]}/{trimmedDatabase}";
+        }
+
+        var colonCount = trimmedDataSource.Count(ch => ch == ':');
+        if (colonCount >= 2)
+        {
+            var lastColonIndex = trimmedDataSource.LastIndexOf(':');
+            return $"{trimmedDataSource[..lastColonIndex]}:{trimmedDatabase}";
+        }
+
+        return $"{trimmedDataSource}/{trimmedDatabase}";
     }
 
     /// <summary>

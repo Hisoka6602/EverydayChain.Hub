@@ -11,6 +11,9 @@ public class OracleOptions
     /// <summary>远端 Oracle 连接字符串（Oracle 标准连接字符串，建议启用连接池并通过密钥注入密码）。</summary>
     public string ConnectionString { get; set; } = string.Empty;
 
+    /// <summary>连接库名（可填写 Oracle ServiceName 或 SID；为空时按 ConnectionString 原样连接）。</summary>
+    public string Database { get; set; } = string.Empty;
+
     /// <summary>默认源端 Schema（Oracle 有效 Schema 名称）。</summary>
     public string DefaultSchema { get; set; } = string.Empty;
 

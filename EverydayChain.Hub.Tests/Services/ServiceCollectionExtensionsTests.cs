@@ -34,10 +34,10 @@ public class ServiceCollectionExtensionsTests
     }
 
     /// <summary>
-    /// 无可用启用逻辑表时应抛出配置异常。
+    /// 无启用同步表时仍应包含分拣任务追踪逻辑表。
     /// </summary>
     [Fact]
-    public void BuildManagedLogicalTables_WithEmptyEnabledTables_ShouldThrow()
+    public void BuildManagedLogicalTables_WithEmptyEnabledTables_ShouldContainSortingTaskTrace()
     {
         var options = new SyncJobOptions
         {
@@ -52,10 +52,9 @@ public class ServiceCollectionExtensionsTests
             ]
         };
 
-        var action = () => ServiceCollectionExtensions.BuildManagedLogicalTables(options);
-
-        var ex = Assert.Throws<InvalidOperationException>(action);
-        Assert.Contains("TargetLogicalTable 为空", ex.Message);
+        var tables = ServiceCollectionExtensions.BuildManagedLogicalTables(options);
+        Assert.Single(tables);
+        Assert.Contains("sorting_task_trace", tables);
     }
 
     /// <summary>

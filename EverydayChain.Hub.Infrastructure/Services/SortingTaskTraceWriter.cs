@@ -13,6 +13,7 @@ namespace EverydayChain.Hub.Infrastructure.Services;
 public class SortingTaskTraceWriter(
     IDbContextFactory<HubDbContext> dbContextFactory,
     IShardSuffixResolver shardSuffixResolver,
+    IShardTableProvisioner shardTableProvisioner,
     ISqlExecutionTuner tuner,
     ILogger<SortingTaskTraceWriter> logger) : ISortingTaskTraceWriter
 {
@@ -28,6 +29,7 @@ public class SortingTaskTraceWriter(
         var grouped = traces.GroupBy(x => shardSuffixResolver.Resolve(x.CreatedAt));
         foreach (var group in grouped)
         {
+            await shardTableProvisioner.EnsureShardTableAsync(group.Key, cancellationToken);
             using var _ = TableSuffixScope.Use(group.Key);
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
