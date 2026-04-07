@@ -133,8 +133,10 @@
 │       └── SortingTaskTraceWriter.cs
 ├── EverydayChain.Hub.Tests
 │   ├── EverydayChain.Hub.Tests.csproj
+│   ├── Repositories/OracleSourceReaderTests.cs
 │   └── Services
 │       ├── ServiceCollectionExtensionsTests.cs
+│       ├── SortingTaskTraceWriterTests.cs
 │       └── SyncWindowCalculatorTests.cs
 └── EverydayChain.Hub.Host
     ├── EverydayChain.Hub.Host.csproj
@@ -200,6 +202,8 @@
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
 - `EverydayChain.Hub.Tests/Services/SyncWindowCalculatorTests.cs`：SyncWindowCalculator 时间窗口回归测试套件（12 个测试用例，覆盖正常窗口、时钟回拨冻结、UTC 拒绝、Unspecified Kind 兼容、时钟扰动组合场景）。
 - `EverydayChain.Hub.Tests/Services/ServiceCollectionExtensionsTests.cs`：逻辑表名构建测试，覆盖非法标识符与空启用集合异常场景。
+- `EverydayChain.Hub.Tests/Services/SortingTaskTraceWriterTests.cs`：分表写入器兜底建表测试，覆盖首次写入先建表与同月重复写入幂等建表触发场景。
+- `EverydayChain.Hub.Tests/Repositories/OracleSourceReaderTests.cs`：Oracle 连接串构建测试，覆盖空连接串、空库名、EZCONNECT（斜杠/SID）覆写与复杂描述符拦截分支。
 - `EFCore手动迁移操作指南.md`：提供手工迁移、脚本导出、回滚、排障流程。
 - `持续运行一年稳定性改造清单.md`：面向"连续运行一年"目标的稳定性改造清单，按 P0/P1/P2 组织改造优先级、待确认项与验收标准。
 - `年度维护清单.md`：月度/季度/年度例行巡检清单，覆盖磁盘、日志、数据一致性、配置审核、依赖升级、灾难恢复与安全审计。
@@ -212,6 +216,6 @@
 - `appsettings.json`：主配置样例，移除分表逻辑表名静态配置，统一由 `SyncJob.Tables.TargetLogicalTable` 提供。
 
 ## 可继续完善内容（本次 PR 后续行动项）
-- 为 `Oracle.Database` 增加配置有效性启动自检（例如库名为空白、Data Source 复杂描述符不支持覆盖时提前阻断）。
+- 为 `Oracle.Database` 增加配置有效性启动自检（例如库名为空白字符串、Data Source 复杂描述符不支持覆盖时提前阻断）。
 - 为分表写入兜底建表增加单元测试，覆盖“月切换后首次写入”与“重复调用幂等”场景。
 - 在启动日志中输出纳管逻辑表集合快照，便于运维核对多表预建范围。

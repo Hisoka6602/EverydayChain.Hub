@@ -342,7 +342,7 @@ public class OracleSourceReader(
 
         if (trimmedDataSource.StartsWith('('))
         {
-            throw new InvalidOperationException("Oracle.ConnectionString 使用复杂 Data Source 描述符时，不支持通过 Oracle.Database 覆写库名。");
+            throw new InvalidOperationException("Oracle.ConnectionString 使用复杂 Data Source 描述符时，不支持通过 Oracle.Database 覆写库名。请直接在 ConnectionString 的 Data Source 描述符中指定 SERVICE_NAME 或 SID，或改用 EZCONNECT 格式（例如：主机:端口/库名）。");
         }
 
         var slashIndex = trimmedDataSource.LastIndexOf('/');
@@ -358,6 +358,7 @@ public class OracleSourceReader(
             return $"{trimmedDataSource[..lastColonIndex]}:{trimmedDatabase}";
         }
 
+        // 兜底策略：按 EZCONNECT ServiceName 形式拼接，产出 主机[:端口]/库名。
         return $"{trimmedDataSource}/{trimmedDatabase}";
     }
 
