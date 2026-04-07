@@ -1,14 +1,11 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 同步契约目录按 DDD 规范收敛：`EverydayChain.Hub.Application/Repositories` 已迁移为 `EverydayChain.Hub.Application/Abstractions/Persistence`，并完成全仓引用更新。
-- 修复 `Worker`、`SyncBackgroundWorker`、`RetentionBackgroundWorker` 的轮询延迟取消路径：在 `Task.Delay` 处显式捕获取消异常并正常退出，避免停止阶段抛出未处理取消异常导致流程噪声。
-- 日志落盘策略保持不变：业务日志继续通过 NLog `file` target 落盘，单文件上限维持 10MB 滚动阈值。
-- 分表预建逻辑改为仅从 `SyncJob.Tables` 启用项的 `TargetLogicalTable` 动态推导，支持多逻辑表并行预建。
-- 启动阶段新增逻辑表名集合构建与校验：去重、去空白、仅允许字母/数字/下划线，空集合直接抛出可读配置异常。
-- `ShardTableProvisioner` 改为按“逻辑表 × 月份后缀”组合预建分表，危险建表动作仍统一通过 `IDangerZoneExecutor` 隔离执行。
-- `ShardingOptions` 与 `appsettings.json` 移除 `BaseTableName`、`ManagedLogicalTables`，仅保留连接与预建月数配置。
-- 危险操作隔离器新增“按操作覆盖超时”能力：默认超时仍由 `DangerZone.TimeoutSeconds` 控制，自动迁移单独使用 `DangerZone.AutoMigrateTimeoutSeconds`（默认 180 秒），用于降低冷启动/数据库唤醒场景下 30 秒超时导致的启动失败概率。
+- 修复分表建表时序：`SortingTaskTraceWriter` 在写入前增加按后缀幂等建表兜底，避免“先写后建”导致写入失败。
+- 修复分表纳管覆盖：`ServiceCollectionExtensions` 固定纳管 `sorting_task_trace`，同时继续纳管启用同步表的 `TargetLogicalTable`。
+- 扩展 Oracle 连接配置：新增 `Oracle.Database`，支持在连接串中独立配置 ServiceName/SID。
+- `SyncJob.Tables` 配置样例补齐 `IDX_PICKTOLIGHT_CARTON1` 与 `IDX_PICKTOWCS2` 两张业务表，便于自动迁移与自动分表验证。
+- 删除旧迁移历史并重建初始迁移为 `20260407100338_RebuildInitialHubSchema`。
 
 ## 解决方案文件树与职责
 ```text
@@ -117,7 +114,8 @@
 │   ├── Persistence/Sharding/IShardSuffixResolver.cs
 │   ├── Persistence/Sharding/MonthShardSuffixResolver.cs
 │   ├── Persistence/Sharding/ShardModelCacheKeyFactory.cs
-│   ├── Migrations/202603280001_InitialHubSchema.cs
+│   ├── Migrations/20260407100338_RebuildInitialHubSchema.cs
+│   ├── Migrations/20260407100338_RebuildInitialHubSchema.Designer.cs
 │   ├── Migrations/HubDbContextModelSnapshot.cs
 │   └── Services
 │       ├── IDangerZoneExecutor.cs
@@ -135,8 +133,10 @@
 │       └── SortingTaskTraceWriter.cs
 ├── EverydayChain.Hub.Tests
 │   ├── EverydayChain.Hub.Tests.csproj
+│   ├── Repositories/OracleSourceReaderTests.cs
 │   └── Services
 │       ├── ServiceCollectionExtensionsTests.cs
+│       ├── SortingTaskTraceWriterTests.cs
 │       └── SyncWindowCalculatorTests.cs
 └── EverydayChain.Hub.Host
     ├── EverydayChain.Hub.Host.csproj
@@ -184,7 +184,7 @@
 - `IRuntimeStorageGuard.cs` + `RuntimeStorageGuard.cs`：运行期存储守护服务，负责启动阶段的磁盘空间、目录权限、关键文件可读写自检，并在检查点/目标快照写入前执行磁盘阈值校验与告警阻断；同时提供单表内存水位监控与节流告警能力。
 - `SortingTaskTraceWriter.cs`：按分表后缀分组写入，并将执行结果回传给调谐器。
 - `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，校验 `StartTimeLocal` 禁止 `Z` 与 offset，校验 `ExcludedColumns` 不得与 `UniqueKeys`、`CursorColumn`、软删除关键列冲突，并解析优先级与多表并发上限。
-- `OracleOptions.cs`：远端 Oracle 连接配置实体，定义连接字符串、默认 Schema、只读开关、命令超时与分页上限。
+- `OracleOptions.cs`：远端 Oracle 连接配置实体，定义连接字符串、连接库名（ServiceName/SID）、默认 Schema、只读开关、命令超时与分页上限。
 - `OracleSourceReader.cs`：源端读取器 Oracle 实现，使用参数化 SQL 执行真实只读查询，支持分页增量读取、业务键读取、`ExcludedColumns` 过滤，并在异常场景输出错误日志。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
 - `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并在合并阶段过滤 `ExcludedColumns`；目标端持久化改为按表分片的轻量幂等状态（业务键、行摘要、游标、软删标记），不保留旧版全量快照兼容迁移；支持目标键删除能力（软删/硬删）、空闲驱逐与 GZip 压缩归档策略。
@@ -196,12 +196,14 @@
 - `SyncChangeLogRepository.cs`：同步变更日志仓储基础实现，支持批量写入审计记录。
 - `SyncDeletionLogRepository.cs`：同步删除日志仓储基础实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖，并在启动阶段从启用同步表配置提取逻辑表名集合，完成安全校验与空配置异常拦截。
-- `202603280001_InitialHubSchema.cs`：基础表结构迁移。
+- `20260407100338_RebuildInitialHubSchema.cs`：重建后的基础表结构迁移。
 - `nlog.config`：NLog 日志配置，输出至控制台与滚动日志文件（按日切割，单文件上限 10 MB，保留 30 天）。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
 - `EverydayChain.Hub.Tests/Services/SyncWindowCalculatorTests.cs`：SyncWindowCalculator 时间窗口回归测试套件（12 个测试用例，覆盖正常窗口、时钟回拨冻结、UTC 拒绝、Unspecified Kind 兼容、时钟扰动组合场景）。
 - `EverydayChain.Hub.Tests/Services/ServiceCollectionExtensionsTests.cs`：逻辑表名构建测试，覆盖非法标识符与空启用集合异常场景。
+- `EverydayChain.Hub.Tests/Services/SortingTaskTraceWriterTests.cs`：分表写入器兜底建表测试，覆盖首次写入先建表与同月重复写入幂等建表触发场景。
+- `EverydayChain.Hub.Tests/Repositories/OracleSourceReaderTests.cs`：Oracle 连接串构建测试，覆盖空连接串、空库名、EZCONNECT（斜杠/SID）覆写与复杂描述符拦截分支。
 - `EFCore手动迁移操作指南.md`：提供手工迁移、脚本导出、回滚、排障流程。
 - `持续运行一年稳定性改造清单.md`：面向"连续运行一年"目标的稳定性改造清单，按 P0/P1/P2 组织改造优先级、待确认项与验收标准。
 - `年度维护清单.md`：月度/季度/年度例行巡检清单，覆盖磁盘、日志、数据一致性、配置审核、依赖升级、灾难恢复与安全审计。
@@ -214,6 +216,6 @@
 - `appsettings.json`：主配置样例，移除分表逻辑表名静态配置，统一由 `SyncJob.Tables.TargetLogicalTable` 提供。
 
 ## 可继续完善内容（本次 PR 后续行动项）
-- 对“全仓一键体检并自动修复”的大范围需求，建议拆分为多批次 PR（性能热点、规则一致性、接口收敛、文档治理）逐项推进并逐项验收。
+- 为 `Oracle.Database` 增加配置有效性启动自检（例如库名为空白字符串、Data Source 复杂描述符不支持覆盖时提前阻断）。
+- 为分表写入兜底建表补充并发场景测试（同后缀并发首写仅一次建表检查）与异常回退重试路径验证。
 - 在启动日志中输出纳管逻辑表集合快照，便于运维核对多表预建范围。
-- 为 `DangerZone` 增加“按操作名配置超时映射”能力（如 `OperationTimeoutOverrides`），避免未来新增长耗时动作时需要再次改动代码。

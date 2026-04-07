@@ -3,6 +3,7 @@ using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Collections.Concurrent;
 using SortingTaskTraceEntity = EverydayChain.Hub.Domain.Aggregates.SortingTaskTraceAggregate.SortingTaskTraceEntity;
 
 namespace EverydayChain.Hub.Infrastructure.Services;
@@ -13,9 +14,13 @@ namespace EverydayChain.Hub.Infrastructure.Services;
 public class SortingTaskTraceWriter(
     IDbContextFactory<HubDbContext> dbContextFactory,
     IShardSuffixResolver shardSuffixResolver,
+    IShardTableProvisioner shardTableProvisioner,
     ISqlExecutionTuner tuner,
     ILogger<SortingTaskTraceWriter> logger) : ISortingTaskTraceWriter
 {
+    /// <summary>已完成建表检查的后缀集合，仅在当前进程生命周期内生效，用于避免同进程重复触发建表检查。</summary>
+    private readonly ConcurrentDictionary<string, byte> _ensuredSuffixes = new(StringComparer.Ordinal);
+
     /// <inheritdoc/>
     public async Task WriteAsync(IReadOnlyCollection<SortingTaskTraceEntity> traces, CancellationToken cancellationToken)
     {
@@ -28,7 +33,19 @@ public class SortingTaskTraceWriter(
         var grouped = traces.GroupBy(x => shardSuffixResolver.Resolve(x.CreatedAt));
         foreach (var group in grouped)
         {
-            using var _ = TableSuffixScope.Use(group.Key);
+            if (_ensuredSuffixes.TryAdd(group.Key, 0))
+            {
+                try
+                {
+                    await shardTableProvisioner.EnsureShardTableAsync(group.Key, cancellationToken);
+                }
+                catch
+                {
+                    _ensuredSuffixes.TryRemove(group.Key, out _);
+                    throw;
+                }
+            }
+            using var suffixScope = TableSuffixScope.Use(group.Key);
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
             // 步骤2：从调谐器获取当前批量写入窗口，分批执行写入。
