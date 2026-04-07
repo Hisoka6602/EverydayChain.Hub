@@ -12,6 +12,11 @@ namespace EverydayChain.Hub.Tests.Services;
 /// </summary>
 public class ShardTableProvisionerTests
 {
+    /// <summary>分拣追踪逻辑表名。</summary>
+    private const string SortingTaskTraceLogicalTable = "sorting_task_trace";
+    /// <summary>WMS 下发 WCS 逻辑表名。</summary>
+    private const string WmsPickToWcsLogicalTable = "IDX_PICKTOWCS2";
+
     /// <summary>
     /// 纳管逻辑表集合为空时应立即抛出异常。
     /// </summary>
@@ -43,7 +48,7 @@ public class ShardTableProvisionerTests
 
         var provisioner = new ShardTableProvisioner(
             options,
-            ["sorting_task_trace"],
+            [SortingTaskTraceLogicalTable],
             CreateDbContextFactory(),
             NullLogger<ShardTableProvisioner>.Instance,
             new PassThroughDangerZoneExecutor());
@@ -57,8 +62,8 @@ public class ShardTableProvisionerTests
     [Fact]
     public void SortingTaskTraceTemplate_ShouldContainBoundedStringColumnsAndIndexes()
     {
-        var provisioner = CreateProvisioner("sorting_task_trace");
-        var template = provisioner.ResolveTableTemplate("sorting_task_trace");
+        var provisioner = CreateProvisioner(SortingTaskTraceLogicalTable);
+        var template = provisioner.ResolveTableTemplate(SortingTaskTraceLogicalTable);
 
         var sql = provisioner.BuildCreateTableSql(
             template,
@@ -77,8 +82,8 @@ public class ShardTableProvisionerTests
     [Fact]
     public void WmsPickToWcsTemplate_ShouldContainPrimaryKeyAndDecimalColumns()
     {
-        var provisioner = CreateProvisioner("IDX_PICKTOWCS2");
-        var template = provisioner.ResolveTableTemplate("IDX_PICKTOWCS2");
+        var provisioner = CreateProvisioner(WmsPickToWcsLogicalTable);
+        var template = provisioner.ResolveTableTemplate(WmsPickToWcsLogicalTable);
 
         var sql = provisioner.BuildCreateTableSql(
             template,

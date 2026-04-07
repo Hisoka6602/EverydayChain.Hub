@@ -276,7 +276,8 @@ END";
         }
 
         var relationalTypeMapping = property.GetRelationalTypeMapping();
-        if (relationalTypeMapping is RelationalTypeMapping { StoreType: { } storeType } && !string.IsNullOrWhiteSpace(storeType))
+        var storeType = relationalTypeMapping?.StoreType;
+        if (!string.IsNullOrWhiteSpace(storeType))
         {
             return storeType;
         }
