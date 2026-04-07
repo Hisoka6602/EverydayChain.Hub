@@ -39,7 +39,10 @@ public class AutoMigrationService(
 
         // 步骤2：解析当前及未来分表后缀，预创建分表结构。
         var localNow = DateTimeOffset.Now;
-        var suffixes = resolver.ResolveBootstrapSuffixes(localNow, _options.AutoCreateMonthsAhead);
+        var suffixes = resolver.ResolveBootstrapSuffixes(localNow, _options.AutoCreateMonthsAhead)
+            .Append(string.Empty)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
         await shardTableProvisioner.EnsureShardTablesAsync(suffixes, cancellationToken);
     }
 
