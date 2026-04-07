@@ -81,7 +81,12 @@ public class RetentionExecutionService(
         }
 
         var summary = $"RetentionCleanup完成。Scanned={scannedCount}, Deleted={deletedCount}, DryRun={dryRunCount}, Failed={failedCount}";
-        logger.LogInformation(summary);
+        logger.LogInformation(
+            "分表保留期清理完成。Scanned={Scanned}, Deleted={Deleted}, DryRun={DryRun}, Failed={Failed}",
+            scannedCount,
+            deletedCount,
+            dryRunCount,
+            failedCount);
         return summary;
     }
 }
