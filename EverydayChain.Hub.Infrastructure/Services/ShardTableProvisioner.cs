@@ -260,7 +260,7 @@ END";
         if (primaryKeyColumns.Count == 1
             && string.Equals(primaryKeyColumns[0], "Id", StringComparison.OrdinalIgnoreCase))
         {
-            return $",{Environment.NewLine}    CONSTRAINT [PK_{tableName}] PRIMARY KEY CLUSTERED ([Id] DESC)";
+            return $",{Environment.NewLine}    CONSTRAINT [PK_{tableName}] PRIMARY KEY CLUSTERED ([{primaryKeyColumns[0]}] DESC)";
         }
 
         return $",{Environment.NewLine}    CONSTRAINT [PK_{tableName}] PRIMARY KEY ({string.Join(", ", primaryKeyColumns.Select(column => $"[{column}]"))})";
