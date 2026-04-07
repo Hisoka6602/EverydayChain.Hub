@@ -49,42 +49,51 @@ public class OracleSourceReader(
                 $"OracleIncrementalRead:{request.TableCode}:P{request.PageNo}",
                 async token =>
                 {
-                    var offset = (request.PageNo - 1) * pageSize;
-                    var limit = offset + pageSize;
-                    var sql = BuildReadPageSql(request, sourceSchema);
-
-                    await using var connection = new OracleConnection(_effectiveConnectionString);
-                    await connection.OpenAsync(token);
-                    await using var command = connection.CreateCommand();
-                    command.BindByName = true;
-                    command.CommandTimeout = ResolveCommandTimeout();
-                    command.CommandText = sql;
-                    command.Parameters.Add("p_windowStart", OracleDbType.TimeStamp, request.Window.WindowStartLocal, ParameterDirection.Input);
-                    command.Parameters.Add("p_windowEnd", OracleDbType.TimeStamp, request.Window.WindowEndLocal, ParameterDirection.Input);
-                    command.Parameters.Add("p_offset", OracleDbType.Int32, offset, ParameterDirection.Input);
-                    command.Parameters.Add("p_limit", OracleDbType.Int32, limit, ParameterDirection.Input);
-                    EnsureReadOnlyCommand(command);
-
-                    var rows = new List<IReadOnlyDictionary<string, object?>>();
-                    await using var reader = await command.ExecuteReaderAsync(token);
-                    while (await reader.ReadAsync(token))
+                    try
                     {
-                        var row = new Dictionary<string, object?>(reader.FieldCount, StringComparer.OrdinalIgnoreCase);
-                        for (var index = 0; index < reader.FieldCount; index++)
+                        var offset = (request.PageNo - 1) * pageSize;
+                        var limit = offset + pageSize;
+                        var sql = BuildReadPageSql(request, sourceSchema);
+
+                        await using var connection = new OracleConnection(_effectiveConnectionString);
+                        await connection.OpenAsync(token);
+                        await using var command = connection.CreateCommand();
+                        command.BindByName = true;
+                        command.CommandTimeout = ResolveCommandTimeout();
+                        command.CommandText = sql;
+                        command.Parameters.Add("p_windowStart", OracleDbType.TimeStamp, request.Window.WindowStartLocal, ParameterDirection.Input);
+                        command.Parameters.Add("p_windowEnd", OracleDbType.TimeStamp, request.Window.WindowEndLocal, ParameterDirection.Input);
+                        command.Parameters.Add("p_offset", OracleDbType.Int32, offset, ParameterDirection.Input);
+                        command.Parameters.Add("p_limit", OracleDbType.Int32, limit, ParameterDirection.Input);
+                        EnsureReadOnlyCommand(command);
+
+                        var rows = new List<IReadOnlyDictionary<string, object?>>();
+                        await using var reader = await command.ExecuteReaderAsync(token);
+                        while (await reader.ReadAsync(token))
                         {
-                            var name = reader.GetName(index);
-                            if (string.Equals(name, "RN", StringComparison.OrdinalIgnoreCase))
+                            var row = new Dictionary<string, object?>(reader.FieldCount, StringComparer.OrdinalIgnoreCase);
+                            for (var index = 0; index < reader.FieldCount; index++)
                             {
-                                continue;
+                                var name = reader.GetName(index);
+                                if (string.Equals(name, "RN", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    continue;
+                                }
+
+                                row[name] = reader.IsDBNull(index) ? null : reader.GetValue(index);
                             }
 
-                            row[name] = reader.IsDBNull(index) ? null : reader.GetValue(index);
+                            rows.Add(SyncColumnFilter.FilterExcludedColumns(row, request.NormalizedExcludedColumns));
                         }
 
-                        rows.Add(SyncColumnFilter.FilterExcludedColumns(row, request.NormalizedExcludedColumns));
+                        return new SyncReadResult { Rows = rows };
                     }
-
-                    return new SyncReadResult { Rows = rows };
+                    catch (OracleException oracleException) when (IsNonRetryableOracleException(oracleException))
+                    {
+                        throw new NonRetryableDangerZoneException(
+                            $"Oracle 增量读取出现不可重试错误（TableCode={request.TableCode}, SourceTable={request.SourceTable}, PageNo={request.PageNo}, ErrorCode=ORA-{oracleException.Number}）。请核对 Oracle ServiceName/SID 与监听注册状态。",
+                            oracleException);
+                    }
                 },
                 ct);
         }
@@ -122,34 +131,43 @@ public class OracleSourceReader(
                 $"OracleKeyRead:{request.TableCode}",
                 async token =>
                 {
-                    await using var connection = new OracleConnection(_effectiveConnectionString);
-                    await connection.OpenAsync(token);
-                    await using var command = connection.CreateCommand();
-                    command.BindByName = true;
-                    command.CommandTimeout = ResolveCommandTimeout();
-                    command.CommandText = sql;
-                    command.Parameters.Add("p_windowStart", OracleDbType.TimeStamp, request.Window.WindowStartLocal, ParameterDirection.Input);
-                    command.Parameters.Add("p_windowEnd", OracleDbType.TimeStamp, request.Window.WindowEndLocal, ParameterDirection.Input);
-                    EnsureReadOnlyCommand(command);
-
-                    var keySet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    await using var reader = await command.ExecuteReaderAsync(token);
-                    while (await reader.ReadAsync(token))
+                    try
                     {
-                        var row = new Dictionary<string, object?>(request.UniqueKeys.Count, StringComparer.OrdinalIgnoreCase);
-                        for (var index = 0; index < reader.FieldCount; index++)
+                        await using var connection = new OracleConnection(_effectiveConnectionString);
+                        await connection.OpenAsync(token);
+                        await using var command = connection.CreateCommand();
+                        command.BindByName = true;
+                        command.CommandTimeout = ResolveCommandTimeout();
+                        command.CommandText = sql;
+                        command.Parameters.Add("p_windowStart", OracleDbType.TimeStamp, request.Window.WindowStartLocal, ParameterDirection.Input);
+                        command.Parameters.Add("p_windowEnd", OracleDbType.TimeStamp, request.Window.WindowEndLocal, ParameterDirection.Input);
+                        EnsureReadOnlyCommand(command);
+
+                        var keySet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        await using var reader = await command.ExecuteReaderAsync(token);
+                        while (await reader.ReadAsync(token))
                         {
-                            row[reader.GetName(index)] = reader.IsDBNull(index) ? null : reader.GetValue(index);
+                            var row = new Dictionary<string, object?>(request.UniqueKeys.Count, StringComparer.OrdinalIgnoreCase);
+                            for (var index = 0; index < reader.FieldCount; index++)
+                            {
+                                row[reader.GetName(index)] = reader.IsDBNull(index) ? null : reader.GetValue(index);
+                            }
+
+                            var key = SyncBusinessKeyBuilder.Build(row, request.UniqueKeys);
+                            if (!string.IsNullOrWhiteSpace(key))
+                            {
+                                keySet.Add(key);
+                            }
                         }
 
-                        var key = SyncBusinessKeyBuilder.Build(row, request.UniqueKeys);
-                        if (!string.IsNullOrWhiteSpace(key))
-                        {
-                            keySet.Add(key);
-                        }
+                        return (IReadOnlySet<string>)keySet;
                     }
-
-                    return (IReadOnlySet<string>)keySet;
+                    catch (OracleException oracleException) when (IsNonRetryableOracleException(oracleException))
+                    {
+                        throw new NonRetryableDangerZoneException(
+                            $"Oracle 业务键读取出现不可重试错误（TableCode={request.TableCode}, SourceTable={request.SourceTable}, ErrorCode=ORA-{oracleException.Number}）。请核对 Oracle ServiceName/SID 与监听注册状态。",
+                            oracleException);
+                    }
                 },
                 ct);
         }
@@ -320,7 +338,7 @@ public class OracleSourceReader(
             throw new InvalidOperationException("Oracle.ConnectionString 缺少 Data Source，无法应用 Oracle.Database。");
         }
 
-        builder.DataSource = OverrideOracleDatabase(builder.DataSource, options.Database);
+        builder.DataSource = OverrideOracleDatabase(builder.DataSource, options.Database, options.DatabaseMode);
         return builder.ConnectionString;
     }
 
@@ -329,12 +347,14 @@ public class OracleSourceReader(
     /// </summary>
     /// <param name="dataSource">原始 Data Source。</param>
     /// <param name="database">目标库名（ServiceName 或 SID）。</param>
+    /// <param name="databaseMode">目标库名模式（ServiceName/Sid/Auto）。</param>
     /// <returns>重写后的 Data Source。</returns>
     /// <exception cref="InvalidOperationException">当 Data Source 非 EZCONNECT 形式且无法安全重写时抛出。</exception>
-    private static string OverrideOracleDatabase(string dataSource, string database)
+    private static string OverrideOracleDatabase(string dataSource, string database, string databaseMode)
     {
         var trimmedDataSource = dataSource.Trim();
         var trimmedDatabase = database.Trim();
+        var normalizedMode = NormalizeDatabaseMode(databaseMode);
         if (string.IsNullOrWhiteSpace(trimmedDatabase))
         {
             return trimmedDataSource;
@@ -358,8 +378,40 @@ public class OracleSourceReader(
             return $"{trimmedDataSource[..lastColonIndex]}:{trimmedDatabase}";
         }
 
+        if (normalizedMode == "Sid")
+        {
+            return $"{trimmedDataSource}:{trimmedDatabase}";
+        }
+
         // 兜底策略：按 EZCONNECT ServiceName 形式拼接，产出 主机[:端口]/库名。
         return $"{trimmedDataSource}/{trimmedDatabase}";
+    }
+
+    /// <summary>
+    /// 规范化库名模式文本。
+    /// </summary>
+    /// <param name="databaseMode">配置文本。</param>
+    /// <returns>规范化后的模式名。</returns>
+    /// <exception cref="InvalidOperationException">当模式值非法时抛出。</exception>
+    private static string NormalizeDatabaseMode(string databaseMode)
+    {
+        var mode = string.IsNullOrWhiteSpace(databaseMode) ? "Auto" : databaseMode.Trim();
+        if (mode.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Auto";
+        }
+
+        if (mode.Equals("ServiceName", StringComparison.OrdinalIgnoreCase))
+        {
+            return "ServiceName";
+        }
+
+        if (mode.Equals("Sid", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Sid";
+        }
+
+        throw new InvalidOperationException("Oracle.DatabaseMode 仅支持 Auto、ServiceName、Sid。");
     }
 
     /// <summary>
@@ -389,6 +441,16 @@ public class OracleSourceReader(
     private int ResolveCommandTimeout()
     {
         return _options.CommandTimeoutSeconds > 0 ? _options.CommandTimeoutSeconds : DefaultCommandTimeoutSeconds;
+    }
+
+    /// <summary>
+    /// 判定 Oracle 异常是否属于不可重试配置类故障。
+    /// </summary>
+    /// <param name="exception">Oracle 异常。</param>
+    /// <returns>为 true 时应快速失败而非重试。</returns>
+    private static bool IsNonRetryableOracleException(OracleException exception)
+    {
+        return exception.Number is 12154 or 12514;
     }
 
     /// <summary>

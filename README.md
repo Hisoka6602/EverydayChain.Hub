@@ -1,6 +1,12 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 新增 Oracle 配置示例说明：当源端 SQL 为 `SELECT * FROM WMS_USER_431.IDX_PICKTOLIGHT_CARTON1` 时，`DefaultSchema` 应配置为 `WMS_USER_431`；`Database` 仍需填写实际 ServiceName/SID（如 `ORCL`），不能填 Schema。
+- 明确 `DefaultSchema` 与 `Database` 职责边界：`Database` 用于 Oracle 连接目标（ServiceName/SID），`DefaultSchema` 仅用于查询对象名前缀（`SCHEMA.TABLE`），两者不可互相替代。
+- 新增 `Oracle.DatabaseMode`（`Auto`/`ServiceName`/`Sid`）配置，支持在 `Data Source=host:port` 场景显式指定按 ServiceName（`/`）或 SID（`:`）拼接库名，避免 `ORA-12514`/库名模式误配。
+- Oracle 异常重试策略优化：将 `ORA-12154`、`ORA-12514` 识别为“不可重试配置类错误”，通过 `NonRetryableDangerZoneException` 快速失败，避免无意义重试与熔断噪音。
+- 危险隔离器策略增强：`DangerZoneExecutor` 的重试与熔断统计统一排除 `NonRetryableDangerZoneException`，确保仅对可恢复故障执行弹性策略。
+- 敏感信息收敛：`AutoMigrationService` 启动连接快照不再输出明文连接串，避免 SQL 密码出现在日志中。
 - 修复分表建表时序：`SortingTaskTraceWriter` 在写入前增加按后缀幂等建表兜底，避免“先写后建”导致写入失败。
 - 修复分表纳管覆盖：`ServiceCollectionExtensions` 固定纳管 `sorting_task_trace`，同时继续纳管启用同步表的 `TargetLogicalTable`。
 - 扩展 Oracle 连接配置：新增 `Oracle.Database`，支持在连接串中独立配置 ServiceName/SID。
@@ -185,11 +191,12 @@
 - `AutoMigrationService.cs` + `AutoMigrationHostedService.cs`：应用启动时自动建库、自动识别并执行待迁移项，同时完成分表预创建。
 - `SqlExecutionTuner.cs`：基于失败率和耗时进行批量窗口升降调谐；采样窗口大小与失败率阈值均来自 `AutoTuneOptions`。
 - `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断），弹性参数来自 `DangerZoneOptions`。
+- `NonRetryableDangerZoneException.cs`：危险隔离器“不可重试异常”标记类型，用于识别配置类确定性失败并快速失败。
 - `IRuntimeStorageGuard.cs` + `RuntimeStorageGuard.cs`：运行期存储守护服务，负责启动阶段的磁盘空间、目录权限、关键文件可读写自检，并在检查点/目标快照写入前执行磁盘阈值校验与告警阻断；同时提供单表内存水位监控与节流告警能力。
 - `SortingTaskTraceWriter.cs`：按分表后缀分组写入，并将执行结果回传给调谐器。
 - `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，校验 `StartTimeLocal` 禁止 `Z` 与 offset，校验 `ExcludedColumns` 不得与 `UniqueKeys`、`CursorColumn`、软删除关键列冲突，并解析优先级与多表并发上限。
-- `OracleOptions.cs`：远端 Oracle 连接配置实体，定义连接字符串、连接库名（ServiceName/SID）、默认 Schema、只读开关、命令超时与分页上限。
-- `OracleSourceReader.cs`：源端读取器 Oracle 实现，使用参数化 SQL 执行真实只读查询，支持分页增量读取、业务键读取、`ExcludedColumns` 过滤，并在异常场景输出错误日志。
+- `OracleOptions.cs`：远端 Oracle 连接配置实体，定义连接字符串、连接库名（ServiceName/SID，决定连接目标）、默认 Schema（仅决定 SQL 对象前缀）、只读开关、命令超时与分页上限。
+- `OracleSourceReader.cs`：源端读取器 Oracle 实现，使用参数化 SQL 执行真实只读查询，支持分页增量读取、业务键读取、`ExcludedColumns` 过滤，并在异常场景输出错误日志；支持 `Oracle.DatabaseMode` 控制库名拼接语义（ServiceName/SID）。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
 - `SyncUpsertRepository.cs`：幂等合并基础实现，支持 `UniqueKeys` 下插入/覆盖更新/一致跳过，并在合并阶段过滤 `ExcludedColumns`；目标端持久化改为按表分片的轻量幂等状态（业务键、行摘要、游标、软删标记），不保留旧版全量快照兼容迁移；支持目标键删除能力（软删/硬删）、空闲驱逐与 GZip 压缩归档策略。
 - `SyncDeletionRepository.cs`：删除同步仓储基础实现，基于轻量幂等状态执行窗口过滤与源端键差异识别，并按策略执行删除。
@@ -221,7 +228,20 @@
 - `AutoMigrationService.cs`：应用启动迁移入口，自动创建缺失数据库、识别并执行待迁移项，通过分表预建器自动覆盖多逻辑表。
 - `appsettings.json`：主配置样例，移除分表逻辑表名静态配置，统一由 `SyncJob.Tables.TargetLogicalTable` 提供。
 
+### Oracle 配置速查（针对 `SELECT * FROM WMS_USER_431.IDX_PICKTOLIGHT_CARTON1`）
+- `Oracle.DefaultSchema = WMS_USER_431`（因为表前缀 Schema 是 `WMS_USER_431`）。
+- `Oracle.Database = <真实 ServiceName 或 SID>`（例如 `ORCL`，以 DBA 提供为准）。
+- `Oracle.DatabaseMode`：
+  - 已知 `Database` 是 ServiceName：`ServiceName`
+  - 已知 `Database` 是 SID：`Sid`
+  - 不确定：`Auto`（默认按 ServiceName 语义拼接）。
+- `Oracle.ConnectionString` 保持 `Data Source=host:port;User Id=...;Password=...;`（由系统按 `DatabaseMode` + `Database` 拼接库名）。
+
 ## 可继续完善内容（本次 PR 后续行动项）
+- 在启动日志中输出 `Database`、`DatabaseMode`、`DefaultSchema` 的“职责分层快照”，帮助运维快速判断是连接目标问题还是对象命名问题。
+- 增加 `Oracle.DatabaseMode` 的启动期连通性探测（按 ServiceName/SID 双模式探测并输出建议），降低现场试错成本。
+- 增加 Oracle 启动预检（如 `SELECT SYS_CONTEXT('USERENV','SERVICE_NAME') FROM DUAL`）并将实际服务名回显到日志，提前识别 `ServiceName/SID` 配置错误。
+- 增加 `OracleSourceReader` 针对 `ORA-12154/ORA-12514` 的单元测试，验证“不可重试异常”分支在分页读取与业务键读取均生效。
 - 为 `Oracle.Database` 增加配置有效性启动自检（例如库名为空白字符串、Data Source 复杂描述符不支持覆盖时提前阻断）。
 - 为分表写入兜底建表补充并发场景测试（同后缀并发首写仅一次建表检查）与异常回退重试路径验证。
 - 在启动日志中输出纳管逻辑表集合快照，便于运维核对多表预建范围。

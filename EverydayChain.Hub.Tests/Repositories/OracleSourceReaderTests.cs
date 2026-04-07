@@ -74,6 +74,41 @@ public class OracleSourceReaderTests
     }
 
     /// <summary>
+    /// host:port 且显式 Sid 模式时应按 SID 语法拼接。
+    /// </summary>
+    [Fact]
+    public void BuildConnectionString_WhenDatabaseModeIsSid_ShouldUseSidStyle()
+    {
+        var options = new OracleOptions
+        {
+            ConnectionString = "Data Source=10.0.0.1:1521;User Id=u;Password=p;",
+            Database = "NEWDB",
+            DatabaseMode = "Sid"
+        };
+
+        var result = InvokeBuildConnectionString(options);
+        Assert.Contains("Data Source=10.0.0.1:1521:NEWDB", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 非法 DatabaseMode 应抛出异常。
+    /// </summary>
+    [Fact]
+    public void BuildConnectionString_WhenDatabaseModeInvalid_ShouldThrow()
+    {
+        var options = new OracleOptions
+        {
+            ConnectionString = "Data Source=10.0.0.1:1521;User Id=u;Password=p;",
+            Database = "NEWDB",
+            DatabaseMode = "Unknown"
+        };
+
+        var action = () => InvokeBuildConnectionString(options);
+        var exception = Assert.Throws<TargetInvocationException>(action);
+        Assert.IsType<InvalidOperationException>(exception.InnerException);
+    }
+
+    /// <summary>
     /// 复杂描述符配置库名覆盖时应抛出异常。
     /// </summary>
     [Fact]
