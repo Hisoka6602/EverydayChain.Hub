@@ -15,11 +15,15 @@ public class AutoMigrationService(
     IShardSuffixResolver resolver,
     IShardTableProvisioner shardTableProvisioner,
     IOptions<ShardingOptions> shardingOptions,
+    IOptions<DangerZoneOptions> dangerZoneOptions,
     IDangerZoneExecutor dangerZoneExecutor,
     ILogger<AutoMigrationService> logger) : IAutoMigrationService
 {
     /// <summary>分表配置快照。</summary>
     private readonly ShardingOptions _options = shardingOptions.Value;
+
+    /// <summary>危险动作门禁配置快照。</summary>
+    private readonly DangerZoneOptions _dangerZoneOptions = dangerZoneOptions.Value;
 
     /// <inheritdoc/>
     public async Task RunAsync(CancellationToken cancellationToken)
@@ -30,7 +34,7 @@ public class AutoMigrationService(
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(token);
             await dbContext.Database.MigrateAsync(token);
             logger.LogInformation("自动迁移: 基础迁移已执行完成。");
-        }, cancellationToken);
+        }, cancellationToken, _dangerZoneOptions.AutoMigrateTimeoutSeconds);
 
         // 步骤2：解析当前及未来分表后缀，预创建分表结构。
         var localNow = DateTimeOffset.Now;

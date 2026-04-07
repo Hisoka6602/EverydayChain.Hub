@@ -8,6 +8,7 @@
 - 启动阶段新增逻辑表名集合构建与校验：去重、去空白、仅允许字母/数字/下划线，空集合直接抛出可读配置异常。
 - `ShardTableProvisioner` 改为按“逻辑表 × 月份后缀”组合预建分表，危险建表动作仍统一通过 `IDangerZoneExecutor` 隔离执行。
 - `ShardingOptions` 与 `appsettings.json` 移除 `BaseTableName`、`ManagedLogicalTables`，仅保留连接与预建月数配置。
+- 危险操作隔离器新增“按操作覆盖超时”能力：默认超时仍由 `DangerZone.TimeoutSeconds` 控制，自动迁移单独使用 `DangerZone.AutoMigrateTimeoutSeconds`（默认 180 秒），用于降低冷启动/数据库唤醒场景下 30 秒超时导致的启动失败概率。
 
 ## 解决方案文件树与职责
 ```text
@@ -215,3 +216,4 @@
 ## 可继续完善内容（本次 PR 后续行动项）
 - 对“全仓一键体检并自动修复”的大范围需求，建议拆分为多批次 PR（性能热点、规则一致性、接口收敛、文档治理）逐项推进并逐项验收。
 - 在启动日志中输出纳管逻辑表集合快照，便于运维核对多表预建范围。
+- 为 `DangerZone` 增加“按操作名配置超时映射”能力（如 `OperationTimeoutOverrides`），避免未来新增长耗时动作时需要再次改动代码。

@@ -12,6 +12,9 @@ public class DangerZoneOptions
     /// <summary>单次操作超时时间（秒），超出则中止并抛出超时异常，默认 30 秒。</summary>
     public int TimeoutSeconds { get; set; } = 30;
 
+    /// <summary>启动自动迁移专用超时时间（秒），建议填写范围 30~3600，默认 180 秒。</summary>
+    public int AutoMigrateTimeoutSeconds { get; set; } = 180;
+
     /// <summary>最大重试次数，不含首次执行，默认 2 次（共最多 3 次执行）。</summary>
     public int MaxRetryAttempts { get; set; } = 2;
 
