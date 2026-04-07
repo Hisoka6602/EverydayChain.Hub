@@ -29,7 +29,7 @@ public class SyncExecutionService(
     private const string FailBatchStatusUpdateErrorLogTemplate = "更新同步失败批次状态异常。TableCode={TableCode}, BatchId={BatchId}";
     /// <summary>批次取消状态更新异常日志模板。</summary>
     private const string FailBatchOnCancelErrorLogTemplate = "在处理同步批次取消时更新批次失败。TableCode={TableCode}, BatchId={BatchId}";
-    /// <summary>“读取到数据但目标端0写入（全部跳过）”告警采样间隔。</summary>
+    /// <summary>“读取到数据但目标端0写入（全部跳过）”告警采样间隔（有效值范围：1~1000，建议值：100）。</summary>
     private const int FullySkippedPageWarningInterval = 100;
 
     /// <summary>快照序列化配置。</summary>
@@ -153,7 +153,9 @@ public class SyncExecutionService(
                     {
                         var uniqueKeysText = BuildUniqueKeysText(context.Definition.UniqueKeys);
                         logger.LogWarning(
-                            "同步读取到数据但目标端0写入（全部跳过，按页采样输出）。TableCode={TableCode}, BatchId={BatchId}, SourceSchema={SourceSchema}, SourceTable={SourceTable}, PageNo={PageNo}, ReadRows={ReadRows}, SkipRows={SkipRows}, UniqueKeys={UniqueKeys}, WarningInterval={WarningInterval}",
+                            "同步读取到数据但目标端0写入（全部跳过，按页采样输出）。"
+                            + "TableCode={TableCode}, BatchId={BatchId}, SourceSchema={SourceSchema}, SourceTable={SourceTable}, "
+                            + "PageNo={PageNo}, ReadRows={ReadRows}, SkipRows={SkipRows}, UniqueKeys={UniqueKeys}, WarningInterval={WarningInterval}",
                             context.Definition.TableCode,
                             context.BatchId,
                             context.Definition.SourceSchema,
