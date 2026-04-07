@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
-using System.Reflection;
 
 namespace EverydayChain.Hub.Tests.Services;
 
@@ -56,13 +55,12 @@ public class ShardTableProvisionerTests
     /// 分拣追踪表模板应保留字符串长度与索引定义。
     /// </summary>
     [Fact]
-    public void BuildCreateTableSql_ForSortingTaskTrace_ShouldContainBoundedStringColumnsAndIndexes()
+    public void SortingTaskTraceTemplate_ShouldContainBoundedStringColumnsAndIndexes()
     {
         var provisioner = CreateProvisioner("sorting_task_trace");
-        var template = GetTableTemplate(provisioner, "sorting_task_trace");
+        var template = provisioner.ResolveTableTemplate("sorting_task_trace");
 
-        var sql = BuildCreateTableSql(
-            provisioner,
+        var sql = provisioner.BuildCreateTableSql(
             template,
             "sorting_task_trace_202604",
             "[dbo].[sorting_task_trace_202604]");
@@ -77,13 +75,12 @@ public class ShardTableProvisionerTests
     /// WMS 表模板应保留主键与高精度小数列类型。
     /// </summary>
     [Fact]
-    public void BuildCreateTableSql_ForWmsPickToWcs_ShouldContainPrimaryKeyAndDecimalColumns()
+    public void WmsPickToWcsTemplate_ShouldContainPrimaryKeyAndDecimalColumns()
     {
         var provisioner = CreateProvisioner("IDX_PICKTOWCS2");
-        var template = GetTableTemplate(provisioner, "IDX_PICKTOWCS2");
+        var template = provisioner.ResolveTableTemplate("IDX_PICKTOWCS2");
 
-        var sql = BuildCreateTableSql(
-            provisioner,
+        var sql = provisioner.BuildCreateTableSql(
             template,
             "IDX_PICKTOWCS2_202604",
             "[dbo].[IDX_PICKTOWCS2_202604]");
@@ -124,38 +121,6 @@ public class ShardTableProvisionerTests
             CreateDbContextFactory(),
             NullLogger<ShardTableProvisioner>.Instance,
             new PassThroughDangerZoneExecutor());
-    }
-
-    /// <summary>
-    /// 获取指定逻辑表对应模板对象。
-    /// </summary>
-    /// <param name="provisioner">分表预置服务实例。</param>
-    /// <param name="logicalTable">逻辑表名。</param>
-    /// <returns>模板对象。</returns>
-    private static object GetTableTemplate(ShardTableProvisioner provisioner, string logicalTable)
-    {
-        var tableTemplatesField = typeof(ShardTableProvisioner).GetField("_tableTemplates", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException("测试反射失败：未找到 _tableTemplates 字段。");
-        var tableTemplates = tableTemplatesField.GetValue(provisioner) as System.Collections.IDictionary
-            ?? throw new InvalidOperationException("测试反射失败：_tableTemplates 字段值为空。");
-        var template = tableTemplates[logicalTable];
-        return template ?? throw new InvalidOperationException($"测试反射失败：逻辑表 {logicalTable} 未找到模板。");
-    }
-
-    /// <summary>
-    /// 调用私有建表 SQL 生成方法。
-    /// </summary>
-    /// <param name="provisioner">分表预置服务实例。</param>
-    /// <param name="template">模板对象。</param>
-    /// <param name="tableName">目标表名。</param>
-    /// <param name="fullName">全限定表名。</param>
-    /// <returns>建表 SQL。</returns>
-    private static string BuildCreateTableSql(ShardTableProvisioner provisioner, object template, string tableName, string fullName)
-    {
-        var buildSqlMethod = typeof(ShardTableProvisioner).GetMethod("BuildCreateTableSql", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException("测试反射失败：未找到 BuildCreateTableSql 方法。");
-        var sql = buildSqlMethod.Invoke(provisioner, [template, tableName, fullName]) as string;
-        return sql ?? throw new InvalidOperationException("测试反射失败：BuildCreateTableSql 返回空字符串。");
     }
 
     /// <summary>

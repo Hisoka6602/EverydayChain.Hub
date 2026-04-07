@@ -98,7 +98,7 @@ public class ShardTableProvisioner(
     /// <param name="tableName">目标表名。</param>
     /// <param name="fullName">Schema 全限定名。</param>
     /// <returns>建表 SQL。</returns>
-    private string BuildCreateTableSql(TableTemplate template, string tableName, string fullName)
+    internal string BuildCreateTableSql(TableTemplate template, string tableName, string fullName)
     {
         var columnDefinitions = string.Join(
             "," + Environment.NewLine,
@@ -156,7 +156,7 @@ END";
     /// <param name="dbContextFactory">DbContext 工厂。</param>
     /// <param name="managedLogicalTables">纳管逻辑表集合。</param>
     /// <returns>逻辑表模板字典。</returns>
-    private static IReadOnlyDictionary<string, TableTemplate> BuildTableTemplates(
+    internal static IReadOnlyDictionary<string, TableTemplate> BuildTableTemplates(
         IDbContextFactory<HubDbContext> dbContextFactory,
         IReadOnlyList<string> managedLogicalTables)
     {
@@ -208,7 +208,7 @@ END";
     /// </summary>
     /// <param name="logicalTable">逻辑表名。</param>
     /// <returns>实体结构模板。</returns>
-    private TableTemplate ResolveTableTemplate(string logicalTable)
+    internal TableTemplate ResolveTableTemplate(string logicalTable)
     {
         if (_tableTemplates.TryGetValue(logicalTable, out var template))
         {
@@ -276,7 +276,7 @@ END";
         }
 
         var relationalTypeMapping = property.GetRelationalTypeMapping();
-        if (relationalTypeMapping is RelationalTypeMapping { StoreType: { Length: > 0 } storeType })
+        if (relationalTypeMapping is RelationalTypeMapping { StoreType: { } storeType } && !string.IsNullOrWhiteSpace(storeType))
         {
             return storeType;
         }
@@ -323,7 +323,7 @@ END";
     /// <param name="StoreType">数据库类型。</param>
     /// <param name="IsNullable">是否可空。</param>
     /// <param name="IsIdentity">是否自增。</param>
-    private readonly record struct ColumnTemplate(string ColumnName, string StoreType, bool IsNullable, bool IsIdentity);
+    internal readonly record struct ColumnTemplate(string ColumnName, string StoreType, bool IsNullable, bool IsIdentity);
 
     /// <summary>
     /// 索引模板。
@@ -331,7 +331,7 @@ END";
     /// <param name="DatabaseName">索引名。</param>
     /// <param name="IsUnique">是否唯一。</param>
     /// <param name="ColumnNames">索引列集合。</param>
-    private readonly record struct IndexTemplate(string DatabaseName, bool IsUnique, IReadOnlyList<string> ColumnNames);
+    internal readonly record struct IndexTemplate(string DatabaseName, bool IsUnique, IReadOnlyList<string> ColumnNames);
 
     /// <summary>
     /// 逻辑表模板。
@@ -340,7 +340,7 @@ END";
     /// <param name="Columns">列集合。</param>
     /// <param name="PrimaryKeyColumns">主键列集合。</param>
     /// <param name="Indexes">索引集合。</param>
-    private readonly record struct TableTemplate(
+    internal readonly record struct TableTemplate(
         string LogicalTable,
         IReadOnlyList<ColumnTemplate> Columns,
         IReadOnlyList<string> PrimaryKeyColumns,
