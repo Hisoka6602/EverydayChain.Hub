@@ -104,9 +104,7 @@ public class ShardTableProvisioner(
             "," + Environment.NewLine,
             template.Columns.Select(BuildColumnDefinition));
 
-        var primaryKeySql = template.PrimaryKeyColumns.Count == 0
-            ? string.Empty
-            : $",{Environment.NewLine}    CONSTRAINT [PK_{tableName}] PRIMARY KEY ({string.Join(", ", template.PrimaryKeyColumns.Select(column => $"[{column}]"))})";
+        var primaryKeySql = BuildPrimaryKeySql(template.PrimaryKeyColumns, tableName);
         var indexSql = string.Join(
             Environment.NewLine,
             template.Indexes.Select(index => BuildIndexSql(index, template.LogicalTable, tableName, fullName)));
@@ -244,6 +242,28 @@ END";
         var identitySql = column.IsIdentity ? " IDENTITY(1,1)" : string.Empty;
         var nullabilitySql = column.IsNullable ? " NULL" : " NOT NULL";
         return $"    [{column.ColumnName}] {column.StoreType}{identitySql}{nullabilitySql}";
+    }
+
+    /// <summary>
+    /// 构建主键定义 SQL。
+    /// </summary>
+    /// <param name="primaryKeyColumns">主键列集合。</param>
+    /// <param name="tableName">表名。</param>
+    /// <returns>主键 SQL 片段。</returns>
+    private static string BuildPrimaryKeySql(IReadOnlyList<string> primaryKeyColumns, string tableName)
+    {
+        if (primaryKeyColumns.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        if (primaryKeyColumns.Count == 1
+            && string.Equals(primaryKeyColumns[0], "Id", StringComparison.OrdinalIgnoreCase))
+        {
+            return $",{Environment.NewLine}    CONSTRAINT [PK_{tableName}] PRIMARY KEY CLUSTERED ([Id] DESC)";
+        }
+
+        return $",{Environment.NewLine}    CONSTRAINT [PK_{tableName}] PRIMARY KEY ({string.Join(", ", primaryKeyColumns.Select(column => $"[{column}]"))})";
     }
 
     /// <summary>

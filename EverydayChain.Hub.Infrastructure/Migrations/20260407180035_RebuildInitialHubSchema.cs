@@ -19,9 +19,11 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 schema: "dbo",
                 columns: table => new
                 {
-                    CARTONNO = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
                     DOCNO = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
                     WORKINGAREA = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    CARTONNO = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
                     SORTATIONLOCATION = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
                     USEFLAG = table.Column<string>(type: "nvarchar(1)", maxLength: 1, nullable: true),
                     ADDITIONAL = table.Column<string>(type: "nvarchar(1)", maxLength: 1, nullable: true),
@@ -49,7 +51,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_IDX_PICKTOLIGHT_CARTON1", x => x.CARTONNO);
+                    table.PrimaryKey("PK_IDX_PICKTOLIGHT_CARTON1", x => x.Id)
+                        .Annotation("SqlServer:Clustered", true);
                 });
 
             migrationBuilder.CreateTable(
@@ -57,7 +60,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 schema: "dbo",
                 columns: table => new
                 {
-                    R_SYSID = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
                     WAVENO = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     DOCNO = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     QTY = table.Column<int>(type: "int", nullable: true),
@@ -76,6 +80,7 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                     SKUQTY1 = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
                     ALLNUM = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     ALLNUM1 = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
+                    R_SYSID = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
                     LENGTH = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
                     WIDTH = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
                     HIGH = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
@@ -91,7 +96,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_IDX_PICKTOWCS2", x => x.R_SYSID);
+                    table.PrimaryKey("PK_IDX_PICKTOWCS2", x => x.Id)
+                        .Annotation("SqlServer:Clustered", true);
                 });
 
             migrationBuilder.CreateTable(
@@ -110,8 +116,35 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_sorting_task_trace", x => x.Id);
+                    table.PrimaryKey("PK_sorting_task_trace", x => x.Id)
+                        .Annotation("SqlServer:Clustered", true);
                 });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_IDX_PICKTOLIGHT_CARTON1_ADDTIME",
+                schema: "dbo",
+                table: "IDX_PICKTOLIGHT_CARTON1",
+                column: "ADDTIME");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_IDX_PICKTOLIGHT_CARTON1_CARTONNO",
+                schema: "dbo",
+                table: "IDX_PICKTOLIGHT_CARTON1",
+                column: "CARTONNO",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_IDX_PICKTOWCS2_ADDTIME",
+                schema: "dbo",
+                table: "IDX_PICKTOWCS2",
+                column: "ADDTIME");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_IDX_PICKTOWCS2_R_SYSID",
+                schema: "dbo",
+                table: "IDX_PICKTOWCS2",
+                column: "R_SYSID",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_sorting_task_trace_BusinessNo",
@@ -124,6 +157,15 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 schema: "dbo",
                 table: "sorting_task_trace",
                 column: "CreatedAt");
+
+            migrationBuilder.Sql("""
+                ALTER TABLE [dbo].[IDX_PICKTOLIGHT_CARTON1] DROP CONSTRAINT [PK_IDX_PICKTOLIGHT_CARTON1];
+                ALTER TABLE [dbo].[IDX_PICKTOLIGHT_CARTON1] ADD CONSTRAINT [PK_IDX_PICKTOLIGHT_CARTON1] PRIMARY KEY CLUSTERED ([Id] DESC);
+                ALTER TABLE [dbo].[IDX_PICKTOWCS2] DROP CONSTRAINT [PK_IDX_PICKTOWCS2];
+                ALTER TABLE [dbo].[IDX_PICKTOWCS2] ADD CONSTRAINT [PK_IDX_PICKTOWCS2] PRIMARY KEY CLUSTERED ([Id] DESC);
+                ALTER TABLE [dbo].[sorting_task_trace] DROP CONSTRAINT [PK_sorting_task_trace];
+                ALTER TABLE [dbo].[sorting_task_trace] ADD CONSTRAINT [PK_sorting_task_trace] PRIMARY KEY CLUSTERED ([Id] DESC);
+                """);
         }
 
         /// <inheritdoc />

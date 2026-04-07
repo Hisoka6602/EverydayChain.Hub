@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EverydayChain.Hub.Infrastructure.Migrations
 {
     [DbContext(typeof(HubDbContext))]
-    [Migration("20260407125614_RebuildInitialHubSchema")]
+    [Migration("20260407180035_RebuildInitialHubSchema")]
     partial class RebuildInitialHubSchema
     {
         /// <inheritdoc />
@@ -62,6 +62,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"));
+
                     b.HasIndex("BusinessNo");
 
                     b.HasIndex("CreatedAt");
@@ -71,10 +73,11 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
             modelBuilder.Entity("EverydayChain.Hub.Domain.Aggregates.WmsPickToWcsAggregate.WmsPickToWcsEntity", b =>
                 {
-                    b.Property<string>("UniqueId")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasColumnName("R_SYSID");
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
                     b.Property<DateTime?>("AddTime")
                         .HasColumnType("datetime2")
@@ -190,6 +193,12 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                         .HasColumnType("nvarchar(2)")
                         .HasColumnName("TASKPROCESS");
 
+                    b.Property<string>("UniqueId")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("R_SYSID");
+
                     b.Property<decimal?>("VolumeCubicCm")
                         .HasColumnType("decimal(18,8)")
                         .HasColumnName("CUBE");
@@ -213,17 +222,25 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                         .HasColumnType("nvarchar(1)")
                         .HasColumnName("ZJFLAG");
 
-                    b.HasKey("UniqueId");
+                    b.HasKey("Id");
+
+                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"));
+
+                    b.HasIndex("AddTime");
+
+                    b.HasIndex("UniqueId")
+                        .IsUnique();
 
                     b.ToTable("IDX_PICKTOWCS2", "dbo");
                 });
 
             modelBuilder.Entity("EverydayChain.Hub.Domain.Aggregates.WmsSplitPickToLightCartonAggregate.WmsSplitPickToLightCartonEntity", b =>
                 {
-                    b.Property<string>("CartonNo")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasColumnName("CARTONNO");
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
                     b.Property<DateTime?>("AddTime")
                         .HasColumnType("datetime2")
@@ -238,6 +255,12 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                         .HasMaxLength(1)
                         .HasColumnType("nvarchar(1)")
                         .HasColumnName("ADDITIONAL");
+
+                    b.Property<string>("CartonNo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("CARTONNO");
 
                     b.Property<int?>("ChuteNo")
                         .HasColumnType("int")
@@ -345,7 +368,14 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                         .HasColumnType("nvarchar(20)")
                         .HasColumnName("WORKINGAREA");
 
-                    b.HasKey("CartonNo");
+                    b.HasKey("Id");
+
+                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"));
+
+                    b.HasIndex("AddTime");
+
+                    b.HasIndex("CartonNo")
+                        .IsUnique();
 
                     b.ToTable("IDX_PICKTOLIGHT_CARTON1", "dbo");
                 });

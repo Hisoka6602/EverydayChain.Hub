@@ -31,7 +31,7 @@ public class SortingTaskTraceEntityTypeConfiguration : IEntityTypeConfiguration<
     public void Configure(EntityTypeBuilder<SortingTaskTraceEntity> builder)
     {
         builder.ToTable(_tableName, _schema);
-        builder.HasKey(x => x.Id);
+        builder.HasKey(x => x.Id).IsClustered();
         builder.Property(x => x.Id).ValueGeneratedOnAdd();
         builder.Property(x => x.BusinessNo).HasMaxLength(32).IsRequired();
         builder.Property(x => x.Channel).HasMaxLength(32).IsRequired();

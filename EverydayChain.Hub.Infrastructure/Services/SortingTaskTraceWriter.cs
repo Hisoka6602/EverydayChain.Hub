@@ -47,6 +47,7 @@ public class SortingTaskTraceWriter(
             }
             using var suffixScope = TableSuffixScope.Use(group.Key);
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+            dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
 
             // 步骤2：从调谐器获取当前批量写入窗口，分批执行写入。
             var batchSize = Math.Max(1, tuner.CurrentBatchSize);
@@ -61,6 +62,7 @@ public class SortingTaskTraceWriter(
                 {
                     await dbContext.SortingTaskTraces.AddRangeAsync(chunk, cancellationToken);
                     await dbContext.SaveChangesAsync(cancellationToken);
+                    dbContext.ChangeTracker.Clear();
                 }
                 catch (Exception ex)
                 {
