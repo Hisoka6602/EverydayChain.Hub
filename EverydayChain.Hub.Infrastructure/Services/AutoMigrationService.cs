@@ -98,29 +98,31 @@ public class AutoMigrationService(
     /// <param name="dbContext">数据库上下文。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     private async Task EnsureDatabaseCreatedAsync(HubDbContext dbContext, CancellationToken cancellationToken) {
+        var dbConnection = dbContext.Database.GetDbConnection();
+        var dataSource = dbConnection.DataSource;
+        var initialCatalog = dbConnection.Database;
         var databaseCreator = dbContext.Database.GetService<IRelationalDatabaseCreator>();
         if (await databaseCreator.ExistsAsync(cancellationToken)) {
             return;
         }
 
-        var builder = new SqlConnectionStringBuilder(_options.ConnectionString);
         if (!_dangerZoneOptions.AllowAutoCreateDatabase) {
             logger.LogError(
                 "自动迁移阻断：检测到目标数据库不存在且 DangerZone.AllowAutoCreateDatabase=false。DataSource={DataSource}, InitialCatalog={InitialCatalog}",
-                builder.DataSource,
-                builder.InitialCatalog);
+                dataSource,
+                initialCatalog);
             throw new InvalidOperationException("自动迁移阻断：目标数据库不存在，且未启用自动建库。");
         }
 
         logger.LogWarning(
-            "自动迁移检测到缺失数据库，即将执行创建操作。DataSource={DataSource}, InitialCatalog={InitialCatalog}",
-            builder.DataSource,
-            builder.InitialCatalog);
+            "自动迁移即将创建缺失数据库。DataSource={DataSource}, InitialCatalog={InitialCatalog}",
+            dataSource,
+            initialCatalog);
         await databaseCreator.CreateAsync(cancellationToken);
         logger.LogInformation(
-            "自动迁移检测到目标数据库不存在并已自动创建。DataSource={DataSource}, InitialCatalog={InitialCatalog}",
-            builder.DataSource,
-            builder.InitialCatalog);
+            "自动迁移已成功创建数据库。DataSource={DataSource}, InitialCatalog={InitialCatalog}",
+            dataSource,
+            initialCatalog);
     }
 
     /// <summary>
