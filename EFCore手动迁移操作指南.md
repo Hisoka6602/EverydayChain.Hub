@@ -1,7 +1,7 @@
 # EF Core 手动迁移操作指南（EverydayChain.Hub）
 
 > 适用时间：2026-03-28 起。
-> 适用项目：`EverydayChain.Hub.Infrastructure`（迁移生成） + `EverydayChain.Hub.Host`（启动项目）。
+> 适用项目：`EverydayChain.Hub.Infrastructure`（迁移生成与启动项目）。
 
 ## 1. 前置条件
 - 已安装 .NET 8 SDK。
@@ -18,7 +18,7 @@ dotnet tool install --global dotnet-ef
 ```bash
 dotnet ef migrations add <MigrationName> \
   --project EverydayChain.Hub.Infrastructure/EverydayChain.Hub.Infrastructure.csproj \
-  --startup-project EverydayChain.Hub.Host/EverydayChain.Hub.Host.csproj \
+  --startup-project EverydayChain.Hub.Infrastructure/EverydayChain.Hub.Infrastructure.csproj \
   --context EverydayChain.Hub.Infrastructure.Persistence.HubDbContext \
   --output-dir Migrations
 ```
@@ -27,7 +27,7 @@ dotnet ef migrations add <MigrationName> \
 ```bash
 dotnet ef migrations add AddTraceExtraColumn \
   --project EverydayChain.Hub.Infrastructure/EverydayChain.Hub.Infrastructure.csproj \
-  --startup-project EverydayChain.Hub.Host/EverydayChain.Hub.Host.csproj \
+  --startup-project EverydayChain.Hub.Infrastructure/EverydayChain.Hub.Infrastructure.csproj \
   --context EverydayChain.Hub.Infrastructure.Persistence.HubDbContext \
   --output-dir Migrations
 ```
@@ -36,7 +36,7 @@ dotnet ef migrations add AddTraceExtraColumn \
 ```bash
 dotnet ef database update \
   --project EverydayChain.Hub.Infrastructure/EverydayChain.Hub.Infrastructure.csproj \
-  --startup-project EverydayChain.Hub.Host/EverydayChain.Hub.Host.csproj \
+  --startup-project EverydayChain.Hub.Infrastructure/EverydayChain.Hub.Infrastructure.csproj \
   --context EverydayChain.Hub.Infrastructure.Persistence.HubDbContext
 ```
 
@@ -44,7 +44,7 @@ dotnet ef database update \
 ```bash
 dotnet ef migrations script \
   --project EverydayChain.Hub.Infrastructure/EverydayChain.Hub.Infrastructure.csproj \
-  --startup-project EverydayChain.Hub.Host/EverydayChain.Hub.Host.csproj \
+  --startup-project EverydayChain.Hub.Infrastructure/EverydayChain.Hub.Infrastructure.csproj \
   --context EverydayChain.Hub.Infrastructure.Persistence.HubDbContext \
   --idempotent \
   --output migration.sql
@@ -54,7 +54,7 @@ dotnet ef migrations script \
 ```bash
 dotnet ef database update <TargetMigration> \
   --project EverydayChain.Hub.Infrastructure/EverydayChain.Hub.Infrastructure.csproj \
-  --startup-project EverydayChain.Hub.Host/EverydayChain.Hub.Host.csproj \
+  --startup-project EverydayChain.Hub.Infrastructure/EverydayChain.Hub.Infrastructure.csproj \
   --context EverydayChain.Hub.Infrastructure.Persistence.HubDbContext
 ```
 
@@ -62,7 +62,7 @@ dotnet ef database update <TargetMigration> \
 ```bash
 dotnet ef database update 0 \
   --project EverydayChain.Hub.Infrastructure/EverydayChain.Hub.Infrastructure.csproj \
-  --startup-project EverydayChain.Hub.Host/EverydayChain.Hub.Host.csproj \
+  --startup-project EverydayChain.Hub.Infrastructure/EverydayChain.Hub.Infrastructure.csproj \
   --context EverydayChain.Hub.Infrastructure.Persistence.HubDbContext
 ```
 
