@@ -90,6 +90,7 @@ public class HubDbContext : DbContext
         builder.ToTable(tableName, _shardingOptions.Schema);
         builder.HasKey(x => x.UniqueId);
         builder.Property(x => x.UniqueId).IsRequired().HasMaxLength(30);
+        builder.Property(x => x.MinUnitQuantity).HasColumnType("decimal(18,8)");
         builder.Property(x => x.LengthCm).HasColumnType("decimal(18,8)");
         builder.Property(x => x.WidthCm).HasColumnType("decimal(18,8)");
         builder.Property(x => x.HeightCm).HasColumnType("decimal(18,8)");

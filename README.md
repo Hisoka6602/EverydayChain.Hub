@@ -5,7 +5,7 @@
 - 修复分表纳管覆盖：`ServiceCollectionExtensions` 固定纳管 `sorting_task_trace`，同时继续纳管启用同步表的 `TargetLogicalTable`。
 - 扩展 Oracle 连接配置：新增 `Oracle.Database`，支持在连接串中独立配置 ServiceName/SID。
 - `SyncJob.Tables` 配置样例补齐 `IDX_PICKTOLIGHT_CARTON1` 与 `IDX_PICKTOWCS2` 两张业务表，便于自动迁移与自动分表验证。
-- 删除旧迁移历史并重建初始迁移为 `20260407100338_RebuildInitialHubSchema`。
+- 删除旧迁移历史并重建初始迁移为 `20260407125614_RebuildInitialHubSchema`。
 - `ShardTableProvisioner` 的列类型解析改为优先读取显式列类型，未显式时回退至 EF 关系映射类型，避免长度/精度丢失。
 - 新增 `ShardTableProvisionerTests` 回归用例，覆盖 `sorting_task_trace` 与 `IDX_PICKTOWCS2` 的列类型、主键、索引 SQL 生成断言。
 
@@ -117,8 +117,8 @@
 │   ├── Persistence/Sharding/IShardSuffixResolver.cs
 │   ├── Persistence/Sharding/MonthShardSuffixResolver.cs
 │   ├── Persistence/Sharding/ShardModelCacheKeyFactory.cs
-│   ├── Migrations/20260407100338_RebuildInitialHubSchema.cs
-│   ├── Migrations/20260407100338_RebuildInitialHubSchema.Designer.cs
+│   ├── Migrations/20260407125614_RebuildInitialHubSchema.cs
+│   ├── Migrations/20260407125614_RebuildInitialHubSchema.Designer.cs
 │   ├── Migrations/HubDbContextModelSnapshot.cs
 │   └── Services
 │       ├── IDangerZoneExecutor.cs
@@ -182,7 +182,7 @@
 - `TableSuffixScope.cs` + `ShardModelCacheKeyFactory.cs`：保证不同后缀下 EF Model 能正确缓存隔离。
 - `MonthShardSuffixResolver.cs`：按月份生成分表后缀（如 `_202603`）。
 - `IShardTableProvisioner.cs` + `ShardTableProvisioner.cs`：在 SQL Server 中按需创建分表与索引（不存在才建）。
-- `AutoMigrationService.cs` + `AutoMigrationHostedService.cs`：应用启动时自动执行 `Migrate` 与分表预创建。
+- `AutoMigrationService.cs` + `AutoMigrationHostedService.cs`：应用启动时自动建库、自动识别并执行待迁移项，同时完成分表预创建。
 - `SqlExecutionTuner.cs`：基于失败率和耗时进行批量窗口升降调谐；采样窗口大小与失败率阈值均来自 `AutoTuneOptions`。
 - `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断），弹性参数来自 `DangerZoneOptions`。
 - `IRuntimeStorageGuard.cs` + `RuntimeStorageGuard.cs`：运行期存储守护服务，负责启动阶段的磁盘空间、目录权限、关键文件可读写自检，并在检查点/目标快照写入前执行磁盘阈值校验与告警阻断；同时提供单表内存水位监控与节流告警能力。
@@ -200,7 +200,7 @@
 - `SyncChangeLogRepository.cs`：同步变更日志仓储基础实现，支持批量写入审计记录。
 - `SyncDeletionLogRepository.cs`：同步删除日志仓储基础实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖，并在启动阶段从启用同步表配置提取逻辑表名集合，完成安全校验与空配置异常拦截。
-- `20260407100338_RebuildInitialHubSchema.cs`：重建后的基础表结构迁移。
+- `20260407125614_RebuildInitialHubSchema.cs`：重建后的基础表结构迁移（覆盖 `sorting_task_trace`、`IDX_PICKTOLIGHT_CARTON1`、`IDX_PICKTOWCS2`）。
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
 - `nlog.config`：NLog 日志配置，输出至控制台与滚动日志文件（按日切割，单文件上限 10 MB，保留 30 天）。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
@@ -218,7 +218,7 @@
 - `Oracle到SQLServer同步实施计划.md`：按 PR 拆分同步架构落地步骤的进度跟踪文档。
 - `ShardingOptions.cs`：分表配置模型，仅保留连接、Schema 与自动预建月数等基础配置。
 - `ShardTableProvisioner.cs`：分表预建实现，按启用同步表推导的逻辑表与后缀笛卡尔组合执行建表，并保持危险动作隔离执行。
-- `AutoMigrationService.cs`：应用启动迁移入口，保持原调用语义，通过分表预建器自动覆盖多逻辑表。
+- `AutoMigrationService.cs`：应用启动迁移入口，自动创建缺失数据库、识别并执行待迁移项，通过分表预建器自动覆盖多逻辑表。
 - `appsettings.json`：主配置样例，移除分表逻辑表名静态配置，统一由 `SyncJob.Tables.TargetLogicalTable` 提供。
 
 ## 可继续完善内容（本次 PR 后续行动项）

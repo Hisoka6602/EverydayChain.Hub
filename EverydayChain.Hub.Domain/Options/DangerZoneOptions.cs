@@ -15,6 +15,12 @@ public class DangerZoneOptions
     /// <summary>启动自动迁移专用超时时间（秒），建议填写范围 30~3600，默认 180 秒。</summary>
     public int AutoMigrateTimeoutSeconds { get; set; } = 180;
 
+    /// <summary>
+    /// 是否允许自动建库（可填写项：true、false；默认 false）。
+    /// 当检测到目标数据库不存在且该值为 false 时，自动迁移会直接阻断并输出审计日志。
+    /// </summary>
+    public bool AllowAutoCreateDatabase { get; set; }
+
     /// <summary>最大重试次数，不含首次执行，默认 2 次（共最多 3 次执行）。</summary>
     public int MaxRetryAttempts { get; set; } = 2;
 
