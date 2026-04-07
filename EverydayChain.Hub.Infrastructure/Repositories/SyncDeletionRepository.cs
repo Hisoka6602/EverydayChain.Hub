@@ -37,7 +37,7 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
 
         if (maxParallelism <= 1)
         {
-            // 并行度为 1 时直接使用顺序循环，避免 ConcurrentBag / Parallel.ForAsync 及 OrderBy 的额外开销。
+            // 并行度为 1 时使用顺序循环，避免 ConcurrentBag / Parallel.ForAsync 及 OrderBy 的额外开销。
             for (var rowIndex = 0; rowIndex < targetRows.Count; rowIndex++)
             {
                 ct.ThrowIfCancellationRequested();
