@@ -90,7 +90,8 @@ public class ServiceCollectionExtensionsTests
 
         var tables = ServiceCollectionExtensions.BuildManagedLogicalTables(options);
 
-        Assert.Single(tables);
+        Assert.Equal(2, tables.Count);
+        Assert.Contains("sorting_task_trace", tables);
         Assert.Contains("Table_A", tables);
     }
 
