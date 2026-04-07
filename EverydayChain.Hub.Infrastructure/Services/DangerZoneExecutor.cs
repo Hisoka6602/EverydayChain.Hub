@@ -21,7 +21,11 @@ public class DangerZoneExecutor : IDangerZoneExecutor
     /// <summary>弹性参数快照。</summary>
     private readonly DangerZoneOptions _options;
 
-    /// <summary>Polly 弹性管道缓存（key=超时秒数）。</summary>
+    /// <summary>
+    /// Polly 弹性管道缓存（key=超时秒数）。
+    /// 注意：每个超时值对应独立的管道实例，熔断器统计与开路状态按超时值分片，不同超时值的操作不共享熔断计数。
+    /// 实践中覆盖超时仅用于启动迁移（单次执行），对全局熔断保护影响可忽略。
+    /// </summary>
     private readonly ConcurrentDictionary<int, ResiliencePipeline> _pipelines = [];
 
     /// <summary>日志记录器。</summary>
@@ -44,16 +48,16 @@ public class DangerZoneExecutor : IDangerZoneExecutor
     public Task ExecuteAsync(
         string operationName,
         Func<CancellationToken, Task> action,
-        int? timeoutSecondsOverride = null,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        int? timeoutSecondsOverride = null) =>
         ExecuteWithLoggingAsync(operationName, action, timeoutSecondsOverride, cancellationToken);
 
     /// <inheritdoc/>
     public Task<T> ExecuteAsync<T>(
         string operationName,
         Func<CancellationToken, Task<T>> action,
-        int? timeoutSecondsOverride = null,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        int? timeoutSecondsOverride = null) =>
         ExecuteWithLoggingAsync(operationName, action, timeoutSecondsOverride, cancellationToken);
 
     /// <summary>

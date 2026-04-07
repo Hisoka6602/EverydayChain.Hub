@@ -11,8 +11,8 @@ internal sealed class PassThroughDangerZoneExecutor : IDangerZoneExecutor
     public Task ExecuteAsync(
         string operationName,
         Func<CancellationToken, Task> action,
-        int? timeoutSecondsOverride = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? timeoutSecondsOverride = null)
     {
         return action(cancellationToken);
     }
@@ -21,8 +21,8 @@ internal sealed class PassThroughDangerZoneExecutor : IDangerZoneExecutor
     public Task<T> ExecuteAsync<T>(
         string operationName,
         Func<CancellationToken, Task<T>> action,
-        int? timeoutSecondsOverride = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? timeoutSecondsOverride = null)
     {
         return action(cancellationToken);
     }
