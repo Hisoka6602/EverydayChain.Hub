@@ -59,6 +59,7 @@ public class AutoMigrationService(
     /// <returns>后缀列表。</returns>
     internal static IReadOnlyList<string> BuildBootstrapSuffixes(IShardSuffixResolver suffixResolver, DateTimeOffset localNow, int monthsAhead)
     {
+        // 约定：空字符串代表“无后缀基础表”，当前策略明确只预建后缀分表，因此此处过滤空后缀。
         return suffixResolver.ResolveBootstrapSuffixes(localNow, monthsAhead)
             .Where(suffix => !string.IsNullOrWhiteSpace(suffix))
             .Distinct(StringComparer.Ordinal)

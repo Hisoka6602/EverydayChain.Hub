@@ -329,6 +329,7 @@ WHERE [TableCode]=@tableCode;";
             return stateMap;
         }
 
+        // SQL Server 单条语句参数上限为 2100；本查询除业务键参数外还包含 tableCode 参数，因此分块上限取 900。
         const int chunkSize = 900;
         for (var index = 0; index < businessKeys.Count; index += chunkSize)
         {
