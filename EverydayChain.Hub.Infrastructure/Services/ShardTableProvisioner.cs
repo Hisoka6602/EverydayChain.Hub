@@ -4,6 +4,7 @@ using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using EverydayChain.Hub.SharedKernel.Utilities;
@@ -180,7 +181,7 @@ END";
                 .GetProperties()
                 .Select(property => new ColumnTemplate(
                     property.GetColumnName(tableIdentifier) ?? property.Name,
-                    property.GetColumnType() ?? ResolveFallbackStoreType(property),
+                    ResolveStoreType(property),
                     property.IsNullable,
                     IsIdentity(property)))
                 .ToList();
@@ -262,23 +263,25 @@ END";
     }
 
     /// <summary>
-    /// 当实体属性未显式声明列类型时推断 SQL Server 存储类型。
+    /// 解析属性对应的关系型存储类型。
     /// </summary>
     /// <param name="property">实体属性元数据。</param>
     /// <returns>SQL Server 存储类型。</returns>
-    private static string ResolveFallbackStoreType(IProperty property)
+    private static string ResolveStoreType(IProperty property)
     {
-        var underlyingType = Nullable.GetUnderlyingType(property.ClrType) ?? property.ClrType;
-        return underlyingType switch
+        var configuredStoreType = property.GetColumnType();
+        if (!string.IsNullOrWhiteSpace(configuredStoreType))
         {
-            var valueType when valueType == typeof(string) => "nvarchar(max)",
-            var valueType when valueType == typeof(int) => "int",
-            var valueType when valueType == typeof(long) => "bigint",
-            var valueType when valueType == typeof(DateTime) => "datetime2",
-            var valueType when valueType == typeof(DateTimeOffset) => "datetimeoffset",
-            var valueType when valueType == typeof(decimal) => "decimal(18,8)",
-            _ => throw new InvalidOperationException($"分表模板解析失败：属性 {property.DeclaringType.DisplayName()}.{property.Name} 缺少可识别的 SQL 类型映射。")
-        };
+            return configuredStoreType;
+        }
+
+        var relationalTypeMapping = property.GetRelationalTypeMapping();
+        if (relationalTypeMapping is RelationalTypeMapping { StoreType: { Length: > 0 } storeType })
+        {
+            return storeType;
+        }
+
+        throw new InvalidOperationException($"分表模板解析失败：属性 {property.DeclaringType.DisplayName()}.{property.Name} 缺少可识别的 SQL 类型映射。");
     }
 
     /// <summary>
