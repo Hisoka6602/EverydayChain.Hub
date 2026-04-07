@@ -58,7 +58,7 @@ public class ShardTableProvisionerTests
     private static IDbContextFactory<HubDbContext> CreateDbContextFactory()
     {
         var contextOptions = new DbContextOptionsBuilder<HubDbContext>()
-            .UseSqlServer("Server=localhost;Database=EverydayChainHub_UnitTest;User Id=sa;Password=Passw0rd!;TrustServerCertificate=True;")
+            .UseSqlServer("Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;")
             .Options;
         var shardingOptions = Options.Create(new ShardingOptions
         {

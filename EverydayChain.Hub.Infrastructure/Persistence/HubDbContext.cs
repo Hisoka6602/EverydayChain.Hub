@@ -17,9 +17,9 @@ public class HubDbContext : DbContext
 {
     /// <summary>分拣任务追踪默认逻辑表名。</summary>
     private const string SortingTaskTraceLogicalTable = "sorting_task_trace";
-    /// <summary>WMS 下发至亮灯拆零箱任务默认逻辑表名。</summary>
+    /// <summary>WMS 下发至亮灯拆零箱任务默认逻辑表名（沿用遗留系统表命名）。</summary>
     private const string WmsSplitPickToLightCartonLogicalTable = "IDX_PICKTOLIGHT_CARTON1";
-    /// <summary>WMS 下发至 WCS 分拣任务默认逻辑表名。</summary>
+    /// <summary>WMS 下发至 WCS 分拣任务默认逻辑表名（沿用遗留系统表命名）。</summary>
     private const string WmsPickToWcsLogicalTable = "IDX_PICKTOWCS2";
 
     /// <summary>分表配置快照，用于动态拼接表名与 Schema。</summary>

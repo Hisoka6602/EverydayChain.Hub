@@ -108,7 +108,7 @@ public class ShardTableProvisioner(
             : $",{Environment.NewLine}    CONSTRAINT [PK_{tableName}] PRIMARY KEY ({string.Join(", ", template.PrimaryKeyColumns.Select(column => $"[{column}]"))})";
         var indexSql = string.Join(
             Environment.NewLine,
-            template.Indexes.Select(index => BuildIndexSql(index, tableName, fullName)));
+            template.Indexes.Select(index => BuildIndexSql(index, template.LogicalTable, tableName, fullName)));
         if (!string.IsNullOrWhiteSpace(indexSql))
         {
             indexSql = Environment.NewLine + indexSql;
@@ -196,7 +196,7 @@ END";
                 .Where(index => index.ColumnNames.Count > 0)
                 .ToList();
 
-            result[logicalTable] = new TableTemplate(columns, primaryKeyColumns, indexes);
+            result[logicalTable] = new TableTemplate(logicalTable, columns, primaryKeyColumns, indexes);
         }
 
         return result;
@@ -249,13 +249,14 @@ END";
     /// 构建索引定义 SQL 片段。
     /// </summary>
     /// <param name="index">索引模板。</param>
+    /// <param name="logicalTable">逻辑表名。</param>
     /// <param name="tableName">表名。</param>
     /// <param name="fullName">Schema 全限定表名。</param>
     /// <returns>索引定义 SQL。</returns>
-    private static string BuildIndexSql(IndexTemplate index, string tableName, string fullName)
+    private static string BuildIndexSql(IndexTemplate index, string logicalTable, string tableName, string fullName)
     {
         var uniqueSql = index.IsUnique ? "UNIQUE " : string.Empty;
-        var indexName = index.DatabaseName.Replace("sorting_task_trace", tableName, StringComparison.OrdinalIgnoreCase);
+        var indexName = index.DatabaseName.Replace(logicalTable, tableName, StringComparison.OrdinalIgnoreCase);
         var columnsSql = string.Join(", ", index.ColumnNames.Select(column => $"[{column}]"));
         return $"    CREATE {uniqueSql}INDEX [{indexName}] ON {fullName}({columnsSql});";
     }
@@ -332,10 +333,12 @@ END";
     /// <summary>
     /// 逻辑表模板。
     /// </summary>
+    /// <param name="LogicalTable">逻辑表名。</param>
     /// <param name="Columns">列集合。</param>
     /// <param name="PrimaryKeyColumns">主键列集合。</param>
     /// <param name="Indexes">索引集合。</param>
     private readonly record struct TableTemplate(
+        string LogicalTable,
         IReadOnlyList<ColumnTemplate> Columns,
         IReadOnlyList<string> PrimaryKeyColumns,
         IReadOnlyList<IndexTemplate> Indexes);
