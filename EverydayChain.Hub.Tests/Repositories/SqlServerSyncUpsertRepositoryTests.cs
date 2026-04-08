@@ -4,6 +4,7 @@ using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Infrastructure.Repositories;
+using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using EverydayChain.Hub.Tests.Services;
@@ -85,6 +86,38 @@ public class SqlServerSyncUpsertRepositoryTests
         var action = () => repository.MergeFromStagingAsync(request, CancellationToken.None);
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(action);
         Assert.Contains("UniqueKeys", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 业务键构建应对时间字段使用稳定本地时间格式。
+    /// </summary>
+    [Fact]
+    public void BuildBusinessKey_WhenContainsDateTime_ShouldUseInvariantLocalFormat()
+    {
+        var row = new Dictionary<string, object?>
+        {
+            ["DOCNO"] = "D001",
+            ["ADDTIME"] = new DateTime(2026, 4, 8, 10, 11, 12, 123, DateTimeKind.Local).AddTicks(4567)
+        };
+
+        var businessKey = SyncBusinessKeyBuilder.Build(row, ["DOCNO", "ADDTIME"]);
+
+        Assert.Equal("D001|2026-04-08 10:11:12.1234567", businessKey);
+    }
+
+    /// <summary>
+    /// 时间业务键组件应可稳定回解析为本地时间。
+    /// </summary>
+    [Fact]
+    public void TryParseBusinessKeyDateTimeComponent_WhenValid_ShouldReturnLocalDateTime()
+    {
+        var success = SyncBusinessKeyBuilder.TryParseLocalDateTimeComponent(
+            "2026-04-08 10:11:12.1234567",
+            out var localDateTime);
+
+        Assert.True(success);
+        Assert.Equal(DateTimeKind.Local, localDateTime.Kind);
+        Assert.Equal(new DateTime(2026, 4, 8, 10, 11, 12, 123, DateTimeKind.Local).AddTicks(4567), localDateTime);
     }
 
     /// <summary>

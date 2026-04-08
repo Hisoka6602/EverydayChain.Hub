@@ -191,7 +191,6 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                         .HasColumnName("TASKPROCESS");
 
                     b.Property<string>("UniqueId")
-                        .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)")
                         .HasColumnName("R_SYSID");
@@ -225,8 +224,9 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     b.HasIndex("AddTime");
 
-                    b.HasIndex("UniqueId")
-                        .IsUnique();
+                    b.HasIndex("DocumentNo", "AddTime");
+
+                    b.HasIndex("UniqueId");
 
                     b.ToTable("IDX_PICKTOWCS2", "dbo");
                 });

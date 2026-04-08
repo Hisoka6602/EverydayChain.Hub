@@ -78,7 +78,7 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                     SKUQTY1 = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
                     ALLNUM = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     ALLNUM1 = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    R_SYSID = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
+                    R_SYSID = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     LENGTH = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
                     WIDTH = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
                     HIGH = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
@@ -134,11 +134,16 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 column: "ADDTIME");
 
             migrationBuilder.CreateIndex(
+                name: "IX_IDX_PICKTOWCS2_DOCNO_ADDTIME",
+                schema: "dbo",
+                table: "IDX_PICKTOWCS2",
+                columns: new[] { "DOCNO", "ADDTIME" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_IDX_PICKTOWCS2_R_SYSID",
                 schema: "dbo",
                 table: "IDX_PICKTOWCS2",
-                column: "R_SYSID",
-                unique: true);
+                column: "R_SYSID");
 
             migrationBuilder.CreateIndex(
                 name: "IX_sorting_task_trace_BusinessNo",

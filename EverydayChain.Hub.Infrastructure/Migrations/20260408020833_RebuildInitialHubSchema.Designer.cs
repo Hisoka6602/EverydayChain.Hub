@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EverydayChain.Hub.Infrastructure.Migrations
 {
     [DbContext(typeof(HubDbContext))]
-    [Migration("20260407180035_RebuildInitialHubSchema")]
+    [Migration("20260408020833_RebuildInitialHubSchema")]
     partial class RebuildInitialHubSchema
     {
         /// <inheritdoc />
@@ -194,7 +194,6 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                         .HasColumnName("TASKPROCESS");
 
                     b.Property<string>("UniqueId")
-                        .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)")
                         .HasColumnName("R_SYSID");
@@ -228,8 +227,9 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     b.HasIndex("AddTime");
 
-                    b.HasIndex("UniqueId")
-                        .IsUnique();
+                    b.HasIndex("DocumentNo", "AddTime");
+
+                    b.HasIndex("UniqueId");
 
                     b.ToTable("IDX_PICKTOWCS2", "dbo");
                 });
