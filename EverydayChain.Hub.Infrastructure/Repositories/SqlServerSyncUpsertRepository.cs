@@ -35,6 +35,9 @@ public class SqlServerSyncUpsertRepository(
     /// <summary>状态表固定 Schema。</summary>
     private const string SyncTargetStateSchema = "dbo";
 
+    /// <summary>临时表清理超时秒数。</summary>
+    private const int TempTableCleanupTimeoutSeconds = 5;
+
     /// <summary>行摘要序列化配置（紧凑输出）。</summary>
     private static readonly JsonSerializerOptions DigestSerializerOptions = new() {
         WriteIndented = false,
@@ -427,7 +430,7 @@ END;";
     }
 
     /// <summary>
-    /// 获取集合式合并批次大小。
+    /// 获取集合式合并批次大小（按配置值钳制到 1~5000）。
     /// </summary>
     /// <returns>批次大小。</returns>
     private int GetBatchMergeSize() {
@@ -511,7 +514,7 @@ FROM {fullTableName};";
         try {
             var dataTable = new DataTable();
             foreach (var column in orderedColumns) {
-                dataTable.Columns.Add(column, typeof(object));
+                dataTable.Columns.Add(column, ResolveEntryColumnType(entries, column));
             }
 
             foreach (var entry in entries) {
@@ -555,10 +558,7 @@ WHEN NOT MATCHED THEN
             await mergeCommand.ExecuteNonQueryAsync(ct);
         }
         finally {
-            await using var dropCommand = connection.CreateCommand();
-            dropCommand.Transaction = transaction;
-            dropCommand.CommandText = $"DROP TABLE IF EXISTS {tempTableName};";
-            await dropCommand.ExecuteNonQueryAsync(CancellationToken.None);
+            await DropTempTableAsync(connection, transaction, tempTableName);
         }
     }
 
@@ -633,13 +633,15 @@ FROM {fullTableName};";
         }
 
         try {
+            var parsedRows = entries
+                .Select(entry => ParseBusinessKey(uniqueKeys, entry.BusinessKey))
+                .ToArray();
             var dataTable = new DataTable();
             foreach (var key in uniqueKeys) {
-                dataTable.Columns.Add(key, typeof(object));
+                dataTable.Columns.Add(key, ResolveBusinessKeyColumnType(parsedRows, key));
             }
 
-            foreach (var entry in entries) {
-                var parsedKeyValues = ParseBusinessKey(uniqueKeys, entry.BusinessKey);
+            foreach (var parsedKeyValues in parsedRows) {
                 var row = dataTable.NewRow();
                 foreach (var key in uniqueKeys) {
                     row[key] = parsedKeyValues.TryGetValue(key, out var value)
@@ -672,10 +674,7 @@ INNER JOIN {tempTableName} AS source
             await deleteCommand.ExecuteNonQueryAsync(ct);
         }
         finally {
-            await using var dropCommand = connection.CreateCommand();
-            dropCommand.Transaction = transaction;
-            dropCommand.CommandText = $"DROP TABLE IF EXISTS {tempTableName};";
-            await dropCommand.ExecuteNonQueryAsync(CancellationToken.None);
+            await DropTempTableAsync(connection, transaction, tempTableName);
         }
     }
 
@@ -726,9 +725,9 @@ CREATE TABLE {tempTableName} (
                 dataTable.Columns.Add("TableCode", typeof(string));
                 dataTable.Columns.Add("BusinessKey", typeof(string));
                 dataTable.Columns.Add("RowDigest", typeof(string));
-                dataTable.Columns.Add("CursorLocal", typeof(object));
+                dataTable.Columns.Add("CursorLocal", typeof(DateTime));
                 dataTable.Columns.Add("IsSoftDeleted", typeof(bool));
-                dataTable.Columns.Add("SoftDeletedTimeLocal", typeof(object));
+                dataTable.Columns.Add("SoftDeletedTimeLocal", typeof(DateTime));
                 dataTable.Columns.Add("ShardSuffix", typeof(string));
                 dataTable.Columns.Add("TargetLogicalTable", typeof(string));
                 dataTable.Columns.Add("UpdatedTimeLocal", typeof(DateTime));
@@ -775,11 +774,69 @@ WHEN NOT MATCHED THEN
                 await mergeCommand.ExecuteNonQueryAsync(ct);
             }
             finally {
-                await using var dropCommand = connection.CreateCommand();
-                dropCommand.Transaction = transaction;
-                dropCommand.CommandText = $"DROP TABLE IF EXISTS {tempTableName};";
-                await dropCommand.ExecuteNonQueryAsync(CancellationToken.None);
+                await DropTempTableAsync(connection, transaction, tempTableName);
             }
+        }
+    }
+
+    /// <summary>
+    /// 推断合并条目列的数据类型。
+    /// </summary>
+    /// <param name="entries">合并条目集合。</param>
+    /// <param name="column">列名。</param>
+    /// <returns>推断类型。</returns>
+    private static Type ResolveEntryColumnType(IReadOnlyList<MergeEntry> entries, string column) {
+        foreach (var entry in entries) {
+            if (!entry.Row.TryGetValue(column, out var rawValue) || rawValue is null) {
+                continue;
+            }
+
+            var dbValue = ConvertToDbValue(rawValue);
+            if (dbValue is not DBNull) {
+                return dbValue.GetType();
+            }
+        }
+
+        return typeof(string);
+    }
+
+    /// <summary>
+    /// 推断业务键列的数据类型。
+    /// </summary>
+    /// <param name="parsedRows">解析后的业务键行。</param>
+    /// <param name="column">列名。</param>
+    /// <returns>推断类型。</returns>
+    private static Type ResolveBusinessKeyColumnType(IReadOnlyList<IReadOnlyDictionary<string, object?>> parsedRows, string column) {
+        foreach (var parsedRow in parsedRows) {
+            if (!parsedRow.TryGetValue(column, out var rawValue) || rawValue is null) {
+                continue;
+            }
+
+            var dbValue = ConvertToDbValue(rawValue);
+            if (dbValue is not DBNull) {
+                return dbValue.GetType();
+            }
+        }
+
+        return typeof(string);
+    }
+
+    /// <summary>
+    /// 删除临时表。
+    /// </summary>
+    /// <param name="connection">数据库连接。</param>
+    /// <param name="transaction">事务对象。</param>
+    /// <param name="tempTableName">临时表名。</param>
+    private async Task DropTempTableAsync(SqlConnection connection, SqlTransaction transaction, string tempTableName) {
+        using var tempTableCleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(TempTableCleanupTimeoutSeconds));
+        try {
+            await using var dropCommand = connection.CreateCommand();
+            dropCommand.Transaction = transaction;
+            dropCommand.CommandText = $"DROP TABLE IF EXISTS {tempTableName};";
+            await dropCommand.ExecuteNonQueryAsync(tempTableCleanupCts.Token);
+        }
+        catch (Exception cleanupException) {
+            logger.LogWarning(cleanupException, "临时表清理异常。TempTableName={TempTableName}", tempTableName);
         }
     }
 
