@@ -18,7 +18,7 @@ public class SqlExecutionTuner : ISqlExecutionTuner
     /// <summary>日志记录器。</summary>
     private readonly ILogger<SqlExecutionTuner> _logger;
 
-    /// <summary>当前推荐批量大小，通过 <see cref="Volatile"/> 保证跨线程可见性。</summary>
+    /// <summary>当前推荐批量大小，通过 <see cref="_syncRoot"/> 保护读写一致性。</summary>
     private int _batchSize;
 
     /// <summary>当前采样窗口内失败次数。</summary>
@@ -40,7 +40,16 @@ public class SqlExecutionTuner : ISqlExecutionTuner
     }
 
     /// <inheritdoc/>
-    public int CurrentBatchSize => Volatile.Read(ref _batchSize);
+    public int CurrentBatchSize
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _batchSize;
+            }
+        }
+    }
 
     /// <inheritdoc/>
     public void Record(TimeSpan elapsed, bool success)

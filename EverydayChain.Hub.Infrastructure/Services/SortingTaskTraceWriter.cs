@@ -18,8 +18,11 @@ public class SortingTaskTraceWriter(
     ISqlExecutionTuner tuner,
     ILogger<SortingTaskTraceWriter> logger) : ISortingTaskTraceWriter
 {
-    /// <summary>已完成建表检查的后缀集合，仅在当前进程生命周期内生效，用于避免同进程重复触发建表检查。</summary>
-    private readonly ConcurrentDictionary<string, byte> _ensuredSuffixes = new(StringComparer.Ordinal);
+    /// <summary>
+    /// 各后缀对应的建表确认任务缓存，键为分表后缀，值为首次调用 EnsureShardTableAsync 返回的 Task（惰性包装）。
+    /// 后续并发调用会等待同一 Task 完成，避免在建表尚未结束时提前写入分表。
+    /// </summary>
+    private readonly ConcurrentDictionary<string, Lazy<Task>> _ensureTasks = new(StringComparer.Ordinal);
 
     /// <inheritdoc/>
     public async Task WriteAsync(IReadOnlyCollection<SortingTaskTraceEntity> traces, CancellationToken cancellationToken)
@@ -33,17 +36,29 @@ public class SortingTaskTraceWriter(
         var grouped = traces.GroupBy(x => shardSuffixResolver.Resolve(x.CreatedAt));
         foreach (var group in grouped)
         {
-            if (_ensuredSuffixes.TryAdd(group.Key, 0))
+            // 使用 Lazy<Task> 保证同一后缀的建表操作在进程生命周期内仅执行一次：
+            // - 共享建表 Task 使用 CancellationToken.None，确保不会因调用方 token 被取消而导致所有并发/后续调用"连坐"；
+            // - 每次调用方用 WaitAsync(cancellationToken) 等待，仅取消当前调用的等待，不中断共享建表任务；
+            // - 仅当建表任务自身失败（非调用方取消）时才移除缓存，避免并发重复触发建表。
+            var lazyEnsure = _ensureTasks.GetOrAdd(
+                group.Key,
+                suffix => new Lazy<Task>(
+                    () => shardTableProvisioner.EnsureShardTableAsync(suffix, CancellationToken.None),
+                    LazyThreadSafetyMode.ExecutionAndPublication));
+            try
             {
-                try
-                {
-                    await shardTableProvisioner.EnsureShardTableAsync(group.Key, cancellationToken);
-                }
-                catch
-                {
-                    _ensuredSuffixes.TryRemove(group.Key, out _);
-                    throw;
-                }
+                await lazyEnsure.Value.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // 调用方主动取消了等待，共享建表任务仍在继续，保留缓存，直接向上传播。
+                throw;
+            }
+            catch
+            {
+                // 建表任务自身失败，移除缓存以允许后续重新触发建表。
+                _ensureTasks.TryRemove(new KeyValuePair<string, Lazy<Task>>(group.Key, lazyEnsure));
+                throw;
             }
             using var suffixScope = TableSuffixScope.Use(group.Key);
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);

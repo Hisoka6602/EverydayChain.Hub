@@ -1,11 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- `SqlServerSyncUpsertRepository` 从逐行 MERGE 重构为按页集合式 MERGE（临时表 + 批量写入 + 批量状态 MERGE），显著减少 SQL 往返次数。
-- 保留幂等语义、唯一键语义、分片后缀语义与 `sync_target_state` 语义；分片切换时旧分片删除升级为批处理。
-- `SyncJob` 新增 `EnableSetBasedMerge` 与 `BatchMergeSize` 配置，并在 `appsettings.json` 增补中文范围说明与建议值。
-- `DangerZoneExecutor` 新增 `OperationCanceledException` 专用分支：调用方取消记录 Warning，非调用方取消仍按 Error 记录。
-- 测试补充：新增批量合并计数、分片迁移删除行为、隔离器取消日志等级测试。
+- 修复 `SortingTaskTraceWriter` 并发竞态：将 `ConcurrentDictionary<string, byte>` 替换为 `ConcurrentDictionary<string, Lazy<Task>>`，确保并发调用均等待同一分表建表任务完成后再执行写入，避免在建表尚未结束时提前写入导致失败。
+- 修复 `RuntimeStorageGuard.GetTableMemoryWarningIntervalTicks` 双检查锁（DCL）内存排序问题：`long` 不支持 `volatile`，首检改用 `Interlocked.Read` 提供原子读取与内存屏障，防止多线程下缓存值不可见。
+- 修复 `SqlExecutionTuner.CurrentBatchSize` 读写语义不一致：将 `Volatile.Read` 改为与写路径一致的 `lock (_syncRoot)` 保护，消除混合同步原语导致的维护隐患。
 
 ## 解决方案文件树与职责
 ```text
