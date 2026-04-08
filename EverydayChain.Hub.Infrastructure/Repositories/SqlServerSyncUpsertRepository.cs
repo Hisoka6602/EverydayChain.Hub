@@ -738,16 +738,30 @@ WHERE [TableCode]=@tableCode
 
         var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         for (var index = 0; index < uniqueKeys.Count; index++) {
+            var uniqueKey = uniqueKeys[index];
             var value = values[index];
-            if (SyncBusinessKeyBuilder.TryParseLocalDateTimeComponent(value, out var localDateTime)) {
-                result[uniqueKeys[index]] = localDateTime;
+            if (IsTemporalUniqueKeyName(uniqueKey)
+                && SyncBusinessKeyBuilder.TryParseLocalDateTimeComponent(value, out var localDateTime)) {
+                result[uniqueKey] = localDateTime;
                 continue;
             }
 
-            result[uniqueKeys[index]] = value;
+            result[uniqueKey] = value;
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// 判断唯一键列名是否为时间语义。
+    /// </summary>
+    /// <param name="uniqueKeyName">唯一键列名。</param>
+    /// <returns>时间语义返回 <c>true</c>。</returns>
+    private static bool IsTemporalUniqueKeyName(string uniqueKeyName) {
+        return uniqueKeyName.EndsWith("TIME", StringComparison.OrdinalIgnoreCase)
+               || uniqueKeyName.EndsWith("_TIME", StringComparison.OrdinalIgnoreCase)
+               || uniqueKeyName.EndsWith("DATE", StringComparison.OrdinalIgnoreCase)
+               || uniqueKeyName.EndsWith("_DATE", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

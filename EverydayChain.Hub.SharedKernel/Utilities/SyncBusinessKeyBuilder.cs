@@ -64,7 +64,7 @@ public static class SyncBusinessKeyBuilder
 
         if (value is DateTime dateTime)
         {
-            var localDateTime = EnsureLocalDateTime(dateTime, dateTime.ToString(LocalDateTimeBusinessKeyFormat, CultureInfo.InvariantCulture));
+            var localDateTime = EnsureLocalDateTime(dateTime, null);
             return localDateTime.ToString(LocalDateTimeBusinessKeyFormat, CultureInfo.InvariantCulture);
         }
 
@@ -88,7 +88,7 @@ public static class SyncBusinessKeyBuilder
     /// <param name="value">时间值。</param>
     /// <param name="originalText">原始文本。</param>
     /// <returns>本地语义时间值。</returns>
-    private static DateTime EnsureLocalDateTime(DateTime value, string originalText)
+    private static DateTime EnsureLocalDateTime(DateTime value, string? originalText)
     {
         if (value.Kind == DateTimeKind.Unspecified)
         {
@@ -100,6 +100,6 @@ public static class SyncBusinessKeyBuilder
             return value;
         }
 
-        throw new InvalidOperationException($"检测到非本地时间语义，已拒绝加载：{originalText}");
+        throw new InvalidOperationException($"检测到非本地时间语义（Kind={value.Kind}），已拒绝加载：{originalText ?? value.ToString("O", CultureInfo.InvariantCulture)}");
     }
 }
