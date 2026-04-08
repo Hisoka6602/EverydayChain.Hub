@@ -146,7 +146,7 @@ public class WmsPickToWcsEntity : IEntity<long>
     /// </summary>
     [Column("R_SYSID")]
     [StringLength(30)]
-    public string UniqueId { get; set; } = string.Empty;
+    public string? UniqueId { get; set; }
 
     /// <summary>
     /// 长，单位厘米。
