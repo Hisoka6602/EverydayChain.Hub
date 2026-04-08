@@ -125,14 +125,15 @@ public class SqlServerSyncUpsertRepository(
             await EnsureSyncTargetStateTableExistsAsync(connection, transaction, ct);
             var distinctBusinessKeys = GetDistinctBusinessKeys(entries);
             var states = await LoadStateMapAsync(connection, transaction, request.TableCode, distinctBusinessKeys, ct);
-            var changedEntries = new List<MergeEntry>(entries.Count);
-            var shardSwitchDeletes = new List<ShardDeleteEntry>(entries.Count);
+            var initialStates = new Dictionary<string, PersistedState>(states, StringComparer.OrdinalIgnoreCase);
+            var latestChangedEntries = new Dictionary<string, MergeEntry>(StringComparer.OrdinalIgnoreCase);
+            var changedBusinessKeysInOrder = new List<string>(entries.Count);
             foreach (var entry in entries) {
                 ct.ThrowIfCancellationRequested();
                 UpdateLastCursor(result, entry.State.CursorLocal);
 
                 if (!states.TryGetValue(entry.BusinessKey, out var existingState)) {
-                    changedEntries.Add(entry);
+                    TrackLatestChangedEntry(latestChangedEntries, changedBusinessKeysInOrder, entry);
                     states[entry.BusinessKey] = new PersistedState(
                         entry.BusinessKey,
                         entry.State.RowDigest,
@@ -151,14 +152,7 @@ public class SqlServerSyncUpsertRepository(
                     continue;
                 }
 
-                if (!string.Equals(existingState.ShardSuffix, entry.ShardSuffix, StringComparison.OrdinalIgnoreCase)) {
-                    shardSwitchDeletes.Add(new ShardDeleteEntry(
-                        existingState.TargetLogicalTable,
-                        existingState.ShardSuffix,
-                        existingState.BusinessKey));
-                }
-
-                changedEntries.Add(entry);
+                TrackLatestChangedEntry(latestChangedEntries, changedBusinessKeysInOrder, entry);
                 states[entry.BusinessKey] = new PersistedState(
                     entry.BusinessKey,
                     entry.State.RowDigest,
@@ -171,6 +165,8 @@ public class SqlServerSyncUpsertRepository(
                 changedOperations[entry.BusinessKey] = SyncChangeOperationType.Update;
             }
 
+            var changedEntries = BuildOrderedChangedEntries(changedBusinessKeysInOrder, latestChangedEntries);
+            var shardSwitchDeletes = BuildShardSwitchDeletes(changedEntries, initialStates);
             var batchMergeSize = GetBatchMergeSize();
             if (_syncJobOptions.EnableSetBasedMerge) {
                 await ExecuteShardDeleteBatchesAsync(connection, transaction, request.UniqueKeys, shardSwitchDeletes, batchMergeSize, ct);
@@ -467,7 +463,8 @@ END;";
             var groupedList = group.ToList();
             for (var index = 0; index < groupedList.Count; index += batchMergeSize) {
                 ct.ThrowIfCancellationRequested();
-                var currentBatch = groupedList.Skip(index).Take(batchMergeSize).ToArray();
+                var currentBatchLength = Math.Min(batchMergeSize, groupedList.Count - index);
+                var currentBatch = CreateBatch(groupedList, index, currentBatchLength);
                 await ExecuteTargetMergeBatchAsync(connection, transaction, uniqueKeys, currentBatch, ct);
             }
         }
@@ -596,7 +593,8 @@ WHEN NOT MATCHED THEN
 
             for (var index = 0; index < deduplicated.Count; index += batchMergeSize) {
                 ct.ThrowIfCancellationRequested();
-                var currentBatch = deduplicated.Skip(index).Take(batchMergeSize).ToArray();
+                var currentBatchLength = Math.Min(batchMergeSize, deduplicated.Count - index);
+                var currentBatch = CreateBatch(deduplicated, index, currentBatchLength);
                 await ExecuteShardDeleteBatchAsync(connection, transaction, uniqueKeys, currentBatch, ct);
             }
         }
@@ -700,7 +698,8 @@ INNER JOIN {tempTableName} AS source
 
         for (var index = 0; index < entries.Count; index += batchMergeSize) {
             ct.ThrowIfCancellationRequested();
-            var currentBatch = entries.Skip(index).Take(batchMergeSize).ToArray();
+            var currentBatchLength = Math.Min(batchMergeSize, entries.Count - index);
+            var currentBatch = CreateBatch(entries, index, currentBatchLength);
             var tempTableName = $"#sync_state_{Guid.NewGuid():N}";
             await using (var createCommand = connection.CreateCommand()) {
                 createCommand.Transaction = transaction;
@@ -851,6 +850,94 @@ WHEN NOT MATCHED THEN
             .OrderBy(column => column, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         return string.Join("|", ordered);
+    }
+
+    /// <summary>
+    /// 跟踪业务键最后一条变更条目（用于集合式批处理去重）。
+    /// </summary>
+    /// <param name="latestChangedEntries">业务键到最后条目的映射。</param>
+    /// <param name="changedBusinessKeysInOrder">业务键首次出现顺序。</param>
+    /// <param name="entry">当前变更条目。</param>
+    private static void TrackLatestChangedEntry(
+        IDictionary<string, MergeEntry> latestChangedEntries,
+        IList<string> changedBusinessKeysInOrder,
+        MergeEntry entry) {
+        if (!latestChangedEntries.ContainsKey(entry.BusinessKey)) {
+            changedBusinessKeysInOrder.Add(entry.BusinessKey);
+        }
+
+        latestChangedEntries[entry.BusinessKey] = entry;
+    }
+
+    /// <summary>
+    /// 构建按首次出现顺序排序的去重变更条目集合。
+    /// </summary>
+    /// <param name="changedBusinessKeysInOrder">业务键首次出现顺序。</param>
+    /// <param name="latestChangedEntries">业务键到最后条目的映射。</param>
+    /// <returns>去重后的变更条目集合。</returns>
+    private static IReadOnlyList<MergeEntry> BuildOrderedChangedEntries(
+        IReadOnlyList<string> changedBusinessKeysInOrder,
+        IReadOnlyDictionary<string, MergeEntry> latestChangedEntries) {
+        if (changedBusinessKeysInOrder.Count == 0) {
+            return Array.Empty<MergeEntry>();
+        }
+
+        var result = new MergeEntry[changedBusinessKeysInOrder.Count];
+        for (var index = 0; index < changedBusinessKeysInOrder.Count; index++) {
+            var businessKey = changedBusinessKeysInOrder[index];
+            result[index] = latestChangedEntries[businessKey];
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// 根据初始状态与最终条目构建跨分片删除集合。
+    /// </summary>
+    /// <param name="changedEntries">最终去重变更条目集合。</param>
+    /// <param name="initialStates">初始状态映射。</param>
+    /// <returns>删除条目集合。</returns>
+    private static IReadOnlyList<ShardDeleteEntry> BuildShardSwitchDeletes(
+        IReadOnlyList<MergeEntry> changedEntries,
+        IReadOnlyDictionary<string, PersistedState> initialStates) {
+        if (changedEntries.Count == 0 || initialStates.Count == 0) {
+            return Array.Empty<ShardDeleteEntry>();
+        }
+
+        var deletes = new List<ShardDeleteEntry>(changedEntries.Count);
+        foreach (var entry in changedEntries) {
+            if (!initialStates.TryGetValue(entry.BusinessKey, out var initialState)) {
+                continue;
+            }
+
+            if (string.Equals(initialState.ShardSuffix, entry.ShardSuffix, StringComparison.OrdinalIgnoreCase)) {
+                continue;
+            }
+
+            deletes.Add(new ShardDeleteEntry(
+                initialState.TargetLogicalTable,
+                initialState.ShardSuffix,
+                initialState.BusinessKey));
+        }
+
+        return deletes;
+    }
+
+    /// <summary>
+    /// 基于索引创建批次数组，避免热路径重复枚举。
+    /// </summary>
+    /// <typeparam name="T">条目类型。</typeparam>
+    /// <param name="source">源集合。</param>
+    /// <param name="startIndex">起始索引。</param>
+    /// <param name="length">批次长度。</param>
+    /// <returns>批次数组。</returns>
+    private static T[] CreateBatch<T>(IReadOnlyList<T> source, int startIndex, int length) {
+        var batch = new T[length];
+        for (var offset = 0; offset < length; offset++) {
+            batch[offset] = source[startIndex + offset];
+        }
+
+        return batch;
     }
 
     /// <summary>
