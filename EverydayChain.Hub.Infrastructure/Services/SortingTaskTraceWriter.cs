@@ -36,21 +36,27 @@ public class SortingTaskTraceWriter(
         var grouped = traces.GroupBy(x => shardSuffixResolver.Resolve(x.CreatedAt));
         foreach (var group in grouped)
         {
-            // 使用 Lazy<Task> 保证同一后缀的建表操作仅执行一次：
-            // 首次调用时 GetOrAdd 存储 Lazy<Task>；并发线程获取同一实例后均 await 其 Value，
-            // LazyThreadSafetyMode.ExecutionAndPublication 确保工厂函数只被调用一次。
-            // 建表失败时将该 Lazy 从字典移除，下次可重新触发建表。
+            // 使用 Lazy<Task> 保证同一后缀的建表操作在进程生命周期内仅执行一次：
+            // - 共享建表 Task 使用 CancellationToken.None，确保不会因调用方 token 被取消而导致所有并发/后续调用"连坐"；
+            // - 每次调用方用 WaitAsync(cancellationToken) 等待，仅取消当前调用的等待，不中断共享建表任务；
+            // - 仅当建表任务自身失败（非调用方取消）时才移除缓存，避免并发重复触发建表。
             var lazyEnsure = _ensureTasks.GetOrAdd(
                 group.Key,
                 suffix => new Lazy<Task>(
-                    () => shardTableProvisioner.EnsureShardTableAsync(suffix, cancellationToken),
+                    () => shardTableProvisioner.EnsureShardTableAsync(suffix, CancellationToken.None),
                     LazyThreadSafetyMode.ExecutionAndPublication));
             try
             {
-                await lazyEnsure.Value;
+                await lazyEnsure.Value.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // 调用方主动取消了等待，共享建表任务仍在继续，保留缓存，直接向上传播。
+                throw;
             }
             catch
             {
+                // 建表任务自身失败，移除缓存以允许后续重新触发建表。
                 _ensureTasks.TryRemove(new KeyValuePair<string, Lazy<Task>>(group.Key, lazyEnsure));
                 throw;
             }

@@ -361,19 +361,21 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     /// <returns>节流间隔 Tick（0 表示不节流）。</returns>
     private long GetTableMemoryWarningIntervalTicks()
     {
-        // 首次检查使用 Interlocked.Read 保证 64 位读取的原子性与内存屏障，
+        // 首次检查使用 Interlocked.Read 将值读入局部变量，保证 64 位读取的原子性与 Acquire 内存屏障，
         // 避免 CPU/JIT 缓存导致 DCL 首检读到过期值（long 不支持 volatile）。
-        if (Interlocked.Read(ref _tableMemoryWarningIntervalTicksCache) >= 0)
+        var cached = Interlocked.Read(ref _tableMemoryWarningIntervalTicksCache);
+        if (cached >= 0)
         {
-            return Interlocked.Read(ref _tableMemoryWarningIntervalTicksCache);
+            return cached;
         }
 
         lock (_tableMemoryWarningIntervalTicksCacheLock)
         {
-            // 锁内二次检查同样使用 Interlocked.Read，与首检保持语义一致，避免混用同步原语引发维护困惑。
-            if (Interlocked.Read(ref _tableMemoryWarningIntervalTicksCache) >= 0)
+            // 锁内二次检查同样读入局部变量，与首检保持语义一致，避免混用同步原语引发维护困惑。
+            cached = Interlocked.Read(ref _tableMemoryWarningIntervalTicksCache);
+            if (cached >= 0)
             {
-                return Interlocked.Read(ref _tableMemoryWarningIntervalTicksCache);
+                return cached;
             }
 
             var intervalSeconds = NormalizeTableMemoryWarningLogIntervalSeconds();
