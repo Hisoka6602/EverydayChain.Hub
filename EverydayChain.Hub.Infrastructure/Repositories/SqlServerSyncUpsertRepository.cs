@@ -434,8 +434,8 @@ WHERE [TableCode]=@tableCode
     private async Task EnsureSyncTargetStateTableExistsAsync(string tableCode, string stateMonthToken, SqlConnection connection, SqlTransaction? transaction, CancellationToken ct) {
         var fullName = GetSyncStateTableFullName(tableCode, stateMonthToken);
         var tableNameRaw = $"{SyncTargetStateTablePrefix}_{tableCode}_{stateMonthToken}";
-        var pkName = EscapeIdentifier($"PK_{tableNameRaw}");
-        var indexName = EscapeIdentifier($"IX_{tableNameRaw}_CursorLocal");
+        var pkName = EscapeIdentifier(BuildStateTableObjectName("PK", tableNameRaw));
+        var indexName = EscapeIdentifier(BuildStateTableObjectName("IX", tableNameRaw, "TableCode_CursorLocal"));
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = $@"
@@ -1272,11 +1272,11 @@ WHERE [TableCode]=@tableCode
     /// <returns>全限定表名。</returns>
     internal static string GetSyncStateTableFullName(string tableCode, string stateMonthToken) {
         if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(tableCode)) {
-            throw new InvalidOperationException($"检测到非法 TableCode 标识符，仅允许字母、数字、下划线：{tableCode}");
+            throw new InvalidOperationException("检测到非法 TableCode 标识符，仅允许字母、数字、下划线。");
         }
 
         if (!IsValidStateMonthToken(stateMonthToken)) {
-            throw new InvalidOperationException($"检测到非法状态分表月份标记，仅允许6位数字（yyyyMM）：{stateMonthToken}");
+            throw new InvalidOperationException("检测到非法状态分表月份标记，仅允许6位数字（yyyyMM）。");
         }
 
         var physicalTableName = $"{SyncTargetStateTablePrefix}_{tableCode}_{stateMonthToken}";
@@ -1307,7 +1307,7 @@ WHERE [TableCode]=@tableCode
         SqlTransaction? transaction,
         CancellationToken ct) {
         if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(tableCode)) {
-            throw new InvalidOperationException($"检测到非法 TableCode 标识符，仅允许字母、数字、下划线：{tableCode}");
+            throw new InvalidOperationException("检测到非法 TableCode 标识符，仅允许字母、数字、下划线。");
         }
 
         var tableNamePrefix = $"{SyncTargetStateTablePrefix}_{tableCode}_";
@@ -1362,6 +1362,27 @@ ORDER BY t.[name] DESC;";
             .Replace("%", @"\%", StringComparison.Ordinal)
             .Replace("_", @"\_", StringComparison.Ordinal)
             .Replace("[", @"\[", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// 构建状态表对象名（超长时使用哈希收敛至 SQL Server 标识符长度上限内）。
+    /// </summary>
+    /// <param name="prefix">对象名前缀。</param>
+    /// <param name="tableNameRaw">状态表原始表名。</param>
+    /// <param name="tail">可选后缀。</param>
+    /// <returns>对象名。</returns>
+    private static string BuildStateTableObjectName(string prefix, string tableNameRaw, string? tail = null) {
+        var candidate = string.IsNullOrWhiteSpace(tail)
+            ? $"{prefix}_{tableNameRaw}"
+            : $"{prefix}_{tableNameRaw}_{tail}";
+        if (candidate.Length <= 128) {
+            return candidate;
+        }
+
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(candidate)).AsSpan(0, 8));
+        return string.IsNullOrWhiteSpace(tail)
+            ? $"{prefix}_{hash}"
+            : $"{prefix}_{tail}_{hash}";
     }
 
     /// <summary>
