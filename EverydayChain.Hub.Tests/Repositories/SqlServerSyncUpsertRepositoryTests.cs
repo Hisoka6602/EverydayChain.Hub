@@ -189,11 +189,26 @@ public class SqlServerSyncUpsertRepositoryTests
     /// </summary>
     [Theory]
     [InlineData("2026-04")]
+    [InlineData("20260")]
+    [InlineData("2026011")]
+    [InlineData("")]
+    [InlineData("2026AB")]
     [InlineData("202600")]
     [InlineData("202613")]
     public void GetSyncStateTableFullName_WhenStateMonthTokenInvalid_ShouldThrow(string stateMonthToken)
     {
         var action = () => SqlServerSyncUpsertRepository.GetSyncStateTableFullName("WmsPickToWcs", stateMonthToken);
+
+        Assert.Throws<InvalidOperationException>(action);
+    }
+
+    /// <summary>
+    /// 状态分表名称对空引用月份标记输入应抛出异常。
+    /// </summary>
+    [Fact]
+    public void GetSyncStateTableFullName_WhenStateMonthTokenIsNull_ShouldThrow()
+    {
+        var action = () => SqlServerSyncUpsertRepository.GetSyncStateTableFullName("WmsPickToWcs", null!);
 
         Assert.Throws<InvalidOperationException>(action);
     }
