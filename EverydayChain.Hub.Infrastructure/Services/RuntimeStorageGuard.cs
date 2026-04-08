@@ -80,7 +80,10 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     /// <summary>单表内存告警判定与时间戳更新锁。</summary>
     private readonly object _tableMemoryWarningGateLock = new();
 
-    /// <summary>单表内存告警节流间隔缓存（Stopwatch Tick）。</summary>
+    /// <summary>
+    /// 单表内存告警节流间隔缓存（Stopwatch Tick）。
+    /// 初始值 -1 表示尚未初始化；读取时须通过 <see cref="Interlocked.Read"/> 保证跨线程可见性（long 不支持 volatile）。
+    /// </summary>
     private long _tableMemoryWarningIntervalTicksCache = -1;
 
     /// <summary>单表内存告警节流间隔缓存锁。</summary>
@@ -358,16 +361,19 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     /// <returns>节流间隔 Tick（0 表示不节流）。</returns>
     private long GetTableMemoryWarningIntervalTicks()
     {
-        if (_tableMemoryWarningIntervalTicksCache >= 0)
+        // 首次检查使用 Interlocked.Read 保证 64 位读取的原子性与内存屏障，
+        // 避免 CPU/JIT 缓存导致 DCL 首检读到过期值（long 不支持 volatile）。
+        if (Interlocked.Read(ref _tableMemoryWarningIntervalTicksCache) >= 0)
         {
-            return _tableMemoryWarningIntervalTicksCache;
+            return Interlocked.Read(ref _tableMemoryWarningIntervalTicksCache);
         }
 
         lock (_tableMemoryWarningIntervalTicksCacheLock)
         {
-            if (_tableMemoryWarningIntervalTicksCache >= 0)
+            // 锁内二次检查同样使用 Interlocked.Read，与首检保持语义一致，避免混用同步原语引发维护困惑。
+            if (Interlocked.Read(ref _tableMemoryWarningIntervalTicksCache) >= 0)
             {
-                return _tableMemoryWarningIntervalTicksCache;
+                return Interlocked.Read(ref _tableMemoryWarningIntervalTicksCache);
             }
 
             var intervalSeconds = NormalizeTableMemoryWarningLogIntervalSeconds();
