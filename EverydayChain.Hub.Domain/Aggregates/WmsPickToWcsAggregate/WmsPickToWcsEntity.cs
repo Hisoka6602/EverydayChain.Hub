@@ -142,7 +142,7 @@ public class WmsPickToWcsEntity : IEntity<long>
     public string? SequenceNo1 { get; set; }
 
     /// <summary>
-    /// 唯一序号。
+    /// 来源侧唯一序号（可为空）；同步链路唯一识别请使用业务联合键 DOCNO + ADDTIME。
     /// </summary>
     [Column("R_SYSID")]
     [StringLength(30)]

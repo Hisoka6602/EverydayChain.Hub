@@ -94,6 +94,7 @@ public class HubDbContext : DbContext
         builder.HasKey(x => x.Id).IsClustered();
         builder.Property(x => x.Id).ValueGeneratedOnAdd();
         builder.Property(x => x.UniqueId).HasMaxLength(30);
+        builder.HasIndex(x => new { x.DocumentNo, x.AddTime });
         builder.HasIndex(x => x.UniqueId);
         builder.HasIndex(x => x.AddTime);
         builder.Property(x => x.MinUnitQuantity).HasColumnType("decimal(18,8)");

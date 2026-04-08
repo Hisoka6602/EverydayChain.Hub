@@ -134,6 +134,12 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 column: "ADDTIME");
 
             migrationBuilder.CreateIndex(
+                name: "IX_IDX_PICKTOWCS2_DOCNO_ADDTIME",
+                schema: "dbo",
+                table: "IDX_PICKTOWCS2",
+                columns: new[] { "DOCNO", "ADDTIME" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_IDX_PICKTOWCS2_R_SYSID",
                 schema: "dbo",
                 table: "IDX_PICKTOWCS2",

@@ -227,6 +227,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     b.HasIndex("AddTime");
 
+                    b.HasIndex("DocumentNo", "AddTime");
+
                     b.HasIndex("UniqueId");
 
                     b.ToTable("IDX_PICKTOWCS2", "dbo");

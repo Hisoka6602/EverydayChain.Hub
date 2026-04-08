@@ -95,6 +95,7 @@ public class ShardTableProvisionerTests
         Assert.Contains("[R_SYSID] nvarchar(30) NULL", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("[LENGTH] decimal(18,8) NULL", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("[WIDTH] decimal(18,8) NULL", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CREATE INDEX [IX_IDX_PICKTOWCS2_202604_DOCNO_ADDTIME] ON [dbo].[IDX_PICKTOWCS2_202604]([DOCNO], [ADDTIME]);", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
