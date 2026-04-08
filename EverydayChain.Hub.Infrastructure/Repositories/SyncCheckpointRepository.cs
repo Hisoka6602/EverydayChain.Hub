@@ -23,7 +23,7 @@ public class SyncCheckpointRepository(
     /// <summary>检查点 JSON 序列化配置（缩进输出，复用避免重复分配）。</summary>
     private static readonly JsonSerializerOptions CheckpointSerializerOptions = new() { WriteIndented = true };
 
-    /// <summary>检查点文件路径。</summary>
+    /// <summary>检查点文件路径（由配置项 CheckpointFilePath 决定；为空时使用应用基目录下 sync-checkpoints.json）。</summary>
     private readonly string _checkpointFilePath = RuntimeStoragePathResolver.ResolveAbsolutePath(
         syncJobOptions.Value.CheckpointFilePath,
         "sync-checkpoints.json");

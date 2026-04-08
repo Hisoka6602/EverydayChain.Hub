@@ -1,9 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 修复 `SortingTaskTraceWriter` 并发竞态：将 `ConcurrentDictionary<string, byte>` 替换为 `ConcurrentDictionary<string, Lazy<Task>>`，确保并发调用均等待同一分表建表任务完成后再执行写入，避免在建表尚未结束时提前写入导致失败。
-- 修复 `RuntimeStorageGuard.GetTableMemoryWarningIntervalTicks` 双检查锁（DCL）内存排序问题：`long` 不支持 `volatile`，首检改用 `Interlocked.Read` 提供原子读取与内存屏障，防止多线程下缓存值不可见。
-- 修复 `SqlExecutionTuner.CurrentBatchSize` 读写语义不一致：将 `Volatile.Read` 改为与写路径一致的 `lock (_syncRoot)` 保护，消除混合同步原语导致的维护隐患。
+- `sync_target_state` 表按 `TableCode+月份` 分表：每个同步表编码每月独立状态表（`sync_target_state_{tableCode}_{yyyyMM}`）；读取状态时跨月份分表聚合并按 `UpdatedTimeLocal` 取最新记录，同时兼容读取旧版状态表（`sync_target_state` 与 `sync_target_state_{tableCode}`），避免升级后幂等状态丢失。
+- `CheckpointFilePath` 保留：经分析确认检查点文件仍被 `SyncOrchestrator`、`SyncExecutionService` 及 `RuntimeStorageGuard` 实际使用（续传断点 + 磁盘空间检测），注释补充部署建议（宿主机挂载持久化目录）。
+- 调整状态分表命名测试：`GetSyncStateTableFullName_ShouldGeneratePerTableCodeAndMonthName`（Theory×3路径）、`GetSyncStateTableFullName_WhenTableCodeContainsInvalidChar_ShouldThrow`、`GetSyncStateTableFullName_WhenStateMonthTokenInvalid_ShouldThrow`，覆盖命名与输入边界。
 
 ## 解决方案文件树与职责
 ```text
@@ -191,7 +191,7 @@
 - `OracleOptions.cs`：远端 Oracle 连接配置实体，定义连接字符串、连接库名（ServiceName/SID，决定连接目标）、只读开关、命令超时与分页上限。
 - `OracleSourceReader.cs`：源端读取器 Oracle 实现，使用参数化 SQL 执行真实只读查询，支持分页增量读取、业务键读取、`ExcludedColumns` 过滤，并在异常场景输出错误日志；支持 `Oracle.DatabaseMode` 控制库名拼接语义（ServiceName/SID）。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
-- `SqlServerSyncUpsertRepository.cs`：SQL Server 真实落库实现，按目标逻辑表+后缀分表执行集合式 MERGE（支持配置回退逐行模式），并在 `sync_target_state` 中记录后缀用于跨分表迁移更新时的旧分表批量清理。
+- `SqlServerSyncUpsertRepository.cs`：SQL Server 真实落库实现，按目标逻辑表+后缀分表执行集合式 MERGE（支持配置回退逐行模式），并在 `sync_target_state_{tableCode}_{yyyyMM}` 状态分表中记录后缀；读取/删除状态时跨月分表聚合，且兼容旧版 `sync_target_state` / `sync_target_state_{tableCode}` 状态表，确保升级过程幂等与删除语义连续。
 - `SyncDeletionRepository.cs`：删除同步仓储基础实现，基于轻量幂等状态执行窗口过滤与源端键差异识别，并按策略执行删除。
 - `ShardTableResolver.cs`：分表解析仓储实现，按逻辑表枚举物理分表并解析分表月份后缀。
 - `ShardRetentionRepository.cs`：分表保留期仓储实现，在危险动作隔离器保护下执行分表删除并输出审计日志，且可基于系统元数据生成可回放回滚 DDL。
@@ -212,7 +212,7 @@
 - `EverydayChain.Hub.Tests/Services/SortingTaskTraceWriterTests.cs`：分表写入器兜底建表测试，覆盖首次写入先建表与同月重复写入幂等建表触发场景。
 - `EverydayChain.Hub.Tests/Services/ShardTableProvisionerTests.cs`：分表模板回归测试，覆盖并发上限钳制、空纳管拦截、实体模型到 DDL 的类型/主键/索引映射断言。
 - `EverydayChain.Hub.Tests/Repositories/OracleSourceReaderTests.cs`：Oracle 连接串构建测试，覆盖空连接串、空库名、EZCONNECT（斜杠/SID）覆写与复杂描述符拦截分支。
-- `EverydayChain.Hub.Tests/Repositories/SqlServerSyncUpsertRepositoryTests.cs`：SQL Server 落库仓储契约测试，覆盖插入/更新/跳过统计与 UniqueKeys 缺失异常。
+- `EverydayChain.Hub.Tests/Repositories/SqlServerSyncUpsertRepositoryTests.cs`：SQL Server 落库仓储契约测试，覆盖插入/更新/跳过统计、UniqueKeys 缺失异常，以及 `sync_target_state` 状态分表命名安全边界（正常路径×3 + TableCode 非法字符 + 月份标记非法）。
 - `EFCore手动迁移操作指南.md`：提供手工迁移、脚本导出、回滚、排障流程。
 - `持续运行一年稳定性改造清单.md`：面向"连续运行一年"目标的稳定性改造清单，按 P0/P1/P2 组织改造优先级、待确认项与验收标准。
 - `年度维护清单.md`：月度/季度/年度例行巡检清单，覆盖磁盘、日志、数据一致性、配置审核、依赖升级、灾难恢复与安全审计。

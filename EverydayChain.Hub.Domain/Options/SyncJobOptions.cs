@@ -17,7 +17,7 @@ public class SyncJobOptions
     /// <summary>全局多表并发上限（最小 1），用于限制同轮同步并行表数量。</summary>
     public int MaxParallelTables { get; set; } = 1;
 
-    /// <summary>检查点文件路径（为空时使用应用基目录下 sync-checkpoints.json）。</summary>
+    /// <summary>检查点文件路径（可填写相对路径或绝对路径；为空时使用应用基目录下 sync-checkpoints.json）。</summary>
     public string CheckpointFilePath { get; set; } = string.Empty;
 
     /// <summary>启动自检最小可用磁盘空间（MB，建议范围：0~10240；0 表示关闭启动阶段磁盘空间校验）。</summary>
