@@ -29,11 +29,14 @@ public class SqlServerSyncUpsertRepository(
     IDangerZoneExecutor dangerZoneExecutor,
     ILogger<SqlServerSyncUpsertRepository> logger) : ISyncUpsertRepository {
 
-    /// <summary>状态表名前缀（按 TableCode 分表，实际表名为 sync_target_state_{tableCode}）。</summary>
+    /// <summary>状态表名前缀（按 TableCode+月份分表，实际表名为 sync_target_state_{tableCode}_{yyyyMM}）。</summary>
     private const string SyncTargetStateTablePrefix = "sync_target_state";
 
     /// <summary>状态表固定 Schema。</summary>
     private const string SyncTargetStateSchema = "dbo";
+
+    /// <summary>状态表月份标记长度（yyyyMM）。</summary>
+    private const int StateMonthTokenLength = 6;
 
     /// <summary>临时表清理超时秒数。</summary>
     private const int TempTableCleanupTimeoutSeconds = 5;
@@ -122,7 +125,8 @@ public class SqlServerSyncUpsertRepository(
         await connection.OpenAsync(ct);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(ct);
         try {
-            await EnsureSyncTargetStateTableExistsAsync(request.TableCode, connection, transaction, ct);
+            var stateMonthToken = ResolveStateMonthToken(DateTime.Now);
+            await EnsureSyncTargetStateTableExistsAsync(request.TableCode, stateMonthToken, connection, transaction, ct);
             var distinctBusinessKeys = GetDistinctBusinessKeys(entries);
             var states = await LoadStateMapAsync(connection, transaction, request.TableCode, distinctBusinessKeys, ct);
             var initialStates = new Dictionary<string, PersistedState>(states, StringComparer.OrdinalIgnoreCase);
@@ -171,7 +175,7 @@ public class SqlServerSyncUpsertRepository(
             if (_syncJobOptions.EnableSetBasedMerge) {
                 await ExecuteShardDeleteBatchesAsync(connection, transaction, request.UniqueKeys, shardSwitchDeletes, batchMergeSize, ct);
                 await ExecuteTargetMergeBatchesAsync(connection, transaction, request.UniqueKeys, changedEntries, batchMergeSize, ct);
-                await UpsertStatesBatchAsync(connection, transaction, request.TableCode, changedEntries, batchMergeSize, ct);
+                await UpsertStatesBatchAsync(connection, transaction, request.TableCode, stateMonthToken, changedEntries, batchMergeSize, ct);
             }
             else {
                 var uniqueKeySet = new HashSet<string>(request.UniqueKeys, StringComparer.OrdinalIgnoreCase);
@@ -188,7 +192,7 @@ public class SqlServerSyncUpsertRepository(
 
                 foreach (var entry in changedEntries) {
                     await UpsertTargetRowAsync(connection, transaction, entry.TargetLogicalTable, entry.ShardSuffix, entry.Row, request.UniqueKeys, uniqueKeySet, ct);
-                    await UpsertStateAsync(connection, transaction, request.TableCode, entry, ct);
+                    await UpsertStateAsync(connection, transaction, request.TableCode, stateMonthToken, entry, ct);
                 }
             }
 
@@ -216,28 +220,41 @@ public class SqlServerSyncUpsertRepository(
     /// <param name="ct">取消令牌。</param>
     /// <returns>状态集合。</returns>
     protected virtual async Task<IReadOnlyList<SyncTargetStateRow>> ListTargetStateRowsCoreAsync(string tableCode, CancellationToken ct) {
-        var states = new List<SyncTargetStateRow>();
+        var stateMap = new Dictionary<string, (SyncTargetStateRow State, DateTime UpdatedTimeLocal)>(StringComparer.OrdinalIgnoreCase);
         await using var connection = new SqlConnection(_shardingOptions.ConnectionString);
         await connection.OpenAsync(ct);
-        await EnsureSyncTargetStateTableExistsAsync(tableCode, connection, transaction: null, ct);
-        await using var command = connection.CreateCommand();
-        command.CommandText = $@"
-SELECT [BusinessKey], [RowDigest], [CursorLocal], [IsSoftDeleted], [SoftDeletedTimeLocal]
-FROM {GetSyncStateTableFullName(tableCode)}
+        var stateMonthToken = ResolveStateMonthToken(DateTime.Now);
+        await EnsureSyncTargetStateTableExistsAsync(tableCode, stateMonthToken, connection, transaction: null, ct);
+        var stateTables = await ListSyncStateTableFullNamesAsync(tableCode, connection, transaction: null, ct);
+        foreach (var stateTable in stateTables) {
+            await using var command = connection.CreateCommand();
+            command.CommandText = $@"
+SELECT [BusinessKey], [RowDigest], [CursorLocal], [IsSoftDeleted], [SoftDeletedTimeLocal], [UpdatedTimeLocal]
+FROM {stateTable}
 WHERE [TableCode]=@tableCode;";
-        command.Parameters.AddWithValue("@tableCode", tableCode);
-        await using var reader = await command.ExecuteReaderAsync(ct);
-        while (await reader.ReadAsync(ct)) {
-            states.Add(new SyncTargetStateRow {
-                BusinessKey = reader.GetString(0),
-                RowDigest = reader.GetString(1),
-                CursorLocal = reader.IsDBNull(2) ? null : reader.GetDateTime(2),
-                IsSoftDeleted = reader.GetBoolean(3),
-                SoftDeletedTimeLocal = reader.IsDBNull(4) ? null : reader.GetDateTime(4),
-            });
+            command.Parameters.AddWithValue("@tableCode", tableCode);
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct)) {
+                var businessKey = reader.GetString(0);
+                var current = new SyncTargetStateRow {
+                    BusinessKey = businessKey,
+                    RowDigest = reader.GetString(1),
+                    CursorLocal = reader.IsDBNull(2) ? null : reader.GetDateTime(2),
+                    IsSoftDeleted = reader.GetBoolean(3),
+                    SoftDeletedTimeLocal = reader.IsDBNull(4) ? null : reader.GetDateTime(4),
+                };
+                var updatedTimeLocal = reader.GetDateTime(5);
+                if (stateMap.TryGetValue(businessKey, out var existed) && existed.UpdatedTimeLocal >= updatedTimeLocal) {
+                    continue;
+                }
+
+                stateMap[businessKey] = (current, updatedTimeLocal);
+            }
         }
 
-        return states;
+        return stateMap
+            .Select(pair => pair.Value.State)
+            .ToArray();
     }
 
     /// <summary>
@@ -352,38 +369,49 @@ WHERE [TableCode]=@tableCode;";
             return stateMap;
         }
 
+        var latestStateMap = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        var stateTables = await ListSyncStateTableFullNamesAsync(tableCode, connection, transaction, ct);
         // SQL Server 单条语句参数上限为 2100；本查询除业务键参数外还包含 tableCode 参数，因此分块上限取 900。
         const int chunkSize = 900;
-        for (var index = 0; index < businessKeys.Count; index += chunkSize) {
-            ct.ThrowIfCancellationRequested();
-            var chunkLength = Math.Min(chunkSize, businessKeys.Count - index);
-            await using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            var parameterNames = new List<string>(chunkLength);
-            for (var i = 0; i < chunkLength; i++) {
-                var businessKey = businessKeys[index + i];
-                var parameterName = $"@businessKey{i}";
-                parameterNames.Add(parameterName);
-                command.Parameters.AddWithValue(parameterName, businessKey);
-            }
+        foreach (var stateTable in stateTables) {
+            for (var index = 0; index < businessKeys.Count; index += chunkSize) {
+                ct.ThrowIfCancellationRequested();
+                var chunkLength = Math.Min(chunkSize, businessKeys.Count - index);
+                await using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+                var parameterNames = new List<string>(chunkLength);
+                for (var i = 0; i < chunkLength; i++) {
+                    var businessKey = businessKeys[index + i];
+                    var parameterName = $"@businessKey{i}";
+                    parameterNames.Add(parameterName);
+                    command.Parameters.AddWithValue(parameterName, businessKey);
+                }
 
-            command.Parameters.AddWithValue("@tableCode", tableCode);
-            command.CommandText = $@"
-SELECT [BusinessKey], [RowDigest], [CursorLocal], [IsSoftDeleted], [SoftDeletedTimeLocal], [ShardSuffix], [TargetLogicalTable]
-FROM {GetSyncStateTableFullName(tableCode)}
+                command.Parameters.AddWithValue("@tableCode", tableCode);
+                command.CommandText = $@"
+SELECT [BusinessKey], [RowDigest], [CursorLocal], [IsSoftDeleted], [SoftDeletedTimeLocal], [ShardSuffix], [TargetLogicalTable], [UpdatedTimeLocal]
+FROM {stateTable}
 WHERE [TableCode]=@tableCode
   AND [BusinessKey] IN ({string.Join(", ", parameterNames)});";
-            await using var reader = await command.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct)) {
-                var persisted = new PersistedState(
-                    reader.GetString(0),
-                    reader.GetString(1),
-                    reader.IsDBNull(2) ? null : reader.GetDateTime(2),
-                    reader.GetBoolean(3),
-                    reader.IsDBNull(4) ? null : reader.GetDateTime(4),
-                    reader.GetString(5),
-                    reader.GetString(6));
-                stateMap[persisted.BusinessKey] = persisted;
+                await using var reader = await command.ExecuteReaderAsync(ct);
+                while (await reader.ReadAsync(ct)) {
+                    var persisted = new PersistedState(
+                        reader.GetString(0),
+                        reader.GetString(1),
+                        reader.IsDBNull(2) ? null : reader.GetDateTime(2),
+                        reader.GetBoolean(3),
+                        reader.IsDBNull(4) ? null : reader.GetDateTime(4),
+                        reader.GetString(5),
+                        reader.GetString(6));
+                    var updatedTimeLocal = reader.GetDateTime(7);
+                    if (latestStateMap.TryGetValue(persisted.BusinessKey, out var latestUpdatedTime)
+                        && latestUpdatedTime >= updatedTimeLocal) {
+                        continue;
+                    }
+
+                    latestStateMap[persisted.BusinessKey] = updatedTimeLocal;
+                    stateMap[persisted.BusinessKey] = persisted;
+                }
             }
         }
 
@@ -391,20 +419,21 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 确保指定表编码对应的幂等状态分表存在（按 TableCode 分表）。
+    /// 确保指定表编码+月份对应的幂等状态分表存在。
     /// </summary>
     /// <remarks>
-    /// 每个 TableCode 对应独立的状态表（sync_target_state_{tableCode}），避免所有表数据堆积在同一张表。
+    /// 每个 TableCode+月份对应独立的状态表（sync_target_state_{tableCode}_{yyyyMM}），避免长期无人值守导致单表膨胀。
     /// 线上若存在“迁移历史被重置 / 部分迁移缺失”场景，状态表可能未被创建。
     /// 此处进行幂等兜底，避免同步任务因 208 异常中断。
     /// </remarks>
     /// <param name="tableCode">同步表编码，用于确定状态分表名称。</param>
+    /// <param name="stateMonthToken">状态分表月份标记（yyyyMM）。</param>
     /// <param name="connection">数据库连接。</param>
     /// <param name="transaction">事务对象（可空）。</param>
     /// <param name="ct">取消令牌。</param>
-private async Task EnsureSyncTargetStateTableExistsAsync(string tableCode, SqlConnection connection, SqlTransaction? transaction, CancellationToken ct) {
-        var fullName = GetSyncStateTableFullName(tableCode);
-        var tableNameRaw = $"{SyncTargetStateTablePrefix}_{tableCode}";
+    private async Task EnsureSyncTargetStateTableExistsAsync(string tableCode, string stateMonthToken, SqlConnection connection, SqlTransaction? transaction, CancellationToken ct) {
+        var fullName = GetSyncStateTableFullName(tableCode, stateMonthToken);
+        var tableNameRaw = $"{SyncTargetStateTablePrefix}_{tableCode}_{stateMonthToken}";
         var pkName = EscapeIdentifier($"PK_{tableNameRaw}");
         var indexName = EscapeIdentifier($"IX_{tableNameRaw}_CursorLocal");
         await using var command = connection.CreateCommand();
@@ -695,6 +724,7 @@ INNER JOIN {tempTableName} AS source
         SqlConnection connection,
         SqlTransaction transaction,
         string tableCode,
+        string stateMonthToken,
         IReadOnlyList<MergeEntry> entries,
         int batchMergeSize,
         CancellationToken ct) {
@@ -761,7 +791,7 @@ CREATE TABLE {tempTableName} (
                 await using var mergeCommand = connection.CreateCommand();
                 mergeCommand.Transaction = transaction;
                 mergeCommand.CommandText = $@"
-MERGE {GetSyncStateTableFullName(tableCode)} AS target
+MERGE {GetSyncStateTableFullName(tableCode, stateMonthToken)} AS target
 USING {tempTableName} AS source
 ON target.[TableCode] = source.[TableCode] AND target.[BusinessKey] = source.[BusinessKey]
 WHEN MATCHED THEN
@@ -1050,13 +1080,14 @@ WHEN NOT MATCHED THEN
         SqlConnection connection,
         SqlTransaction transaction,
         string tableCode,
+        string stateMonthToken,
         MergeEntry entry,
         CancellationToken ct) {
         var nowLocal = DateTime.Now;
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = $@"
-MERGE {GetSyncStateTableFullName(tableCode)} AS target
+MERGE {GetSyncStateTableFullName(tableCode, stateMonthToken)} AS target
 USING (SELECT
     @tableCode AS [TableCode],
     @businessKey AS [BusinessKey],
@@ -1106,20 +1137,23 @@ WHEN NOT MATCHED THEN
         string tableCode,
         string businessKey,
         CancellationToken ct) {
-        await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = $@"
-UPDATE {GetSyncStateTableFullName(tableCode)}
+        var stateTables = await ListSyncStateTableFullNamesAsync(tableCode, connection, transaction, ct);
+        foreach (var stateTable in stateTables) {
+            await using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = $@"
+UPDATE {stateTable}
 SET [IsSoftDeleted]=1,
     [SoftDeletedTimeLocal]=@softDeletedTimeLocal,
     [UpdatedTimeLocal]=@updatedTimeLocal
 WHERE [TableCode]=@tableCode
   AND [BusinessKey]=@businessKey;";
-        command.Parameters.AddWithValue("@softDeletedTimeLocal", DateTime.Now);
-        command.Parameters.AddWithValue("@updatedTimeLocal", DateTime.Now);
-        command.Parameters.AddWithValue("@tableCode", tableCode);
-        command.Parameters.AddWithValue("@businessKey", businessKey);
-        await command.ExecuteNonQueryAsync(ct);
+            command.Parameters.AddWithValue("@softDeletedTimeLocal", DateTime.Now);
+            command.Parameters.AddWithValue("@updatedTimeLocal", DateTime.Now);
+            command.Parameters.AddWithValue("@tableCode", tableCode);
+            command.Parameters.AddWithValue("@businessKey", businessKey);
+            await command.ExecuteNonQueryAsync(ct);
+        }
     }
 
     /// <summary>
@@ -1136,12 +1170,15 @@ WHERE [TableCode]=@tableCode
         string tableCode,
         string businessKey,
         CancellationToken ct) {
-        await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = $@"DELETE FROM {GetSyncStateTableFullName(tableCode)} WHERE [TableCode]=@tableCode AND [BusinessKey]=@businessKey;";
-        command.Parameters.AddWithValue("@tableCode", tableCode);
-        command.Parameters.AddWithValue("@businessKey", businessKey);
-        await command.ExecuteNonQueryAsync(ct);
+        var stateTables = await ListSyncStateTableFullNamesAsync(tableCode, connection, transaction, ct);
+        foreach (var stateTable in stateTables) {
+            await using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = $@"DELETE FROM {stateTable} WHERE [TableCode]=@tableCode AND [BusinessKey]=@businessKey;";
+            command.Parameters.AddWithValue("@tableCode", tableCode);
+            command.Parameters.AddWithValue("@businessKey", businessKey);
+            await command.ExecuteNonQueryAsync(ct);
+        }
     }
 
     /// <summary>
@@ -1228,17 +1265,103 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 构建状态分表全限定名（按 TableCode 分表，表名格式为 sync_target_state_{tableCode}）。
+    /// 构建状态分表全限定名（按 TableCode+月份分表，表名格式为 sync_target_state_{tableCode}_{yyyyMM}）。
     /// </summary>
     /// <param name="tableCode">同步表编码。</param>
+    /// <param name="stateMonthToken">状态分表月份标记（yyyyMM）。</param>
     /// <returns>全限定表名。</returns>
-    internal static string GetSyncStateTableFullName(string tableCode) {
+    internal static string GetSyncStateTableFullName(string tableCode, string stateMonthToken) {
         if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(tableCode)) {
             throw new InvalidOperationException($"检测到非法 TableCode 标识符，仅允许字母、数字、下划线：{tableCode}");
         }
 
-        var physicalTableName = $"{SyncTargetStateTablePrefix}_{tableCode}";
+        if (!IsValidStateMonthToken(stateMonthToken)) {
+            throw new InvalidOperationException($"检测到非法状态分表月份标记，仅允许6位数字（yyyyMM）：{stateMonthToken}");
+        }
+
+        var physicalTableName = $"{SyncTargetStateTablePrefix}_{tableCode}_{stateMonthToken}";
         return $"[{EscapeIdentifier(SyncTargetStateSchema)}].[{EscapeIdentifier(physicalTableName)}]";
+    }
+
+    /// <summary>
+    /// 解析状态分表月份标记（yyyyMM）。
+    /// </summary>
+    /// <param name="localTime">本地时间。</param>
+    /// <returns>月份标记。</returns>
+    private static string ResolveStateMonthToken(DateTime localTime) {
+        var ensuredLocalTime = EnsureLocalDateTime(localTime, "状态分表时间");
+        return ensuredLocalTime.ToString("yyyyMM", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// 查询指定表编码已有的状态分表全限定名集合（按表名降序，最新月份优先）。
+    /// </summary>
+    /// <param name="tableCode">同步表编码。</param>
+    /// <param name="connection">数据库连接。</param>
+    /// <param name="transaction">事务对象（可空）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>状态分表集合。</returns>
+    private static async Task<IReadOnlyList<string>> ListSyncStateTableFullNamesAsync(
+        string tableCode,
+        SqlConnection connection,
+        SqlTransaction? transaction,
+        CancellationToken ct) {
+        if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(tableCode)) {
+            throw new InvalidOperationException($"检测到非法 TableCode 标识符，仅允许字母、数字、下划线：{tableCode}");
+        }
+
+        var tableNamePrefix = $"{SyncTargetStateTablePrefix}_{tableCode}_";
+        var likePattern = $"{EscapeLikePattern(tableNamePrefix)}%";
+        var tableFullNames = new List<string>();
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = @"
+SELECT QUOTENAME(s.[name]) + '.' + QUOTENAME(t.[name]) AS [FullName]
+FROM sys.tables AS t
+INNER JOIN sys.schemas AS s ON t.[schema_id] = s.[schema_id]
+WHERE s.[name] = @schemaName
+  AND t.[name] LIKE @tableLikePattern ESCAPE '\'
+ORDER BY t.[name] DESC;";
+        command.Parameters.AddWithValue("@schemaName", SyncTargetStateSchema);
+        command.Parameters.AddWithValue("@tableLikePattern", likePattern);
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct)) {
+            tableFullNames.Add(reader.GetString(0));
+        }
+
+        return tableFullNames;
+    }
+
+    /// <summary>
+    /// 校验状态分表月份标记合法性（yyyyMM）。
+    /// </summary>
+    /// <param name="stateMonthToken">月份标记。</param>
+    /// <returns>合法返回 true；否则 false。</returns>
+    private static bool IsValidStateMonthToken(string stateMonthToken) {
+        if (string.IsNullOrWhiteSpace(stateMonthToken) || stateMonthToken.Length != StateMonthTokenLength) {
+            return false;
+        }
+
+        for (var index = 0; index < stateMonthToken.Length; index++) {
+            if (!char.IsDigit(stateMonthToken[index])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 转义 LIKE 模式特殊字符。
+    /// </summary>
+    /// <param name="value">原始文本。</param>
+    /// <returns>转义后文本。</returns>
+    private static string EscapeLikePattern(string value) {
+        return value
+            .Replace(@"\", @"\\", StringComparison.Ordinal)
+            .Replace("%", @"\%", StringComparison.Ordinal)
+            .Replace("_", @"\_", StringComparison.Ordinal)
+            .Replace("[", @"\[", StringComparison.Ordinal);
     }
 
     /// <summary>

@@ -160,15 +160,15 @@ public class SqlServerSyncUpsertRepositoryTests
     }
 
     /// <summary>
-    /// 状态分表名称应按 TableCode 生成独立表名，格式为 sync_target_state_{tableCode}。
+    /// 状态分表名称应按 TableCode+月份生成独立表名，格式为 sync_target_state_{tableCode}_{yyyyMM}。
     /// </summary>
     [Theory]
-    [InlineData("WmsPickToWcs", "[dbo].[sync_target_state_WmsPickToWcs]")]
-    [InlineData("WmsSplitPickToLightCarton", "[dbo].[sync_target_state_WmsSplitPickToLightCarton]")]
-    [InlineData("SortingTaskTrace", "[dbo].[sync_target_state_SortingTaskTrace]")]
-    public void GetSyncStateTableFullName_ShouldGeneratePerTableCodeName(string tableCode, string expectedFullName)
+    [InlineData("WmsPickToWcs", "202604", "[dbo].[sync_target_state_WmsPickToWcs_202604]")]
+    [InlineData("WmsSplitPickToLightCarton", "202512", "[dbo].[sync_target_state_WmsSplitPickToLightCarton_202512]")]
+    [InlineData("SortingTaskTrace", "202601", "[dbo].[sync_target_state_SortingTaskTrace_202601]")]
+    public void GetSyncStateTableFullName_ShouldGeneratePerTableCodeAndMonthName(string tableCode, string stateMonthToken, string expectedFullName)
     {
-        var actualFullName = SqlServerSyncUpsertRepository.GetSyncStateTableFullName(tableCode);
+        var actualFullName = SqlServerSyncUpsertRepository.GetSyncStateTableFullName(tableCode, stateMonthToken);
 
         Assert.Equal(expectedFullName, actualFullName);
     }
@@ -179,7 +179,18 @@ public class SqlServerSyncUpsertRepositoryTests
     [Fact]
     public void GetSyncStateTableFullName_WhenTableCodeContainsInvalidChar_ShouldThrow()
     {
-        var action = () => SqlServerSyncUpsertRepository.GetSyncStateTableFullName("my-table; DROP TABLE--");
+        var action = () => SqlServerSyncUpsertRepository.GetSyncStateTableFullName("my-table; DROP TABLE--", "202604");
+
+        Assert.Throws<InvalidOperationException>(action);
+    }
+
+    /// <summary>
+    /// 状态分表名称对含非法月份标记的输入应抛出异常。
+    /// </summary>
+    [Fact]
+    public void GetSyncStateTableFullName_WhenStateMonthTokenInvalid_ShouldThrow()
+    {
+        var action = () => SqlServerSyncUpsertRepository.GetSyncStateTableFullName("WmsPickToWcs", "2026-04");
 
         Assert.Throws<InvalidOperationException>(action);
     }
