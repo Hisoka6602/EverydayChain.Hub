@@ -224,9 +224,7 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     b.HasIndex("AddTime");
 
-                    b.HasIndex("UniqueId")
-                        .IsUnique()
-                        .HasFilter("[R_SYSID] IS NOT NULL");
+                    b.HasIndex("UniqueId");
 
                     b.ToTable("IDX_PICKTOWCS2", "dbo");
                 });

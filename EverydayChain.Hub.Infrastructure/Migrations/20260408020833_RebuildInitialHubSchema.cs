@@ -51,6 +51,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
+                    table.PrimaryKey("PK_IDX_PICKTOLIGHT_CARTON1", x => x.Id)
+                        .Annotation("SqlServer:Clustered", true);
                 });
 
             migrationBuilder.CreateTable(
@@ -78,7 +80,7 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                     SKUQTY1 = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
                     ALLNUM = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     ALLNUM1 = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    R_SYSID = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
+                    R_SYSID = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     LENGTH = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
                     WIDTH = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
                     HIGH = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
@@ -94,6 +96,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
+                    table.PrimaryKey("PK_IDX_PICKTOWCS2", x => x.Id)
+                        .Annotation("SqlServer:Clustered", true);
                 });
 
             migrationBuilder.CreateTable(
@@ -112,6 +116,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
+                    table.PrimaryKey("PK_sorting_task_trace", x => x.Id)
+                        .Annotation("SqlServer:Clustered", true);
                 });
 
             migrationBuilder.CreateIndex(
@@ -137,8 +143,7 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 name: "IX_IDX_PICKTOWCS2_R_SYSID",
                 schema: "dbo",
                 table: "IDX_PICKTOWCS2",
-                column: "R_SYSID",
-                unique: true);
+                column: "R_SYSID");
 
             migrationBuilder.CreateIndex(
                 name: "IX_sorting_task_trace_BusinessNo",
@@ -151,26 +156,6 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 schema: "dbo",
                 table: "sorting_task_trace",
                 column: "CreatedAt");
-
-            migrationBuilder.Sql("""
-                IF OBJECT_ID(N'[dbo].[IDX_PICKTOLIGHT_CARTON1]', N'U') IS NOT NULL
-                   AND NOT EXISTS (SELECT 1 FROM sys.key_constraints WHERE [name] = N'PK_IDX_PICKTOLIGHT_CARTON1' AND [parent_object_id] = OBJECT_ID(N'[dbo].[IDX_PICKTOLIGHT_CARTON1]'))
-                BEGIN
-                    ALTER TABLE [dbo].[IDX_PICKTOLIGHT_CARTON1] ADD CONSTRAINT [PK_IDX_PICKTOLIGHT_CARTON1] PRIMARY KEY CLUSTERED ([Id] DESC);
-                END;
-
-                IF OBJECT_ID(N'[dbo].[IDX_PICKTOWCS2]', N'U') IS NOT NULL
-                   AND NOT EXISTS (SELECT 1 FROM sys.key_constraints WHERE [name] = N'PK_IDX_PICKTOWCS2' AND [parent_object_id] = OBJECT_ID(N'[dbo].[IDX_PICKTOWCS2]'))
-                BEGIN
-                    ALTER TABLE [dbo].[IDX_PICKTOWCS2] ADD CONSTRAINT [PK_IDX_PICKTOWCS2] PRIMARY KEY CLUSTERED ([Id] DESC);
-                END;
-
-                IF OBJECT_ID(N'[dbo].[sorting_task_trace]', N'U') IS NOT NULL
-                   AND NOT EXISTS (SELECT 1 FROM sys.key_constraints WHERE [name] = N'PK_sorting_task_trace' AND [parent_object_id] = OBJECT_ID(N'[dbo].[sorting_task_trace]'))
-                BEGIN
-                    ALTER TABLE [dbo].[sorting_task_trace] ADD CONSTRAINT [PK_sorting_task_trace] PRIMARY KEY CLUSTERED ([Id] DESC);
-                END;
-                """);
         }
 
         /// <inheritdoc />

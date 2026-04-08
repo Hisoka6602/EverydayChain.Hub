@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EverydayChain.Hub.Infrastructure.Migrations
 {
     [DbContext(typeof(HubDbContext))]
-    [Migration("20260408020119_MakeWmsPickToWcsUniqueIdNullable")]
-    partial class MakeWmsPickToWcsUniqueIdNullable
+    [Migration("20260408020833_RebuildInitialHubSchema")]
+    partial class RebuildInitialHubSchema
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -227,9 +227,7 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     b.HasIndex("AddTime");
 
-                    b.HasIndex("UniqueId")
-                        .IsUnique()
-                        .HasFilter("[R_SYSID] IS NOT NULL");
+                    b.HasIndex("UniqueId");
 
                     b.ToTable("IDX_PICKTOWCS2", "dbo");
                 });
