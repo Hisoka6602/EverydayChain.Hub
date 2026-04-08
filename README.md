@@ -3,7 +3,7 @@
 ## 本次更新内容
 - `IDX_PICKTOWCS2.R_SYSID` 调整为可空且非唯一，仅保留普通索引。
 - 迁移历史再次重建：删除历史迁移并重新生成 `RebuildInitialHubSchema` 初始化迁移。
-- `WmsPickToWcs` 的 `UniqueKeys` 改为联合键配置示例（`DOCNO` + `SEQNO` + `SKUID`），避免将 `R_SYSID` 作为唯一业务键。
+- `WmsPickToWcs` 的 `UniqueKeys` 改为联合键配置示例（`DOCNO` + `ADDTIME`），避免将 `R_SYSID` 作为唯一业务键。
 - 聚合模型统一：`Aggregates` 目录全部实体统一继承 `IEntity<long>`，新增 `Id` 自增主键模型。
 - 主键策略升级：聚合表主键统一为 `Id`，并在基表迁移与分表建表模板中强制为倒序聚簇主键。
 - 迁移历史重建：删除旧迁移并重新生成 `RebuildInitialHubSchema` 初始化迁移。
