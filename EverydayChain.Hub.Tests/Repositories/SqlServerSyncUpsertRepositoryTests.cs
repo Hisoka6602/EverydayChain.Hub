@@ -160,6 +160,31 @@ public class SqlServerSyncUpsertRepositoryTests
     }
 
     /// <summary>
+    /// 状态分表名称应按 TableCode 生成独立表名，格式为 sync_target_state_{tableCode}。
+    /// </summary>
+    [Theory]
+    [InlineData("WmsPickToWcs", "[dbo].[sync_target_state_WmsPickToWcs]")]
+    [InlineData("WmsSplitPickToLightCarton", "[dbo].[sync_target_state_WmsSplitPickToLightCarton]")]
+    [InlineData("SortingTaskTrace", "[dbo].[sync_target_state_SortingTaskTrace]")]
+    public void GetSyncStateTableFullName_ShouldGeneratePerTableCodeName(string tableCode, string expectedFullName)
+    {
+        var actualFullName = SqlServerSyncUpsertRepository.GetSyncStateTableFullName(tableCode);
+
+        Assert.Equal(expectedFullName, actualFullName);
+    }
+
+    /// <summary>
+    /// 状态分表名称对含非法字符的 TableCode 应抛出异常。
+    /// </summary>
+    [Fact]
+    public void GetSyncStateTableFullName_WhenTableCodeContainsInvalidChar_ShouldThrow()
+    {
+        var action = () => SqlServerSyncUpsertRepository.GetSyncStateTableFullName("my-table; DROP TABLE--");
+
+        Assert.Throws<InvalidOperationException>(action);
+    }
+
+    /// <summary>
     /// 创建测试仓储。
     /// </summary>
     /// <returns>测试仓储。</returns>

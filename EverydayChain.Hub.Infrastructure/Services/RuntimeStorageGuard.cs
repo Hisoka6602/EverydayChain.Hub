@@ -27,7 +27,7 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     /// <summary>单表内存告警节流间隔上限（秒）。</summary>
     private const int MaxTableMemoryWarningLogIntervalSeconds = 86400;
 
-    /// <summary>检查点文件绝对路径。</summary>
+    /// <summary>检查点文件绝对路径（由配置项 CheckpointFilePath 决定；为空时使用应用基目录下 sync-checkpoints.json）。</summary>
     private readonly string _checkpointFilePath = RuntimeStoragePathResolver.ResolveAbsolutePath(
         syncJobOptions.Value.CheckpointFilePath,
         "sync-checkpoints.json");

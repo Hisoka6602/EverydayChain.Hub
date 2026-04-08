@@ -29,8 +29,8 @@ public class SqlServerSyncUpsertRepository(
     IDangerZoneExecutor dangerZoneExecutor,
     ILogger<SqlServerSyncUpsertRepository> logger) : ISyncUpsertRepository {
 
-    /// <summary>状态表名。</summary>
-    private const string SyncTargetStateTableName = "sync_target_state";
+    /// <summary>状态表名前缀（按 TableCode 分表，实际表名为 sync_target_state_{tableCode}）。</summary>
+    private const string SyncTargetStateTablePrefix = "sync_target_state";
 
     /// <summary>状态表固定 Schema。</summary>
     private const string SyncTargetStateSchema = "dbo";
@@ -122,7 +122,7 @@ public class SqlServerSyncUpsertRepository(
         await connection.OpenAsync(ct);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(ct);
         try {
-            await EnsureSyncTargetStateTableExistsAsync(connection, transaction, ct);
+            await EnsureSyncTargetStateTableExistsAsync(request.TableCode, connection, transaction, ct);
             var distinctBusinessKeys = GetDistinctBusinessKeys(entries);
             var states = await LoadStateMapAsync(connection, transaction, request.TableCode, distinctBusinessKeys, ct);
             var initialStates = new Dictionary<string, PersistedState>(states, StringComparer.OrdinalIgnoreCase);
@@ -219,11 +219,11 @@ public class SqlServerSyncUpsertRepository(
         var states = new List<SyncTargetStateRow>();
         await using var connection = new SqlConnection(_shardingOptions.ConnectionString);
         await connection.OpenAsync(ct);
-        await EnsureSyncTargetStateTableExistsAsync(connection, transaction: null, ct);
+        await EnsureSyncTargetStateTableExistsAsync(tableCode, connection, transaction: null, ct);
         await using var command = connection.CreateCommand();
         command.CommandText = $@"
 SELECT [BusinessKey], [RowDigest], [CursorLocal], [IsSoftDeleted], [SoftDeletedTimeLocal]
-FROM {GetSyncStateTableFullName()}
+FROM {GetSyncStateTableFullName(tableCode)}
 WHERE [TableCode]=@tableCode;";
         command.Parameters.AddWithValue("@tableCode", tableCode);
         await using var reader = await command.ExecuteReaderAsync(ct);
@@ -370,7 +370,7 @@ WHERE [TableCode]=@tableCode;";
             command.Parameters.AddWithValue("@tableCode", tableCode);
             command.CommandText = $@"
 SELECT [BusinessKey], [RowDigest], [CursorLocal], [IsSoftDeleted], [SoftDeletedTimeLocal], [ShardSuffix], [TargetLogicalTable]
-FROM {GetSyncStateTableFullName()}
+FROM {GetSyncStateTableFullName(tableCode)}
 WHERE [TableCode]=@tableCode
   AND [BusinessKey] IN ({string.Join(", ", parameterNames)});";
             await using var reader = await command.ExecuteReaderAsync(ct);
@@ -391,22 +391,28 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 确保幂等状态表存在。
+    /// 确保指定表编码对应的幂等状态分表存在（按 TableCode 分表）。
     /// </summary>
     /// <remarks>
+    /// 每个 TableCode 对应独立的状态表（sync_target_state_{tableCode}），避免所有表数据堆积在同一张表。
     /// 线上若存在“迁移历史被重置 / 部分迁移缺失”场景，状态表可能未被创建。
     /// 此处进行幂等兜底，避免同步任务因 208 异常中断。
     /// </remarks>
+    /// <param name="tableCode">同步表编码，用于确定状态分表名称。</param>
     /// <param name="connection">数据库连接。</param>
     /// <param name="transaction">事务对象（可空）。</param>
     /// <param name="ct">取消令牌。</param>
-    private async Task EnsureSyncTargetStateTableExistsAsync(SqlConnection connection, SqlTransaction? transaction, CancellationToken ct) {
+private async Task EnsureSyncTargetStateTableExistsAsync(string tableCode, SqlConnection connection, SqlTransaction? transaction, CancellationToken ct) {
+        var fullName = GetSyncStateTableFullName(tableCode);
+        var tableNameRaw = $"{SyncTargetStateTablePrefix}_{tableCode}";
+        var pkName = EscapeIdentifier($"PK_{tableNameRaw}");
+        var indexName = EscapeIdentifier($"IX_{tableNameRaw}_CursorLocal");
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = $@"
-IF OBJECT_ID(N'{GetSyncStateTableFullName()}', N'U') IS NULL
+IF OBJECT_ID(N'{fullName}', N'U') IS NULL
 BEGIN
-    CREATE TABLE {GetSyncStateTableFullName()} (
+    CREATE TABLE {fullName} (
         [TableCode] NVARCHAR(128) NOT NULL,
         [BusinessKey] NVARCHAR(512) NOT NULL,
         [RowDigest] NVARCHAR(128) NOT NULL,
@@ -416,11 +422,11 @@ BEGIN
         [ShardSuffix] NVARCHAR(32) NOT NULL,
         [TargetLogicalTable] NVARCHAR(128) NOT NULL,
         [UpdatedTimeLocal] DATETIME2 NOT NULL,
-        CONSTRAINT [PK_sync_target_state] PRIMARY KEY ([TableCode], [BusinessKey])
+        CONSTRAINT [{pkName}] PRIMARY KEY ([TableCode], [BusinessKey])
     );
 
-    CREATE INDEX [IX_sync_target_state_TableCode_CursorLocal]
-    ON {GetSyncStateTableFullName()} ([TableCode], [CursorLocal]);
+    CREATE INDEX [{indexName}]
+    ON {fullName} ([TableCode], [CursorLocal]);
 END;";
         await command.ExecuteNonQueryAsync(ct);
     }
@@ -755,7 +761,7 @@ CREATE TABLE {tempTableName} (
                 await using var mergeCommand = connection.CreateCommand();
                 mergeCommand.Transaction = transaction;
                 mergeCommand.CommandText = $@"
-MERGE {GetSyncStateTableFullName()} AS target
+MERGE {GetSyncStateTableFullName(tableCode)} AS target
 USING {tempTableName} AS source
 ON target.[TableCode] = source.[TableCode] AND target.[BusinessKey] = source.[BusinessKey]
 WHEN MATCHED THEN
@@ -1050,7 +1056,7 @@ WHEN NOT MATCHED THEN
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = $@"
-MERGE {GetSyncStateTableFullName()} AS target
+MERGE {GetSyncStateTableFullName(tableCode)} AS target
 USING (SELECT
     @tableCode AS [TableCode],
     @businessKey AS [BusinessKey],
@@ -1103,7 +1109,7 @@ WHEN NOT MATCHED THEN
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = $@"
-UPDATE {GetSyncStateTableFullName()}
+UPDATE {GetSyncStateTableFullName(tableCode)}
 SET [IsSoftDeleted]=1,
     [SoftDeletedTimeLocal]=@softDeletedTimeLocal,
     [UpdatedTimeLocal]=@updatedTimeLocal
@@ -1132,7 +1138,7 @@ WHERE [TableCode]=@tableCode
         CancellationToken ct) {
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = $@"DELETE FROM {GetSyncStateTableFullName()} WHERE [TableCode]=@tableCode AND [BusinessKey]=@businessKey;";
+        command.CommandText = $@"DELETE FROM {GetSyncStateTableFullName(tableCode)} WHERE [TableCode]=@tableCode AND [BusinessKey]=@businessKey;";
         command.Parameters.AddWithValue("@tableCode", tableCode);
         command.Parameters.AddWithValue("@businessKey", businessKey);
         await command.ExecuteNonQueryAsync(ct);
@@ -1222,11 +1228,17 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 构建状态表全限定名。
+    /// 构建状态分表全限定名（按 TableCode 分表，表名格式为 sync_target_state_{tableCode}）。
     /// </summary>
+    /// <param name="tableCode">同步表编码。</param>
     /// <returns>全限定表名。</returns>
-    private string GetSyncStateTableFullName() {
-        return $"[{EscapeIdentifier(SyncTargetStateSchema)}].[{EscapeIdentifier(SyncTargetStateTableName)}]";
+    internal static string GetSyncStateTableFullName(string tableCode) {
+        if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(tableCode)) {
+            throw new InvalidOperationException($"检测到非法 TableCode 标识符，仅允许字母、数字、下划线：{tableCode}");
+        }
+
+        var physicalTableName = $"{SyncTargetStateTablePrefix}_{tableCode}";
+        return $"[{EscapeIdentifier(SyncTargetStateSchema)}].[{EscapeIdentifier(physicalTableName)}]";
     }
 
     /// <summary>
