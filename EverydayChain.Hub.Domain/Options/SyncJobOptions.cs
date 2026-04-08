@@ -44,6 +44,12 @@ public class SyncJobOptions
     /// <summary>后台任务看门狗超时时间（单位：秒，可填写范围：[0, 86400]；0 表示关闭看门狗检测；建议值 1800）。主循环超过此阈值未推进时，输出 Critical 日志提示运维检查并重启服务。</summary>
     public int WatchdogTimeoutSeconds { get; set; } = 1800;
 
+    /// <summary>是否启用按页集合式 MERGE（可填写项：true、false；建议值 true）。</summary>
+    public bool EnableSetBasedMerge { get; set; } = true;
+
+    /// <summary>按页集合式 MERGE 的批次大小（建议范围：1~5000；建议值 500）。</summary>
+    public int BatchMergeSize { get; set; } = 500;
+
     /// <summary>单表配置集合。</summary>
     public List<SyncTableOptions> Tables { get; set; } = [];
 }

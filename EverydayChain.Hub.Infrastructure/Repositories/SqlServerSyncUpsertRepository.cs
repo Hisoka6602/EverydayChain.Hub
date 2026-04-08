@@ -2,6 +2,7 @@ using System.Text;
 using System.Buffers;
 using System.Text.Json;
 using System.Globalization;
+using System.Data;
 using System.Buffers.Binary;
 using Microsoft.Data.SqlClient;
 using System.Security.Cryptography;
@@ -101,7 +102,6 @@ public class SqlServerSyncUpsertRepository(
 
         var tableOptions = ResolveTableOptions(request.TableCode);
         var targetLogicalTable = ResolveTargetLogicalTable(request.TableCode, tableOptions);
-        var uniqueKeySet = new HashSet<string>(request.UniqueKeys, StringComparer.OrdinalIgnoreCase);
         var entries = BuildMergeEntries(request, targetLogicalTable);
         if (entries.Count == 0) {
             return result;
@@ -122,13 +122,14 @@ public class SqlServerSyncUpsertRepository(
             await EnsureSyncTargetStateTableExistsAsync(connection, transaction, ct);
             var distinctBusinessKeys = GetDistinctBusinessKeys(entries);
             var states = await LoadStateMapAsync(connection, transaction, request.TableCode, distinctBusinessKeys, ct);
+            var changedEntries = new List<MergeEntry>(entries.Count);
+            var shardSwitchDeletes = new List<ShardDeleteEntry>(entries.Count);
             foreach (var entry in entries) {
                 ct.ThrowIfCancellationRequested();
                 UpdateLastCursor(result, entry.State.CursorLocal);
 
                 if (!states.TryGetValue(entry.BusinessKey, out var existingState)) {
-                    await UpsertTargetRowAsync(connection, transaction, entry.TargetLogicalTable, entry.ShardSuffix, entry.Row, request.UniqueKeys, uniqueKeySet, ct);
-                    await UpsertStateAsync(connection, transaction, request.TableCode, entry, ct);
+                    changedEntries.Add(entry);
                     states[entry.BusinessKey] = new PersistedState(
                         entry.BusinessKey,
                         entry.State.RowDigest,
@@ -148,18 +149,13 @@ public class SqlServerSyncUpsertRepository(
                 }
 
                 if (!string.Equals(existingState.ShardSuffix, entry.ShardSuffix, StringComparison.OrdinalIgnoreCase)) {
-                    await DeleteTargetRowByBusinessKeyAsync(
-                        connection,
-                        transaction,
+                    shardSwitchDeletes.Add(new ShardDeleteEntry(
                         existingState.TargetLogicalTable,
                         existingState.ShardSuffix,
-                        request.UniqueKeys,
-                        existingState.BusinessKey,
-                        ct);
+                        existingState.BusinessKey));
                 }
 
-                await UpsertTargetRowAsync(connection, transaction, entry.TargetLogicalTable, entry.ShardSuffix, entry.Row, request.UniqueKeys, uniqueKeySet, ct);
-                await UpsertStateAsync(connection, transaction, request.TableCode, entry, ct);
+                changedEntries.Add(entry);
                 states[entry.BusinessKey] = new PersistedState(
                     entry.BusinessKey,
                     entry.State.RowDigest,
@@ -170,6 +166,31 @@ public class SqlServerSyncUpsertRepository(
                     entry.TargetLogicalTable);
                 result.UpdateCount++;
                 changedOperations[entry.BusinessKey] = SyncChangeOperationType.Update;
+            }
+
+            var batchMergeSize = GetBatchMergeSize();
+            if (_syncJobOptions.EnableSetBasedMerge) {
+                await ExecuteShardDeleteBatchesAsync(connection, transaction, request.UniqueKeys, shardSwitchDeletes, batchMergeSize, ct);
+                await ExecuteTargetMergeBatchesAsync(connection, transaction, request.UniqueKeys, changedEntries, batchMergeSize, ct);
+                await UpsertStatesBatchAsync(connection, transaction, request.TableCode, changedEntries, batchMergeSize, ct);
+            }
+            else {
+                var uniqueKeySet = new HashSet<string>(request.UniqueKeys, StringComparer.OrdinalIgnoreCase);
+                foreach (var shardDelete in shardSwitchDeletes) {
+                    await DeleteTargetRowByBusinessKeyAsync(
+                        connection,
+                        transaction,
+                        shardDelete.TargetLogicalTable,
+                        shardDelete.ShardSuffix,
+                        request.UniqueKeys,
+                        shardDelete.BusinessKey,
+                        ct);
+                }
+
+                foreach (var entry in changedEntries) {
+                    await UpsertTargetRowAsync(connection, transaction, entry.TargetLogicalTable, entry.ShardSuffix, entry.Row, request.UniqueKeys, uniqueKeySet, ct);
+                    await UpsertStateAsync(connection, transaction, request.TableCode, entry, ct);
+                }
             }
 
             await transaction.CommitAsync(ct);
@@ -403,6 +424,376 @@ BEGIN
     ON {GetSyncStateTableFullName()} ([TableCode], [CursorLocal]);
 END;";
         await command.ExecuteNonQueryAsync(ct);
+    }
+
+    /// <summary>
+    /// 获取集合式合并批次大小。
+    /// </summary>
+    /// <returns>批次大小。</returns>
+    private int GetBatchMergeSize() {
+        return Math.Clamp(_syncJobOptions.BatchMergeSize, 1, 5000);
+    }
+
+    /// <summary>
+    /// 执行目标表集合式 MERGE 批处理。
+    /// </summary>
+    /// <param name="connection">数据库连接。</param>
+    /// <param name="transaction">事务对象。</param>
+    /// <param name="uniqueKeys">唯一键集合。</param>
+    /// <param name="entries">变更条目集合。</param>
+    /// <param name="batchMergeSize">批次大小。</param>
+    /// <param name="ct">取消令牌。</param>
+    private async Task ExecuteTargetMergeBatchesAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        IReadOnlyList<string> uniqueKeys,
+        IReadOnlyList<MergeEntry> entries,
+        int batchMergeSize,
+        CancellationToken ct) {
+        if (entries.Count == 0) {
+            return;
+        }
+
+        var groupedEntries = entries
+            .GroupBy(entry => new TargetMergeGroupKey(
+                entry.TargetLogicalTable,
+                entry.ShardSuffix,
+                BuildColumnSignature(entry.Row.Keys)))
+            .ToArray();
+        foreach (var group in groupedEntries) {
+            var groupedList = group.ToList();
+            for (var index = 0; index < groupedList.Count; index += batchMergeSize) {
+                ct.ThrowIfCancellationRequested();
+                var currentBatch = groupedList.Skip(index).Take(batchMergeSize).ToArray();
+                await ExecuteTargetMergeBatchAsync(connection, transaction, uniqueKeys, currentBatch, ct);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 执行单个目标分组的集合式 MERGE。
+    /// </summary>
+    /// <param name="connection">数据库连接。</param>
+    /// <param name="transaction">事务对象。</param>
+    /// <param name="uniqueKeys">唯一键集合。</param>
+    /// <param name="entries">批次条目集合。</param>
+    /// <param name="ct">取消令牌。</param>
+    private async Task ExecuteTargetMergeBatchAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        IReadOnlyList<string> uniqueKeys,
+        IReadOnlyList<MergeEntry> entries,
+        CancellationToken ct) {
+        if (entries.Count == 0) {
+            return;
+        }
+
+        var sampleEntry = entries[0];
+        var fullTableName = BuildTargetTableFullName(sampleEntry.TargetLogicalTable, sampleEntry.ShardSuffix);
+        var orderedColumns = sampleEntry.Row.Keys
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(column => column, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        EnsureIdentifiersSafe(orderedColumns);
+        EnsureUniqueKeysPresent(uniqueKeys, sampleEntry.Row);
+        var uniqueKeySet = new HashSet<string>(uniqueKeys, StringComparer.OrdinalIgnoreCase);
+
+        var tempTableName = $"#sync_merge_{Guid.NewGuid():N}";
+        await using (var createCommand = connection.CreateCommand()) {
+            createCommand.Transaction = transaction;
+            createCommand.CommandText = $@"
+SELECT TOP (0) {string.Join(", ", orderedColumns.Select(column => $"[{EscapeIdentifier(column)}]"))}
+INTO {tempTableName}
+FROM {fullTableName};";
+            await createCommand.ExecuteNonQueryAsync(ct);
+        }
+
+        try {
+            var dataTable = new DataTable();
+            foreach (var column in orderedColumns) {
+                dataTable.Columns.Add(column, typeof(object));
+            }
+
+            foreach (var entry in entries) {
+                var row = dataTable.NewRow();
+                foreach (var column in orderedColumns) {
+                    row[column] = entry.Row.TryGetValue(column, out var value)
+                        ? ConvertToDbValue(value)
+                        : DBNull.Value;
+                }
+
+                dataTable.Rows.Add(row);
+            }
+
+            using (var bulkCopy = new SqlBulkCopy(connection, SqlBulkCopyOptions.Default, transaction)) {
+                bulkCopy.DestinationTableName = tempTableName;
+                foreach (var column in orderedColumns) {
+                    bulkCopy.ColumnMappings.Add(column, column);
+                }
+
+                await bulkCopy.WriteToServerAsync(dataTable, ct);
+            }
+
+            var uniquePredicates = uniqueKeys.Select(key => $"target.[{EscapeIdentifier(key)}] = source.[{EscapeIdentifier(key)}]").ToArray();
+            var updateColumns = orderedColumns
+                .Where(column => !uniqueKeySet.Contains(column))
+                .Select(column => $"target.[{EscapeIdentifier(column)}] = source.[{EscapeIdentifier(column)}]")
+                .ToArray();
+            var insertColumns = string.Join(", ", orderedColumns.Select(column => $"[{EscapeIdentifier(column)}]"));
+            var insertValues = string.Join(", ", orderedColumns.Select(column => $"source.[{EscapeIdentifier(column)}]"));
+            var matchedClause = updateColumns.Length == 0
+                ? string.Empty
+                : $"{Environment.NewLine}WHEN MATCHED THEN{Environment.NewLine}    UPDATE SET {string.Join(", ", updateColumns)}";
+            await using var mergeCommand = connection.CreateCommand();
+            mergeCommand.Transaction = transaction;
+            mergeCommand.CommandText = $@"
+MERGE {fullTableName} AS target
+USING {tempTableName} AS source
+ON {string.Join(" AND ", uniquePredicates)}{matchedClause}
+WHEN NOT MATCHED THEN
+    INSERT ({insertColumns}) VALUES ({insertValues});";
+            await mergeCommand.ExecuteNonQueryAsync(ct);
+        }
+        finally {
+            await using var dropCommand = connection.CreateCommand();
+            dropCommand.Transaction = transaction;
+            dropCommand.CommandText = $"DROP TABLE IF EXISTS {tempTableName};";
+            await dropCommand.ExecuteNonQueryAsync(CancellationToken.None);
+        }
+    }
+
+    /// <summary>
+    /// 执行跨分片迁移时的旧分片批量删除。
+    /// </summary>
+    /// <param name="connection">数据库连接。</param>
+    /// <param name="transaction">事务对象。</param>
+    /// <param name="uniqueKeys">唯一键集合。</param>
+    /// <param name="entries">删除条目集合。</param>
+    /// <param name="batchMergeSize">批次大小。</param>
+    /// <param name="ct">取消令牌。</param>
+    private async Task ExecuteShardDeleteBatchesAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        IReadOnlyList<string> uniqueKeys,
+        IReadOnlyList<ShardDeleteEntry> entries,
+        int batchMergeSize,
+        CancellationToken ct) {
+        if (entries.Count == 0) {
+            return;
+        }
+
+        var groupedEntries = entries
+            .GroupBy(entry => new TargetShardGroupKey(entry.TargetLogicalTable, entry.ShardSuffix))
+            .ToArray();
+        foreach (var group in groupedEntries) {
+            var deduplicated = new List<ShardDeleteEntry>(group.Count());
+            var seenBusinessKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in group) {
+                if (seenBusinessKeys.Add(entry.BusinessKey)) {
+                    deduplicated.Add(entry);
+                }
+            }
+
+            for (var index = 0; index < deduplicated.Count; index += batchMergeSize) {
+                ct.ThrowIfCancellationRequested();
+                var currentBatch = deduplicated.Skip(index).Take(batchMergeSize).ToArray();
+                await ExecuteShardDeleteBatchAsync(connection, transaction, uniqueKeys, currentBatch, ct);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 执行单个分片批次删除。
+    /// </summary>
+    /// <param name="connection">数据库连接。</param>
+    /// <param name="transaction">事务对象。</param>
+    /// <param name="uniqueKeys">唯一键集合。</param>
+    /// <param name="entries">删除条目集合。</param>
+    /// <param name="ct">取消令牌。</param>
+    private async Task ExecuteShardDeleteBatchAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        IReadOnlyList<string> uniqueKeys,
+        IReadOnlyList<ShardDeleteEntry> entries,
+        CancellationToken ct) {
+        if (entries.Count == 0) {
+            return;
+        }
+
+        EnsureIdentifiersSafe(uniqueKeys);
+        var fullTableName = BuildTargetTableFullName(entries[0].TargetLogicalTable, entries[0].ShardSuffix);
+        var tempTableName = $"#sync_delete_{Guid.NewGuid():N}";
+        await using (var createCommand = connection.CreateCommand()) {
+            createCommand.Transaction = transaction;
+            createCommand.CommandText = $@"
+SELECT TOP (0) {string.Join(", ", uniqueKeys.Select(key => $"[{EscapeIdentifier(key)}]"))}
+INTO {tempTableName}
+FROM {fullTableName};";
+            await createCommand.ExecuteNonQueryAsync(ct);
+        }
+
+        try {
+            var dataTable = new DataTable();
+            foreach (var key in uniqueKeys) {
+                dataTable.Columns.Add(key, typeof(object));
+            }
+
+            foreach (var entry in entries) {
+                var parsedKeyValues = ParseBusinessKey(uniqueKeys, entry.BusinessKey);
+                var row = dataTable.NewRow();
+                foreach (var key in uniqueKeys) {
+                    row[key] = parsedKeyValues.TryGetValue(key, out var value)
+                        ? ConvertToDbValue(value)
+                        : DBNull.Value;
+                }
+
+                dataTable.Rows.Add(row);
+            }
+
+            using (var bulkCopy = new SqlBulkCopy(connection, SqlBulkCopyOptions.Default, transaction)) {
+                bulkCopy.DestinationTableName = tempTableName;
+                foreach (var key in uniqueKeys) {
+                    bulkCopy.ColumnMappings.Add(key, key);
+                }
+
+                await bulkCopy.WriteToServerAsync(dataTable, ct);
+            }
+
+            var predicates = uniqueKeys
+                .Select(key => $"target.[{EscapeIdentifier(key)}] = source.[{EscapeIdentifier(key)}]")
+                .ToArray();
+            await using var deleteCommand = connection.CreateCommand();
+            deleteCommand.Transaction = transaction;
+            deleteCommand.CommandText = $@"
+DELETE target
+FROM {fullTableName} AS target
+INNER JOIN {tempTableName} AS source
+    ON {string.Join(" AND ", predicates)};";
+            await deleteCommand.ExecuteNonQueryAsync(ct);
+        }
+        finally {
+            await using var dropCommand = connection.CreateCommand();
+            dropCommand.Transaction = transaction;
+            dropCommand.CommandText = $"DROP TABLE IF EXISTS {tempTableName};";
+            await dropCommand.ExecuteNonQueryAsync(CancellationToken.None);
+        }
+    }
+
+    /// <summary>
+    /// 批量合并状态表。
+    /// </summary>
+    /// <param name="connection">数据库连接。</param>
+    /// <param name="transaction">事务对象。</param>
+    /// <param name="tableCode">表编码。</param>
+    /// <param name="entries">变更条目集合。</param>
+    /// <param name="batchMergeSize">批次大小。</param>
+    /// <param name="ct">取消令牌。</param>
+    private async Task UpsertStatesBatchAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        string tableCode,
+        IReadOnlyList<MergeEntry> entries,
+        int batchMergeSize,
+        CancellationToken ct) {
+        if (entries.Count == 0) {
+            return;
+        }
+
+        for (var index = 0; index < entries.Count; index += batchMergeSize) {
+            ct.ThrowIfCancellationRequested();
+            var currentBatch = entries.Skip(index).Take(batchMergeSize).ToArray();
+            var tempTableName = $"#sync_state_{Guid.NewGuid():N}";
+            await using (var createCommand = connection.CreateCommand()) {
+                createCommand.Transaction = transaction;
+                createCommand.CommandText = $@"
+CREATE TABLE {tempTableName} (
+    [TableCode] NVARCHAR(128) NOT NULL,
+    [BusinessKey] NVARCHAR(512) NOT NULL,
+    [RowDigest] NVARCHAR(128) NOT NULL,
+    [CursorLocal] DATETIME2 NULL,
+    [IsSoftDeleted] BIT NOT NULL,
+    [SoftDeletedTimeLocal] DATETIME2 NULL,
+    [ShardSuffix] NVARCHAR(32) NOT NULL,
+    [TargetLogicalTable] NVARCHAR(128) NOT NULL,
+    [UpdatedTimeLocal] DATETIME2 NOT NULL
+);";
+                await createCommand.ExecuteNonQueryAsync(ct);
+            }
+
+            try {
+                var nowLocal = DateTime.Now;
+                var dataTable = new DataTable();
+                dataTable.Columns.Add("TableCode", typeof(string));
+                dataTable.Columns.Add("BusinessKey", typeof(string));
+                dataTable.Columns.Add("RowDigest", typeof(string));
+                dataTable.Columns.Add("CursorLocal", typeof(object));
+                dataTable.Columns.Add("IsSoftDeleted", typeof(bool));
+                dataTable.Columns.Add("SoftDeletedTimeLocal", typeof(object));
+                dataTable.Columns.Add("ShardSuffix", typeof(string));
+                dataTable.Columns.Add("TargetLogicalTable", typeof(string));
+                dataTable.Columns.Add("UpdatedTimeLocal", typeof(DateTime));
+                foreach (var entry in currentBatch) {
+                    dataTable.Rows.Add(
+                        tableCode,
+                        entry.BusinessKey,
+                        entry.State.RowDigest,
+                        ConvertToDbValue(entry.State.CursorLocal),
+                        entry.State.IsSoftDeleted,
+                        ConvertToDbValue(entry.State.SoftDeletedTimeLocal),
+                        entry.ShardSuffix,
+                        entry.TargetLogicalTable,
+                        nowLocal);
+                }
+
+                using (var bulkCopy = new SqlBulkCopy(connection, SqlBulkCopyOptions.Default, transaction)) {
+                    bulkCopy.DestinationTableName = tempTableName;
+                    foreach (DataColumn column in dataTable.Columns) {
+                        bulkCopy.ColumnMappings.Add(column.ColumnName, column.ColumnName);
+                    }
+
+                    await bulkCopy.WriteToServerAsync(dataTable, ct);
+                }
+
+                await using var mergeCommand = connection.CreateCommand();
+                mergeCommand.Transaction = transaction;
+                mergeCommand.CommandText = $@"
+MERGE {GetSyncStateTableFullName()} AS target
+USING {tempTableName} AS source
+ON target.[TableCode] = source.[TableCode] AND target.[BusinessKey] = source.[BusinessKey]
+WHEN MATCHED THEN
+    UPDATE SET
+        target.[RowDigest] = source.[RowDigest],
+        target.[CursorLocal] = source.[CursorLocal],
+        target.[IsSoftDeleted] = source.[IsSoftDeleted],
+        target.[SoftDeletedTimeLocal] = source.[SoftDeletedTimeLocal],
+        target.[ShardSuffix] = source.[ShardSuffix],
+        target.[TargetLogicalTable] = source.[TargetLogicalTable],
+        target.[UpdatedTimeLocal] = source.[UpdatedTimeLocal]
+WHEN NOT MATCHED THEN
+    INSERT ([TableCode], [BusinessKey], [RowDigest], [CursorLocal], [IsSoftDeleted], [SoftDeletedTimeLocal], [ShardSuffix], [TargetLogicalTable], [UpdatedTimeLocal])
+    VALUES (source.[TableCode], source.[BusinessKey], source.[RowDigest], source.[CursorLocal], source.[IsSoftDeleted], source.[SoftDeletedTimeLocal], source.[ShardSuffix], source.[TargetLogicalTable], source.[UpdatedTimeLocal]);";
+                await mergeCommand.ExecuteNonQueryAsync(ct);
+            }
+            finally {
+                await using var dropCommand = connection.CreateCommand();
+                dropCommand.Transaction = transaction;
+                dropCommand.CommandText = $"DROP TABLE IF EXISTS {tempTableName};";
+                await dropCommand.ExecuteNonQueryAsync(CancellationToken.None);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 构建列签名文本。
+    /// </summary>
+    /// <param name="columns">列集合。</param>
+    /// <returns>列签名。</returns>
+    private static string BuildColumnSignature(IEnumerable<string> columns) {
+        var ordered = columns
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(column => column, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return string.Join("|", ordered);
     }
 
     /// <summary>
@@ -1128,4 +1519,35 @@ WHERE [TableCode]=@tableCode
         DateTime? SoftDeletedTimeLocal,
         string ShardSuffix,
         string TargetLogicalTable);
+
+    /// <summary>
+    /// 目标分组键（按表、后缀、列签名分组）。
+    /// </summary>
+    /// <param name="TargetLogicalTable">目标逻辑表。</param>
+    /// <param name="ShardSuffix">分表后缀。</param>
+    /// <param name="ColumnSignature">列签名。</param>
+    private readonly record struct TargetMergeGroupKey(
+        string TargetLogicalTable,
+        string ShardSuffix,
+        string ColumnSignature);
+
+    /// <summary>
+    /// 目标分片分组键（按表、后缀分组）。
+    /// </summary>
+    /// <param name="TargetLogicalTable">目标逻辑表。</param>
+    /// <param name="ShardSuffix">分表后缀。</param>
+    private readonly record struct TargetShardGroupKey(
+        string TargetLogicalTable,
+        string ShardSuffix);
+
+    /// <summary>
+    /// 分片迁移删除条目。
+    /// </summary>
+    /// <param name="TargetLogicalTable">目标逻辑表。</param>
+    /// <param name="ShardSuffix">旧分表后缀。</param>
+    /// <param name="BusinessKey">业务键。</param>
+    private readonly record struct ShardDeleteEntry(
+        string TargetLogicalTable,
+        string ShardSuffix,
+        string BusinessKey);
 }
