@@ -85,13 +85,13 @@ public class AutoMigrationService(
     }
 
     /// <summary>
-    /// 输出连接参数快照（脱敏），便于定位 pre-login 握手失败。
+    /// 输出连接参数快照，便于定位 pre-login 握手失败。
     /// </summary>
     private void LogConnectionSecuritySnapshot() {
         try {
             var builder = new SqlConnectionStringBuilder(_options.ConnectionString);
             logger.LogInformation(
-                "自动迁移连接快照(脱敏): DataSource={DataSource}, InitialCatalog={InitialCatalog}, Encrypt={Encrypt}, TrustServerCertificate={TrustServerCertificate}, IntegratedSecurity={IntegratedSecurity}, ConnectTimeout={ConnectTimeout}",
+                "自动迁移连接快照: DataSource={DataSource}, InitialCatalog={InitialCatalog}, Encrypt={Encrypt}, TrustServerCertificate={TrustServerCertificate}, IntegratedSecurity={IntegratedSecurity}, ConnectTimeout={ConnectTimeout}",
                 builder.DataSource,
                 builder.InitialCatalog,
                 builder.Encrypt,
