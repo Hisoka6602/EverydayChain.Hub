@@ -1,12 +1,11 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- `IDX_PICKTOWCS2.R_SYSID` 调整为可空且非唯一，仅保留普通索引。
-- 迁移历史再次重建：删除历史迁移并重新生成 `RebuildInitialHubSchema` 初始化迁移。
-- `WmsPickToWcs` 的 `UniqueKeys` 改为联合键配置示例（`DOCNO` + `ADDTIME`）。
-- 聚合模型统一：`Aggregates` 目录全部实体统一继承 `IEntity<long>`，新增 `Id` 自增主键模型。
-- 主键策略升级：聚合表主键统一为 `Id`，并在基表迁移与分表建表模板中强制为倒序聚簇主键。
-- EF Core 写入性能优化：`SortingTaskTraceWriter` 关闭自动变更检测并按批次清理跟踪器，降低大批量写入的跟踪开销。
+- `SqlServerSyncUpsertRepository` 从逐行 MERGE 重构为按页集合式 MERGE（临时表 + 批量写入 + 批量状态 MERGE），显著减少 SQL 往返次数。
+- 保留幂等语义、唯一键语义、分片后缀语义与 `sync_target_state` 语义；分片切换时旧分片删除升级为批处理。
+- `SyncJob` 新增 `EnableSetBasedMerge` 与 `BatchMergeSize` 配置，并在 `appsettings.json` 增补中文范围说明与建议值。
+- `DangerZoneExecutor` 新增 `OperationCanceledException` 专用分支：调用方取消记录 Warning，非调用方取消仍按 Error 记录。
+- 测试补充：新增批量合并计数、分片迁移删除行为、隔离器取消日志等级测试。
 
 ## 解决方案文件树与职责
 ```text
@@ -139,6 +138,7 @@
 │   ├── Repositories/SqlServerSyncUpsertRepositoryTests.cs
 │   └── Services
 │       ├── AutoMigrationServiceTests.cs
+│       ├── DangerZoneExecutorTests.cs
 │       ├── ServiceCollectionExtensionsTests.cs
 │       ├── ShardTableProvisionerTests.cs
 │       ├── SortingTaskTraceWriterTests.cs
@@ -193,7 +193,7 @@
 - `OracleOptions.cs`：远端 Oracle 连接配置实体，定义连接字符串、连接库名（ServiceName/SID，决定连接目标）、只读开关、命令超时与分页上限。
 - `OracleSourceReader.cs`：源端读取器 Oracle 实现，使用参数化 SQL 执行真实只读查询，支持分页增量读取、业务键读取、`ExcludedColumns` 过滤，并在异常场景输出错误日志；支持 `Oracle.DatabaseMode` 控制库名拼接语义（ServiceName/SID）。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
-- `SqlServerSyncUpsertRepository.cs`：SQL Server 真实落库实现，按目标逻辑表+后缀分表执行 UPSERT，并在 `sync_target_state` 中记录后缀用于跨分表迁移更新时的旧分表清理。
+- `SqlServerSyncUpsertRepository.cs`：SQL Server 真实落库实现，按目标逻辑表+后缀分表执行集合式 MERGE（支持配置回退逐行模式），并在 `sync_target_state` 中记录后缀用于跨分表迁移更新时的旧分表批量清理。
 - `SyncDeletionRepository.cs`：删除同步仓储基础实现，基于轻量幂等状态执行窗口过滤与源端键差异识别，并按策略执行删除。
 - `ShardTableResolver.cs`：分表解析仓储实现，按逻辑表枚举物理分表并解析分表月份后缀。
 - `ShardRetentionRepository.cs`：分表保留期仓储实现，在危险动作隔离器保护下执行分表删除并输出审计日志，且可基于系统元数据生成可回放回滚 DDL。
@@ -207,6 +207,7 @@
 - `nlog.config`：NLog 日志配置，输出至控制台与滚动日志文件（按日切割，单文件上限 10 MB，保留 30 天）。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
+- `EverydayChain.Hub.Tests/Services/DangerZoneExecutorTests.cs`：危险操作隔离器取消语义测试，覆盖调用方取消与非调用方取消的日志等级分支。
 - `EverydayChain.Hub.Tests/Services/SyncWindowCalculatorTests.cs`：SyncWindowCalculator 时间窗口回归测试套件（12 个测试用例，覆盖正常窗口、时钟回拨冻结、UTC 拒绝、Unspecified Kind 兼容、时钟扰动组合场景）。
 - `EverydayChain.Hub.Tests/Services/AutoMigrationServiceTests.cs`：分表预建后缀策略测试，断言启动预建不再包含无后缀基础表。
 - `EverydayChain.Hub.Tests/Services/ServiceCollectionExtensionsTests.cs`：逻辑表名构建测试，覆盖非法标识符与空启用集合异常场景。
@@ -235,10 +236,7 @@
 - `Oracle.ConnectionString` 保持 `Data Source=host:port;User Id=...;Password=...;`（由系统按 `DatabaseMode` + `Database` 拼接库名）。
 
 ## 可继续完善内容（本次 PR 后续行动项）
-- 在启动日志中输出 `Database`、`DatabaseMode` 与每张表 `SourceSchema` 的“职责分层快照”，帮助运维快速定位配置问题。
-- 增加 `Oracle.DatabaseMode` 的启动期连通性探测（按 ServiceName/SID 双模式探测并输出建议），降低现场试错成本。
-- 增加 Oracle 启动预检（如 `SELECT SYS_CONTEXT('USERENV','SERVICE_NAME') FROM DUAL`）并将实际服务名回显到日志，提前识别 `ServiceName/SID` 配置错误。
-- 增加 `OracleSourceReader` 针对 `ORA-12154/ORA-12514` 的单元测试，验证“不可重试异常”分支在分页读取与业务键读取均生效。
-- 为 `Oracle.Database` 增加配置有效性启动自检（例如库名为空白字符串、Data Source 复杂描述符不支持覆盖时提前阻断）。
-- 为 SQL Server UPSERT 落库补充真实数据库集成测试（跨分表迁移更新、硬删回收、事务回滚重试）。
-- 在启动日志中输出纳管逻辑表集合快照，便于运维核对多表预建范围。
+- 为集合式 MERGE 增加真实 SQL Server 集成基准（大页写入、锁等待、超时重试）并沉淀基线阈值告警。
+- 评估 TVP 版本的集合式 MERGE 实现，减少临时表 DDL 与批次内元数据开销。
+- 增加“取消触发下的数据库事务回滚”集成测试，补齐真实数据库回滚行为验收。
+- 为不同业务表列集差异场景补充列签名分组覆盖测试，进一步降低回归风险。

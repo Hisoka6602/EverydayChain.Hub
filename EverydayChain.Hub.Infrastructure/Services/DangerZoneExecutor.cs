@@ -80,6 +80,16 @@ public class DangerZoneExecutor : IDangerZoneExecutor
                 action,
                 cancellationToken);
         }
+        catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "危险操作隔离器检测到调用方取消请求，操作已取消。操作名: {OperationName}", operationName);
+            throw;
+        }
+        catch (OperationCanceledException ex)
+        {
+            _logger.LogError(ex, "危险操作隔离器执行出现未预期取消异常，操作名: {OperationName}", operationName);
+            throw;
+        }
         catch (BrokenCircuitException ex)
         {
             _logger.LogError(ex, "危险操作隔离器触发熔断，操作名: {OperationName}", operationName);
@@ -119,6 +129,16 @@ public class DangerZoneExecutor : IDangerZoneExecutor
                 static (Func<CancellationToken, Task<T>> callback, CancellationToken token) => new ValueTask<T>(callback(token)),
                 action,
                 cancellationToken);
+        }
+        catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "危险操作隔离器检测到调用方取消请求，操作已取消。操作名: {OperationName}", operationName);
+            throw;
+        }
+        catch (OperationCanceledException ex)
+        {
+            _logger.LogError(ex, "危险操作隔离器执行出现未预期取消异常，操作名: {OperationName}", operationName);
+            throw;
         }
         catch (BrokenCircuitException ex)
         {

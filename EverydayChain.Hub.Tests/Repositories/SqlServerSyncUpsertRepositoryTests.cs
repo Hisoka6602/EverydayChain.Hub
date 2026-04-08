@@ -62,6 +62,45 @@ public class SqlServerSyncUpsertRepositoryTests
     }
 
     /// <summary>
+    /// 批量混合变更应返回正确插入/更新/跳过统计。
+    /// </summary>
+    [Fact]
+    public async Task MergeFromStagingAsync_WhenBatchContainsInsertUpdateSkip_ShouldReturnExpectedCounts()
+    {
+        var repository = CreateRepository();
+        await repository.MergeFromStagingAsync(CreateRequest("BK1", "A"), CancellationToken.None);
+        await repository.MergeFromStagingAsync(CreateRequest("BK2", "A"), CancellationToken.None);
+        var result = await repository.MergeFromStagingAsync(CreateRequest(
+            ("BK1", "A", new DateTime(2026, 4, 7, 10, 0, 0, DateTimeKind.Local)),
+            ("BK2", "B", new DateTime(2026, 4, 7, 10, 0, 0, DateTimeKind.Local)),
+            ("BK3", "C", new DateTime(2026, 4, 7, 10, 0, 0, DateTimeKind.Local))), CancellationToken.None);
+
+        Assert.Equal(1, result.InsertCount);
+        Assert.Equal(1, result.UpdateCount);
+        Assert.Equal(1, result.SkipCount);
+        Assert.Equal(SyncChangeOperationType.Insert, result.ChangedOperations["BK3"]);
+        Assert.Equal(SyncChangeOperationType.Update, result.ChangedOperations["BK2"]);
+    }
+
+    /// <summary>
+    /// 分片切换时应删除旧分片并写入新分片。
+    /// </summary>
+    [Fact]
+    public async Task MergeFromStagingAsync_WhenShardSwitched_ShouldDeleteOldShardAndWriteNewShard()
+    {
+        var repository = CreateRepository();
+        await repository.MergeFromStagingAsync(CreateRequest("BK1", "A", new DateTime(2026, 4, 7, 10, 0, 0, DateTimeKind.Local)), CancellationToken.None);
+        var result = await repository.MergeFromStagingAsync(CreateRequest("BK1", "B", new DateTime(2026, 5, 7, 10, 0, 0, DateTimeKind.Local)), CancellationToken.None);
+
+        Assert.Equal(0, result.InsertCount);
+        Assert.Equal(1, result.UpdateCount);
+        Assert.Equal(0, result.SkipCount);
+        Assert.False(repository.ExistsInShard("BK1", "_202604"));
+        Assert.True(repository.ExistsInShard("BK1", "_202605"));
+        Assert.Equal(1, repository.ShardMigrationDeleteCount);
+    }
+
+    /// <summary>
     /// 未配置唯一键应抛异常。
     /// </summary>
     [Fact]
@@ -174,6 +213,39 @@ public class SqlServerSyncUpsertRepositoryTests
     }
 
     /// <summary>
+    /// 构建单行测试请求（指定游标时间）。
+    /// </summary>
+    /// <param name="businessKey">业务键。</param>
+    /// <param name="payload">摘要载荷。</param>
+    /// <param name="addTime">游标时间。</param>
+    /// <returns>合并请求。</returns>
+    private static SyncMergeRequest CreateRequest(string businessKey, string payload, DateTime addTime)
+    {
+        return CreateRequest((businessKey, payload, addTime));
+    }
+
+    /// <summary>
+    /// 构建多行测试请求。
+    /// </summary>
+    /// <param name="rows">业务行集合。</param>
+    /// <returns>合并请求。</returns>
+    private static SyncMergeRequest CreateRequest(params (string BusinessKey, string Payload, DateTime AddTime)[] rows)
+    {
+        return new SyncMergeRequest
+        {
+            TableCode = "WmsSplitPickToLightCarton",
+            CursorColumn = "ADDTIME",
+            UniqueKeys = ["CARTONNO"],
+            Rows = rows.Select(row => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
+            {
+                ["CARTONNO"] = row.BusinessKey,
+                ["PAYLOAD"] = row.Payload,
+                ["ADDTIME"] = row.AddTime
+            }).ToArray()
+        };
+    }
+
+    /// <summary>
     /// 内存测试替身。
     /// </summary>
     private sealed class InMemorySqlServerSyncUpsertRepository(
@@ -186,7 +258,24 @@ public class SqlServerSyncUpsertRepositoryTests
         : SqlServerSyncUpsertRepository(syncJobOptions, shardingOptions, shardSuffixResolver, shardTableProvisioner, dangerZoneExecutor, logger)
     {
         /// <summary>内存状态表。</summary>
-        private readonly Dictionary<string, string> _states = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, InMemoryState> _states = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>分片行集合（Key=Suffix|BusinessKey）。</summary>
+        private readonly HashSet<string> _shardRows = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>分片迁移删除计数。</summary>
+        public int ShardMigrationDeleteCount { get; private set; }
+
+        /// <summary>
+        /// 判断业务键是否位于指定分片。
+        /// </summary>
+        /// <param name="businessKey">业务键。</param>
+        /// <param name="shardSuffix">分片后缀。</param>
+        /// <returns>存在返回 true。</returns>
+        public bool ExistsInShard(string businessKey, string shardSuffix)
+        {
+            return _shardRows.Contains($"{shardSuffix}|{businessKey}");
+        }
 
         /// <inheritdoc/>
         protected override Task<SyncMergeResult> MergeCoreAsync(SyncMergeRequest request, CancellationToken ct)
@@ -200,21 +289,34 @@ public class SqlServerSyncUpsertRepositoryTests
             {
                 var businessKey = row["CARTONNO"]?.ToString() ?? string.Empty;
                 var digest = JsonSerializer.Serialize(row);
-                if (!_states.TryGetValue(businessKey, out var existingDigest))
+                var addTime = row.TryGetValue("ADDTIME", out var addTimeValue) && addTimeValue is DateTime dateTime
+                    ? dateTime
+                    : DateTime.Now;
+                var shardSuffix = new MonthShardSuffixResolver().Resolve(new DateTimeOffset(addTime));
+                if (!_states.TryGetValue(businessKey, out var existingState))
                 {
-                    _states[businessKey] = digest;
+                    _states[businessKey] = new InMemoryState(digest, shardSuffix);
+                    _shardRows.Add($"{shardSuffix}|{businessKey}");
                     result.InsertCount++;
                     changedOperations[businessKey] = SyncChangeOperationType.Insert;
                     continue;
                 }
 
-                if (string.Equals(existingDigest, digest, StringComparison.Ordinal))
+                if (string.Equals(existingState.Digest, digest, StringComparison.Ordinal)
+                    && string.Equals(existingState.ShardSuffix, shardSuffix, StringComparison.OrdinalIgnoreCase))
                 {
                     result.SkipCount++;
                     continue;
                 }
 
-                _states[businessKey] = digest;
+                if (!string.Equals(existingState.ShardSuffix, shardSuffix, StringComparison.OrdinalIgnoreCase))
+                {
+                    _shardRows.Remove($"{existingState.ShardSuffix}|{businessKey}");
+                    ShardMigrationDeleteCount++;
+                }
+
+                _states[businessKey] = new InMemoryState(digest, shardSuffix);
+                _shardRows.Add($"{shardSuffix}|{businessKey}");
                 result.UpdateCount++;
                 changedOperations[businessKey] = SyncChangeOperationType.Update;
             }
@@ -228,7 +330,7 @@ public class SqlServerSyncUpsertRepositoryTests
             var rows = _states.Select(x => new SyncTargetStateRow
             {
                 BusinessKey = x.Key,
-                RowDigest = x.Value
+                RowDigest = x.Value.Digest
             }).ToArray();
             return Task.FromResult<IReadOnlyList<SyncTargetStateRow>>(rows);
         }
@@ -239,14 +341,22 @@ public class SqlServerSyncUpsertRepositoryTests
             var count = 0;
             foreach (var businessKey in businessKeys)
             {
-                if (_states.Remove(businessKey))
+                if (_states.Remove(businessKey, out var state))
                 {
+                    _shardRows.Remove($"{state.ShardSuffix}|{businessKey}");
                     count++;
                 }
             }
 
             return Task.FromResult(count);
         }
+
+        /// <summary>
+        /// 内存状态行。
+        /// </summary>
+        /// <param name="Digest">摘要值。</param>
+        /// <param name="ShardSuffix">分片后缀。</param>
+        private readonly record struct InMemoryState(string Digest, string ShardSuffix);
     }
 
     /// <summary>
