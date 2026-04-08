@@ -34,21 +34,13 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
         var candidates = new List<SyncDeletionCandidate>();
         var segmentSize = request.CompareSegmentSize > 0 ? request.CompareSegmentSize : DefaultCompareSegmentSize;
         var maxParallelism = request.CompareMaxParallelism > 0 ? request.CompareMaxParallelism : DefaultCompareMaxParallelism;
-        var parallelOptions = new ParallelOptions
-        {
-            CancellationToken = ct,
-            MaxDegreeOfParallelism = maxParallelism,
-        };
 
-        var candidateBag = new System.Collections.Concurrent.ConcurrentBag<SyncDeletionCandidate>();
-        var segmentCount = (targetRows.Count + segmentSize - 1) / segmentSize;
-        await Parallel.ForAsync(0, segmentCount, parallelOptions, (segmentIndex, token) =>
+        if (maxParallelism <= 1)
         {
-            var startIndex = segmentIndex * segmentSize;
-            var endExclusive = Math.Min(startIndex + segmentSize, targetRows.Count);
-            for (var rowIndex = startIndex; rowIndex < endExclusive; rowIndex++)
+            // 并行度为 1 时使用顺序循环，避免 ConcurrentBag / Parallel.ForAsync 的额外开销。
+            for (var rowIndex = 0; rowIndex < targetRows.Count; rowIndex++)
             {
-                token.ThrowIfCancellationRequested();
+                ct.ThrowIfCancellationRequested();
                 var row = targetRows[rowIndex];
 
                 if (!IsRowWithinWindow(row, request.Window))
@@ -62,7 +54,7 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
                     continue;
                 }
 
-                candidateBag.Add(new SyncDeletionCandidate
+                candidates.Add(new SyncDeletionCandidate
                 {
                     BusinessKey = businessKey,
                     TargetSnapshot = new Dictionary<string, object?>
@@ -76,11 +68,60 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
                     SourceEvidence = MissingSourceEvidenceMessage,
                 });
             }
+        }
+        else
+        {
+            var parallelOptions = new ParallelOptions
+            {
+                CancellationToken = ct,
+                MaxDegreeOfParallelism = maxParallelism,
+            };
 
-            return ValueTask.CompletedTask;
-        });
+            var candidateBag = new System.Collections.Concurrent.ConcurrentBag<SyncDeletionCandidate>();
+            var segmentCount = (targetRows.Count + segmentSize - 1) / segmentSize;
+            await Parallel.ForAsync(0, segmentCount, parallelOptions, (segmentIndex, token) =>
+            {
+                var startIndex = segmentIndex * segmentSize;
+                var endExclusive = Math.Min(startIndex + segmentSize, targetRows.Count);
+                for (var rowIndex = startIndex; rowIndex < endExclusive; rowIndex++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    var row = targetRows[rowIndex];
 
-        candidates.AddRange(candidateBag.OrderBy(x => x.BusinessKey, StringComparer.OrdinalIgnoreCase));
+                    if (!IsRowWithinWindow(row, request.Window))
+                    {
+                        continue;
+                    }
+
+                    var businessKey = row.BusinessKey;
+                    if (string.IsNullOrWhiteSpace(businessKey) || sourceKeys.Contains(businessKey))
+                    {
+                        continue;
+                    }
+
+                    candidateBag.Add(new SyncDeletionCandidate
+                    {
+                        BusinessKey = businessKey,
+                        TargetSnapshot = new Dictionary<string, object?>
+                        {
+                            [nameof(SyncTargetStateRow.BusinessKey)] = row.BusinessKey,
+                            [nameof(SyncTargetStateRow.RowDigest)] = row.RowDigest,
+                            [nameof(SyncTargetStateRow.CursorLocal)] = row.CursorLocal,
+                            [nameof(SyncTargetStateRow.IsSoftDeleted)] = row.IsSoftDeleted,
+                            [nameof(SyncTargetStateRow.SoftDeletedTimeLocal)] = row.SoftDeletedTimeLocal,
+                        },
+                        SourceEvidence = MissingSourceEvidenceMessage,
+                    });
+                }
+
+                return ValueTask.CompletedTask;
+            });
+
+            candidates.AddRange(candidateBag);
+        }
+
+        // 统一按 BusinessKey 排序，保证无论并行度配置如何，输出顺序均一致稳定。
+        candidates.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.BusinessKey, b.BusinessKey));
 
         return candidates;
     }
