@@ -64,8 +64,8 @@ public static class SyncBusinessKeyBuilder
 
         if (value is DateTime dateTime)
         {
-            return EnsureLocalDateTime(dateTime, dateTime.ToString(LocalDateTimeBusinessKeyFormat, CultureInfo.InvariantCulture))
-                .ToString(LocalDateTimeBusinessKeyFormat, CultureInfo.InvariantCulture);
+            var localDateTime = EnsureLocalDateTime(dateTime, dateTime.ToString(LocalDateTimeBusinessKeyFormat, CultureInfo.InvariantCulture));
+            return localDateTime.ToString(LocalDateTimeBusinessKeyFormat, CultureInfo.InvariantCulture);
         }
 
         if (value is DateTimeOffset dateTimeOffset)
