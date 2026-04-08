@@ -1,7 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- `sync_target_state` 表按 `TableCode+月份` 分表：每个同步表编码每月独立状态表（`sync_target_state_{tableCode}_{yyyyMM}`）；读取状态时跨月份分表聚合并按 `UpdatedTimeLocal` 取最新记录，避免无人值守场景下单表长期膨胀。
+- `sync_target_state` 表按 `TableCode+月份` 分表：每个同步表编码每月独立状态表（`sync_target_state_{tableCode}_{yyyyMM}`）；读取状态时跨月份分表聚合并按 `UpdatedTimeLocal` 取最新记录，同时兼容读取旧版状态表（`sync_target_state` 与 `sync_target_state_{tableCode}`），避免升级后幂等状态丢失。
 - `CheckpointFilePath` 保留：经分析确认检查点文件仍被 `SyncOrchestrator`、`SyncExecutionService` 及 `RuntimeStorageGuard` 实际使用（续传断点 + 磁盘空间检测），注释补充部署建议（宿主机挂载持久化目录）。
 - 调整状态分表命名测试：`GetSyncStateTableFullName_ShouldGeneratePerTableCodeAndMonthName`（Theory×3路径）、`GetSyncStateTableFullName_WhenTableCodeContainsInvalidChar_ShouldThrow`、`GetSyncStateTableFullName_WhenStateMonthTokenInvalid_ShouldThrow`，覆盖命名与输入边界。
 
@@ -191,7 +191,7 @@
 - `OracleOptions.cs`：远端 Oracle 连接配置实体，定义连接字符串、连接库名（ServiceName/SID，决定连接目标）、只读开关、命令超时与分页上限。
 - `OracleSourceReader.cs`：源端读取器 Oracle 实现，使用参数化 SQL 执行真实只读查询，支持分页增量读取、业务键读取、`ExcludedColumns` 过滤，并在异常场景输出错误日志；支持 `Oracle.DatabaseMode` 控制库名拼接语义（ServiceName/SID）。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
-- `SqlServerSyncUpsertRepository.cs`：SQL Server 真实落库实现，按目标逻辑表+后缀分表执行集合式 MERGE（支持配置回退逐行模式），并在 `sync_target_state_{tableCode}_{yyyyMM}` 状态分表中记录后缀；读取/删除状态时跨月分表聚合，确保时间分表后幂等与删除语义保持一致。
+- `SqlServerSyncUpsertRepository.cs`：SQL Server 真实落库实现，按目标逻辑表+后缀分表执行集合式 MERGE（支持配置回退逐行模式），并在 `sync_target_state_{tableCode}_{yyyyMM}` 状态分表中记录后缀；读取/删除状态时跨月分表聚合，且兼容旧版 `sync_target_state` / `sync_target_state_{tableCode}` 状态表，确保升级过程幂等与删除语义连续。
 - `SyncDeletionRepository.cs`：删除同步仓储基础实现，基于轻量幂等状态执行窗口过滤与源端键差异识别，并按策略执行删除。
 - `ShardTableResolver.cs`：分表解析仓储实现，按逻辑表枚举物理分表并解析分表月份后缀。
 - `ShardRetentionRepository.cs`：分表保留期仓储实现，在危险动作隔离器保护下执行分表删除并输出审计日志，且可基于系统元数据生成可回放回滚 DDL。

@@ -187,10 +187,13 @@ public class SqlServerSyncUpsertRepositoryTests
     /// <summary>
     /// 状态分表名称对含非法月份标记的输入应抛出异常。
     /// </summary>
-    [Fact]
-    public void GetSyncStateTableFullName_WhenStateMonthTokenInvalid_ShouldThrow()
+    [Theory]
+    [InlineData("2026-04")]
+    [InlineData("202600")]
+    [InlineData("202613")]
+    public void GetSyncStateTableFullName_WhenStateMonthTokenInvalid_ShouldThrow(string stateMonthToken)
     {
-        var action = () => SqlServerSyncUpsertRepository.GetSyncStateTableFullName("WmsPickToWcs", "2026-04");
+        var action = () => SqlServerSyncUpsertRepository.GetSyncStateTableFullName("WmsPickToWcs", stateMonthToken);
 
         Assert.Throws<InvalidOperationException>(action);
     }

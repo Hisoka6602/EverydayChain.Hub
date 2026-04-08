@@ -1310,6 +1310,8 @@ WHERE [TableCode]=@tableCode
             throw new InvalidOperationException("检测到非法 TableCode 标识符，仅允许字母、数字、下划线。");
         }
 
+        var legacyBaseTableName = SyncTargetStateTablePrefix;
+        var legacyPerTableName = $"{SyncTargetStateTablePrefix}_{tableCode}";
         var tableNamePrefix = $"{SyncTargetStateTablePrefix}_{tableCode}_";
         var likePattern = $"{EscapeLikePattern(tableNamePrefix)}%";
         var tableFullNames = new List<string>();
@@ -1320,9 +1322,15 @@ SELECT QUOTENAME(s.[name]) + '.' + QUOTENAME(t.[name]) AS [FullName]
 FROM sys.tables AS t
 INNER JOIN sys.schemas AS s ON t.[schema_id] = s.[schema_id]
 WHERE s.[name] = @schemaName
-  AND t.[name] LIKE @tableLikePattern ESCAPE '\'
+  AND (
+        t.[name] = @legacyBaseTableName
+     OR t.[name] = @legacyPerTableName
+     OR t.[name] LIKE @tableLikePattern ESCAPE '\'
+      )
 ORDER BY t.[name] DESC;";
         command.Parameters.AddWithValue("@schemaName", SyncTargetStateSchema);
+        command.Parameters.AddWithValue("@legacyBaseTableName", legacyBaseTableName);
+        command.Parameters.AddWithValue("@legacyPerTableName", legacyPerTableName);
         command.Parameters.AddWithValue("@tableLikePattern", likePattern);
         await using var reader = await command.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct)) {
@@ -1348,7 +1356,8 @@ ORDER BY t.[name] DESC;";
             }
         }
 
-        return true;
+        var month = ((stateMonthToken[4] - '0') * 10) + (stateMonthToken[5] - '0');
+        return month is >= 1 and <= 12;
     }
 
     /// <summary>
