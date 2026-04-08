@@ -203,7 +203,7 @@ public class SqlServerSyncUpsertRepositoryTests
     }
 
     /// <summary>
-    /// 状态分表名称对空引用月份标记输入应抛出异常。
+    /// 状态分表名称对空引用（null）月份标记输入应抛出异常。
     /// </summary>
     [Fact]
     public void GetSyncStateTableFullName_WhenStateMonthTokenIsNull_ShouldThrow()

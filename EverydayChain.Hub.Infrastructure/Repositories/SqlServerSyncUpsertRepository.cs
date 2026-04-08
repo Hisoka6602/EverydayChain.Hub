@@ -1323,8 +1323,11 @@ FROM sys.tables AS t
 INNER JOIN sys.schemas AS s ON t.[schema_id] = s.[schema_id]
 WHERE s.[name] = @schemaName
   AND (
+        -- 兼容旧版单表：sync_target_state
         t.[name] = @legacyBaseTableName
+        -- 兼容旧版按 TableCode 分表：sync_target_state_{tableCode}
      OR t.[name] = @legacyPerTableName
+        -- 新版按 TableCode+月份分表：sync_target_state_{tableCode}_{yyyyMM}
      OR t.[name] LIKE @tableLikePattern ESCAPE '\'
       )
 ORDER BY t.[name] DESC;";
@@ -1354,6 +1357,10 @@ ORDER BY t.[name] DESC;";
             if (!char.IsDigit(stateMonthToken[index])) {
                 return false;
             }
+        }
+
+        if (!char.IsDigit(stateMonthToken[4]) || !char.IsDigit(stateMonthToken[5])) {
+            return false;
         }
 
         var month = ((stateMonthToken[4] - '0') * 10) + (stateMonthToken[5] - '0');
