@@ -79,6 +79,8 @@
 │   ├── Abstractions/Persistence/ISyncChangeLogRepository.cs
 │   ├── Abstractions/Persistence/ISyncDeletionRepository.cs
 │   ├── Abstractions/Persistence/ISyncDeletionLogRepository.cs
+│   ├── Abstractions/Persistence/IShardTableResolver.cs
+│   ├── Abstractions/Persistence/IShardRetentionRepository.cs
 │   ├── Abstractions/Sync/IOracleRemoteStatusWriter.cs
 │   ├── Abstractions/Sync/IOracleStatusDrivenSourceReader.cs
 │   ├── Abstractions/Sync/ISqlServerAppendOnlyWriter.cs
