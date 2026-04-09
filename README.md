@@ -1,17 +1,8 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 完成全量逐文件代码审查（共 136 个 C# 文件，依据 `逐文件代码检查方案.md`），输出 `逐文件代码检查台账.md` 记录每文件检查状态与问题列表。
-- 修复 **P1-001**：`SqlServerSyncUpsertRepository.MarkSoftDeletedStateAsync` 两次 `DateTime.Now` 存在时间倒置风险，统一捕获为 `nowLocal` 后复用。
-- 修复 **P1-002**：`SyncBatchRepository._batches` 字典无界增长（OOM 风险），新增上限 5,000 条及超限淘汰最早完成/失败批次机制。
-- 修复 **P1-003**：`SyncChangeLogRepository._changes` 队列无消费机制无限累积，新增上限 200,000 条及超限淘汰机制；淘汰逻辑提取至 `BoundedConcurrentQueueHelper`（SharedKernel），解决 `ConcurrentQueue.Count` O(n) 两次遍历问题，同时消除与 `SyncDeletionLogRepository` 的重复实现。
-- 修复 **P1-004**：`SyncDeletionLogRepository._logs` 队列同 P1-003，统一复用 `BoundedConcurrentQueueHelper`；将常量 `EvictionBatchSize` 重命名为 `ExtraEvictionCount` 并修正注释语义（实际单次移除数为 `currentCount - MaxCapacity + ExtraEvictionCount`，非固定值）。
-- 修复 **P1-005**：`ISyncStagingRepository.BulkInsertAsync` 接口注释明确要求调用方在 try/finally 中调用 `ClearPageAsync` 以防止暂存条目永久残留。
-- 修复 **P2-001**：删除 `SyncColumnFilter.NormalizedSoftDeleteColumns` 冗余别名字段，`SyncTaskConfigRepository` 引用改为 `SoftDeleteColumns`。
-- 修复 **P2-002**：`OracleRemoteStatusWriter` 热路径改用 `FillArray<T>`（内部 `Array.Fill`）替代 `Enumerable.Repeat().ToArray()`，减少 GC 压力。
-- 修复 **P2-003**：`DeletionExecutionService.ExecuteDeletionAsync` 在 `uniqueCandidates` 为空时提前返回，跳过无效的 DangerZone 管道调用。
-- 修复 **P2-004**：`SortingTaskTraceEntity.CreatedAt` 注释补充 `DateTimeOffset.UtcNow` 禁用说明，防止调用方误用 UTC 赋值。
-- 修复 **P2-005**：`WmsSplitPickToLightCartonEntity.StopCode` 移除"当前业务语义待进一步确认"的代码内注释（违反治理规范：待确认项应通过 Issue 跟踪，不得保留在代码注释中）。
+- 修复 **P2-006**：`SyncBatchRepository`、`SyncChangeLogRepository`、`SyncDeletionLogRepository` 三个内存实现类名缺少 `InMemory` 前缀，已统一重命名为 `InMemorySyncBatchRepository`、`InMemorySyncChangeLogRepository`、`InMemorySyncDeletionLogRepository`；同步更新 DI 注册。
+- 修复 **P2-007**：`Infrastructure/Sync/Abstractions/` 中 `IOracleRemoteStatusWriter`、`IOracleStatusDrivenSourceReader`、`ISqlServerAppendOnlyWriter` 三个接口存在分层边界争议，已迁移至 `Application/Abstractions/Sync/`；同步更新 Infrastructure 实现层与 Tests 层的 using 引用，删除旧接口文件。
 
 ## 解决方案文件树与职责
 ```text
@@ -90,6 +81,9 @@
 │   ├── Abstractions/Persistence/ISyncDeletionLogRepository.cs
 │   ├── Abstractions/Persistence/IShardTableResolver.cs
 │   ├── Abstractions/Persistence/IShardRetentionRepository.cs
+│   ├── Abstractions/Sync/IOracleRemoteStatusWriter.cs
+│   ├── Abstractions/Sync/IOracleStatusDrivenSourceReader.cs
+│   ├── Abstractions/Sync/ISqlServerAppendOnlyWriter.cs
 │   ├── Sync/Abstractions/IRemoteStatusConsumeService.cs
 │   ├── Sync/Models/RemoteStatusConsumeResult.cs
 │   ├── Services/ISyncOrchestrator.cs
@@ -114,9 +108,6 @@
 │   ├── EverydayChain.Hub.Infrastructure.csproj
 │   ├── DependencyInjection/ServiceCollectionExtensions.cs
 │   ├── Properties/AssemblyInfo.cs
-│   ├── Sync/Abstractions/IOracleStatusDrivenSourceReader.cs
-│   ├── Sync/Abstractions/ISqlServerAppendOnlyWriter.cs
-│   ├── Sync/Abstractions/IOracleRemoteStatusWriter.cs
 │   ├── Sync/Readers/OracleStatusDrivenSourceReader.cs
 │   ├── Sync/Writers/SqlServerAppendOnlyWriter.cs
 │   ├── Sync/Writers/OracleRemoteStatusWriter.cs
@@ -129,9 +120,9 @@
 │   ├── Repositories/ShardTableResolver.cs
 │   ├── Repositories/ShardRetentionRepository.cs
 │   ├── Repositories/SyncCheckpointRepository.cs
-│   ├── Repositories/SyncBatchRepository.cs
-│   ├── Repositories/SyncChangeLogRepository.cs
-│   ├── Repositories/SyncDeletionLogRepository.cs
+│   ├── Repositories/InMemorySyncBatchRepository.cs
+│   ├── Repositories/InMemorySyncChangeLogRepository.cs
+│   ├── Repositories/InMemorySyncDeletionLogRepository.cs
 │   ├── Persistence/HubDbContext.cs
 │   ├── Persistence/DesignTimeHubDbContextFactory.cs
 │   ├── Persistence/EntityConfigurations/SortingTaskTraceEntityTypeConfiguration.cs
@@ -214,6 +205,7 @@
 - `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`SyncTable`、`SyncDelete`、`SyncRetention`、`RetentionJob`、`Oracle` 等），供 Infrastructure 绑定读取。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
 - `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs` + `SyncTargetStateRow.cs`：同步执行、删除识别与轻量幂等状态存储的数据契约模型。
+- `Application/Abstractions/Sync/IOracleRemoteStatusWriter.cs` / `IOracleStatusDrivenSourceReader.cs` / `ISqlServerAppendOnlyWriter.cs`：定义 StatusDriven 模式中 Oracle 远端状态回写、Oracle 状态驱动源读取与 SQL Server 仅追加写入的外部协作能力抽象，遵循 Application 层外部协作抽象放置规则。
 - `Application/Sync/Abstractions/IRemoteStatusConsumeService.cs` + `Application/Sync/Models/RemoteStatusConsumeResult.cs`：定义 StatusDriven 模式执行入口与读取/追加/回写统计模型。
 - `Application/Abstractions/Persistence/ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。
 - `Application/Abstractions/Persistence/IShardTableResolver.cs` / `IShardRetentionRepository.cs`：定义分表识别与分表清理执行契约（含分表完整回滚脚本生成）。
@@ -245,9 +237,9 @@
 - `ShardTableResolver.cs`：分表解析仓储实现，按逻辑表枚举物理分表并解析分表月份后缀。
 - `ShardRetentionRepository.cs`：分表保留期仓储实现，在危险动作隔离器保护下执行分表删除并输出审计日志，且可基于系统元数据生成可回放回滚 DDL。
 - `SyncCheckpointRepository.cs`：检查点文件持久化实现，读写日志均以 Information 级落盘；写入改为临时文件 + File.Replace/Move 原子替换，防止崩溃产生半写 JSON。
-- `SyncBatchRepository.cs`：同步批次仓储基础实现，支持 `Pending/InProgress/Completed/Failed` 状态流转与最近失败批次查询。
-- `SyncChangeLogRepository.cs`：同步变更日志仓储基础实现，支持批量写入审计记录。
-- `SyncDeletionLogRepository.cs`：同步删除日志仓储基础实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
+- `InMemorySyncBatchRepository.cs`：同步批次仓储内存实现，支持 `Pending/InProgress/Completed/Failed` 状态流转与最近失败批次查询。
+- `InMemorySyncChangeLogRepository.cs`：同步变更日志仓储内存实现，支持批量写入审计记录。
+- `InMemorySyncDeletionLogRepository.cs`：同步删除日志仓储内存实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖，并在启动阶段从启用同步表配置提取逻辑表名集合，完成安全校验与空配置异常拦截。
 - `20260408020833_RebuildInitialHubSchema.cs`：初始化迁移，定义 `sorting_task_trace`、`IDX_PICKTOLIGHT_CARTON1`、`IDX_PICKTOWCS2` 三张聚合表结构及索引。
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。

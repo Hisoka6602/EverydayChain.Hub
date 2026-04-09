@@ -6,10 +6,10 @@ using EverydayChain.Hub.Domain.Sync;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 同步批次仓储基础实现（内存存储）。
+/// 同步批次仓储内存实现。
 /// 内存条目上限为 <see cref="MaxBatchCount"/>，超限时自动淘汰最早完成/失败的批次，防止长期运行导致 OOM。
 /// </summary>
-public class SyncBatchRepository : ISyncBatchRepository
+public class InMemorySyncBatchRepository : ISyncBatchRepository
 {
     /// <summary>内存批次条目上限。</summary>
     private const int MaxBatchCount = 5_000;

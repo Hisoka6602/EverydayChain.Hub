@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Infrastructure.Sync.Abstractions;
+using EverydayChain.Hub.Application.Abstractions.Sync;
 
 namespace EverydayChain.Hub.Tests.Sync.Fakes;
 

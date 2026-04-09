@@ -6,11 +6,11 @@ using EverydayChain.Hub.SharedKernel.Utilities;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 同步变更日志仓储基础实现（内存存储）。
+/// 同步变更日志仓储内存实现。
 /// 队列上限为 <see cref="MaxQueueCapacity"/>，超限时自动淘汰最早入队的条目，防止长期运行导致 OOM。
 /// 生产环境建议替换为持久化实现。
 /// </summary>
-public class SyncChangeLogRepository : ISyncChangeLogRepository
+public class InMemorySyncChangeLogRepository : ISyncChangeLogRepository
 {
     /// <summary>内存队列条目上限（水位上限）。</summary>
     private const int MaxQueueCapacity = 200_000;
