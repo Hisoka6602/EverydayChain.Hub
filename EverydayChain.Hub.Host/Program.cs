@@ -1,4 +1,3 @@
-using NLog;
 using NLog.Extensions.Logging;
 using EverydayChain.Hub.Host.Workers;
 using EverydayChain.Hub.Domain.Options;
@@ -27,5 +26,5 @@ try {
 }
 finally {
     // 确保应用退出时 NLog 将所有缓冲日志全部落盘后再释放资源。
-    LogManager.Shutdown();
+    NLog.LogManager.Shutdown();
 }

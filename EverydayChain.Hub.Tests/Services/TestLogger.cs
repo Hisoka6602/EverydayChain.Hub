@@ -14,7 +14,7 @@ public sealed class TestLogger<T> : ILogger<T>
     /// <inheritdoc/>
     public IDisposable BeginScope<TState>(TState state) where TState : notnull
     {
-        return default(Scope);
+        return LoggerNullScope.Instance;
     }
 
     /// <inheritdoc/>
@@ -36,14 +36,4 @@ public sealed class TestLogger<T> : ILogger<T>
     /// <param name="Message">日志内容。</param>
     public readonly record struct LogEntry(LogLevel Level, string Message);
 
-    /// <summary>
-    /// 空作用域结构体。
-    /// </summary>
-    private readonly struct Scope : IDisposable
-    {
-        /// <inheritdoc/>
-        public void Dispose()
-        {
-        }
-    }
 }
