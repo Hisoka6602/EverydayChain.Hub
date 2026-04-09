@@ -1,8 +1,8 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 修复 **P2-006**：`SyncBatchRepository`、`SyncChangeLogRepository`、`SyncDeletionLogRepository` 三个内存实现类名缺少 `InMemory` 前缀，已统一重命名为 `InMemorySyncBatchRepository`、`InMemorySyncChangeLogRepository`、`InMemorySyncDeletionLogRepository`；同步更新 DI 注册。
-- 修复 **P2-007**：`Infrastructure/Sync/Abstractions/` 中 `IOracleRemoteStatusWriter`、`IOracleStatusDrivenSourceReader`、`ISqlServerAppendOnlyWriter` 三个接口存在分层边界争议，已迁移至 `Application/Abstractions/Sync/`；同步更新 Infrastructure 实现层与 Tests 层的 using 引用，删除旧接口文件。
+- 创建 `Oracle到SQLServer同步实施计划.md`：补充缺失的实施计划跟踪文档（README 与 `copilot-instructions.md` 均引用该文件，文件原本缺失）；按阶段一至四记录已完成的实施条目与架构验收清单。
+- 更新 `逐文件代码检查台账.md`：修正文件计数不一致（台账标题与汇总表数值对齐），补充根目录 `*.md` 与 `scripts/` 目录的检查记录。
 
 ## 解决方案文件树与职责
 ```text
