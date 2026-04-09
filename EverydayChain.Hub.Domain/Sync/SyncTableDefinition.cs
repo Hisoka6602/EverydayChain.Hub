@@ -1,4 +1,5 @@
 using EverydayChain.Hub.Domain.Enums;
+using EverydayChain.Hub.Domain.Sync.Models;
 
 namespace EverydayChain.Hub.Domain.Sync;
 
@@ -13,8 +14,12 @@ public class SyncTableDefinition
     /// <summary>是否启用。</summary>
     public bool Enabled { get; set; }
 
-    /// <summary>同步模式。</summary>
-    public SyncMode SyncMode { get; set; } = SyncMode.Incremental;
+    /// <summary>
+    /// 同步执行模式。
+    /// 可选值：KeyedMerge（键控合并，默认）、StatusDriven（状态驱动消费）。
+    /// 未配置时默认 KeyedMerge，存量配置无需修改。
+    /// </summary>
+    public SyncMode SyncMode { get; set; } = SyncMode.KeyedMerge;
 
     /// <summary>源端 Schema。</summary>
     public string SourceSchema { get; set; } = string.Empty;
@@ -75,4 +80,11 @@ public class SyncTableDefinition
 
     /// <summary>是否允许执行删除分表动作。</summary>
     public bool RetentionAllowDrop { get; set; }
+
+    /// <summary>
+    /// 状态驱动消费配置（仅 SyncMode = StatusDriven 时生效）。
+    /// 包含状态列名、待处理值、完成值、是否回写远端状态与批次大小。
+    /// KeyedMerge 模式下此属性为 null，不产生任何效果。
+    /// </summary>
+    public RemoteStatusConsumeProfile? StatusConsumeProfile { get; set; }
 }
