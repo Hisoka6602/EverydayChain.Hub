@@ -13,23 +13,10 @@ namespace EverydayChain.Hub.Tests.Repositories;
 /// <summary>
 /// 内存版 SqlServerSyncUpsertRepository 测试替身。
 /// </summary>
-/// <param name="syncJobOptions">同步配置。</param>
-/// <param name="shardingOptions">分片配置。</param>
-/// <param name="shardSuffixResolver">分片后缀解析器。</param>
-/// <param name="shardTableProvisioner">分片建表服务。</param>
-/// <param name="dangerZoneExecutor">危险动作执行器。</param>
-/// <param name="logger">日志实例。</param>
-public sealed class InMemorySqlServerSyncUpsertRepository(
-    IOptions<SyncJobOptions> syncJobOptions,
-    IOptions<ShardingOptions> shardingOptions,
-    IShardSuffixResolver shardSuffixResolver,
-    IShardTableProvisioner shardTableProvisioner,
-    IDangerZoneExecutor dangerZoneExecutor,
-    ILogger<SqlServerSyncUpsertRepository> logger)
-    : SqlServerSyncUpsertRepository(syncJobOptions, shardingOptions, shardSuffixResolver, shardTableProvisioner, dangerZoneExecutor, logger)
+public sealed class InMemorySqlServerSyncUpsertRepository : SqlServerSyncUpsertRepository
 {
-    /// <summary>分片后缀解析器。</summary>
-    private readonly IShardSuffixResolver _shardSuffixResolver = shardSuffixResolver;
+    /// <summary>通过构造函数注入的分片后缀解析器，用于计算业务键所属分片后缀，确保测试替身与真实仓储使用相同的分片策略。</summary>
+    private readonly IShardSuffixResolver _shardSuffixResolver;
 
     /// <summary>内存状态表。</summary>
     private readonly Dictionary<string, InMemoryState> _states = new(StringComparer.OrdinalIgnoreCase);
@@ -39,6 +26,28 @@ public sealed class InMemorySqlServerSyncUpsertRepository(
 
     /// <summary>分片迁移删除计数。</summary>
     public int ShardMigrationDeleteCount { get; private set; }
+
+    /// <summary>
+    /// 初始化内存版仓储测试替身。
+    /// </summary>
+    /// <param name="syncJobOptions">同步配置。</param>
+    /// <param name="shardingOptions">分片配置。</param>
+    /// <param name="shardSuffixResolver">分片后缀解析器。</param>
+    /// <param name="shardTableProvisioner">分片建表服务。</param>
+    /// <param name="dangerZoneExecutor">危险动作执行器。</param>
+    /// <param name="logger">日志实例。</param>
+    /// <remarks>步骤：保存注入的分片后缀解析器实例，确保测试替身与真实仓储采用相同分片策略。</remarks>
+    public InMemorySqlServerSyncUpsertRepository(
+        IOptions<SyncJobOptions> syncJobOptions,
+        IOptions<ShardingOptions> shardingOptions,
+        IShardSuffixResolver shardSuffixResolver,
+        IShardTableProvisioner shardTableProvisioner,
+        IDangerZoneExecutor dangerZoneExecutor,
+        ILogger<SqlServerSyncUpsertRepository> logger)
+        : base(syncJobOptions, shardingOptions, shardSuffixResolver, shardTableProvisioner, dangerZoneExecutor, logger)
+    {
+        _shardSuffixResolver = shardSuffixResolver;
+    }
 
     /// <summary>
     /// 判断业务键是否位于指定分片。
