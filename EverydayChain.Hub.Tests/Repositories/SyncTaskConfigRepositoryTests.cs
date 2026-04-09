@@ -120,6 +120,29 @@ public class SyncTaskConfigRepositoryTests
     }
 
     /// <summary>
+    /// StatusDriven 模式下配置回写审计列时应正确映射并执行 Trim。
+    /// </summary>
+    [Fact]
+    public async Task GetByTableCodeAsync_WhenStatusDrivenAndAuditColumnsConfigured_ShouldMapAuditColumns()
+    {
+        var options = BuildOptions(table =>
+        {
+            table.SyncMode = nameof(SyncMode.StatusDriven);
+            table.ShouldWriteBackRemoteStatus = true;
+            table.WriteBackCompletedTimeColumnName = "  FINISH_TIME  ";
+            table.WriteBackBatchIdColumnName = "  FINISH_BATCH_ID  ";
+        });
+        var logger = new TestLogger<SyncTaskConfigRepository>();
+        var repository = new SyncTaskConfigRepository(Options.Create(options), logger);
+
+        var definition = await repository.GetByTableCodeAsync("T1", CancellationToken.None);
+
+        Assert.NotNull(definition.StatusConsumeProfile);
+        Assert.Equal("FINISH_TIME", definition.StatusConsumeProfile!.WriteBackCompletedTimeColumnName);
+        Assert.Equal("FINISH_BATCH_ID", definition.StatusConsumeProfile.WriteBackBatchIdColumnName);
+    }
+
+    /// <summary>
     /// 构建默认测试配置。
     /// </summary>
     /// <param name="configureTable">表级配置回调。</param>

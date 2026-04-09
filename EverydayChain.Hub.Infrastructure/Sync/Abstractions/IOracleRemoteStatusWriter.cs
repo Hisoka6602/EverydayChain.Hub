@@ -13,12 +13,14 @@ public interface IOracleRemoteStatusWriter
     /// </summary>
     /// <param name="definition">同步表定义。</param>
     /// <param name="profile">状态消费配置。</param>
+    /// <param name="batchId">当前同步批次号。</param>
     /// <param name="rowIds">ROWID 集合。</param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>成功回写行数。</returns>
     Task<int> WriteBackByRowIdAsync(
         SyncTableDefinition definition,
         RemoteStatusConsumeProfile profile,
+        string batchId,
         IReadOnlyList<string> rowIds,
         CancellationToken ct);
 }

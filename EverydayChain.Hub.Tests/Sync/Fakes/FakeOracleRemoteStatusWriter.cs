@@ -12,13 +12,18 @@ public class FakeOracleRemoteStatusWriter : IOracleRemoteStatusWriter
     /// <summary>累计回写行数。</summary>
     public int TotalWriteBackRows { get; private set; }
 
+    /// <summary>最近一次回写批次号。</summary>
+    public string LastBatchId { get; private set; } = string.Empty;
+
     /// <inheritdoc/>
     public Task<int> WriteBackByRowIdAsync(
         SyncTableDefinition definition,
         RemoteStatusConsumeProfile profile,
+        string batchId,
         IReadOnlyList<string> rowIds,
         CancellationToken ct)
     {
+        LastBatchId = batchId;
         TotalWriteBackRows += rowIds.Count;
         return Task.FromResult(rowIds.Count);
     }
