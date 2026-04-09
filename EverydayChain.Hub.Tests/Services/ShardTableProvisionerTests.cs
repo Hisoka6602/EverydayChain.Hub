@@ -112,7 +112,7 @@ public class ShardTableProvisionerTests
             Schema = "dbo"
         });
 
-        return new TestHubDbContextFactory(contextOptions, shardingOptions);
+        return new HubDbContextTestFactory(contextOptions, shardingOptions);
     }
 
     /// <summary>
@@ -128,19 +128,5 @@ public class ShardTableProvisionerTests
             CreateDbContextFactory(),
             NullLogger<ShardTableProvisioner>.Instance,
             new PassThroughDangerZoneExecutor());
-    }
-
-    /// <summary>
-    /// HubDbContext 测试工厂。
-    /// </summary>
-    private sealed class TestHubDbContextFactory(
-        DbContextOptions<HubDbContext> contextOptions,
-        IOptions<ShardingOptions> shardingOptions) : IDbContextFactory<HubDbContext>
-    {
-        /// <inheritdoc/>
-        public HubDbContext CreateDbContext()
-        {
-            return new HubDbContext(contextOptions, shardingOptions);
-        }
     }
 }

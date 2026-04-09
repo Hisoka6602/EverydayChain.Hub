@@ -15,7 +15,7 @@ public class AutoMigrationServiceTests
     public void BuildBootstrapSuffixes_ShouldFilterEmptySuffix()
     {
         var suffixes = AutoMigrationService.BuildBootstrapSuffixes(
-            new StubShardSuffixResolver(["_202604", "", "_202605", "_202604"]),
+            new FixedBootstrapShardSuffixResolver(["_202604", "", "_202605", "_202604"]),
             DateTimeOffset.Now,
             1);
 
@@ -23,24 +23,5 @@ public class AutoMigrationServiceTests
         Assert.Contains("_202604", suffixes);
         Assert.Contains("_202605", suffixes);
         Assert.DoesNotContain(string.Empty, suffixes);
-    }
-
-    /// <summary>
-    /// 测试用后缀解析器。
-    /// </summary>
-    /// <param name="bootstrapSuffixes">启动后缀集合。</param>
-    private sealed class StubShardSuffixResolver(IReadOnlyList<string> bootstrapSuffixes) : IShardSuffixResolver
-    {
-        /// <inheritdoc/>
-        public string Resolve(DateTimeOffset timestamp)
-        {
-            return "_202604";
-        }
-
-        /// <inheritdoc/>
-        public IReadOnlyList<string> ResolveBootstrapSuffixes(DateTimeOffset now, int monthsAhead)
-        {
-            return bootstrapSuffixes;
-        }
     }
 }

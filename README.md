@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 按最新 `.github/copilot-instructions.md` 约束完成测试代码结构治理：拆分同文件多类/嵌套类测试替身，统一为“一类一文件”，降低影子代码与重复定义风险。
 - 移除 `Program` 中默认注册的 `Worker` 演示写入后台服务，仅保留 `SyncBackgroundWorker` 与 `RetentionBackgroundWorker`，避免生产运行链路出现演示数据写入造成的影子执行与额外负载。
 - 修复 `SyncStagingRepository` 行复制时的字典比较器丢失问题：暂存行改为 `StringComparer.OrdinalIgnoreCase`，避免后续按配置列名大小写差异读取时出现业务键字段匹配失败。
 - 新增 `SyncStagingRepositoryTests`，覆盖暂存行字段大小写不敏感访问回归场景，防止同类问题回归。
@@ -136,14 +137,22 @@
 ├── EverydayChain.Hub.Tests
 │   ├── EverydayChain.Hub.Tests.csproj
 │   ├── Repositories/OracleSourceReaderTests.cs
+│   ├── Repositories/InMemorySqlServerSyncUpsertRepository.cs
+│   ├── Repositories/NoOpShardTableProvisioner.cs
 │   ├── Repositories/SyncStagingRepositoryTests.cs
 │   ├── Repositories/SqlServerSyncUpsertRepositoryTests.cs
 │   └── Services
 │       ├── AutoMigrationServiceTests.cs
 │       ├── DangerZoneExecutorTests.cs
+│       ├── FixedBootstrapShardSuffixResolver.cs
+│       ├── HubDbContextTestFactory.cs
+│       ├── PassThroughSqlExecutionTuner.cs
+│       ├── RecordingShardTableProvisioner.cs
 │       ├── ServiceCollectionExtensionsTests.cs
 │       ├── ShardTableProvisionerTests.cs
 │       ├── SortingTaskTraceWriterTests.cs
+│       ├── TestLogger.cs
+│       ├── ThrowingHubDbContextFactory.cs
 │       └── SyncWindowCalculatorTests.cs
 └── EverydayChain.Hub.Host
     ├── EverydayChain.Hub.Host.csproj
@@ -210,14 +219,22 @@
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
 - `EverydayChain.Hub.Tests/Services/DangerZoneExecutorTests.cs`：危险操作隔离器取消语义测试，覆盖调用方取消与非调用方取消的日志等级分支。
+- `EverydayChain.Hub.Tests/Services/TestLogger.cs`：通用测试日志记录器，集中承载日志采集替身，避免在测试文件内重复声明嵌套日志类型。
 - `EverydayChain.Hub.Tests/Services/SyncWindowCalculatorTests.cs`：SyncWindowCalculator 时间窗口回归测试套件（12 个测试用例，覆盖正常窗口、时钟回拨冻结、UTC 拒绝、Unspecified Kind 兼容、时钟扰动组合场景）。
 - `EverydayChain.Hub.Tests/Services/AutoMigrationServiceTests.cs`：分表预建后缀策略测试，断言启动预建不再包含无后缀基础表。
+- `EverydayChain.Hub.Tests/Services/FixedBootstrapShardSuffixResolver.cs`：分表后缀解析器测试替身，固定返回可控启动后缀集合用于自动迁移后缀策略测试。
 - `EverydayChain.Hub.Tests/Services/ServiceCollectionExtensionsTests.cs`：逻辑表名构建测试，覆盖非法标识符与空启用集合异常场景。
 - `EverydayChain.Hub.Tests/Services/SortingTaskTraceWriterTests.cs`：分表写入器兜底建表测试，覆盖首次写入先建表与同月重复写入幂等建表触发场景。
+- `EverydayChain.Hub.Tests/Services/RecordingShardTableProvisioner.cs`：分表预建器测试替身，记录触发后缀以验证建表调用次数与后缀分发行为。
+- `EverydayChain.Hub.Tests/Services/PassThroughSqlExecutionTuner.cs`：SQL 调谐器测试替身，提供恒定批大小用于隔离写入器行为测试。
+- `EverydayChain.Hub.Tests/Services/ThrowingHubDbContextFactory.cs`：DbContext 工厂测试替身，强制抛错用于验证“先建表后建上下文”调用顺序。
 - `EverydayChain.Hub.Tests/Services/ShardTableProvisionerTests.cs`：分表模板回归测试，覆盖并发上限钳制、空纳管拦截、实体模型到 DDL 的类型/主键/索引映射断言。
+- `EverydayChain.Hub.Tests/Services/HubDbContextTestFactory.cs`：HubDbContext 测试工厂，集中承载上下文构造逻辑，避免测试文件内多类定义。
 - `EverydayChain.Hub.Tests/Repositories/OracleSourceReaderTests.cs`：Oracle 连接串构建测试，覆盖空连接串、空库名、EZCONNECT（斜杠/SID）覆写与复杂描述符拦截分支。
 - `EverydayChain.Hub.Tests/Repositories/SyncStagingRepositoryTests.cs`：暂存仓储回归测试，覆盖暂存行字段大小写不敏感访问，防止业务键字段因列名大小写差异导致读取失败。
 - `EverydayChain.Hub.Tests/Repositories/SqlServerSyncUpsertRepositoryTests.cs`：SQL Server 落库仓储契约测试，覆盖插入/更新/跳过统计、UniqueKeys 缺失异常，以及 `sync_target_state` 状态分表命名安全边界（正常路径×3 + TableCode 非法字符 + 月份标记非法）。
+- `EverydayChain.Hub.Tests/Repositories/InMemorySqlServerSyncUpsertRepository.cs`：SqlServerSyncUpsertRepository 内存测试替身，集中维护状态与分片迁移断言逻辑。
+- `EverydayChain.Hub.Tests/Repositories/NoOpShardTableProvisioner.cs`：空实现分表预置器测试替身，用于隔离仓储合并测试的建表外部依赖。
 - `EFCore手动迁移操作指南.md`：提供手工迁移、脚本导出、回滚、排障流程。
 - `持续运行一年稳定性改造清单.md`：面向"连续运行一年"目标的稳定性改造清单，按 P0/P1/P2 组织改造优先级、待确认项与验收标准。
 - `年度维护清单.md`：月度/季度/年度例行巡检清单，覆盖磁盘、日志、数据一致性、配置审核、依赖升级、灾难恢复与安全审计。
