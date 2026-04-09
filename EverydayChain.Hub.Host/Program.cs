@@ -1,16 +1,11 @@
-using NLog;
-using EverydayChain.Hub.Host;
 using NLog.Extensions.Logging;
 using EverydayChain.Hub.Host.Workers;
-using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.DependencyInjection;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddNLog();
-builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection(WorkerOptions.SectionName));
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddHostedService<Worker>();
 builder.Services.AddHostedService<SyncBackgroundWorker>();
 builder.Services.AddHostedService<RetentionBackgroundWorker>();
 #if !DEBUG
@@ -29,5 +24,5 @@ try {
 }
 finally {
     // 确保应用退出时 NLog 将所有缓冲日志全部落盘后再释放资源。
-    LogManager.Shutdown();
+    NLog.LogManager.Shutdown();
 }

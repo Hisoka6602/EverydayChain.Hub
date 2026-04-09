@@ -21,7 +21,7 @@ public class SyncStagingRepository : ISyncStagingRepository
             .Select(row =>
             {
                 var filteredRow = SyncColumnFilter.FilterExcludedColumns(row, normalizedExcludedColumns);
-                return new Dictionary<string, object?>(filteredRow);
+                return new Dictionary<string, object?>(filteredRow, StringComparer.OrdinalIgnoreCase);
             })
             .ToList();
         _staging[storageKey] = pageRows;

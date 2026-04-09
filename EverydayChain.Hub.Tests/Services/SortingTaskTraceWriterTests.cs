@@ -20,7 +20,7 @@ public class SortingTaskTraceWriterTests
     {
         var provisioner = new RecordingShardTableProvisioner();
         var writer = new SortingTaskTraceWriter(
-            new ThrowingDbContextFactory(),
+            new ThrowingHubDbContextFactory(),
             new MonthShardSuffixResolver(),
             provisioner,
             new PassThroughSqlExecutionTuner(),
@@ -48,7 +48,7 @@ public class SortingTaskTraceWriterTests
     {
         var provisioner = new RecordingShardTableProvisioner();
         var writer = new SortingTaskTraceWriter(
-            new ThrowingDbContextFactory(),
+            new ThrowingHubDbContextFactory(),
             new MonthShardSuffixResolver(),
             provisioner,
             new PassThroughSqlExecutionTuner(),
@@ -78,7 +78,7 @@ public class SortingTaskTraceWriterTests
     {
         var provisioner = new RecordingShardTableProvisioner();
         var writer = new SortingTaskTraceWriter(
-            new ThrowingDbContextFactory(),
+            new ThrowingHubDbContextFactory(),
             new MonthShardSuffixResolver(),
             provisioner,
             new PassThroughSqlExecutionTuner(),
@@ -107,64 +107,5 @@ public class SortingTaskTraceWriterTests
         Assert.Equal(2, provisioner.EnsuredSuffixes.Count);
         Assert.Contains("_202604", provisioner.EnsuredSuffixes);
         Assert.Contains("_202605", provisioner.EnsuredSuffixes);
-    }
-
-    /// <summary>
-    /// 记录建表调用的分表预建器桩实现。
-    /// </summary>
-    private sealed class RecordingShardTableProvisioner : IShardTableProvisioner
-    {
-        /// <summary>已触发建表的后缀列表。</summary>
-        public List<string> EnsuredSuffixes { get; } = [];
-
-        /// <inheritdoc />
-        public Task EnsureShardTableAsync(string suffix, CancellationToken cancellationToken)
-        {
-            EnsuredSuffixes.Add(suffix);
-            return Task.CompletedTask;
-        }
-
-        /// <inheritdoc />
-        public Task EnsureShardTablesAsync(IEnumerable<string> suffixes, CancellationToken cancellationToken)
-        {
-            foreach (var suffix in suffixes)
-            {
-                EnsuredSuffixes.Add(suffix);
-            }
-
-            return Task.CompletedTask;
-        }
-    }
-
-    /// <summary>
-    /// 恒定批大小调谐器桩实现。
-    /// </summary>
-    private sealed class PassThroughSqlExecutionTuner : ISqlExecutionTuner
-    {
-        /// <inheritdoc />
-        public int CurrentBatchSize => 100;
-
-        /// <inheritdoc />
-        public void Record(TimeSpan elapsed, bool success)
-        {
-        }
-    }
-
-    /// <summary>
-    /// 总是抛出异常的 DbContextFactory 桩实现。
-    /// </summary>
-    private sealed class ThrowingDbContextFactory : IDbContextFactory<HubDbContext>
-    {
-        /// <inheritdoc />
-        public Task<HubDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
-        {
-            return Task.FromException<HubDbContext>(new InvalidOperationException("测试桩：禁止创建真实 DbContext。"));
-        }
-
-        /// <inheritdoc />
-        public HubDbContext CreateDbContext()
-        {
-            throw new InvalidOperationException("测试桩：禁止创建真实 DbContext。");
-        }
     }
 }
