@@ -54,6 +54,12 @@ public class DeletionExecutionService(
             businessKeys.Add(candidate.BusinessKey);
         }
 
+        // 无候选删除项时直接返回，跳过后续 DangerZone 管道调用以避免无效开销。
+        if (uniqueCandidates.Count == 0)
+        {
+            return new SyncDeletionExecutionResult();
+        }
+
         var deletedCount = await deletionRepository.ApplyDeletionAsync(new SyncDeletionApplyRequest
         {
             TableCode = context.Definition.TableCode,

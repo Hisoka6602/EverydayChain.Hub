@@ -1138,6 +1138,8 @@ WHEN NOT MATCHED THEN
         string businessKey,
         CancellationToken ct) {
         var stateTables = await ListSyncStateTableFullNamesAsync(tableCode, connection, transaction, ct);
+        // 统一捕获当前本地时间，确保 SoftDeletedTimeLocal 与 UpdatedTimeLocal 严格同时刻，避免两次调用产生时间倒置。
+        var nowLocal = DateTime.Now;
         foreach (var stateTable in stateTables) {
             await using var command = connection.CreateCommand();
             command.Transaction = transaction;
@@ -1148,8 +1150,8 @@ SET [IsSoftDeleted]=1,
     [UpdatedTimeLocal]=@updatedTimeLocal
 WHERE [TableCode]=@tableCode
   AND [BusinessKey]=@businessKey;";
-            command.Parameters.AddWithValue("@softDeletedTimeLocal", DateTime.Now);
-            command.Parameters.AddWithValue("@updatedTimeLocal", DateTime.Now);
+            command.Parameters.AddWithValue("@softDeletedTimeLocal", nowLocal);
+            command.Parameters.AddWithValue("@updatedTimeLocal", nowLocal);
             command.Parameters.AddWithValue("@tableCode", tableCode);
             command.Parameters.AddWithValue("@businessKey", businessKey);
             await command.ExecuteNonQueryAsync(ct);

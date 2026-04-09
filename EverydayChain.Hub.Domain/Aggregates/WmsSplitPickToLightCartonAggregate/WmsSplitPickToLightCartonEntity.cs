@@ -116,7 +116,6 @@ public class WmsSplitPickToLightCartonEntity : IEntity<long>
 
     /// <summary>
     /// 停止标识或停止状态。
-    /// 当前业务语义待进一步确认。
     /// </summary>
     [Column("STOP")]
     [StringLength(20)]
