@@ -1,12 +1,17 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 执行全量逐文件代码审查（P0/P1/P2 分级），按 `.github/copilot-instructions.md` 强制规则对所有代码文件进行合规检查并修复发现问题。
-- 删除 `EverydayChain.Hub.Host/Worker.cs`：该后台演示写入服务已在上一迭代从 `Program.cs` 移除注册，但文件本身残留；本次按已过时代码必须删除规则清除死代码文件。
-- 删除 `EverydayChain.Hub.Domain/Options/WorkerOptions.cs`：仅被已删除的 `Worker.cs` 引用，随之成为死代码，同步删除。
-- 移除 `appsettings.json` 中的 `Worker` 配置节：`WorkerOptions` 删除后该配置段无任何绑定对象，予以移除，避免配置孤岛误导维护。
-- 补全 `README.md` 文件树：将 `Domain/Options` 目录下实际存在的 `AutoTuneOptions.cs`、`DangerZoneOptions.cs`、`SyncDeleteOptions.cs`、`SyncRetentionOptions.cs`、`SyncTableOptions.cs` 补入文件树（此前遗漏），与磁盘文件一一对应。
-- 审查确认：UTC API 零使用（`UtcNow`/`DateTimeKind.Utc` 等仅在防御性单元测试中出现）、NLog 配置合规（`archiveAboveSize=10485760`）、所有枚举含 XML 注释与 `Description`、Host 层无 `Servers` 目录、命名空间与目录一致、DDD 分层依赖方向合规、无 `[Obsolete]` 残留、注释无第二人称字眼。
+- 完成全量逐文件代码审查（共 136 个 C# 文件，依据 `逐文件代码检查方案.md`），输出 `逐文件代码检查台账.md` 记录每文件检查状态与问题列表。
+- 修复 **P1-001**：`SqlServerSyncUpsertRepository.MarkSoftDeletedStateAsync` 两次 `DateTime.Now` 存在时间倒置风险，统一捕获为 `nowLocal` 后复用。
+- 修复 **P1-002**：`SyncBatchRepository._batches` 字典无界增长（OOM 风险），新增上限 5,000 条及超限淘汰最早完成/失败批次机制。
+- 修复 **P1-003**：`SyncChangeLogRepository._changes` 队列无消费机制无限累积，新增上限 200,000 条及超限淘汰最早条目机制。
+- 修复 **P1-004**：`SyncDeletionLogRepository._logs` 队列同 P1-003，新增相同容量保护。
+- 修复 **P1-005**：`ISyncStagingRepository.BulkInsertAsync` 接口注释明确要求调用方在 try/finally 中调用 `ClearPageAsync` 以防止暂存条目永久残留。
+- 修复 **P2-001**：删除 `SyncColumnFilter.NormalizedSoftDeleteColumns` 冗余别名字段，`SyncTaskConfigRepository` 引用改为 `SoftDeleteColumns`。
+- 修复 **P2-002**：`OracleRemoteStatusWriter` 热路径改用 `FillArray<T>`（内部 `Array.Fill`）替代 `Enumerable.Repeat().ToArray()`，减少 GC 压力。
+- 修复 **P2-003**：`DeletionExecutionService.ExecuteDeletionAsync` 在 `uniqueCandidates` 为空时提前返回，跳过无效的 DangerZone 管道调用。
+- 修复 **P2-004**：`SortingTaskTraceEntity.CreatedAt` 注释补充 `DateTimeOffset.UtcNow` 禁用说明，防止调用方误用 UTC 赋值。
+- 修复 **P2-005**：`WmsSplitPickToLightCartonEntity.StopCode` 移除"当前业务语义待进一步确认"的代码内注释（违反治理规范：待确认项应通过 Issue 跟踪，不得保留在代码注释中）。
 
 ## 解决方案文件树与职责
 ```text
@@ -20,6 +25,7 @@
 ├── 值班处置手册.md
 ├── 当前程序能力与缺陷分析.md
 ├── 逐文件代码检查方案.md
+├── 逐文件代码检查台账.md
 ├── Oracle到SQLServer同步架构设计.md
 ├── Oracle到SQLServer同步实施计划.md
 ├── 兼容现有实现的可切换同步模式改造分析与执行步骤.md
@@ -194,6 +200,7 @@
 - `年度维护清单.md`：月度/季度/年度例行巡检项标准化清单，包含磁盘治理、日志审查、数据一致性、配置审核、灾难恢复演练、容量规划、安全审计等条目及快速异常处理参考表。
 - `值班处置手册.md`：日常值班与告警应急处置手册，覆盖 9 类告警的处置步骤（卡死检测、磁盘不足、内存水位、整轮超时、熔断、检查点损坏、快照损坏、归档失败、进程停止），定义 P0~P3 优先级与升级规则，含处置记录与演练记录模板。
 - `逐文件代码检查方案.md`：逐文件审查执行方案，定义检查范围、单文件检查维度、无遗漏对账流程、问题分级与分批 PR 策略，支持“本 PR 不改代码”的审查场景。
+- `逐文件代码检查台账.md`：136 个 C# 文件逐文件检查台账，记录每文件检查状态（未检查/进行中/已完成）、问题编号与修复状态，供后续 PR 复核追溯。
 - `SyncTableDefinition.cs` / `SyncWindow.cs` / `SyncCheckpoint.cs` / `SyncBatchResult.cs`：定义同步链路执行、窗口与结果统计的核心领域模型。
 - `SyncBatch.cs` / `SyncChangeLog.cs` / `SyncDeletionLog.cs`：定义批次状态跟踪、变更审计与删除审计的数据模型。
 - `SyncBusinessKeyBuilder.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：同步业务键构建共享组件，按 `UniqueKeys` 配置将行数据拼接为 `|` 分隔的业务键文本，供 Upsert 与删除识别阶段统一调用。

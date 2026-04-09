@@ -7,6 +7,8 @@ public interface ISyncStagingRepository
 {
     /// <summary>
     /// 批量写入暂存。
+    /// 调用方必须在 try/finally 块中调用 <see cref="ClearPageAsync"/> 确保每次写入后数据均被清理，
+    /// 防止暂存条目在 Singleton 生命周期内长期残留。
     /// </summary>
     /// <param name="batchId">批次编号。</param>
     /// <param name="pageNo">页码。</param>

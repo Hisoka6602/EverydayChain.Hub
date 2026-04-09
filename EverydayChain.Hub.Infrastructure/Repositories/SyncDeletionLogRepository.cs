@@ -6,9 +6,17 @@ namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
 /// 同步删除日志仓储基础实现（内存存储）。
+/// 队列上限为 <see cref="MaxQueueCapacity"/>，超限时自动淘汰最早入队的条目，防止长期运行导致 OOM。
+/// 生产环境建议替换为持久化实现。
 /// </summary>
 public class SyncDeletionLogRepository : ISyncDeletionLogRepository
 {
+    /// <summary>内存队列条目上限。</summary>
+    private const int MaxQueueCapacity = 200_000;
+
+    /// <summary>触发淘汰时单次最多移除的条目数。</summary>
+    private const int EvictionBatchSize = 10_000;
+
     /// <summary>删除日志集合。</summary>
     private readonly ConcurrentQueue<SyncDeletionLog> _logs = new();
 
@@ -29,7 +37,25 @@ public class SyncDeletionLogRepository : ISyncDeletionLogRepository
             _logs.Enqueue(log);
         }
 
+        TrimExcessIfNeeded();
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 当队列条目超过 <see cref="MaxQueueCapacity"/> 时，淘汰最早入队的条目，防止无界增长。
+    /// </summary>
+    private void TrimExcessIfNeeded()
+    {
+        if (_logs.Count <= MaxQueueCapacity)
+        {
+            return;
+        }
+
+        var toRemove = _logs.Count - MaxQueueCapacity + EvictionBatchSize;
+        for (var i = 0; i < toRemove; i++)
+        {
+            _logs.TryDequeue(out _);
+        }
     }
 
     /// <summary>

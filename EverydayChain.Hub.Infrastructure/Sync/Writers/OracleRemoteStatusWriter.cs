@@ -80,14 +80,14 @@ public class OracleRemoteStatusWriter(
                 command.ArrayBindCount = rowIds.Count;
                 command.CommandTimeout = ResolveCommandTimeout();
                 command.CommandText = sql;
-                command.Parameters.Add("p_completedStatus", OracleDbType.Varchar2, Enumerable.Repeat(profile.CompletedStatusValue, rowIds.Count).ToArray(), ParameterDirection.Input);
+                command.Parameters.Add("p_completedStatus", OracleDbType.Varchar2, FillArray(profile.CompletedStatusValue, rowIds.Count), ParameterDirection.Input);
                 if (!string.IsNullOrWhiteSpace(profile.WriteBackCompletedTimeColumnName))
                 {
                     var completedTimeLocal = DateTime.Now;
                     command.Parameters.Add(
                         "p_completedTimeLocal",
                         OracleDbType.TimeStamp,
-                        Enumerable.Repeat(completedTimeLocal, rowIds.Count).ToArray(),
+                        FillArray(completedTimeLocal, rowIds.Count),
                         ParameterDirection.Input);
                 }
 
@@ -96,7 +96,7 @@ public class OracleRemoteStatusWriter(
                     command.Parameters.Add(
                         "p_batchId",
                         OracleDbType.Varchar2,
-                        Enumerable.Repeat(batchId, rowIds.Count).ToArray(),
+                        FillArray(batchId, rowIds.Count),
                         ParameterDirection.Input);
                 }
 
@@ -151,5 +151,19 @@ public class OracleRemoteStatusWriter(
         {
             throw new InvalidOperationException($"{fieldName} 包含非法字符，仅允许字母、数字、下划线。 ");
         }
+    }
+
+    /// <summary>
+    /// 创建指定长度并填充相同值的数组，避免 LINQ 分配开销。
+    /// </summary>
+    /// <typeparam name="T">元素类型。</typeparam>
+    /// <param name="value">填充值。</param>
+    /// <param name="count">数组长度。</param>
+    /// <returns>填充后的数组。</returns>
+    private static T[] FillArray<T>(T value, int count)
+    {
+        var arr = new T[count];
+        Array.Fill(arr, value);
+        return arr;
     }
 }

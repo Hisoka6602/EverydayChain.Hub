@@ -216,7 +216,7 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             throw new InvalidOperationException($"表 {table.TableCode} 的 ExcludedColumns 禁止包含 CursorColumn：{table.CursorColumn}。");
         }
 
-        var conflictsWithSoftDeleteColumns = SyncColumnFilter.NormalizedSoftDeleteColumns
+        var conflictsWithSoftDeleteColumns = SyncColumnFilter.SoftDeleteColumns
             .Intersect(excludedColumns, StringComparer.OrdinalIgnoreCase)
             .ToList();
         if (conflictsWithSoftDeleteColumns.Count > 0)

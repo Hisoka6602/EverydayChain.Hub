@@ -7,9 +7,16 @@ namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
 /// 同步批次仓储基础实现（内存存储）。
+/// 内存条目上限为 <see cref="MaxBatchCount"/>，超限时自动淘汰最早完成/失败的批次，防止长期运行导致 OOM。
 /// </summary>
 public class SyncBatchRepository : ISyncBatchRepository
 {
+    /// <summary>内存批次条目上限。</summary>
+    private const int MaxBatchCount = 5_000;
+
+    /// <summary>触发淘汰时单次最多移除的条目数。</summary>
+    private const int EvictionCount = 200;
+
     /// <summary>批次存储字典。</summary>
     private readonly ConcurrentDictionary<string, SyncBatch> _batches = new(StringComparer.OrdinalIgnoreCase);
 
@@ -36,6 +43,7 @@ public class SyncBatchRepository : ISyncBatchRepository
             throw new InvalidOperationException($"批次已存在：{batch.BatchId}");
         }
 
+        TrimExcessBatchesIfNeeded();
         return Task.CompletedTask;
     }
 
@@ -110,6 +118,30 @@ public class SyncBatchRepository : ISyncBatchRepository
         }
 
         throw new InvalidOperationException($"未找到批次：{batchId}");
+    }
+
+    /// <summary>
+    /// 当内存批次数超过 <see cref="MaxBatchCount"/> 时，淘汰最早完成或失败的批次，防止无界增长。
+    /// 进行中（InProgress/Pending）的批次不会被淘汰。
+    /// </summary>
+    private void TrimExcessBatchesIfNeeded()
+    {
+        if (_batches.Count <= MaxBatchCount)
+        {
+            return;
+        }
+
+        var trimCandidates = _batches.Values
+            .Where(static b => b.Status is SyncBatchStatus.Completed or SyncBatchStatus.Failed)
+            .OrderBy(static b => b.CompletedTimeLocal ?? DateTime.MinValue)
+            .Take(EvictionCount)
+            .Select(static b => b.BatchId)
+            .ToList();
+
+        foreach (var id in trimCandidates)
+        {
+            _batches.TryRemove(id, out _);
+        }
     }
 
     /// <summary>

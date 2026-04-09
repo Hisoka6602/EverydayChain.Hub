@@ -25,11 +25,6 @@ public static class SyncColumnFilter
     };
 
     /// <summary>
-    /// 规范化后的软删除关键列集合。
-    /// </summary>
-    public static readonly IReadOnlySet<string> NormalizedSoftDeleteColumns = SoftDeleteColumns;
-
-    /// <summary>
     /// 过滤行中的排除列（使用已规范化集合）。
     /// </summary>
     /// <param name="row">原始数据行。</param>
