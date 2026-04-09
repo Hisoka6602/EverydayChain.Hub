@@ -118,6 +118,12 @@ public class RemoteStatusConsumeService(
                     rowIds.Count);
                 if (shouldUseFixedFirstPage)
                 {
+                    logger.LogWarning(
+                        "状态驱动消费提前结束：固定第1页模式下远端回写失败，停止本批次以避免重复追加。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, FailedRowIdCount={FailedRowIdCount}",
+                        definition.TableCode,
+                        batchId,
+                        currentPageNo,
+                        rowIds.Count);
                     break;
                 }
             }

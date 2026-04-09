@@ -129,13 +129,13 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
 
         var statusColumnName = string.IsNullOrWhiteSpace(table.StatusColumnName) ? "TASKPROCESS" : table.StatusColumnName.Trim();
         EnsureSafeIdentifier(statusColumnName, table.TableCode, nameof(table.StatusColumnName));
-        var batchSize = table.StatusBatchSize > 0 ? table.StatusBatchSize : 5000;
-        var completedStatusValue = string.IsNullOrWhiteSpace(table.CompletedStatusValue) ? "Y" : table.CompletedStatusValue.Trim();
         if (!table.ShouldWriteBackRemoteStatus)
         {
             throw new InvalidOperationException($"表 {table.TableCode} 在 StatusDriven 模式下必须开启 ShouldWriteBackRemoteStatus，禁止关闭远端回写。");
         }
 
+        var batchSize = table.StatusBatchSize > 0 ? table.StatusBatchSize : 5000;
+        var completedStatusValue = string.IsNullOrWhiteSpace(table.CompletedStatusValue) ? "Y" : table.CompletedStatusValue.Trim();
         if (table.ShouldWriteBackRemoteStatus && string.IsNullOrWhiteSpace(completedStatusValue))
         {
             throw new InvalidOperationException($"表 {table.TableCode} 开启远端回写时，CompletedStatusValue 不能为空。");
