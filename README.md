@@ -1,19 +1,12 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 完成“可切换同步模式”主链路改造：新增 `KeyedMerge/StatusDriven` 模式定义、状态驱动配置模型、执行分流入口与基础设施消费组件（读取/追加/回写），并保持 KeyedMerge 旧链路行为不变。
-- 新增 StatusDriven 组件与测试：`OracleStatusDrivenSourceReader`、`SqlServerAppendOnlyWriter`、`OracleRemoteStatusWriter`、`RemoteStatusConsumeService` 及对应测试替身/用例，覆盖 `PendingStatusValue=null` 的 `IS NULL` 语义与按 `ROWID` 回写路径。
-- `SyncTaskConfigRepository` 增加 `SyncMode` 与状态驱动参数映射、默认值填充与中文错误校验；`appsettings.json` 同步补充新配置项范围说明与 `null` 示例值。
-- 新增 `兼容现有实现的可切换同步模式改造分析与执行步骤.md` 文档，基于当前代码梳理 KeyedMerge/StatusDriven 双模式改造边界、分层落位、配置扩展点、执行步骤与验收口径。
-- 补全验收清单第7条：`ShouldWriteBackRemoteStatus` 改为可配置（true/false），移除强制为 true 的约束；关闭后仅本地追加、不触发任何远端更新；更新 `SyncTableOptions`、`RemoteStatusConsumeProfile` 与 `EverydayChain.Hub.Host/appsettings.json` 注释，新增关闭回写场景测试。
-- 按最新 `.github/copilot-instructions.md` 约束完成测试代码结构治理：拆分同文件多类/嵌套类测试替身，统一为“一类一文件”，降低影子代码与重复定义风险。
-- 移除 `Program` 中默认注册的 `Worker` 演示写入后台服务，仅保留 `SyncBackgroundWorker` 与 `RetentionBackgroundWorker`，避免生产运行链路出现演示数据写入造成的影子执行与额外负载。
-- 修复 `SyncStagingRepository` 行复制时的字典比较器丢失问题：暂存行改为 `StringComparer.OrdinalIgnoreCase`，避免后续按配置列名大小写差异读取时出现业务键字段匹配失败。
-- 新增 `SyncStagingRepositoryTests`，覆盖暂存行字段大小写不敏感访问回归场景，防止同类问题回归。
-- `sync_target_state` 表按 `TableCode+月份` 分表：每个同步表编码每月独立状态表（`sync_target_state_{tableCode}_{yyyyMM}`）；读取状态时跨月份分表聚合并按 `UpdatedTimeLocal` 取最新记录，同时兼容读取旧版状态表（`sync_target_state` 与 `sync_target_state_{tableCode}`），避免升级后幂等状态丢失。
-- `CheckpointFilePath` 保留：经分析确认检查点文件仍被 `SyncOrchestrator`、`SyncExecutionService` 及 `RuntimeStorageGuard` 实际使用（续传断点 + 磁盘空间检测），注释补充部署建议（宿主机挂载持久化目录）。
-- 调整状态分表命名测试：`GetSyncStateTableFullName_ShouldGeneratePerTableCodeAndMonthName`（Theory×3路径）、`GetSyncStateTableFullName_WhenTableCodeContainsInvalidChar_ShouldThrow`、`GetSyncStateTableFullName_WhenStateMonthTokenInvalid_ShouldThrow`，覆盖命名与输入边界。
-- 新增 `逐文件代码检查方案.md`，用于指导“仅检查不改代码”的逐文件审查执行，覆盖检查维度、无遗漏流程、问题分级与分批 PR 策略。
+- 执行全量逐文件代码审查（P0/P1/P2 分级），按  强制规则对所有代码文件进行合规检查并修复发现问题。
+- 删除 ：该后台演示写入服务已在上一迭代从  移除注册，但文件本身残留；本次按已过时代码必须删除规则清除死代码文件。
+- 删除 ：仅被已删除的  引用，随之成为死代码，同步删除。
+- 移除  中的  配置节： 删除后该配置段无任何绑定对象，予以移除，避免配置孤岛误导维护。
+- 补全 README.md 文件树：将  目录下实际存在的 、、、、 补入文件树（此前遗漏），与磁盘文件一一对应。
+- 审查确认：UTC API 零使用（/ 等仅在防御性单元测试中出现）、NLog 配置合规（）、所有枚举含 XML 注释与 、Host 层无  目录、命名空间与目录一致、DDD 分层依赖方向合规、无  残留、注释无第二人称字眼。
 
 ## 解决方案文件树与职责
 ```text
@@ -58,11 +51,15 @@
 │   ├── Aggregates/SortingTaskTraceAggregate/SortingTaskTraceEntity.cs
 │   ├── Aggregates/WmsPickToWcsAggregate/WmsPickToWcsEntity.cs
 │   ├── Aggregates/WmsSplitPickToLightCartonAggregate/WmsSplitPickToLightCartonEntity.cs
-│   ├── Options/WorkerOptions.cs
-│   ├── Options/ShardingOptions.cs
-│   ├── Options/SyncJobOptions.cs
+│   ├── Options/AutoTuneOptions.cs
+│   ├── Options/DangerZoneOptions.cs
+│   ├── Options/OracleOptions.cs
 │   ├── Options/RetentionJobOptions.cs
-│   └── Options/OracleOptions.cs
+│   ├── Options/ShardingOptions.cs
+│   ├── Options/SyncDeleteOptions.cs
+│   ├── Options/SyncJobOptions.cs
+│   ├── Options/SyncRetentionOptions.cs
+│   └── Options/SyncTableOptions.cs
 ├── EverydayChain.Hub.Application
 │   ├── EverydayChain.Hub.Application.csproj
 │   ├── Models/SyncExecutionContext.cs
@@ -181,7 +178,6 @@
 └── EverydayChain.Hub.Host
     ├── EverydayChain.Hub.Host.csproj
     ├── Program.cs
-    ├── Worker.cs
     ├── Workers/SyncBackgroundWorker.cs
     ├── Workers/RetentionBackgroundWorker.cs
     ├── nlog.config
@@ -206,7 +202,7 @@
 - `LogicalTableNameNormalizer.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：逻辑表名规范化与安全校验共享组件，统一执行去空白、SQL 标识符校验与异常信息输出。
 - `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs` / `SyncTablePriority.cs`：同步模式、删除策略、滞后控制、批次状态、变更操作类型与调度优先级枚举，均含中文 XML 注释与 `Description`。
 - `RemoteStatusConsumeProfile.cs`（`EverydayChain.Hub.Domain/Sync/Models`）：StatusDriven 消费配置模型，统一承载状态列、待处理值、完成值、回写开关与批次大小。
-- `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Worker`、`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`RetentionJob`、`Oracle` 等），供 Host/Infrastructure 绑定读取。
+- `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`SyncTable`、`SyncDelete`、`SyncRetention`、`RetentionJob`、`Oracle` 等），供 Infrastructure 绑定读取。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
 - `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs` + `SyncTargetStateRow.cs`：同步执行、删除识别与轻量幂等状态存储的数据契约模型。
 - `Application/Sync/Abstractions/IRemoteStatusConsumeService.cs` + `Application/Sync/Models/RemoteStatusConsumeResult.cs`：定义 StatusDriven 模式执行入口与读取/追加/回写统计模型。
@@ -277,6 +273,11 @@
 - `Oracle到SQLServer同步实施计划.md`：按 PR 拆分同步架构落地步骤的进度跟踪文档。
 - `兼容现有实现的可切换同步模式改造分析与执行步骤.md`：基于现有代码的双模式改造分析文档，明确保留链路、StatusDriven 停用项、分层新增文件与实施步骤。
 - `ShardingOptions.cs`：分表配置模型，仅保留连接、Schema 与自动预建月数等基础配置。
+- `AutoTuneOptions.cs`：批量写入自动调谐配置，从 `AutoTune` 节点绑定，覆盖初始/最小/最大批量、步长、慢阈值与采样窗口等参数。
+- `DangerZoneOptions.cs`（Domain/Options）：危险操作隔离器弹性策略配置，从 `DangerZone` 节点绑定，覆盖超时、重试与熔断参数。
+- `SyncTableOptions.cs`：单表同步配置，承载 `TableCode`、`SourceSchema`、`SourceTable`、`CursorColumn`、`StartTimeLocal`、`SyncMode`、状态驱动参数与删除/保留期子配置。
+- `SyncDeleteOptions.cs`：单表删除同步配置子模型，承载 `DeletionPolicy`、`Enabled`、`DryRun`、比对分段大小与并行度。
+- `SyncRetentionOptions.cs`：单表保留期治理配置子模型，承载 `Enabled`、`KeepMonths`、`DryRun` 与 `AllowDrop` 开关。
 - `ShardTableProvisioner.cs`：分表预建实现，按启用同步表推导的逻辑表与后缀笛卡尔组合执行建表，并保持危险动作隔离执行。
 - `AutoMigrationService.cs`：应用启动迁移入口，自动创建缺失数据库、识别并执行待迁移项，通过分表预建器自动覆盖多逻辑表。
 - `appsettings.json`：主配置样例，移除分表逻辑表名静态配置，统一由 `SyncJob.Tables.TargetLogicalTable` 提供。
