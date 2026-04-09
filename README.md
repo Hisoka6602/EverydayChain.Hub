@@ -1,6 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 完成“可切换同步模式”主链路改造：新增 `KeyedMerge/StatusDriven` 模式定义、状态驱动配置模型、执行分流入口与基础设施消费组件（读取/追加/回写），并保持 KeyedMerge 旧链路行为不变。
+- 新增 StatusDriven 组件与测试：`OracleStatusDrivenSourceReader`、`SqlServerAppendOnlyWriter`、`OracleRemoteStatusWriter`、`RemoteStatusConsumeService` 及对应测试替身/用例，覆盖 `PendingStatusValue=null` 的 `IS NULL` 语义与按 `ROWID` 回写路径。
+- `SyncTaskConfigRepository` 增加 `SyncMode` 与状态驱动参数映射、默认值填充与中文错误校验；`appsettings.json` 同步补充新配置项范围说明与 `null` 示例值。
 - 新增 `兼容现有实现的可切换同步模式改造分析与执行步骤.md` 文档，基于当前代码梳理 KeyedMerge/StatusDriven 双模式改造边界、分层落位、配置扩展点、执行步骤与验收口径。
 - 按最新 `.github/copilot-instructions.md` 约束完成测试代码结构治理：拆分同文件多类/嵌套类测试替身，统一为“一类一文件”，降低影子代码与重复定义风险。
 - 移除 `Program` 中默认注册的 `Worker` 演示写入后台服务，仅保留 `SyncBackgroundWorker` 与 `RetentionBackgroundWorker`，避免生产运行链路出现演示数据写入造成的影子执行与额外负载。
@@ -42,6 +45,7 @@
 │   ├── Enums/SyncChangeOperationType.cs
 │   ├── Enums/SyncTablePriority.cs
 │   ├── Sync/SyncTableDefinition.cs
+│   ├── Sync/Models/RemoteStatusConsumeProfile.cs
 │   ├── Sync/SyncWindow.cs
 │   ├── Sync/SyncCheckpoint.cs
 │   ├── Sync/SyncBatchResult.cs
@@ -80,6 +84,8 @@
 │   ├── Abstractions/Persistence/ISyncDeletionLogRepository.cs
 │   ├── Abstractions/Persistence/IShardTableResolver.cs
 │   ├── Abstractions/Persistence/IShardRetentionRepository.cs
+│   ├── Sync/Abstractions/IRemoteStatusConsumeService.cs
+│   ├── Sync/Models/RemoteStatusConsumeResult.cs
 │   ├── Services/ISyncOrchestrator.cs
 │   ├── Services/ISyncWindowCalculator.cs
 │   ├── Services/ISyncExecutionService.cs
@@ -101,6 +107,13 @@
 │   ├── EverydayChain.Hub.Infrastructure.csproj
 │   ├── DependencyInjection/ServiceCollectionExtensions.cs
 │   ├── Properties/AssemblyInfo.cs
+│   ├── Sync/Abstractions/IOracleStatusDrivenSourceReader.cs
+│   ├── Sync/Abstractions/ISqlServerAppendOnlyWriter.cs
+│   ├── Sync/Abstractions/IOracleRemoteStatusWriter.cs
+│   ├── Sync/Readers/OracleStatusDrivenSourceReader.cs
+│   ├── Sync/Writers/SqlServerAppendOnlyWriter.cs
+│   ├── Sync/Writers/OracleRemoteStatusWriter.cs
+│   ├── Sync/Services/RemoteStatusConsumeService.cs
 │   ├── Repositories/SyncTaskConfigRepository.cs
 │   ├── Repositories/OracleSourceReader.cs
 │   ├── Repositories/SyncStagingRepository.cs
@@ -143,6 +156,11 @@
 │   ├── Repositories/NoOpShardTableProvisioner.cs
 │   ├── Repositories/SyncStagingRepositoryTests.cs
 │   ├── Repositories/SqlServerSyncUpsertRepositoryTests.cs
+│   ├── Repositories/SyncTaskConfigRepositoryTests.cs
+│   ├── Sync/RemoteStatusConsumeServiceTests.cs
+│   ├── Sync/Fakes/FakeOracleStatusDrivenSourceReader.cs
+│   ├── Sync/Fakes/FakeSqlServerAppendOnlyWriter.cs
+│   ├── Sync/Fakes/FakeOracleRemoteStatusWriter.cs
 │   └── Services
 │       ├── AutoMigrationServiceTests.cs
 │       ├── DangerZoneExecutorTests.cs
@@ -183,9 +201,11 @@
 - `RuntimeStoragePathResolver.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：运行期路径解析共享组件，统一解析检查点、目标快照与存储守护所需的绝对路径。
 - `LogicalTableNameNormalizer.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：逻辑表名规范化与安全校验共享组件，统一执行去空白、SQL 标识符校验与异常信息输出。
 - `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs` / `SyncTablePriority.cs`：同步模式、删除策略、滞后控制、批次状态、变更操作类型与调度优先级枚举，均含中文 XML 注释与 `Description`。
+- `RemoteStatusConsumeProfile.cs`（`EverydayChain.Hub.Domain/Sync/Models`）：StatusDriven 消费配置模型，统一承载状态列、待处理值、完成值、回写开关与批次大小。
 - `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Worker`、`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`RetentionJob`、`Oracle` 等），供 Host/Infrastructure 绑定读取。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
 - `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs` + `SyncTargetStateRow.cs`：同步执行、删除识别与轻量幂等状态存储的数据契约模型。
+- `Application/Sync/Abstractions/IRemoteStatusConsumeService.cs` + `Application/Sync/Models/RemoteStatusConsumeResult.cs`：定义 StatusDriven 模式执行入口与读取/追加/回写统计模型。
 - `Application/Abstractions/Persistence/ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。
 - `Application/Abstractions/Persistence/IShardTableResolver.cs` / `IShardRetentionRepository.cs`：定义分表识别与分表清理执行契约（含分表完整回滚脚本生成）。
 - `ISyncOrchestrator.cs` / `SyncOrchestrator.cs`：同步任务编排入口，负责读取配置、加载检查点、计算窗口，并基于优先级与并发上限执行多表同步。
@@ -203,9 +223,13 @@
 - `NonRetryableDangerZoneException.cs`：危险隔离器“不可重试异常”标记类型，用于识别配置类确定性失败并快速失败。
 - `IRuntimeStorageGuard.cs` + `RuntimeStorageGuard.cs`：运行期存储守护服务，负责启动阶段的磁盘空间、目录权限、关键文件可读写自检，并在检查点/目标快照写入前执行磁盘阈值校验与告警阻断；同时提供单表内存水位监控与节流告警能力。
 - `SortingTaskTraceWriter.cs`：按分表后缀分组写入，并将执行结果回传给调谐器。
-- `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，校验 `StartTimeLocal` 禁止 `Z` 与 offset，校验 `ExcludedColumns` 不得与 `UniqueKeys`、`CursorColumn`、软删除关键列冲突，并解析优先级与多表并发上限。
+- `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，校验 `StartTimeLocal` 禁止 `Z` 与 offset，校验 `ExcludedColumns` 不得与 `UniqueKeys`、`CursorColumn`、软删除关键列冲突，并解析优先级与多表并发上限；新增 `SyncMode` 与 StatusDriven 参数映射、默认值填充及中文错误校验。
 - `OracleOptions.cs`：远端 Oracle 连接配置实体，定义连接字符串、连接库名（ServiceName/SID，决定连接目标）、只读开关、命令超时与分页上限。
 - `OracleSourceReader.cs`：源端读取器 Oracle 实现，使用参数化 SQL 执行真实只读查询，支持分页增量读取、业务键读取、`ExcludedColumns` 过滤，并在异常场景输出错误日志；支持 `Oracle.DatabaseMode` 控制库名拼接语义（ServiceName/SID）。
+- `Sync/Readers/OracleStatusDrivenSourceReader.cs`：StatusDriven 读取器，按状态列读取待处理行，支持 `PendingStatusValue=null` 时生成 `IS NULL` 条件，并输出 `__RowId` 供后续回写使用。
+- `Sync/Writers/SqlServerAppendOnlyWriter.cs`：StatusDriven 本地落库写入器，仅执行批量追加，不执行 merge/delete。
+- `Sync/Writers/OracleRemoteStatusWriter.cs`：StatusDriven 远端回写器，仅按 `ROWID` 更新远端状态列。
+- `Sync/Services/RemoteStatusConsumeService.cs`：串联“读取→追加→可选回写”流程，执行页级异常隔离并输出中文统计日志。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
 - `SqlServerSyncUpsertRepository.cs`：SQL Server 真实落库实现，按目标逻辑表+后缀分表执行集合式 MERGE（支持配置回退逐行模式），并在 `sync_target_state_{tableCode}_{yyyyMM}` 状态分表中记录后缀；读取/删除状态时跨月分表聚合，且兼容旧版 `sync_target_state` / `sync_target_state_{tableCode}` 状态表，确保升级过程幂等与删除语义连续。
 - `SyncDeletionRepository.cs`：删除同步仓储基础实现，基于轻量幂等状态执行窗口过滤与源端键差异识别，并按策略执行删除。
@@ -237,6 +261,8 @@
 - `EverydayChain.Hub.Tests/Repositories/OracleSourceReaderTests.cs`：Oracle 连接串构建测试，覆盖空连接串、空库名、EZCONNECT（斜杠/SID）覆写与复杂描述符拦截分支。
 - `EverydayChain.Hub.Tests/Repositories/SyncStagingRepositoryTests.cs`：暂存仓储回归测试，覆盖暂存行字段大小写不敏感访问，防止业务键字段因列名大小写差异导致读取失败。
 - `EverydayChain.Hub.Tests/Repositories/SqlServerSyncUpsertRepositoryTests.cs`：SQL Server 落库仓储契约测试，覆盖插入/更新/跳过统计、UniqueKeys 缺失异常，以及 `sync_target_state` 状态分表命名安全边界（正常路径×3 + TableCode 非法字符 + 月份标记非法）。
+- `EverydayChain.Hub.Tests/Repositories/SyncTaskConfigRepositoryTests.cs`：配置映射测试，覆盖 `SyncMode` 默认值与 `StatusDriven + PendingStatusValue=null` 映射语义。
+- `EverydayChain.Hub.Tests/Sync/RemoteStatusConsumeServiceTests.cs` + `EverydayChain.Hub.Tests/Sync/Fakes/*.cs`：状态驱动消费测试与替身，覆盖追加、回写、缺失 `__RowId` 跳过回写统计路径。
 - `EverydayChain.Hub.Tests/Repositories/InMemorySqlServerSyncUpsertRepository.cs`：SqlServerSyncUpsertRepository 内存测试替身，集中维护状态与分片迁移断言逻辑。
 - `EverydayChain.Hub.Tests/Repositories/NoOpShardTableProvisioner.cs`：空实现分表预置器测试替身，用于隔离仓储合并测试的建表外部依赖。
 - `EFCore手动迁移操作指南.md`：提供手工迁移、脚本导出、回滚、排障流程。
