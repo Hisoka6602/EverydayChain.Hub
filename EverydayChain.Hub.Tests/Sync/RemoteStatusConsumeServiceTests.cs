@@ -54,6 +54,35 @@ public class RemoteStatusConsumeServiceTests
     }
 
     /// <summary>
+    /// 启用回写时应固定读取第 1 页，避免集合收缩导致翻页跳过。
+    /// </summary>
+    [Fact]
+    public async Task ConsumeAsync_WhenWriteBackEnabled_ShouldAlwaysReadFirstPage()
+    {
+        var reader = new FakeOracleStatusDrivenSourceReader();
+        reader.Pages.Enqueue([
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["ID"] = 1,
+                ["TASKPROCESS"] = "N",
+                ["__RowId"] = "AAA001",
+            },
+        ]);
+        reader.Pages.Enqueue([]);
+        var appendWriter = new FakeSqlServerAppendOnlyWriter();
+        var remoteWriter = new FakeOracleRemoteStatusWriter();
+        var logger = new TestLogger<RemoteStatusConsumeService>();
+        var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, logger);
+        var definition = BuildStatusDrivenDefinition();
+
+        var result = await service.ConsumeAsync(definition, "BATCH-002", CancellationToken.None);
+
+        Assert.Equal([1, 1], reader.RequestedPageNos);
+        Assert.Equal(1, result.AppendCount);
+        Assert.Equal(1, result.WriteBackCount);
+    }
+
+    /// <summary>
     /// 构建状态驱动测试定义。
     /// </summary>
     /// <returns>同步表定义。</returns>

@@ -58,6 +58,66 @@ public class SyncTaskConfigRepositoryTests
     }
 
     /// <summary>
+    /// StatusDriven 模式下 PendingStatusValue 应执行 Trim。
+    /// </summary>
+    [Fact]
+    public async Task GetByTableCodeAsync_WhenStatusDrivenAndPendingHasWhitespace_ShouldTrim()
+    {
+        var options = BuildOptions(table =>
+        {
+            table.SyncMode = nameof(SyncMode.StatusDriven);
+            table.PendingStatusValue = " N ";
+            table.ShouldWriteBackRemoteStatus = true;
+        });
+        var logger = new TestLogger<SyncTaskConfigRepository>();
+        var repository = new SyncTaskConfigRepository(Options.Create(options), logger);
+
+        var definition = await repository.GetByTableCodeAsync("T1", CancellationToken.None);
+
+        Assert.Equal("N", definition.StatusConsumeProfile!.PendingStatusValue);
+    }
+
+    /// <summary>
+    /// StatusDriven 模式下 PendingStatusValue 去空白后为空时应报错。
+    /// </summary>
+    [Fact]
+    public async Task GetByTableCodeAsync_WhenStatusDrivenAndPendingBecomesBlank_ShouldThrow()
+    {
+        var options = BuildOptions(table =>
+        {
+            table.SyncMode = nameof(SyncMode.StatusDriven);
+            table.PendingStatusValue = "   ";
+            table.ShouldWriteBackRemoteStatus = true;
+        });
+        var logger = new TestLogger<SyncTaskConfigRepository>();
+        var repository = new SyncTaskConfigRepository(Options.Create(options), logger);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => repository.GetByTableCodeAsync("T1", CancellationToken.None));
+
+        Assert.Contains("PendingStatusValue", exception.Message);
+    }
+
+    /// <summary>
+    /// StatusDriven 模式下禁止关闭远端回写。
+    /// </summary>
+    [Fact]
+    public async Task GetByTableCodeAsync_WhenStatusDrivenAndWriteBackDisabled_ShouldThrow()
+    {
+        var options = BuildOptions(table =>
+        {
+            table.SyncMode = nameof(SyncMode.StatusDriven);
+            table.PendingStatusValue = "N";
+            table.ShouldWriteBackRemoteStatus = false;
+        });
+        var logger = new TestLogger<SyncTaskConfigRepository>();
+        var repository = new SyncTaskConfigRepository(Options.Create(options), logger);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => repository.GetByTableCodeAsync("T1", CancellationToken.None));
+
+        Assert.Contains("ShouldWriteBackRemoteStatus", exception.Message);
+    }
+
+    /// <summary>
     /// 构建默认测试配置。
     /// </summary>
     /// <param name="configureTable">表级配置回调。</param>

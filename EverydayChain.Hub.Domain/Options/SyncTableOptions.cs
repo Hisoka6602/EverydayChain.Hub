@@ -76,8 +76,8 @@ public class SyncTableOptions
     public string CompletedStatusValue { get; set; } = "Y";
 
     /// <summary>
-    /// 是否回写远端状态（仅 StatusDriven 模式使用；可填写项：true、false；
-    /// true 时本地追加完成后按 ROWID 将远端状态更新为 CompletedStatusValue；默认 true）。
+    /// 是否回写远端状态（仅 StatusDriven 模式使用；可填写项：true；
+    /// StatusDriven 必须为 true，本地追加完成后按 ROWID 将远端状态更新为 CompletedStatusValue；默认 true）。
     /// </summary>
     public bool ShouldWriteBackRemoteStatus { get; set; } = true;
 

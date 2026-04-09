@@ -12,6 +12,9 @@ public class FakeOracleStatusDrivenSourceReader : IOracleStatusDrivenSourceReade
     /// <summary>分页结果队列。</summary>
     public Queue<IReadOnlyList<IReadOnlyDictionary<string, object?>>> Pages { get; } = new();
 
+    /// <summary>请求页码记录。</summary>
+    public List<int> RequestedPageNos { get; } = [];
+
     /// <inheritdoc/>
     public Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReadPendingPageAsync(
         SyncTableDefinition definition,
@@ -21,6 +24,7 @@ public class FakeOracleStatusDrivenSourceReader : IOracleStatusDrivenSourceReade
         IReadOnlySet<string> normalizedExcludedColumns,
         CancellationToken ct)
     {
+        RequestedPageNos.Add(pageNo);
         if (Pages.Count == 0)
         {
             return Task.FromResult<IReadOnlyList<IReadOnlyDictionary<string, object?>>>([]);

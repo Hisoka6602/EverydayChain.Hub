@@ -34,14 +34,17 @@ public class RemoteStatusConsumeService(
         var normalizedExcludedColumns = SyncColumnFilter.NormalizeColumns(definition.ExcludedColumns);
         var result = new RemoteStatusConsumeResult();
         var pageNo = 1;
+        var shouldUseFixedFirstPage = profile.ShouldWriteBackRemoteStatus;
 
         while (!ct.IsCancellationRequested)
         {
             // 步骤1：按状态列分页读取待处理数据（支持 pending = null 的 IS NULL 语义）。
+            // 当启用远端状态回写时，当前轮处理后待处理集合会收缩；固定读取第 1 页可避免 offset 翻页跳过未消费行。
+            var currentPageNo = shouldUseFixedFirstPage ? 1 : pageNo;
             var rows = await sourceReader.ReadPendingPageAsync(
                 definition,
                 profile,
-                pageNo,
+                currentPageNo,
                 profile.BatchSize,
                 normalizedExcludedColumns,
                 ct);
@@ -98,7 +101,7 @@ public class RemoteStatusConsumeService(
                         "状态驱动远端回写存在未命中行。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, RowIdCount={RowIdCount}, WriteBackCount={WriteBackCount}",
                         definition.TableCode,
                         batchId,
-                        pageNo,
+                        currentPageNo,
                         rowIds.Count,
                         writeBackCount);
                 }
@@ -111,8 +114,12 @@ public class RemoteStatusConsumeService(
                     "状态驱动远端回写失败，已隔离到页级。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, FailedRowIdCount={FailedRowIdCount}",
                     definition.TableCode,
                     batchId,
-                    pageNo,
+                    currentPageNo,
                     rowIds.Count);
+                if (shouldUseFixedFirstPage)
+                {
+                    break;
+                }
             }
 
             pageNo++;
