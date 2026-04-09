@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 新增 `兼容现有实现的可切换同步模式改造分析与执行步骤.md` 文档，基于当前代码梳理 KeyedMerge/StatusDriven 双模式改造边界、分层落位、配置扩展点、执行步骤与验收口径。
 - 按最新 `.github/copilot-instructions.md` 约束完成测试代码结构治理：拆分同文件多类/嵌套类测试替身，统一为“一类一文件”，降低影子代码与重复定义风险。
 - 移除 `Program` 中默认注册的 `Worker` 演示写入后台服务，仅保留 `SyncBackgroundWorker` 与 `RetentionBackgroundWorker`，避免生产运行链路出现演示数据写入造成的影子执行与额外负载。
 - 修复 `SyncStagingRepository` 行复制时的字典比较器丢失问题：暂存行改为 `StringComparer.OrdinalIgnoreCase`，避免后续按配置列名大小写差异读取时出现业务键字段匹配失败。
@@ -22,6 +23,7 @@
 ├── 当前程序能力与缺陷分析.md
 ├── Oracle到SQLServer同步架构设计.md
 ├── Oracle到SQLServer同步实施计划.md
+├── 兼容现有实现的可切换同步模式改造分析与执行步骤.md
 ├── scripts
 │   ├── health-check.sh
 │   ├── disaster-recovery.sh
@@ -243,6 +245,7 @@
 - `当前程序能力与缺陷分析.md`：汇总当前程序能力、功能清单、代码缺陷与逻辑 BUG，作为后续修复与优化输入。
 - `Oracle到SQLServer同步架构设计.md`：定义外部 Oracle DB First 只读同步到本地 SQL Server 的详细落地方案。
 - `Oracle到SQLServer同步实施计划.md`：按 PR 拆分同步架构落地步骤的进度跟踪文档。
+- `兼容现有实现的可切换同步模式改造分析与执行步骤.md`：基于现有代码的双模式改造分析文档，明确保留链路、StatusDriven 停用项、分层新增文件与实施步骤。
 - `ShardingOptions.cs`：分表配置模型，仅保留连接、Schema 与自动预建月数等基础配置。
 - `ShardTableProvisioner.cs`：分表预建实现，按启用同步表推导的逻辑表与后缀笛卡尔组合执行建表，并保持危险动作隔离执行。
 - `AutoMigrationService.cs`：应用启动迁移入口，自动创建缺失数据库、识别并执行待迁移项，通过分表预建器自动覆盖多逻辑表。
