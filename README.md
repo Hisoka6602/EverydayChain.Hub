@@ -13,6 +13,7 @@
 - `sync_target_state` 表按 `TableCode+月份` 分表：每个同步表编码每月独立状态表（`sync_target_state_{tableCode}_{yyyyMM}`）；读取状态时跨月份分表聚合并按 `UpdatedTimeLocal` 取最新记录，同时兼容读取旧版状态表（`sync_target_state` 与 `sync_target_state_{tableCode}`），避免升级后幂等状态丢失。
 - `CheckpointFilePath` 保留：经分析确认检查点文件仍被 `SyncOrchestrator`、`SyncExecutionService` 及 `RuntimeStorageGuard` 实际使用（续传断点 + 磁盘空间检测），注释补充部署建议（宿主机挂载持久化目录）。
 - 调整状态分表命名测试：`GetSyncStateTableFullName_ShouldGeneratePerTableCodeAndMonthName`（Theory×3路径）、`GetSyncStateTableFullName_WhenTableCodeContainsInvalidChar_ShouldThrow`、`GetSyncStateTableFullName_WhenStateMonthTokenInvalid_ShouldThrow`，覆盖命名与输入边界。
+- 新增 `逐文件代码检查方案.md`，用于指导“仅检查不改代码”的逐文件审查执行，覆盖检查维度、无遗漏流程、问题分级与分批 PR 策略。
 
 ## 解决方案文件树与职责
 ```text
@@ -25,6 +26,7 @@
 ├── 年度维护清单.md
 ├── 值班处置手册.md
 ├── 当前程序能力与缺陷分析.md
+├── 逐文件代码检查方案.md
 ├── Oracle到SQLServer同步架构设计.md
 ├── Oracle到SQLServer同步实施计划.md
 ├── 兼容现有实现的可切换同步模式改造分析与执行步骤.md
@@ -195,6 +197,7 @@
 - `监控告警规则基线清单.md`：监控告警规则基线文档，定义日志关键字告警、指标阈值告警与演练留档验收口径，用于补齐稳定性清单剩余交付项。
 - `年度维护清单.md`：月度/季度/年度例行巡检项标准化清单，包含磁盘治理、日志审查、数据一致性、配置审核、灾难恢复演练、容量规划、安全审计等条目及快速异常处理参考表。
 - `值班处置手册.md`：日常值班与告警应急处置手册，覆盖 9 类告警的处置步骤（卡死检测、磁盘不足、内存水位、整轮超时、熔断、检查点损坏、快照损坏、归档失败、进程停止），定义 P0~P3 优先级与升级规则，含处置记录与演练记录模板。
+- `逐文件代码检查方案.md`：逐文件审查执行方案，定义检查范围、单文件检查维度、无遗漏对账流程、问题分级与分批 PR 策略，支持“本 PR 不改代码”的审查场景。
 - `SyncTableDefinition.cs` / `SyncWindow.cs` / `SyncCheckpoint.cs` / `SyncBatchResult.cs`：定义同步链路执行、窗口与结果统计的核心领域模型。
 - `SyncBatch.cs` / `SyncChangeLog.cs` / `SyncDeletionLog.cs`：定义批次状态跟踪、变更审计与删除审计的数据模型。
 - `SyncBusinessKeyBuilder.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：同步业务键构建共享组件，按 `UniqueKeys` 配置将行数据拼接为 `|` 分隔的业务键文本，供 Upsert 与删除识别阶段统一调用。
@@ -292,3 +295,4 @@
 - 评估 TVP 版本的集合式 MERGE 实现，减少临时表 DDL 与批次内元数据开销。
 - 增加“取消触发下的数据库事务回滚”集成测试，补齐真实数据库回滚行为验收。
 - 为不同业务表列集差异场景补充列签名分组覆盖测试，进一步降低回归风险。
+- 将“逐文件代码检查方案”沉淀为可复用的检查台账模板（含自动统计未检查文件能力）。
