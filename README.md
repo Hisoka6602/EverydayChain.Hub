@@ -5,7 +5,7 @@
 - 删除 `EverydayChain.Hub.Host/Worker.cs`：该后台演示写入服务已在上一迭代从 `Program.cs` 移除注册，但文件本身残留；本次按已过时代码必须删除规则清除死代码文件。
 - 删除 `EverydayChain.Hub.Domain/Options/WorkerOptions.cs`：仅被已删除的 `Worker.cs` 引用，随之成为死代码，同步删除。
 - 移除 `appsettings.json` 中的 `Worker` 配置节：`WorkerOptions` 删除后该配置段无任何绑定对象，予以移除，避免配置孤岛误导维护。
-- 补全 README.md 文件树：将 `Domain/Options` 目录下实际存在的 `AutoTuneOptions.cs`、`DangerZoneOptions.cs`、`SyncDeleteOptions.cs`、`SyncRetentionOptions.cs`、`SyncTableOptions.cs` 补入文件树（此前遗漏），与磁盘文件一一对应。
+- 补全 `README.md` 文件树：将 `Domain/Options` 目录下实际存在的 `AutoTuneOptions.cs`、`DangerZoneOptions.cs`、`SyncDeleteOptions.cs`、`SyncRetentionOptions.cs`、`SyncTableOptions.cs` 补入文件树（此前遗漏），与磁盘文件一一对应。
 - 审查确认：UTC API 零使用（`UtcNow`/`DateTimeKind.Utc` 等仅在防御性单元测试中出现）、NLog 配置合规（`archiveAboveSize=10485760`）、所有枚举含 XML 注释与 `Description`、Host 层无 `Servers` 目录、命名空间与目录一致、DDD 分层依赖方向合规、无 `[Obsolete]` 残留、注释无第二人称字眼。
 
 ## 解决方案文件树与职责
