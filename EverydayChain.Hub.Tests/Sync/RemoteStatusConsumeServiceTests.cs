@@ -83,6 +83,41 @@ public class RemoteStatusConsumeServiceTests
     }
 
     /// <summary>
+    /// 关闭回写时应仅追加本地数据，不触发任何远端状态更新。
+    /// </summary>
+    [Fact]
+    public async Task ConsumeAsync_WhenWriteBackDisabled_ShouldAppendOnlyWithoutRemoteUpdate()
+    {
+        var reader = new FakeOracleStatusDrivenSourceReader();
+        reader.Pages.Enqueue([
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["ID"] = 1,
+                ["TASKPROCESS"] = "N",
+                ["__RowId"] = "AAABBB",
+            },
+        ]);
+        reader.Pages.Enqueue([]);
+
+        var appendWriter = new FakeSqlServerAppendOnlyWriter();
+        var remoteWriter = new FakeOracleRemoteStatusWriter();
+        var logger = new TestLogger<RemoteStatusConsumeService>();
+        var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, logger);
+        var definition = BuildStatusDrivenDefinitionWithWriteBackDisabled();
+
+        var result = await service.ConsumeAsync(definition, "BATCH-003", CancellationToken.None);
+
+        Assert.Equal(1, result.ReadCount);
+        Assert.Equal(1, result.AppendCount);
+        Assert.Equal(0, result.WriteBackCount);
+        Assert.Equal(0, result.WriteBackFailCount);
+        Assert.Equal(0, result.SkippedWriteBackCount);
+        Assert.Equal(1, result.PageCount);
+        Assert.Equal(1, appendWriter.TotalAppended);
+        Assert.Equal(0, remoteWriter.TotalWriteBackRows);
+    }
+
+    /// <summary>
     /// 构建状态驱动测试定义。
     /// </summary>
     /// <returns>同步表定义。</returns>
@@ -102,6 +137,31 @@ public class RemoteStatusConsumeServiceTests
                 PendingStatusValue = "N",
                 CompletedStatusValue = "Y",
                 ShouldWriteBackRemoteStatus = true,
+                BatchSize = 5000,
+            },
+        };
+    }
+
+    /// <summary>
+    /// 构建关闭回写的状态驱动测试定义。
+    /// </summary>
+    /// <returns>同步表定义。</returns>
+    private static SyncTableDefinition BuildStatusDrivenDefinitionWithWriteBackDisabled()
+    {
+        return new SyncTableDefinition
+        {
+            TableCode = "T1",
+            Enabled = true,
+            SyncMode = SyncMode.StatusDriven,
+            SourceSchema = "SRC",
+            SourceTable = "TAB1",
+            TargetLogicalTable = "TAB1",
+            StatusConsumeProfile = new RemoteStatusConsumeProfile
+            {
+                StatusColumnName = "TASKPROCESS",
+                PendingStatusValue = "N",
+                CompletedStatusValue = "Y",
+                ShouldWriteBackRemoteStatus = false,
                 BatchSize = 5000,
             },
         };

@@ -27,9 +27,10 @@ public class RemoteStatusConsumeProfile
     public string CompletedStatusValue { get; set; } = "Y";
 
     /// <summary>
-    /// 是否回写远端状态。
-    /// StatusDriven 模式下必须为 true：
-    /// 本地追加成功后，按 ROWID 将远端行状态更新为 CompletedStatusValue。
+    /// 是否回写远端状态（可选，取值 true/false）。
+    /// true：本地追加成功后，按 ROWID 将远端行状态更新为 CompletedStatusValue；
+    /// false：仅本地追加，不执行任何远端状态更新。
+    /// 默认值：true。
     /// </summary>
     public bool ShouldWriteBackRemoteStatus { get; set; } = true;
 

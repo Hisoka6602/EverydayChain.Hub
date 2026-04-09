@@ -98,10 +98,10 @@ public class SyncTaskConfigRepositoryTests
     }
 
     /// <summary>
-    /// StatusDriven 模式下禁止关闭远端回写。
+    /// StatusDriven 模式下关闭回写时应正常创建 Profile，ShouldWriteBackRemoteStatus 为 false。
     /// </summary>
     [Fact]
-    public async Task GetByTableCodeAsync_WhenStatusDrivenAndWriteBackDisabled_ShouldThrow()
+    public async Task GetByTableCodeAsync_WhenStatusDrivenAndWriteBackDisabled_ShouldSucceedWithFalse()
     {
         var options = BuildOptions(table =>
         {
@@ -112,9 +112,11 @@ public class SyncTaskConfigRepositoryTests
         var logger = new TestLogger<SyncTaskConfigRepository>();
         var repository = new SyncTaskConfigRepository(Options.Create(options), logger);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => repository.GetByTableCodeAsync("T1", CancellationToken.None));
+        var definition = await repository.GetByTableCodeAsync("T1", CancellationToken.None);
 
-        Assert.Contains("ShouldWriteBackRemoteStatus", exception.Message);
+        Assert.Equal(SyncMode.StatusDriven, definition.SyncMode);
+        Assert.NotNull(definition.StatusConsumeProfile);
+        Assert.False(definition.StatusConsumeProfile!.ShouldWriteBackRemoteStatus);
     }
 
     /// <summary>
