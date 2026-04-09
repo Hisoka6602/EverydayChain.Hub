@@ -40,4 +40,16 @@ public class RemoteStatusConsumeProfile
     /// 默认值：5000。
     /// </summary>
     public int BatchSize { get; set; } = 5000;
+
+    /// <summary>
+    /// 回写完成时间审计列名（可选，取值范围：源端真实列名，仅允许字母、数字、下划线）。
+    /// 配置后回写时会将该列更新为当前本地时间；未配置时不更新该审计列。
+    /// </summary>
+    public string? WriteBackCompletedTimeColumnName { get; set; }
+
+    /// <summary>
+    /// 回写批次号审计列名（可选，取值范围：源端真实列名，仅允许字母、数字、下划线）。
+    /// 配置后回写时会将该列更新为当前同步批次号；未配置时不更新该审计列。
+    /// </summary>
+    public string? WriteBackBatchIdColumnName { get; set; }
 }

@@ -51,6 +51,7 @@ public class RemoteStatusConsumeServiceTests
         Assert.Equal(1, result.PageCount);
         Assert.Equal(2, appendWriter.TotalAppended);
         Assert.Equal(1, remoteWriter.TotalWriteBackRows);
+        Assert.Equal("BATCH-001", remoteWriter.LastBatchId);
     }
 
     /// <summary>
@@ -80,6 +81,7 @@ public class RemoteStatusConsumeServiceTests
         Assert.Equal([1, 1], reader.RequestedPageNos);
         Assert.Equal(1, result.AppendCount);
         Assert.Equal(1, result.WriteBackCount);
+        Assert.Equal("BATCH-002", remoteWriter.LastBatchId);
     }
 
     /// <summary>

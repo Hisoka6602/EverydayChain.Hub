@@ -32,6 +32,7 @@ public class OracleRemoteStatusWriter(
     public async Task<int> WriteBackByRowIdAsync(
         SyncTableDefinition definition,
         RemoteStatusConsumeProfile profile,
+        string batchId,
         IReadOnlyList<string> rowIds,
         CancellationToken ct)
     {
@@ -43,7 +44,31 @@ public class OracleRemoteStatusWriter(
         EnsureSafeIdentifier(definition.SourceSchema, nameof(definition.SourceSchema));
         EnsureSafeIdentifier(definition.SourceTable, nameof(definition.SourceTable));
         EnsureSafeIdentifier(profile.StatusColumnName, nameof(profile.StatusColumnName));
-        var sql = $"UPDATE {definition.SourceSchema}.{definition.SourceTable} SET {profile.StatusColumnName} = :p_completedStatus WHERE ROWID = :p_rowid";
+        if (!string.IsNullOrWhiteSpace(profile.WriteBackCompletedTimeColumnName))
+        {
+            EnsureSafeIdentifier(profile.WriteBackCompletedTimeColumnName, nameof(profile.WriteBackCompletedTimeColumnName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(profile.WriteBackBatchIdColumnName))
+        {
+            EnsureSafeIdentifier(profile.WriteBackBatchIdColumnName, nameof(profile.WriteBackBatchIdColumnName));
+        }
+
+        var setClauses = new List<string>
+        {
+            $"{profile.StatusColumnName} = :p_completedStatus",
+        };
+        if (!string.IsNullOrWhiteSpace(profile.WriteBackCompletedTimeColumnName))
+        {
+            setClauses.Add($"{profile.WriteBackCompletedTimeColumnName} = :p_completedTimeLocal");
+        }
+
+        if (!string.IsNullOrWhiteSpace(profile.WriteBackBatchIdColumnName))
+        {
+            setClauses.Add($"{profile.WriteBackBatchIdColumnName} = :p_batchId");
+        }
+
+        var sql = $"UPDATE {definition.SourceSchema}.{definition.SourceTable} SET {string.Join(", ", setClauses)} WHERE ROWID = :p_rowid";
         return await dangerZoneExecutor.ExecuteAsync(
             $"OracleStatusDrivenWriteBack:{definition.TableCode}",
             async token =>
@@ -56,14 +81,36 @@ public class OracleRemoteStatusWriter(
                 command.CommandTimeout = ResolveCommandTimeout();
                 command.CommandText = sql;
                 command.Parameters.Add("p_completedStatus", OracleDbType.Varchar2, Enumerable.Repeat(profile.CompletedStatusValue, rowIds.Count).ToArray(), ParameterDirection.Input);
+                if (!string.IsNullOrWhiteSpace(profile.WriteBackCompletedTimeColumnName))
+                {
+                    var completedTimeLocal = DateTime.Now;
+                    command.Parameters.Add(
+                        "p_completedTimeLocal",
+                        OracleDbType.TimeStamp,
+                        Enumerable.Repeat(completedTimeLocal, rowIds.Count).ToArray(),
+                        ParameterDirection.Input);
+                }
+
+                if (!string.IsNullOrWhiteSpace(profile.WriteBackBatchIdColumnName))
+                {
+                    command.Parameters.Add(
+                        "p_batchId",
+                        OracleDbType.Varchar2,
+                        Enumerable.Repeat(batchId, rowIds.Count).ToArray(),
+                        ParameterDirection.Input);
+                }
+
                 command.Parameters.Add("p_rowid", OracleDbType.Varchar2, rowIds.ToArray(), ParameterDirection.Input);
                 var affectedRows = await command.ExecuteNonQueryAsync(token);
                 logger.LogInformation(
-                    "状态驱动远端回写完成。TableCode={TableCode}, SourceTable={SourceTable}, RequestedRows={RequestedRows}, AffectedRows={AffectedRows}",
+                    "状态驱动远端回写完成。TableCode={TableCode}, BatchId={BatchId}, SourceTable={SourceTable}, RequestedRows={RequestedRows}, AffectedRows={AffectedRows}, CompletedTimeColumn={CompletedTimeColumn}, BatchIdColumn={BatchIdColumn}",
                     definition.TableCode,
+                    batchId,
                     definition.SourceTable,
                     rowIds.Count,
-                    affectedRows);
+                    affectedRows,
+                    profile.WriteBackCompletedTimeColumnName ?? "未配置",
+                    profile.WriteBackBatchIdColumnName ?? "未配置");
                 return affectedRows;
             },
             ct);

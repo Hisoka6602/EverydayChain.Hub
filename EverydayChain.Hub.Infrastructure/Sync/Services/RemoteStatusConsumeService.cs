@@ -92,7 +92,7 @@ public class RemoteStatusConsumeService(
             // 步骤4：按 ROWID 回写远端状态；回写异常隔离为页级错误，不回滚已追加数据。
             try
             {
-                var writeBackCount = await remoteStatusWriter.WriteBackByRowIdAsync(definition, profile, rowIds, ct);
+                var writeBackCount = await remoteStatusWriter.WriteBackByRowIdAsync(definition, profile, batchId, rowIds, ct);
                 result.WriteBackCount += writeBackCount;
                 if (writeBackCount < rowIds.Count)
                 {

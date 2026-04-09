@@ -86,4 +86,16 @@ public class SyncTableOptions
     /// 状态驱动批次读取大小（仅 StatusDriven 模式使用；可填写范围：1~100000；默认 5000）。
     /// </summary>
     public int StatusBatchSize { get; set; } = 5000;
+
+    /// <summary>
+    /// 回写完成时间审计列名（仅 SyncMode=StatusDriven 且 ShouldWriteBackRemoteStatus=true 生效；
+    /// 可填写范围：源端真实列名，仅允许字母、数字、下划线；留空表示不回写完成时间审计列）。
+    /// </summary>
+    public string? WriteBackCompletedTimeColumnName { get; set; }
+
+    /// <summary>
+    /// 回写批次号审计列名（仅 SyncMode=StatusDriven 且 ShouldWriteBackRemoteStatus=true 生效；
+    /// 可填写范围：源端真实列名，仅允许字母、数字、下划线；留空表示不回写批次号审计列）。
+    /// </summary>
+    public string? WriteBackBatchIdColumnName { get; set; }
 }

@@ -131,10 +131,8 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         EnsureSafeIdentifier(statusColumnName, table.TableCode, nameof(table.StatusColumnName));
         var batchSize = table.StatusBatchSize > 0 ? table.StatusBatchSize : 5000;
         var completedStatusValue = string.IsNullOrWhiteSpace(table.CompletedStatusValue) ? "Y" : table.CompletedStatusValue.Trim();
-        if (table.ShouldWriteBackRemoteStatus && string.IsNullOrWhiteSpace(completedStatusValue))
-        {
-            throw new InvalidOperationException($"表 {table.TableCode} 开启远端回写时，CompletedStatusValue 不能为空。");
-        }
+        var writeBackCompletedTimeColumnName = NormalizeAndValidateOptionalIdentifier(table.WriteBackCompletedTimeColumnName, table.TableCode, nameof(table.WriteBackCompletedTimeColumnName));
+        var writeBackBatchIdColumnName = NormalizeAndValidateOptionalIdentifier(table.WriteBackBatchIdColumnName, table.TableCode, nameof(table.WriteBackBatchIdColumnName));
 
         string? pendingStatusValue = null;
         if (table.PendingStatusValue is not null)
@@ -153,7 +151,28 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             CompletedStatusValue = completedStatusValue,
             ShouldWriteBackRemoteStatus = table.ShouldWriteBackRemoteStatus,
             BatchSize = batchSize,
+            WriteBackCompletedTimeColumnName = writeBackCompletedTimeColumnName,
+            WriteBackBatchIdColumnName = writeBackBatchIdColumnName,
         };
+    }
+
+    /// <summary>
+    /// 规范化可选标识符并执行安全校验。
+    /// </summary>
+    /// <param name="identifierText">标识符文本。</param>
+    /// <param name="tableCode">表编码。</param>
+    /// <param name="fieldName">字段名。</param>
+    /// <returns>规范化后的标识符；空白返回 null。</returns>
+    private static string? NormalizeAndValidateOptionalIdentifier(string? identifierText, string tableCode, string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(identifierText))
+        {
+            return null;
+        }
+
+        var normalized = identifierText.Trim();
+        EnsureSafeIdentifier(normalized, tableCode, fieldName);
+        return normalized;
     }
 
     /// <summary>
