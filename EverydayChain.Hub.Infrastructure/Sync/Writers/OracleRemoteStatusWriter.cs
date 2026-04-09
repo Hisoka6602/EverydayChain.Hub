@@ -83,10 +83,11 @@ public class OracleRemoteStatusWriter(
                 command.Parameters.Add("p_completedStatus", OracleDbType.Varchar2, Enumerable.Repeat(profile.CompletedStatusValue, rowIds.Count).ToArray(), ParameterDirection.Input);
                 if (!string.IsNullOrWhiteSpace(profile.WriteBackCompletedTimeColumnName))
                 {
+                    var completedTimeLocal = DateTime.Now;
                     command.Parameters.Add(
                         "p_completedTimeLocal",
                         OracleDbType.TimeStamp,
-                        Enumerable.Repeat(DateTime.Now, rowIds.Count).ToArray(),
+                        Enumerable.Repeat(completedTimeLocal, rowIds.Count).ToArray(),
                         ParameterDirection.Input);
                 }
 
