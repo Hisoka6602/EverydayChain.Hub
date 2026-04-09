@@ -1,5 +1,6 @@
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
+using EverydayChain.Hub.Application.Sync.Abstractions;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.Extensions.Logging;
@@ -11,6 +12,9 @@ namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
 /// 同步执行服务实现。
+/// 支持 KeyedMerge（键控合并）与 StatusDriven（状态驱动消费）两种执行模式。
+/// KeyedMerge 为默认模式，复用既有读取/合并/删除链路；
+/// StatusDriven 委托给 <see cref="IRemoteStatusConsumeService"/> 执行。
 /// </summary>
 public class SyncExecutionService(
     IOracleSourceReader oracleSourceReader,
@@ -21,6 +25,7 @@ public class SyncExecutionService(
     ISyncChangeLogRepository changeLogRepository,
     ISyncDeletionLogRepository deletionLogRepository,
     ISyncCheckpointRepository checkpointRepository,
+    IRemoteStatusConsumeService remoteStatusConsumeService,
     ILogger<SyncExecutionService> logger) : ISyncExecutionService
 {
     /// <summary>失败检查点写入超时秒数。</summary>
@@ -41,6 +46,12 @@ public class SyncExecutionService(
     /// <inheritdoc/>
     public async Task<SyncBatchResult> ExecuteBatchAsync(SyncExecutionContext context, CancellationToken ct)
     {
+        // StatusDriven 模式委托给专用消费服务，KeyedMerge 路径保持不变。
+        if (context.Definition.SyncMode == SyncMode.StatusDriven)
+        {
+            return await ExecuteStatusDrivenBatchAsync(context, ct);
+        }
+
         var stopwatch = Stopwatch.StartNew();
         var batchPersistedToRepository = false;
         var readCount = 0;
@@ -435,6 +446,126 @@ public class SyncExecutionService(
         catch (Exception statusEx)
         {
             logger.LogError(statusEx, onFailureLogTemplate, context.Definition.TableCode, context.BatchId);
+        }
+    }
+
+    /// <summary>
+    /// 执行 StatusDriven 批次：委托给 <see cref="IRemoteStatusConsumeService"/> 完成读取、追加、回写。
+    /// 不调用 Merge/删除仓储；检查点提交与批次管理逻辑与 KeyedMerge 路径相同。
+    /// </summary>
+    /// <param name="context">执行上下文。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>批次结果。</returns>
+    private async Task<SyncBatchResult> ExecuteStatusDrivenBatchAsync(SyncExecutionContext context, CancellationToken ct)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var batchPersistedToRepository = false;
+        try
+        {
+            await batchRepository.CreateBatchAsync(new SyncBatch
+            {
+                BatchId = context.BatchId,
+                ParentBatchId = context.ParentBatchId,
+                TableCode = context.Definition.TableCode,
+                WindowStartLocal = context.Window.WindowStartLocal,
+                WindowEndLocal = context.Window.WindowEndLocal,
+            }, ct);
+            batchPersistedToRepository = true;
+            await batchRepository.MarkInProgressAsync(context.BatchId, DateTime.Now, ct);
+
+            // StatusDriven 主流程：委托给专用消费服务完成分页读取→追加→可选回写。
+            var consumeResult = await remoteStatusConsumeService.ConsumeAsync(context.Definition, context.BatchId, ct);
+
+            // StatusDriven 不产生变更日志与删除日志，写入空集合保持链路一致。
+            await changeLogRepository.WriteChangesAsync([], ct);
+            await deletionLogRepository.WriteDeletionsAsync([], ct);
+
+            // 提交检查点（StatusDriven 无游标推进，保留原检查点游标不变）。
+            await checkpointRepository.SaveAsync(new SyncCheckpoint
+            {
+                TableCode = context.Definition.TableCode,
+                LastBatchId = context.BatchId,
+                LastSuccessCursorLocal = context.Checkpoint.LastSuccessCursorLocal,
+                LastSuccessTimeLocal = DateTime.Now,
+                LastError = null,
+            }, ct);
+
+            var metrics = BuildMetrics(context.Window, consumeResult.ReadCount, stopwatch.Elapsed);
+            var batchResult = new SyncBatchResult
+            {
+                BatchId = context.BatchId,
+                TableCode = context.Definition.TableCode,
+                WindowStartLocal = context.Window.WindowStartLocal,
+                WindowEndLocal = context.Window.WindowEndLocal,
+                ReadCount = consumeResult.ReadCount,
+                InsertCount = consumeResult.AppendCount,
+                UpdateCount = 0,
+                DeleteCount = 0,
+                SkipCount = consumeResult.SkippedWriteBackCount,
+                Elapsed = stopwatch.Elapsed,
+                LagMinutes = metrics.LagMinutes,
+                BacklogMinutes = metrics.BacklogMinutes,
+                ThroughputRowsPerSecond = metrics.ThroughputRowsPerSecond,
+                FailureRate = consumeResult.WriteBackFailCount > 0 ? (double)consumeResult.WriteBackFailCount / Math.Max(1, consumeResult.ReadCount) : 0,
+            };
+            await batchRepository.CompleteBatchAsync(batchResult, DateTime.Now, ct);
+            logger.LogInformation(
+                "状态驱动消费同步指标。TableCode={TableCode}, BatchId={BatchId}, ReadCount={ReadCount}, AppendCount={AppendCount}, WriteBackCount={WriteBackCount}, WriteBackFailCount={WriteBackFailCount}, SkippedWriteBackCount={SkippedWriteBackCount}, PageCount={PageCount}, LagMinutes={LagMinutes}, ThroughputRowsPerSecond={ThroughputRowsPerSecond}",
+                batchResult.TableCode,
+                batchResult.BatchId,
+                consumeResult.ReadCount,
+                consumeResult.AppendCount,
+                consumeResult.WriteBackCount,
+                consumeResult.WriteBackFailCount,
+                consumeResult.SkippedWriteBackCount,
+                consumeResult.PageCount,
+                batchResult.LagMinutes,
+                batchResult.ThroughputRowsPerSecond);
+            return batchResult;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            var metrics = BuildMetrics(context.Window, 0, stopwatch.Elapsed);
+            logger.LogWarning(
+                "状态驱动消费同步指标。TableCode={TableCode}, BatchId={BatchId}, LagMinutes={LagMinutes}, ThroughputRowsPerSecond={ThroughputRowsPerSecond}, FailureRate={FailureRate}",
+                context.Definition.TableCode,
+                context.BatchId,
+                metrics.LagMinutes,
+                metrics.ThroughputRowsPerSecond,
+                1D);
+            logger.LogInformation("状态驱动消费批次已取消。TableCode={TableCode}, BatchId={BatchId}", context.Definition.TableCode, context.BatchId);
+            await TryMarkBatchFailedAsync(batchPersistedToRepository, context, "同步任务被取消。", FailBatchOnCancelErrorLogTemplate);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            var metrics = BuildMetrics(context.Window, 0, stopwatch.Elapsed);
+            logger.LogWarning(
+                "状态驱动消费同步指标。TableCode={TableCode}, BatchId={BatchId}, LagMinutes={LagMinutes}, ThroughputRowsPerSecond={ThroughputRowsPerSecond}, FailureRate={FailureRate}",
+                context.Definition.TableCode,
+                context.BatchId,
+                metrics.LagMinutes,
+                metrics.ThroughputRowsPerSecond,
+                1D);
+            logger.LogError(ex, "状态驱动消费批次执行失败。TableCode={TableCode}, BatchId={BatchId}", context.Definition.TableCode, context.BatchId);
+            using var errorCheckpointCts = new CancellationTokenSource(TimeSpan.FromSeconds(ErrorCheckpointSaveTimeoutSeconds));
+            await TryMarkBatchFailedAsync(batchPersistedToRepository, context, ex.Message, FailBatchStatusUpdateErrorLogTemplate);
+            try
+            {
+                await checkpointRepository.SaveAsync(new SyncCheckpoint
+                {
+                    TableCode = context.Definition.TableCode,
+                    LastBatchId = context.BatchId,
+                    LastSuccessCursorLocal = context.Checkpoint.LastSuccessCursorLocal,
+                    LastSuccessTimeLocal = context.Checkpoint.LastSuccessTimeLocal,
+                    LastError = ex.Message,
+                }, errorCheckpointCts.Token);
+            }
+            catch (Exception checkpointEx)
+            {
+                logger.LogError(checkpointEx, "写入失败检查点异常。TableCode={TableCode}, BatchId={BatchId}", context.Definition.TableCode, context.BatchId);
+            }
+            throw;
         }
     }
 }

@@ -49,4 +49,40 @@ public class SyncTableOptions
 
     /// <summary>保留期治理配置（仅作用于本地 SQL Server 目标端）。</summary>
     public SyncRetentionOptions Retention { get; set; } = new();
+
+    /// <summary>
+    /// 同步执行模式（可填写项：KeyedMerge、StatusDriven；默认 KeyedMerge）。
+    /// KeyedMerge：按游标窗口增量读取，执行幂等 Upsert 合并与缺失删除识别。
+    /// StatusDriven：按状态列读取待处理行，仅追加写入，可选回写远端状态。
+    /// 未配置时默认 KeyedMerge，存量配置无需修改。
+    /// </summary>
+    public string SyncMode { get; set; } = "KeyedMerge";
+
+    /// <summary>
+    /// 状态列名（仅 StatusDriven 模式使用；可填写范围：源端真实列名，仅允许字母、数字、下划线；默认 TASKPROCESS）。
+    /// </summary>
+    public string StatusColumnName { get; set; } = "TASKPROCESS";
+
+    /// <summary>
+    /// 待处理状态值（仅 StatusDriven 模式使用；可填写范围：字符串或 null；
+    /// null 时生成 IS NULL 查询条件，非 null 时生成等值条件；默认 N）。
+    /// </summary>
+    public string? PendingStatusValue { get; set; } = "N";
+
+    /// <summary>
+    /// 完成状态值（仅 StatusDriven 且 ShouldWriteBackRemoteStatus=true 时使用；
+    /// 可填写范围：字符串；默认 Y）。
+    /// </summary>
+    public string CompletedStatusValue { get; set; } = "Y";
+
+    /// <summary>
+    /// 是否回写远端状态（仅 StatusDriven 模式使用；可填写项：true；
+    /// StatusDriven 必须为 true，本地追加完成后按 ROWID 将远端状态更新为 CompletedStatusValue；默认 true）。
+    /// </summary>
+    public bool ShouldWriteBackRemoteStatus { get; set; } = true;
+
+    /// <summary>
+    /// 状态驱动批次读取大小（仅 StatusDriven 模式使用；可填写范围：1~100000；默认 5000）。
+    /// </summary>
+    public int StatusBatchSize { get; set; } = 5000;
 }

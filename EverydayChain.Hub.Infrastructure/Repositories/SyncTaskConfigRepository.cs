@@ -4,6 +4,7 @@ using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.Domain.Sync.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using EverydayChain.Hub.Domain.Sync;
@@ -56,14 +57,16 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
     {
         var startTimeLocal = ParseLocalTime(table.StartTimeLocal, table.TableCode);
         ValidateExcludedColumns(table);
+        var syncMode = ParseSyncMode(table.SyncMode, table.TableCode);
         var globalPollingIntervalSeconds = _options.PollingIntervalSeconds > 0 ? _options.PollingIntervalSeconds : 60;
         var effectivePageSize = table.PageSize > 0 ? table.PageSize : 5000;
         var priority = ParsePriority(table.Priority, table.TableCode);
+        var statusConsumeProfile = BuildStatusConsumeProfile(table, syncMode);
         return new SyncTableDefinition
         {
             TableCode = table.TableCode,
             Enabled = table.Enabled,
-            SyncMode = SyncMode.Incremental,
+            SyncMode = syncMode,
             SourceSchema = table.SourceSchema,
             SourceTable = table.SourceTable,
             TargetLogicalTable = table.TargetLogicalTable,
@@ -84,7 +87,92 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             RetentionKeepMonths = table.Retention.KeepMonths > 0 ? table.Retention.KeepMonths : 3,
             RetentionDryRun = table.Retention.DryRun,
             RetentionAllowDrop = table.Retention.AllowDrop,
+            StatusConsumeProfile = statusConsumeProfile,
         };
+    }
+
+    /// <summary>
+    /// 解析同步模式配置。
+    /// </summary>
+    /// <param name="syncModeText">同步模式文本。</param>
+    /// <param name="tableCode">表编码。</param>
+    /// <returns>同步模式。</returns>
+    private static SyncMode ParseSyncMode(string? syncModeText, string tableCode)
+    {
+        if (string.IsNullOrWhiteSpace(syncModeText))
+        {
+            return SyncMode.KeyedMerge;
+        }
+
+        var normalized = syncModeText.Trim();
+        if (!Enum.TryParse<SyncMode>(normalized, true, out var mode) || !Enum.IsDefined(mode))
+        {
+            throw new InvalidOperationException(
+                $"表 {tableCode} 的 SyncMode 配置非法，仅支持 {nameof(SyncMode.KeyedMerge)} 或 {nameof(SyncMode.StatusDriven)}。");
+        }
+
+        return mode;
+    }
+
+    /// <summary>
+    /// 构建状态驱动消费配置。
+    /// </summary>
+    /// <param name="table">单表配置。</param>
+    /// <param name="syncMode">同步模式。</param>
+    /// <returns>状态消费配置；非 StatusDriven 模式返回 null。</returns>
+    private static RemoteStatusConsumeProfile? BuildStatusConsumeProfile(SyncTableOptions table, SyncMode syncMode)
+    {
+        if (syncMode != SyncMode.StatusDriven)
+        {
+            return null;
+        }
+
+        var statusColumnName = string.IsNullOrWhiteSpace(table.StatusColumnName) ? "TASKPROCESS" : table.StatusColumnName.Trim();
+        EnsureSafeIdentifier(statusColumnName, table.TableCode, nameof(table.StatusColumnName));
+        if (!table.ShouldWriteBackRemoteStatus)
+        {
+            throw new InvalidOperationException($"表 {table.TableCode} 在 StatusDriven 模式下必须开启 ShouldWriteBackRemoteStatus，禁止关闭远端回写。");
+        }
+
+        var batchSize = table.StatusBatchSize > 0 ? table.StatusBatchSize : 5000;
+        var completedStatusValue = string.IsNullOrWhiteSpace(table.CompletedStatusValue) ? "Y" : table.CompletedStatusValue.Trim();
+        if (table.ShouldWriteBackRemoteStatus && string.IsNullOrWhiteSpace(completedStatusValue))
+        {
+            throw new InvalidOperationException($"表 {table.TableCode} 开启远端回写时，CompletedStatusValue 不能为空。");
+        }
+
+        string? pendingStatusValue = null;
+        if (table.PendingStatusValue is not null)
+        {
+            pendingStatusValue = table.PendingStatusValue.Trim();
+            if (string.IsNullOrEmpty(pendingStatusValue))
+            {
+                throw new InvalidOperationException($"表 {table.TableCode} 的 PendingStatusValue 去除空白后为空，请使用 null 表示 IS NULL 语义。");
+            }
+        }
+
+        return new RemoteStatusConsumeProfile
+        {
+            StatusColumnName = statusColumnName,
+            PendingStatusValue = pendingStatusValue,
+            CompletedStatusValue = completedStatusValue,
+            ShouldWriteBackRemoteStatus = table.ShouldWriteBackRemoteStatus,
+            BatchSize = batchSize,
+        };
+    }
+
+    /// <summary>
+    /// 校验标识符安全性。
+    /// </summary>
+    /// <param name="identifier">标识符文本。</param>
+    /// <param name="tableCode">表编码。</param>
+    /// <param name="fieldName">字段名。</param>
+    private static void EnsureSafeIdentifier(string identifier, string tableCode, string fieldName)
+    {
+        if (!identifier.All(ch => char.IsLetterOrDigit(ch) || ch == '_'))
+        {
+            throw new InvalidOperationException($"表 {tableCode} 的 {fieldName} 包含非法字符，仅允许字母、数字、下划线。");
+        }
     }
 
     /// <summary>

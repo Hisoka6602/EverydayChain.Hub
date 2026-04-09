@@ -10,6 +10,11 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using EverydayChain.Hub.Infrastructure.Repositories;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
+using EverydayChain.Hub.Application.Sync.Abstractions;
+using EverydayChain.Hub.Infrastructure.Sync.Abstractions;
+using EverydayChain.Hub.Infrastructure.Sync.Readers;
+using EverydayChain.Hub.Infrastructure.Sync.Services;
+using EverydayChain.Hub.Infrastructure.Sync.Writers;
 
 namespace EverydayChain.Hub.Infrastructure.DependencyInjection;
 
@@ -63,6 +68,10 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<ISyncChangeLogRepository, SyncChangeLogRepository>();
         services.AddSingleton<ISyncDeletionRepository, SyncDeletionRepository>();
         services.AddSingleton<ISyncDeletionLogRepository, SyncDeletionLogRepository>();
+        services.AddSingleton<IOracleStatusDrivenSourceReader, OracleStatusDrivenSourceReader>();
+        services.AddSingleton<ISqlServerAppendOnlyWriter, SqlServerAppendOnlyWriter>();
+        services.AddSingleton<IOracleRemoteStatusWriter, OracleRemoteStatusWriter>();
+        services.AddSingleton<IRemoteStatusConsumeService, RemoteStatusConsumeService>();
         services.AddSingleton<ISyncWindowCalculator, SyncWindowCalculator>();
         services.AddSingleton<IDeletionExecutionService, DeletionExecutionService>();
         services.AddSingleton<IRetentionExecutionService, RetentionExecutionService>();
