@@ -145,7 +145,7 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         if (table.PendingStatusValue is not null)
         {
             pendingStatusValue = table.PendingStatusValue.Trim();
-            if (pendingStatusValue.Length == 0)
+            if (string.IsNullOrEmpty(pendingStatusValue))
             {
                 throw new InvalidOperationException($"表 {table.TableCode} 的 PendingStatusValue 去除空白后为空，请使用 null 表示 IS NULL 语义。");
             }

@@ -122,7 +122,10 @@ public class RemoteStatusConsumeService(
                 }
             }
 
-            pageNo++;
+            if (!shouldUseFixedFirstPage)
+            {
+                pageNo++;
+            }
         }
 
         logger.LogInformation(
