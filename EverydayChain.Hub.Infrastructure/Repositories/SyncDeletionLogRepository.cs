@@ -51,8 +51,8 @@ public class SyncDeletionLogRepository : ISyncDeletionLogRepository
             return;
         }
 
-        var toRemove = _logs.Count - MaxQueueCapacity + EvictionBatchSize;
-        for (var i = 0; i < toRemove; i++)
+        var evictionCount = _logs.Count - MaxQueueCapacity + EvictionBatchSize;
+        for (var i = 0; i < evictionCount; i++)
         {
             _logs.TryDequeue(out _);
         }

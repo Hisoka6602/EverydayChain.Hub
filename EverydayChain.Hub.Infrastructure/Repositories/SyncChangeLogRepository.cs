@@ -51,8 +51,8 @@ public class SyncChangeLogRepository : ISyncChangeLogRepository
             return;
         }
 
-        var toRemove = _changes.Count - MaxQueueCapacity + EvictionBatchSize;
-        for (var i = 0; i < toRemove; i++)
+        var evictionCount = _changes.Count - MaxQueueCapacity + EvictionBatchSize;
+        for (var i = 0; i < evictionCount; i++)
         {
             _changes.TryDequeue(out _);
         }
