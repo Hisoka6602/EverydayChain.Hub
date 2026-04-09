@@ -122,7 +122,12 @@ public class SyncBatchRepository : ISyncBatchRepository
 
     /// <summary>
     /// 当内存批次数超过 <see cref="MaxBatchCount"/> 时，淘汰最早完成或失败的批次，防止无界增长。
-    /// 进行中（InProgress/Pending）的批次不会被淘汰。
+    /// <para>
+    /// <b>注意：</b>此方法仅淘汰 <c>Completed</c> 或 <c>Failed</c> 状态的批次。
+    /// 若当前所有批次均处于 <c>Pending</c> 或 <c>InProgress</c>（正在运行中），
+    /// 本次淘汰将无效，<see cref="MaxBatchCount"/> 为软上限，不强制拒绝新批次的创建。
+    /// 正常生产场景下批次会迅速完成/失败并进入可淘汰状态，长期全部活跃批次超过上限的情况不应出现。
+    /// </para>
     /// </summary>
     private void TrimExcessBatchesIfNeeded()
     {

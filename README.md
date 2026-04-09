@@ -4,8 +4,8 @@
 - 完成全量逐文件代码审查（共 136 个 C# 文件，依据 `逐文件代码检查方案.md`），输出 `逐文件代码检查台账.md` 记录每文件检查状态与问题列表。
 - 修复 **P1-001**：`SqlServerSyncUpsertRepository.MarkSoftDeletedStateAsync` 两次 `DateTime.Now` 存在时间倒置风险，统一捕获为 `nowLocal` 后复用。
 - 修复 **P1-002**：`SyncBatchRepository._batches` 字典无界增长（OOM 风险），新增上限 5,000 条及超限淘汰最早完成/失败批次机制。
-- 修复 **P1-003**：`SyncChangeLogRepository._changes` 队列无消费机制无限累积，新增上限 200,000 条及超限淘汰最早条目机制。
-- 修复 **P1-004**：`SyncDeletionLogRepository._logs` 队列同 P1-003，新增相同容量保护。
+- 修复 **P1-003**：`SyncChangeLogRepository._changes` 队列无消费机制无限累积，新增上限 200,000 条及超限淘汰机制；淘汰逻辑提取至 `BoundedConcurrentQueueHelper`（SharedKernel），解决 `ConcurrentQueue.Count` O(n) 两次遍历问题，同时消除与 `SyncDeletionLogRepository` 的重复实现。
+- 修复 **P1-004**：`SyncDeletionLogRepository._logs` 队列同 P1-003，统一复用 `BoundedConcurrentQueueHelper`；将常量 `EvictionBatchSize` 重命名为 `ExtraEvictionCount` 并修正注释语义（实际单次移除数为 `currentCount - MaxCapacity + ExtraEvictionCount`，非固定值）。
 - 修复 **P1-005**：`ISyncStagingRepository.BulkInsertAsync` 接口注释明确要求调用方在 try/finally 中调用 `ClearPageAsync` 以防止暂存条目永久残留。
 - 修复 **P2-001**：删除 `SyncColumnFilter.NormalizedSoftDeleteColumns` 冗余别名字段，`SyncTaskConfigRepository` 引用改为 `SoftDeleteColumns`。
 - 修复 **P2-002**：`OracleRemoteStatusWriter` 热路径改用 `FillArray<T>`（内部 `Array.Fill`）替代 `Enumerable.Repeat().ToArray()`，减少 GC 压力。
@@ -107,6 +107,7 @@
 │   └── Utilities
 │       ├── LogicalTableNameNormalizer.cs
 │       ├── RuntimeStoragePathResolver.cs
+│       ├── BoundedConcurrentQueueHelper.cs
 │       ├── SyncBusinessKeyBuilder.cs
 │       └── SyncColumnFilter.cs
 ├── EverydayChain.Hub.Infrastructure
@@ -207,6 +208,7 @@
 - `SyncColumnFilter.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：同步列过滤共享组件，提供 `ExcludedColumns` 规范化与行级过滤能力，并统一维护软删除关键列常量。
 - `RuntimeStoragePathResolver.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：运行期路径解析共享组件，统一解析检查点、目标快照与存储守护所需的绝对路径。
 - `LogicalTableNameNormalizer.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：逻辑表名规范化与安全校验共享组件，统一执行去空白、SQL 标识符校验与异常信息输出。
+- `BoundedConcurrentQueueHelper.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：有界并发队列淘汰辅助工具，仅执行一次 O(n) `Count` 遍历并缓存结果，供需要内存容量保护的队列实现统一复用。
 - `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs` / `SyncTablePriority.cs`：同步模式、删除策略、滞后控制、批次状态、变更操作类型与调度优先级枚举，均含中文 XML 注释与 `Description`。
 - `RemoteStatusConsumeProfile.cs`（`EverydayChain.Hub.Domain/Sync/Models`）：StatusDriven 消费配置模型，统一承载状态列、待处理值、完成值、回写开关与批次大小。
 - `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`SyncTable`、`SyncDelete`、`SyncRetention`、`RetentionJob`、`Oracle` 等），供 Infrastructure 绑定读取。
