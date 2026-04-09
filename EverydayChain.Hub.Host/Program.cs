@@ -1,5 +1,4 @@
 using NLog;
-using EverydayChain.Hub.Host;
 using NLog.Extensions.Logging;
 using EverydayChain.Hub.Host.Workers;
 using EverydayChain.Hub.Domain.Options;
@@ -10,7 +9,6 @@ builder.Logging.ClearProviders();
 builder.Logging.AddNLog();
 builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection(WorkerOptions.SectionName));
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddHostedService<Worker>();
 builder.Services.AddHostedService<SyncBackgroundWorker>();
 builder.Services.AddHostedService<RetentionBackgroundWorker>();
 #if !DEBUG
