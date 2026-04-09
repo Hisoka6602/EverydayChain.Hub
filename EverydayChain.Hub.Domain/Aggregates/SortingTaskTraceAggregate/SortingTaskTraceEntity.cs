@@ -40,7 +40,7 @@ public class SortingTaskTraceEntity : IEntity<long>
 
     /// <summary>
     /// 记录创建时间（含本地偏移）。
-    /// 赋值时必须使用 <c>DateTimeOffset.Now</c>（本地时间偏移），禁止使用 <c>DateTimeOffset.UtcNow</c> 或任何 UTC 语义。
+    /// 赋值时必须使用 <c>DateTimeOffset.Now</c>（本地时间偏移），禁止使用任何 UTC 时间语义（如 UtcNow 等）。
     /// </summary>
     public DateTimeOffset CreatedAt { get; set; }
 
