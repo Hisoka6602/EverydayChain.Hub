@@ -1,7 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 新增《兼容现有实现的可切换同步模式改造分析与执行步骤》文档，基于当前代码梳理 KeyedMerge/StatusDriven 双模式改造边界、分层落位、配置扩展点、执行步骤与验收口径。
+- 新增 `兼容现有实现的可切换同步模式改造分析与执行步骤.md` 文档，基于当前代码梳理 KeyedMerge/StatusDriven 双模式改造边界、分层落位、配置扩展点、执行步骤与验收口径。
 - 按最新 `.github/copilot-instructions.md` 约束完成测试代码结构治理：拆分同文件多类/嵌套类测试替身，统一为“一类一文件”，降低影子代码与重复定义风险。
 - 移除 `Program` 中默认注册的 `Worker` 演示写入后台服务，仅保留 `SyncBackgroundWorker` 与 `RetentionBackgroundWorker`，避免生产运行链路出现演示数据写入造成的影子执行与额外负载。
 - 修复 `SyncStagingRepository` 行复制时的字典比较器丢失问题：暂存行改为 `StringComparer.OrdinalIgnoreCase`，避免后续按配置列名大小写差异读取时出现业务键字段匹配失败。
