@@ -28,6 +28,9 @@ public sealed class InMemorySqlServerSyncUpsertRepository(
     ILogger<SqlServerSyncUpsertRepository> logger)
     : SqlServerSyncUpsertRepository(syncJobOptions, shardingOptions, shardSuffixResolver, shardTableProvisioner, dangerZoneExecutor, logger)
 {
+    /// <summary>分片后缀解析器。</summary>
+    private readonly IShardSuffixResolver _shardSuffixResolver = shardSuffixResolver;
+
     /// <summary>内存状态表。</summary>
     private readonly Dictionary<string, InMemoryState> _states = new(StringComparer.OrdinalIgnoreCase);
 
@@ -63,7 +66,7 @@ public sealed class InMemorySqlServerSyncUpsertRepository(
             var addTime = row.TryGetValue("ADDTIME", out var addTimeValue) && addTimeValue is DateTime dateTime
                 ? dateTime
                 : DateTime.Now;
-            var shardSuffix = new MonthShardSuffixResolver().Resolve(new DateTimeOffset(addTime));
+            var shardSuffix = _shardSuffixResolver.Resolve(new DateTimeOffset(addTime));
             if (!_states.TryGetValue(businessKey, out var existingState))
             {
                 _states[businessKey] = new InMemoryState(digest, shardSuffix);
