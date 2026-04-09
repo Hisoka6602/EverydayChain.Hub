@@ -5,6 +5,7 @@
 - 新增 StatusDriven 组件与测试：`OracleStatusDrivenSourceReader`、`SqlServerAppendOnlyWriter`、`OracleRemoteStatusWriter`、`RemoteStatusConsumeService` 及对应测试替身/用例，覆盖 `PendingStatusValue=null` 的 `IS NULL` 语义与按 `ROWID` 回写路径。
 - `SyncTaskConfigRepository` 增加 `SyncMode` 与状态驱动参数映射、默认值填充与中文错误校验；`appsettings.json` 同步补充新配置项范围说明与 `null` 示例值。
 - 新增 `兼容现有实现的可切换同步模式改造分析与执行步骤.md` 文档，基于当前代码梳理 KeyedMerge/StatusDriven 双模式改造边界、分层落位、配置扩展点、执行步骤与验收口径。
+- 补全验收清单第7条：`ShouldWriteBackRemoteStatus` 改为可配置（true/false），移除强制为 true 的约束；关闭后仅本地追加、不触发任何远端更新；更新 `SyncTableOptions`、`RemoteStatusConsumeProfile` 注释，新增关闭回写场景测试。
 - 按最新 `.github/copilot-instructions.md` 约束完成测试代码结构治理：拆分同文件多类/嵌套类测试替身，统一为“一类一文件”，降低影子代码与重复定义风险。
 - 移除 `Program` 中默认注册的 `Worker` 演示写入后台服务，仅保留 `SyncBackgroundWorker` 与 `RetentionBackgroundWorker`，避免生产运行链路出现演示数据写入造成的影子执行与额外负载。
 - 修复 `SyncStagingRepository` 行复制时的字典比较器丢失问题：暂存行改为 `StringComparer.OrdinalIgnoreCase`，避免后续按配置列名大小写差异读取时出现业务键字段匹配失败。
