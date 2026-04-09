@@ -1,10 +1,10 @@
 using EverydayChain.Hub.Domain.Sync;
 using EverydayChain.Hub.Domain.Sync.Models;
 
-namespace EverydayChain.Hub.Infrastructure.Sync.Abstractions;
+namespace EverydayChain.Hub.Application.Abstractions.Sync;
 
 /// <summary>
-/// Oracle 状态驱动源读取抽象。
+/// Oracle 状态驱动源读取抽象，表达从 Oracle 源端按状态列分页读取待处理数据的外部协作能力。
 /// </summary>
 public interface IOracleStatusDrivenSourceReader
 {

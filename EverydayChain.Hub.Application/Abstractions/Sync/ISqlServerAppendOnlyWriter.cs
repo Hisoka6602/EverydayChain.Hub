@@ -1,7 +1,7 @@
-namespace EverydayChain.Hub.Infrastructure.Sync.Abstractions;
+namespace EverydayChain.Hub.Application.Abstractions.Sync;
 
 /// <summary>
-/// SQL Server 仅追加写入抽象。
+/// SQL Server 仅追加写入抽象，表达向 SQL Server 目标分表批量追加数据的外部协作能力。
 /// </summary>
 public interface ISqlServerAppendOnlyWriter
 {

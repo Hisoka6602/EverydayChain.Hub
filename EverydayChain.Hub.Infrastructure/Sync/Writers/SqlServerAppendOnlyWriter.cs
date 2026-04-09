@@ -1,8 +1,8 @@
 using System.Data;
+using EverydayChain.Hub.Application.Abstractions.Sync;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Infrastructure.Services;
-using EverydayChain.Hub.Infrastructure.Sync.Abstractions;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

@@ -1,10 +1,10 @@
 using EverydayChain.Hub.Domain.Sync;
 using EverydayChain.Hub.Domain.Sync.Models;
 
-namespace EverydayChain.Hub.Infrastructure.Sync.Abstractions;
+namespace EverydayChain.Hub.Application.Abstractions.Sync;
 
 /// <summary>
-/// Oracle 远端状态回写抽象。
+/// Oracle 远端状态回写抽象，表达向 Oracle 源端写回处理状态的外部协作能力。
 /// </summary>
 public interface IOracleRemoteStatusWriter
 {
