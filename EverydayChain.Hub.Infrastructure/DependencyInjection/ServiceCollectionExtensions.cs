@@ -10,8 +10,8 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using EverydayChain.Hub.Infrastructure.Repositories;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
+using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Abstractions.Sync;
-using EverydayChain.Hub.Application.Sync.Abstractions;
 using EverydayChain.Hub.Infrastructure.Sync.Readers;
 using EverydayChain.Hub.Infrastructure.Sync.Services;
 using EverydayChain.Hub.Infrastructure.Sync.Writers;
@@ -26,7 +26,7 @@ public static class ServiceCollectionExtensions {
     private const string SortingTaskTraceLogicalTable = "sorting_task_trace";
 
     /// <summary>
-    /// 注册基础设施层全部服务，包括 EF Core 工厂、分表服务、调谐器、危险操作执行器与自动迁移托管服务。
+    /// 注册基础设施层全部服务，包括 EF Core 工厂、分表服务、调谐器、危险操作执行器与自动迁移应用服务（不含 HostedService 注册，该注册由 Host 层 Program.cs 负责）。
     /// </summary>
     /// <param name="services">服务集合。</param>
     /// <param name="configuration">应用配置，用于绑定 Sharding/AutoTune/DangerZone 配置节。</param>
@@ -77,7 +77,6 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IRetentionExecutionService, RetentionExecutionService>();
         services.AddSingleton<ISyncExecutionService, SyncExecutionService>();
         services.AddSingleton<ISyncOrchestrator, SyncOrchestrator>();
-        services.AddHostedService<AutoMigrationHostedService>();
 
         return services;
     }

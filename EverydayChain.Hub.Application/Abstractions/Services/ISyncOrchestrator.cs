@@ -1,6 +1,6 @@
 using EverydayChain.Hub.Domain.Sync;
 
-namespace EverydayChain.Hub.Application.Services;
+namespace EverydayChain.Hub.Application.Abstractions.Services;
 
 /// <summary>
 /// 同步编排服务接口。

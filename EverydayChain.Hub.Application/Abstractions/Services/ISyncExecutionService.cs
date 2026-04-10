@@ -1,7 +1,7 @@
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Sync;
 
-namespace EverydayChain.Hub.Application.Services;
+namespace EverydayChain.Hub.Application.Abstractions.Services;
 
 /// <summary>
 /// 同步执行服务接口。
