@@ -1,7 +1,7 @@
-using EverydayChain.Hub.Application.Sync.Models;
+using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Sync;
 
-namespace EverydayChain.Hub.Application.Sync.Abstractions;
+namespace EverydayChain.Hub.Application.Abstractions.Sync;
 
 /// <summary>
 /// 状态驱动消费服务接口，串联 Oracle 状态行读取、SQL Server 追加写入与可选远端状态回写。

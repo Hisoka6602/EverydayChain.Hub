@@ -1,6 +1,7 @@
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
-using EverydayChain.Hub.Application.Sync.Abstractions;
+using EverydayChain.Hub.Application.Abstractions.Services;
+using EverydayChain.Hub.Application.Abstractions.Sync;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.Extensions.Logging;

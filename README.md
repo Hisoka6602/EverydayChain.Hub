@@ -1,16 +1,13 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 新增续审方案文档 `逐文件全量审查实施方案.md`，先核对首轮已处理内容，再对首轮台账未覆盖文件继续逐文件补审。
-- `逐文件代码检查台账.md` 新增“续审批次 A（2026-04-10）”，补齐 15 个遗漏文件检查记录，结论均为通过，未新增 P0/P1/P2 问题。
-- `逐文件代码检查台账.md` 新增“续审批次 B（2026-04-10）”，补齐 `逐文件全量审查实施方案.md` 续审文档自身记录，形成续审闭环，未新增 P0/P1/P2 问题。
-- `逐文件全量审查实施方案.md` 的续审验收清单已全部勾选完成并与台账、README 联动。
-- 完成首轮逐文件代码检查方案（`逐文件代码检查方案.md`）的全量落地：155 个文件审查完毕，13 项问题（P1×5、P2×8）全部修复。
-- **P1 修复**：`MarkSoftDeletedStateAsync` 时间倒置风险（单次 `DateTime.Now`）、三个内存仓储无界增长（`InMemorySyncBatch/ChangeLog/DeletionLogRepository` 引入上限淘汰）、`ISyncStagingRepository` 接口补充 try/finally 职责说明注释。
-- **P2 修复**：删除 `SyncColumnFilter` 冗余别名字段 `NormalizedSoftDeleteColumns`、`OracleRemoteStatusWriter` 热路径改用 `Array.Fill`、`DeletionExecutionService` 空候选早退、`SortingTaskTraceEntity` 注释明确禁止 UtcNow、`WmsSplitPickToLightCartonEntity` 移除待确认注释、三个内存仓储类添加 `InMemory` 前缀并同步 DI 注册、三个外部协作接口迁移至 `Application/Abstractions/Sync/`。
-- 新增 `EverydayChain.Hub.SharedKernel/Utilities/BoundedConcurrentQueueHelper.cs` 统一实现有界并发队列淘汰逻辑。
-- 修正本文件 `逐文件代码检查台账.md` 描述中的 C# 文件计数（136→137）。
-
+- 执行续审批次 D（`逐文件全量审查实施方案.md`）：对全仓 171 个文件进行规范合规性深度扫描，发现并修复 9 个问题（P1×7 + P2×2）。
+- **D-P1 修复（接口分层规范）**：将 5 个应用编排服务接口（`ISyncOrchestrator`、`ISyncExecutionService`、`IDeletionExecutionService`、`IRetentionExecutionService`、`ISyncWindowCalculator`）从 `Application/Services/` 迁移至 `Application/Abstractions/Services/`，命名空间改为 `EverydayChain.Hub.Application.Abstractions.Services`，同步更新所有实现层与 Host 层引用。
+- **D-P1 修复（接口分层规范）**：将 `IRemoteStatusConsumeService` 从 `Application/Sync/Abstractions/` 迁移至 `Application/Abstractions/Sync/`，统一应用层抽象放置目录。
+- **D-P1 修复（后台任务入口层级）**：将 `AutoMigrationHostedService`（`IHostedService` 实现）从 `Infrastructure/Services/` 迁移至 `Host/Workers/`，DI 注册移至 `Program.cs`，符合"后台任务入口归属 Host 层"规则。
+- **D-P2 修复（模型目录一致性）**：将 `RemoteStatusConsumeResult` 从 `Application/Sync/Models/` 迁移至 `Application/Models/`，统一应用层模型放置目录。
+- **D-P2 修复（注释完整性）**：为 `AutoMigrationHostedService.TryGetSqlException` 私有方法补充 XML 文档注释。
+- 修复后：0 Warning 0 Error，64/64 单元测试通过。
 ## 后续可完善点
 - 将续审批次从 A 扩展为周期化机制，新增“新增文件自动入账”校验，避免后续再出现台账遗漏。
 
@@ -95,13 +92,13 @@
 │   ├── Abstractions/Sync/IOracleRemoteStatusWriter.cs
 │   ├── Abstractions/Sync/IOracleStatusDrivenSourceReader.cs
 │   ├── Abstractions/Sync/ISqlServerAppendOnlyWriter.cs
-│   ├── Sync/Abstractions/IRemoteStatusConsumeService.cs
-│   ├── Sync/Models/RemoteStatusConsumeResult.cs
-│   ├── Services/ISyncOrchestrator.cs
-│   ├── Services/ISyncWindowCalculator.cs
-│   ├── Services/ISyncExecutionService.cs
-│   ├── Services/IDeletionExecutionService.cs
-│   ├── Services/IRetentionExecutionService.cs
+│   ├── Abstractions/Sync/IRemoteStatusConsumeService.cs
+│   ├── Abstractions/Services/ISyncOrchestrator.cs
+│   ├── Abstractions/Services/ISyncWindowCalculator.cs
+│   ├── Abstractions/Services/ISyncExecutionService.cs
+│   ├── Abstractions/Services/IDeletionExecutionService.cs
+│   ├── Abstractions/Services/IRetentionExecutionService.cs
+│   ├── Models/RemoteStatusConsumeResult.cs
 │   ├── Services/SyncOrchestrator.cs
 │   ├── Services/SyncWindowCalculator.cs
 │   ├── Services/SyncExecutionService.cs
@@ -151,7 +148,6 @@
 │       ├── RuntimeStorageGuard.cs
 │       ├── IAutoMigrationService.cs
 │       ├── AutoMigrationService.cs
-│       ├── AutoMigrationHostedService.cs
 │       ├── IShardTableProvisioner.cs
 │       ├── ShardTableProvisioner.cs
 │       ├── ISqlExecutionTuner.cs
@@ -189,6 +185,7 @@
     ├── Program.cs
     ├── Workers/SyncBackgroundWorker.cs
     ├── Workers/RetentionBackgroundWorker.cs
+    ├── Workers/AutoMigrationHostedService.cs
     ├── nlog.config
     └── appsettings.json
 ```
@@ -218,19 +215,20 @@
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
 - `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs` + `SyncTargetStateRow.cs`：同步执行、删除识别与轻量幂等状态存储的数据契约模型。
 - `Application/Abstractions/Sync/IOracleRemoteStatusWriter.cs` / `IOracleStatusDrivenSourceReader.cs` / `ISqlServerAppendOnlyWriter.cs`：定义 StatusDriven 模式中 Oracle 远端状态回写、Oracle 状态驱动源读取与 SQL Server 仅追加写入的外部协作能力抽象，遵循 Application 层外部协作抽象放置规则。
-- `Application/Sync/Abstractions/IRemoteStatusConsumeService.cs` + `Application/Sync/Models/RemoteStatusConsumeResult.cs`：定义 StatusDriven 模式执行入口与读取/追加/回写统计模型。
+- `Application/Abstractions/Sync/IRemoteStatusConsumeService.cs` + `Application/Models/RemoteStatusConsumeResult.cs`：定义 StatusDriven 模式执行入口（应用编排抽象）与读取/追加/回写统计模型。
 - `Application/Abstractions/Persistence/ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。
 - `Application/Abstractions/Persistence/IShardTableResolver.cs` / `IShardRetentionRepository.cs`：定义分表识别与分表清理执行契约（含分表完整回滚脚本生成）。
-- `ISyncOrchestrator.cs` / `SyncOrchestrator.cs`：同步任务编排入口，负责读取配置、加载检查点、计算窗口，并基于优先级与并发上限执行多表同步。
-- `ISyncWindowCalculator.cs` / `SyncWindowCalculator.cs`：根据 `CursorColumn + StartTimeLocal` 与检查点计算本地增量窗口，并对时钟回拨与 DST 非法本地时刻执行窗口边界保护。
-- `IDeletionExecutionService.cs` / `DeletionExecutionService.cs`：执行删除识别、删除策略应用（含 DryRun）并生成删除审计与删除变更日志。
-- `IRetentionExecutionService.cs` / `RetentionExecutionService.cs`：执行分表保留期治理，完成过期分表识别、完整回滚脚本生成、dry-run 审计、删除执行、失败隔离与汇总。
-- `ISyncExecutionService.cs` / `SyncExecutionService.cs`：执行分页读取、暂存、幂等合并、删除同步、日志写入、检查点提交，并输出延迟/积压/吞吐/失败率指标日志；异常场景输出 NLog 错误日志。
+- `Application/Abstractions/Services/ISyncOrchestrator.cs` / `SyncOrchestrator.cs`：同步任务编排入口应用抽象（位于 Abstractions/Services/）；`SyncOrchestrator.cs` 实现位于 Services/ 目录。
+- `Application/Abstractions/Services/ISyncWindowCalculator.cs` / `SyncWindowCalculator.cs`：根据 `CursorColumn + StartTimeLocal` 与检查点计算本地增量窗口，并对时钟回拨与 DST 非法本地时刻执行窗口边界保护。
+- `Application/Abstractions/Services/IDeletionExecutionService.cs` / `DeletionExecutionService.cs`：执行删除识别、删除策略应用（含 DryRun）并生成删除审计与删除变更日志。
+- `Application/Abstractions/Services/IRetentionExecutionService.cs` / `RetentionExecutionService.cs`：执行分表保留期治理，完成过期分表识别、完整回滚脚本生成、dry-run 审计、删除执行、失败隔离与汇总。
+- `Application/Abstractions/Services/ISyncExecutionService.cs` / `SyncExecutionService.cs`：执行分页读取、暂存、幂等合并、删除同步、日志写入、检查点提交，并输出延迟/积压/吞吐/失败率指标日志；异常场景输出 NLog 错误日志。
 - `HubDbContext.cs`：根据分表后缀动态映射表名。
 - `TableSuffixScope.cs` + `ShardModelCacheKeyFactory.cs`：保证不同后缀下 EF Model 能正确缓存隔离。
 - `MonthShardSuffixResolver.cs`：按月份生成分表后缀（如 `_202603`）。
 - `IShardTableProvisioner.cs` + `ShardTableProvisioner.cs`：在 SQL Server 中按需创建分表与索引（不存在才建）。
-- `AutoMigrationService.cs` + `AutoMigrationHostedService.cs`：应用启动时自动建库、自动识别并执行待迁移项，同时仅预建后缀分表。
+- `AutoMigrationService.cs`：应用启动时自动建库、自动识别并执行待迁移项，同时仅预建后缀分表（Infrastructure 层实现）。
+- `Host/Workers/AutoMigrationHostedService.cs`：后台任务入口，在应用启动阶段触发自动迁移与分表预置流程，依赖 `IAutoMigrationService` 与 `IRuntimeStorageGuard`（遵循后台任务入口归属 Host 层规则）。
 - `SqlExecutionTuner.cs`：基于失败率和耗时进行批量窗口升降调谐；采样窗口大小与失败率阈值均来自 `AutoTuneOptions`。
 - `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断），弹性参数来自 `DangerZoneOptions`。
 - `NonRetryableDangerZoneException.cs`：危险隔离器“不可重试异常”标记类型，用于识别配置类确定性失败并快速失败。

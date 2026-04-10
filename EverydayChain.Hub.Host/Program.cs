@@ -6,6 +6,7 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddNLog();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddHostedService<AutoMigrationHostedService>();
 builder.Services.AddHostedService<SyncBackgroundWorker>();
 builder.Services.AddHostedService<RetentionBackgroundWorker>();
 #if !DEBUG

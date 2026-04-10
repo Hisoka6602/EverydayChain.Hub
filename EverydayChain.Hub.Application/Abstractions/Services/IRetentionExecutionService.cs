@@ -1,4 +1,4 @@
-namespace EverydayChain.Hub.Application.Services;
+namespace EverydayChain.Hub.Application.Abstractions.Services;
 
 /// <summary>
 /// 分表保留期执行服务接口。

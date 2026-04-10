@@ -1,6 +1,6 @@
 using EverydayChain.Hub.Application.Models;
 
-namespace EverydayChain.Hub.Application.Services;
+namespace EverydayChain.Hub.Application.Abstractions.Services;
 
 /// <summary>
 /// 删除执行服务接口。

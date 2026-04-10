@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Services;
+using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Domain.Options;
 using Microsoft.Extensions.Options;
 

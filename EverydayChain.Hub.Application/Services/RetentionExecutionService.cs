@@ -1,4 +1,5 @@
 using EverydayChain.Hub.Application.Abstractions.Persistence;
+using EverydayChain.Hub.Application.Abstractions.Services;
 using Microsoft.Extensions.Logging;
 
 namespace EverydayChain.Hub.Application.Services;

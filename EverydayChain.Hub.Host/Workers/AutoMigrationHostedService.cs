@@ -3,8 +3,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using EverydayChain.Hub.Infrastructure.Services;
 
-namespace EverydayChain.Hub.Infrastructure.Services;
+namespace EverydayChain.Hub.Host.Workers;
 
 /// <summary>
 /// 托管服务入口，在应用启动阶段触发自动迁移与分表预置流程。
@@ -49,6 +50,11 @@ public class AutoMigrationHostedService(
     /// <param name="cancellationToken">取消令牌。</param>
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
+    /// <summary>
+    /// 从异常链中提取第一个 <see cref="SqlException"/> 实例；若不存在则返回 <c>null</c>。
+    /// </summary>
+    /// <param name="exception">待遍历的异常对象。</param>
+    /// <returns>找到的 <see cref="SqlException"/>，或 <c>null</c>。</returns>
     private static SqlException? TryGetSqlException(Exception exception) {
         var current = exception;
         while (current is not null) {

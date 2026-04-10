@@ -5,6 +5,7 @@ using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
+using EverydayChain.Hub.Application.Abstractions.Services;
 
 namespace EverydayChain.Hub.Application.Services;
 

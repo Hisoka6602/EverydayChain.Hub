@@ -1,4 +1,4 @@
-namespace EverydayChain.Hub.Application.Sync.Models;
+namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
 /// 状态驱动消费结果，汇总一轮 StatusDriven 批次的读取、追加、回写统计。

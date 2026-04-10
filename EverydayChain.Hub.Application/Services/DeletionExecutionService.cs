@@ -1,6 +1,7 @@
 using System.Text.Json;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
+using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Domain.Enums;
 using Microsoft.Extensions.Logging;
 using EverydayChain.Hub.Domain.Sync;

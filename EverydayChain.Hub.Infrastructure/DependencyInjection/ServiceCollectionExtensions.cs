@@ -10,8 +10,8 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using EverydayChain.Hub.Infrastructure.Repositories;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
+using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Abstractions.Sync;
-using EverydayChain.Hub.Application.Sync.Abstractions;
 using EverydayChain.Hub.Infrastructure.Sync.Readers;
 using EverydayChain.Hub.Infrastructure.Sync.Services;
 using EverydayChain.Hub.Infrastructure.Sync.Writers;
@@ -77,7 +77,6 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IRetentionExecutionService, RetentionExecutionService>();
         services.AddSingleton<ISyncExecutionService, SyncExecutionService>();
         services.AddSingleton<ISyncOrchestrator, SyncOrchestrator>();
-        services.AddHostedService<AutoMigrationHostedService>();
 
         return services;
     }

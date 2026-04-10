@@ -1,6 +1,5 @@
 using EverydayChain.Hub.Application.Abstractions.Sync;
-using EverydayChain.Hub.Application.Sync.Abstractions;
-using EverydayChain.Hub.Application.Sync.Models;
+using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Sync;
 using EverydayChain.Hub.SharedKernel.Utilities;
