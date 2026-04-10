@@ -1,8 +1,11 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 创建 `Oracle到SQLServer同步实施计划.md`：补充缺失的实施计划跟踪文档（README 与 `copilot-instructions.md` 均引用该文件，文件原本缺失）；按阶段一至四记录已完成的实施条目与架构验收清单。
-- 更新 `逐文件代码检查台账.md`：修正文件计数不一致（台账标题与汇总表数值对齐），补充根目录 `*.md` 与 `scripts/` 目录的检查记录。
+- 完成逐文件全量审查实施方案（`逐文件代码检查方案.md`）的全量落地：155 个文件审查完毕，13 项问题（P1×5、P2×8）全部修复。
+- **P1 修复**：`MarkSoftDeletedStateAsync` 时间倒置风险（单次 `DateTime.Now`）、三个内存仓储无界增长（`InMemorySyncBatch/ChangeLog/DeletionLogRepository` 引入上限淘汰）、`ISyncStagingRepository` 接口补充 try/finally 职责说明注释。
+- **P2 修复**：删除 `SyncColumnFilter` 冗余别名字段 `NormalizedSoftDeleteColumns`、`OracleRemoteStatusWriter` 热路径改用 `Array.Fill`、`DeletionExecutionService` 空候选早退、`SortingTaskTraceEntity` 注释明确禁止 UtcNow、`WmsSplitPickToLightCartonEntity` 移除待确认注释、三个内存仓储类添加 `InMemory` 前缀并同步 DI 注册、三个外部协作接口迁移至 `Application/Abstractions/Sync/`。
+- 新增 `SharedKernel/Utilities/BoundedConcurrentQueueHelper.cs` 统一实现有界并发队列淘汰逻辑。
+- 修正本文件 `逐文件代码检查台账.md` 描述中的 C# 文件计数（136→137）。
 
 ## 解决方案文件树与职责
 ```text
@@ -192,7 +195,7 @@
 - `年度维护清单.md`：月度/季度/年度例行巡检项标准化清单，包含磁盘治理、日志审查、数据一致性、配置审核、灾难恢复演练、容量规划、安全审计等条目及快速异常处理参考表。
 - `值班处置手册.md`：日常值班与告警应急处置手册，覆盖 9 类告警的处置步骤（卡死检测、磁盘不足、内存水位、整轮超时、熔断、检查点损坏、快照损坏、归档失败、进程停止），定义 P0~P3 优先级与升级规则，含处置记录与演练记录模板。
 - `逐文件代码检查方案.md`：逐文件审查执行方案，定义检查范围、单文件检查维度、无遗漏对账流程、问题分级与分批 PR 策略，支持“本 PR 不改代码”的审查场景。
-- `逐文件代码检查台账.md`：136 个 C# 文件逐文件检查台账，记录每文件检查状态（未检查/进行中/已完成）、问题编号与修复状态，供后续 PR 复核追溯。
+- `逐文件代码检查台账.md`：155 个文件（含 137 个 C# 文件）逐文件检查台账，记录每文件检查状态（未检查/进行中/已完成）、问题编号与修复状态，供后续 PR 复核追溯。
 - `SyncTableDefinition.cs` / `SyncWindow.cs` / `SyncCheckpoint.cs` / `SyncBatchResult.cs`：定义同步链路执行、窗口与结果统计的核心领域模型。
 - `SyncBatch.cs` / `SyncChangeLog.cs` / `SyncDeletionLog.cs`：定义批次状态跟踪、变更审计与删除审计的数据模型。
 - `SyncBusinessKeyBuilder.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：同步业务键构建共享组件，按 `UniqueKeys` 配置将行数据拼接为 `|` 分隔的业务键文本，供 Upsert 与删除识别阶段统一调用。
