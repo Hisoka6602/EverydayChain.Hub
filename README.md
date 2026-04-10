@@ -1,9 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 执行续审批次 E（`逐文件全量审查实施方案.md`）：对全仓 167 个文件进行 README 文件树完整性复核，发现并修复 2 个问题（P2×2）。
+- 执行续审批次 E（`逐文件全量审查实施方案.md`）：对全仓 171 个文件进行 README 文件树完整性复核，发现并修复 2 个问题（P2×2）。
 - **E-P2 修复（README 文件树不完整）**：补齐 README 文件树中缺失的 8 个文件条目（`.gitattributes`、`.gitignore`、`EverydayChain.Hub_详细业务背景开发指令_v2.md`、`.github/DDD分层接口与实现放置规范.md`、`install.bat`、`uninstall.bat`、`Properties/launchSettings.json`、`NonRetryableDangerZoneException.cs`），同步补充对应逐项说明。
-- **E-P2 修复（台账头部统计数字滞后）**：更新台账头部 `总文件数` 为 167，与 `git ls-files` 实际结果一致。
+- **E-P2 修复（台账头部统计数字滞后）**：更新台账头部 `总文件数` 为 171，与 `git ls-files` 实际结果一致。
 
 ## 后续可完善点
 - 将续审批次从 A 扩展为周期化机制，新增"新增文件自动入账"校验，避免后续再出现台账遗漏。
