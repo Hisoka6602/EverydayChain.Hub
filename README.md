@@ -1,19 +1,18 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 执行续审批次 D（`逐文件全量审查实施方案.md`）：对全仓 171 个文件进行规范合规性深度扫描，发现并修复 9 个问题（P1×7 + P2×2）。
-- **D-P1 修复（接口分层规范）**：将 5 个应用编排服务接口（`ISyncOrchestrator`、`ISyncExecutionService`、`IDeletionExecutionService`、`IRetentionExecutionService`、`ISyncWindowCalculator`）从 `Application/Services/` 迁移至 `Application/Abstractions/Services/`，命名空间改为 `EverydayChain.Hub.Application.Abstractions.Services`，同步更新所有实现层与 Host 层引用。
-- **D-P1 修复（接口分层规范）**：将 `IRemoteStatusConsumeService` 从 `Application/Sync/Abstractions/` 迁移至 `Application/Abstractions/Sync/`，统一应用层抽象放置目录。
-- **D-P1 修复（后台任务入口层级）**：将 `AutoMigrationHostedService`（`IHostedService` 实现）从 `Infrastructure/Services/` 迁移至 `Host/Workers/`，DI 注册移至 `Program.cs`，符合"后台任务入口归属 Host 层"规则。
-- **D-P2 修复（模型目录一致性）**：将 `RemoteStatusConsumeResult` 从 `Application/Sync/Models/` 迁移至 `Application/Models/`，统一应用层模型放置目录。
-- **D-P2 修复（注释完整性）**：为 `AutoMigrationHostedService.TryGetSqlException` 私有方法补充 XML 文档注释。
-- 修复后：0 Warning 0 Error，64/64 单元测试通过。
+- 执行续审批次 E（`逐文件全量审查实施方案.md`）：对全仓 171 个文件进行 README 文件树完整性复核，发现并修复 2 个问题（P2×2）。
+- **E-P2 修复（README 文件树不完整）**：补齐 README 文件树中缺失的 8 个文件条目（`.gitattributes`、`.gitignore`、`EverydayChain.Hub_详细业务背景开发指令_v2.md`、`.github/DDD分层接口与实现放置规范.md`、`install.bat`、`uninstall.bat`、`Properties/launchSettings.json`、`NonRetryableDangerZoneException.cs`），同步补充对应逐项说明。
+- **E-P2 修复（台账头部统计数字滞后）**：更新台账头部 `总文件数` 为 171，与 `git ls-files` 实际结果一致。
+
 ## 后续可完善点
-- 将续审批次从 A 扩展为周期化机制，新增“新增文件自动入账”校验，避免后续再出现台账遗漏。
+- 将续审批次从 A 扩展为周期化机制，新增"新增文件自动入账"校验，避免后续再出现台账遗漏。
 
 ## 解决方案文件树与职责
 ```text
 .
+├── .gitattributes
+├── .gitignore
 ├── EverydayChain.Hub.sln
 ├── README.md
 ├── EFCore手动迁移操作指南.md
@@ -28,12 +27,14 @@
 ├── Oracle到SQLServer同步架构设计.md
 ├── Oracle到SQLServer同步实施计划.md
 ├── 兼容现有实现的可切换同步模式改造分析与执行步骤.md
+├── EverydayChain.Hub_详细业务背景开发指令_v2.md
 ├── scripts
 │   ├── health-check.sh
 │   ├── disaster-recovery.sh
 │   └── stability-drill.sh
 ├── .github
 │   ├── copilot-instructions.md
+│   ├── DDD分层接口与实现放置规范.md
 │   └── workflows
 │       └── copilot-governance.yml
 ├── EverydayChain.Hub.Domain
@@ -153,7 +154,8 @@
 │       ├── ISqlExecutionTuner.cs
 │       ├── SqlExecutionTuner.cs
 │       ├── ISortingTaskTraceWriter.cs
-│       └── SortingTaskTraceWriter.cs
+│       ├── SortingTaskTraceWriter.cs
+│       └── NonRetryableDangerZoneException.cs
 ├── EverydayChain.Hub.Tests
 │   ├── EverydayChain.Hub.Tests.csproj
 │   ├── Repositories/OracleSourceReaderTests.cs
@@ -186,12 +188,18 @@
     ├── Workers/SyncBackgroundWorker.cs
     ├── Workers/RetentionBackgroundWorker.cs
     ├── Workers/AutoMigrationHostedService.cs
+    ├── Properties/launchSettings.json
     ├── nlog.config
-    └── appsettings.json
+    ├── appsettings.json
+    ├── install.bat
+    └── uninstall.bat
 ```
 
 ## 各层级与各文件作用说明（逐项）
+- `.gitattributes`：设置 Git 仓库行尾统一处理规则（`text=auto`），确保跨平台提交行尾一致性。
+- `.gitignore`：配置 Visual Studio 及 .NET 项目的忽略规则，排除构建产物（`bin/`、`obj/`）、用户配置（`*.suo`、`*.user`）与临时文件。
 - `.github/copilot-instructions.md`：定义仓库级 Copilot 强制约束，覆盖时间语义、结构规范、文档联动与交付门禁。
+- `.github/DDD分层接口与实现放置规范.md`：DDD 项目接口定义位置、实现类放置位置、依赖方向与目录结构统一规范，覆盖领域/应用/基础设施各层的抽象归属规则。
 - `.github/workflows/copilot-governance.yml`：执行规则自动校验，并强制规则文件与工作流联动修改。
 - `scripts/health-check.sh`：一键体检脚本，检查磁盘空间、目录权限、关键文件可读写、配置文件格式、日志健康状态、进程存活与压缩归档文件状态，可集成到监控或定时任务。
 - `scripts/disaster-recovery.sh`：灾难恢复脚本，支持检查点重置（checkpoint-reset）、快照从归档恢复（snapshot-restore）、快照备份（snapshot-backup）、归档清理（archive-cleanup）与完全重置（full-reset）；全部操作支持 --dry-run 预览模式。
@@ -282,6 +290,7 @@
 - `当前程序能力与缺陷分析.md`：汇总当前程序能力、功能清单、代码缺陷与逻辑 BUG，作为后续修复与优化输入。
 - `Oracle到SQLServer同步架构设计.md`：定义外部 Oracle DB First 只读同步到本地 SQL Server 的详细落地方案。
 - `Oracle到SQLServer同步实施计划.md`：按 PR 拆分同步架构落地步骤的进度跟踪文档。
+- `EverydayChain.Hub_详细业务背景开发指令_v2.md`：项目详细业务背景与开发指令参考文档 v2，记录业务领域知识与 Copilot 开发约定。
 - `兼容现有实现的可切换同步模式改造分析与执行步骤.md`：基于现有代码的双模式改造分析文档，明确保留链路、StatusDriven 停用项、分层新增文件与实施步骤。
 - `ShardingOptions.cs`：分表配置模型，仅保留连接、Schema 与自动预建月数等基础配置。
 - `AutoTuneOptions.cs`：批量写入自动调谐配置，从 `AutoTune` 节点绑定，覆盖初始/最小/最大批量、步长、慢阈值与采样窗口等参数。
@@ -292,6 +301,9 @@
 - `ShardTableProvisioner.cs`：分表预建实现，按启用同步表推导的逻辑表与后缀笛卡尔组合执行建表，并保持危险动作隔离执行。
 - `AutoMigrationService.cs`：应用启动迁移入口，自动创建缺失数据库、识别并执行待迁移项，通过分表预建器自动覆盖多逻辑表。
 - `appsettings.json`：主配置样例，移除分表逻辑表名静态配置，统一由 `SyncJob.Tables.TargetLogicalTable` 提供。
+- `install.bat`：Windows 服务安装脚本，将 Host 程序注册为 Windows Service，配置开机自启、失败自动恢复策略（5 秒×3 次，含非崩溃退出），需以管理员身份运行。
+- `uninstall.bat`：Windows 服务卸载脚本，停止并删除已注册的 Windows Service，需以管理员身份运行。
+- `Properties/launchSettings.json`：本地开发启动配置，设定 `DOTNET_ENVIRONMENT=Development` 环境变量，供 `dotnet run` 与 IDE 调试使用。
 
 ### Oracle 配置速查（针对 `SELECT * FROM WMS_USER_431.IDX_PICKTOLIGHT_CARTON1`）
 - `SyncJob.Tables[*].SourceSchema = WMS_USER_431`（源端 Schema 改为逐表必填）。
