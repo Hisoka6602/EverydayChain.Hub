@@ -3,6 +3,8 @@
 ## 本次更新内容
 - 新增续审方案文档 `逐文件全量审查实施方案.md`，先核对首轮已处理内容，再对首轮台账未覆盖文件继续逐文件补审。
 - `逐文件代码检查台账.md` 新增“续审批次 A（2026-04-10）”，补齐 15 个遗漏文件检查记录，结论均为通过，未新增 P0/P1/P2 问题。
+- `逐文件代码检查台账.md` 新增“续审批次 B（2026-04-10）”，补齐 `逐文件全量审查实施方案.md` 续审文档自身记录，形成续审闭环，未新增 P0/P1/P2 问题。
+- `逐文件全量审查实施方案.md` 的续审验收清单已全部勾选完成并与台账、README 联动。
 - 完成首轮逐文件代码检查方案（`逐文件代码检查方案.md`）的全量落地：155 个文件审查完毕，13 项问题（P1×5、P2×8）全部修复。
 - **P1 修复**：`MarkSoftDeletedStateAsync` 时间倒置风险（单次 `DateTime.Now`）、三个内存仓储无界增长（`InMemorySyncBatch/ChangeLog/DeletionLogRepository` 引入上限淘汰）、`ISyncStagingRepository` 接口补充 try/finally 职责说明注释。
 - **P2 修复**：删除 `SyncColumnFilter` 冗余别名字段 `NormalizedSoftDeleteColumns`、`OracleRemoteStatusWriter` 热路径改用 `Array.Fill`、`DeletionExecutionService` 空候选早退、`SortingTaskTraceEntity` 注释明确禁止 UtcNow、`WmsSplitPickToLightCartonEntity` 移除待确认注释、三个内存仓储类添加 `InMemory` 前缀并同步 DI 注册、三个外部协作接口迁移至 `Application/Abstractions/Sync/`。
