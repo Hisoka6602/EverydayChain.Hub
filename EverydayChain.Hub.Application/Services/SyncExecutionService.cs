@@ -62,8 +62,17 @@ public class SyncExecutionService(
         var skipCount = 0;
         DateTime? lastSuccessCursorLocal = context.Checkpoint.LastSuccessCursorLocal;
         var pendingChanges = new List<SyncChangeLog>();
+        // 各步骤累计耗时（毫秒），用于批次完成后输出详细性能日志。
+        var batchInitElapsedMs = 0L;
+        var readElapsedMs = 0L;
+        var stagingElapsedMs = 0L;
+        var mergeElapsedMs = 0L;
+        var deletionElapsedMs = 0L;
+        var persistElapsedMs = 0L;
+        var checkpointElapsedMs = 0L;
         try
         {
+            var stepSw = Stopwatch.StartNew();
             await batchRepository.CreateBatchAsync(new SyncBatch
             {
                 BatchId = context.BatchId,
@@ -74,6 +83,7 @@ public class SyncExecutionService(
             }, ct);
             batchPersistedToRepository = true;
             await batchRepository.MarkInProgressAsync(context.BatchId, DateTime.Now, ct);
+            batchInitElapsedMs = stepSw.ElapsedMilliseconds;
 
             var pageNo = 1;
             while (!ct.IsCancellationRequested)
@@ -91,7 +101,9 @@ public class SyncExecutionService(
                     UniqueKeys = context.Definition.UniqueKeys,
                     NormalizedExcludedColumns = context.NormalizedExcludedColumns,
                 };
+                stepSw.Restart();
                 var readResult = await oracleSourceReader.ReadIncrementalPageAsync(readRequest, ct);
+                readElapsedMs += stepSw.ElapsedMilliseconds;
                 if (readResult.Rows.Count == 0)
                 {
                     if (pageNo == 1)
@@ -111,9 +123,12 @@ public class SyncExecutionService(
                 }
 
                 // 步骤2：写入暂存并执行幂等合并。
+                stepSw.Restart();
                 await stagingRepository.BulkInsertAsync(context.BatchId, pageNo, readResult.Rows, context.NormalizedExcludedColumns, ct);
+                stagingElapsedMs += stepSw.ElapsedMilliseconds;
                 SyncMergeResult mergeResult;
                 Exception? mergeException = null;
+                stepSw.Restart();
                 try
                 {
                     var stagingRows = await stagingRepository.GetPageRowsAsync(context.BatchId, pageNo, ct);
@@ -152,6 +167,7 @@ public class SyncExecutionService(
                         // 合并异常将向外抛出，此处不覆盖原始失败原因。
                     }
                 }
+                mergeElapsedMs += stepSw.ElapsedMilliseconds;
 
                 // 步骤3：累计统计并推进最大游标。
                 readCount += readResult.Rows.Count;
@@ -194,7 +210,9 @@ public class SyncExecutionService(
             }
 
             // 步骤4：执行删除同步（识别+执行+删除变更构建）。
+            stepSw.Restart();
             var deletionExecutionResult = await deletionExecutionService.ExecuteDeletionAsync(context, ct);
+            deletionElapsedMs = stepSw.ElapsedMilliseconds;
             deleteCount = deletionExecutionResult.DeletedCount;
             foreach (var deletionChange in deletionExecutionResult.ChangeLogs)
             {
@@ -202,10 +220,13 @@ public class SyncExecutionService(
             }
 
             // 步骤5：读取、合并、删除处理完成后，先落变更日志与删除日志。
+            stepSw.Restart();
             await changeLogRepository.WriteChangesAsync(pendingChanges, ct);
             await deletionLogRepository.WriteDeletionsAsync(deletionExecutionResult.DeletionLogs, ct);
+            persistElapsedMs = stepSw.ElapsedMilliseconds;
 
             // 步骤6：仅在读取、合并、删除、日志写入全部完成后提交检查点。
+            stepSw.Restart();
             await checkpointRepository.SaveAsync(new SyncCheckpoint
             {
                 TableCode = context.Definition.TableCode,
@@ -214,6 +235,7 @@ public class SyncExecutionService(
                 LastSuccessTimeLocal = DateTime.Now,
                 LastError = null,
             }, ct);
+            checkpointElapsedMs = stepSw.ElapsedMilliseconds;
 
             var metrics = BuildMetrics(context.Window, readCount + deleteCount, stopwatch.Elapsed);
             var batchResult = new SyncBatchResult
@@ -234,6 +256,19 @@ public class SyncExecutionService(
                 FailureRate = 0,
             };
             await batchRepository.CompleteBatchAsync(batchResult, DateTime.Now, ct);
+            logger.LogInformation(
+                "同步批次步骤耗时。TableCode={TableCode}, BatchId={BatchId}, PageCount={PageCount}, BatchInitMs={BatchInitMs}, ReadMs={ReadMs}, StagingMs={StagingMs}, MergeMs={MergeMs}, DeletionMs={DeletionMs}, PersistMs={PersistMs}, CheckpointMs={CheckpointMs}, TotalMs={TotalMs}",
+                context.Definition.TableCode,
+                context.BatchId,
+                pageNo,
+                batchInitElapsedMs,
+                readElapsedMs,
+                stagingElapsedMs,
+                mergeElapsedMs,
+                deletionElapsedMs,
+                persistElapsedMs,
+                checkpointElapsedMs,
+                stopwatch.ElapsedMilliseconds);
             logger.LogInformation(
                 "同步指标。TableCode={TableCode}, BatchId={BatchId}, LagMinutes={LagMinutes}, BacklogMinutes={BacklogMinutes}, ThroughputRowsPerSecond={ThroughputRowsPerSecond}, FailureRate={FailureRate}",
                 batchResult.TableCode,
@@ -461,8 +496,14 @@ public class SyncExecutionService(
     {
         var stopwatch = Stopwatch.StartNew();
         var batchPersistedToRepository = false;
+        // 各步骤耗时（毫秒），用于批次完成后输出详细性能日志。
+        var batchInitElapsedMs = 0L;
+        var consumeElapsedMs = 0L;
+        var persistElapsedMs = 0L;
+        var checkpointElapsedMs = 0L;
         try
         {
+            var stepSw = Stopwatch.StartNew();
             await batchRepository.CreateBatchAsync(new SyncBatch
             {
                 BatchId = context.BatchId,
@@ -473,15 +514,21 @@ public class SyncExecutionService(
             }, ct);
             batchPersistedToRepository = true;
             await batchRepository.MarkInProgressAsync(context.BatchId, DateTime.Now, ct);
+            batchInitElapsedMs = stepSw.ElapsedMilliseconds;
 
             // StatusDriven 主流程：委托给专用消费服务完成分页读取→追加→可选回写。
+            stepSw.Restart();
             var consumeResult = await remoteStatusConsumeService.ConsumeAsync(context.Definition, context.BatchId, ct);
+            consumeElapsedMs = stepSw.ElapsedMilliseconds;
 
             // StatusDriven 不产生变更日志与删除日志，写入空集合保持链路一致。
+            stepSw.Restart();
             await changeLogRepository.WriteChangesAsync([], ct);
             await deletionLogRepository.WriteDeletionsAsync([], ct);
+            persistElapsedMs = stepSw.ElapsedMilliseconds;
 
             // 提交检查点（StatusDriven 无游标推进，保留原检查点游标不变）。
+            stepSw.Restart();
             await checkpointRepository.SaveAsync(new SyncCheckpoint
             {
                 TableCode = context.Definition.TableCode,
@@ -490,6 +537,7 @@ public class SyncExecutionService(
                 LastSuccessTimeLocal = DateTime.Now,
                 LastError = null,
             }, ct);
+            checkpointElapsedMs = stepSw.ElapsedMilliseconds;
 
             var metrics = BuildMetrics(context.Window, consumeResult.ReadCount, stopwatch.Elapsed);
             var batchResult = new SyncBatchResult
