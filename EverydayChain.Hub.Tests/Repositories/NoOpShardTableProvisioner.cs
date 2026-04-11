@@ -14,6 +14,12 @@ public sealed class NoOpShardTableProvisioner : IShardTableProvisioner
     }
 
     /// <inheritdoc/>
+    public Task EnsureShardTableAsync(string logicalTable, string suffix, CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
     public Task EnsureShardTablesAsync(IEnumerable<string> suffixes, CancellationToken cancellationToken)
     {
         return Task.CompletedTask;

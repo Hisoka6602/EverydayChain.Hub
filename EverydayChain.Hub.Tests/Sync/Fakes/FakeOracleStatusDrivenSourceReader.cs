@@ -15,6 +15,9 @@ public class FakeOracleStatusDrivenSourceReader : IOracleStatusDrivenSourceReade
     /// <summary>请求页码记录。</summary>
     public List<int> RequestedPageNos { get; } = [];
 
+    /// <summary>最近一次传入的同步窗口。</summary>
+    public SyncWindow LastWindow { get; private set; }
+
     /// <inheritdoc/>
     public Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReadPendingPageAsync(
         SyncTableDefinition definition,
@@ -22,9 +25,11 @@ public class FakeOracleStatusDrivenSourceReader : IOracleStatusDrivenSourceReade
         int pageNo,
         int pageSize,
         IReadOnlySet<string> normalizedExcludedColumns,
+        SyncWindow window,
         CancellationToken ct)
     {
         RequestedPageNos.Add(pageNo);
+        LastWindow = window;
         if (Pages.Count == 0)
         {
             return Task.FromResult<IReadOnlyList<IReadOnlyDictionary<string, object?>>>([]);

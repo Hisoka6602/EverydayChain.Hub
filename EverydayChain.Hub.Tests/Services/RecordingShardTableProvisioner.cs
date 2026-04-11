@@ -18,6 +18,13 @@ public sealed class RecordingShardTableProvisioner : IShardTableProvisioner
     }
 
     /// <inheritdoc />
+    public Task EnsureShardTableAsync(string logicalTable, string suffix, CancellationToken cancellationToken)
+    {
+        EnsuredSuffixes.Add($"{logicalTable}:{suffix}");
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
     public Task EnsureShardTablesAsync(IEnumerable<string> suffixes, CancellationToken cancellationToken)
     {
         foreach (var suffix in suffixes)

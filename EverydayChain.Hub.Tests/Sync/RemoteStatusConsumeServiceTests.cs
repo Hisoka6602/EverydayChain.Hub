@@ -4,6 +4,7 @@ using EverydayChain.Hub.Domain.Sync.Models;
 using EverydayChain.Hub.Infrastructure.Sync.Services;
 using EverydayChain.Hub.Tests.Services;
 using EverydayChain.Hub.Tests.Sync.Fakes;
+using Microsoft.Extensions.Logging;
 
 namespace EverydayChain.Hub.Tests.Sync;
 
@@ -41,7 +42,7 @@ public class RemoteStatusConsumeServiceTests
         var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, logger);
         var definition = BuildStatusDrivenDefinition();
 
-        var result = await service.ConsumeAsync(definition, "BATCH-001", CancellationToken.None);
+        var result = await service.ConsumeAsync(definition, "BATCH-001", default, CancellationToken.None);
 
         Assert.Equal(2, result.ReadCount);
         Assert.Equal(2, result.AppendCount);
@@ -76,7 +77,7 @@ public class RemoteStatusConsumeServiceTests
         var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, logger);
         var definition = BuildStatusDrivenDefinition();
 
-        var result = await service.ConsumeAsync(definition, "BATCH-002", CancellationToken.None);
+        var result = await service.ConsumeAsync(definition, "BATCH-002", default, CancellationToken.None);
 
         Assert.Equal([1, 1], reader.RequestedPageNos);
         Assert.Equal(1, result.AppendCount);
@@ -107,7 +108,7 @@ public class RemoteStatusConsumeServiceTests
         var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, logger);
         var definition = BuildStatusDrivenDefinitionWithWriteBackDisabled();
 
-        var result = await service.ConsumeAsync(definition, "BATCH-003", CancellationToken.None);
+        var result = await service.ConsumeAsync(definition, "BATCH-003", default, CancellationToken.None);
 
         Assert.Equal(1, result.ReadCount);
         Assert.Equal(1, result.AppendCount);
@@ -117,6 +118,66 @@ public class RemoteStatusConsumeServiceTests
         Assert.Equal(1, result.PageCount);
         Assert.Equal(1, appendWriter.TotalAppended);
         Assert.Equal(0, remoteWriter.TotalWriteBackRows);
+    }
+
+    /// <summary>
+    /// 回写异常时应记录错误日志并写出失败原因。
+    /// </summary>
+    [Fact]
+    public async Task ConsumeAsync_WhenWriteBackThrows_ShouldLogFailureReason()
+    {
+        var reader = new FakeOracleStatusDrivenSourceReader();
+        reader.Pages.Enqueue([
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["ID"] = 1,
+                ["TASKPROCESS"] = "N",
+                ["__RowId"] = "ROW001",
+            },
+        ]);
+        var appendWriter = new FakeSqlServerAppendOnlyWriter();
+        var remoteWriter = new FakeOracleRemoteStatusWriter
+        {
+            ThrowOnWriteBack = true,
+            ThrowMessage = "模拟回写失败：网络中断",
+        };
+        var logger = new TestLogger<RemoteStatusConsumeService>();
+        var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, logger);
+        var definition = BuildStatusDrivenDefinition();
+
+        var result = await service.ConsumeAsync(definition, "BATCH-004", default, CancellationToken.None);
+
+        Assert.Equal(1, result.ReadCount);
+        Assert.Equal(1, result.AppendCount);
+        Assert.Equal(0, result.WriteBackCount);
+        Assert.Equal(1, result.WriteBackFailCount);
+        Assert.Contains(
+            logger.Logs,
+            x => x.Level == LogLevel.Error
+                 && x.Message.Contains("FailureReason=模拟回写失败：网络中断", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// 配置游标过滤时，default 时间窗口应被拒绝并输出失败日志。
+    /// </summary>
+    [Fact]
+    public async Task ConsumeAsync_WhenCursorColumnConfiguredAndWindowInvalid_ShouldThrow()
+    {
+        var reader = new FakeOracleStatusDrivenSourceReader();
+        var appendWriter = new FakeSqlServerAppendOnlyWriter();
+        var remoteWriter = new FakeOracleRemoteStatusWriter();
+        var logger = new TestLogger<RemoteStatusConsumeService>();
+        var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, logger);
+        var definition = BuildStatusDrivenDefinitionWithCursorColumn();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.ConsumeAsync(definition, "BATCH-005", default, CancellationToken.None));
+
+        Assert.Contains("游标时间窗口无效", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            logger.Logs,
+            x => x.Level == LogLevel.Error
+                 && x.Message.Contains("状态驱动消费游标时间窗口无效", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -167,5 +228,16 @@ public class RemoteStatusConsumeServiceTests
                 BatchSize = 5000,
             },
         };
+    }
+
+    /// <summary>
+    /// 构建启用游标列过滤的状态驱动测试定义。
+    /// </summary>
+    /// <returns>同步表定义。</returns>
+    private static SyncTableDefinition BuildStatusDrivenDefinitionWithCursorColumn()
+    {
+        var definition = BuildStatusDrivenDefinition();
+        definition.CursorColumn = "ADDTIME";
+        return definition;
     }
 }
