@@ -63,48 +63,71 @@ public class OracleRemoteStatusWriter(
         }
 
         var sql = $"UPDATE {definition.SourceSchema}.{definition.SourceTable} SET {string.Join(", ", setClauses)} WHERE ROWID = :p_rowid";
-        return await dangerZoneExecutor.ExecuteAsync(
-            $"OracleStatusDrivenWriteBack:{definition.TableCode}",
-            async token => {
-                await using var connection = new OracleConnection(_effectiveConnectionString);
-                await connection.OpenAsync(token);
-                await using var command = connection.CreateCommand();
-                command.BindByName = true;
-                command.ArrayBindCount = rowIds.Count;
-                command.CommandTimeout = ResolveCommandTimeout();
-                command.CommandText = sql;
-                command.Parameters.Add("p_completedStatus", OracleDbType.Varchar2, FillArray(profile.CompletedStatusValue, rowIds.Count), ParameterDirection.Input);
-                if (!string.IsNullOrWhiteSpace(profile.WriteBackCompletedTimeColumnName)) {
-                    var completedTimeLocal = DateTime.Now;
-                    command.Parameters.Add(
-                        "p_completedTimeLocal",
-                        OracleDbType.TimeStamp,
-                        FillArray(completedTimeLocal, rowIds.Count),
-                        ParameterDirection.Input);
-                }
+        try {
+            return await dangerZoneExecutor.ExecuteAsync(
+                $"OracleStatusDrivenWriteBack:{definition.TableCode}",
+                async token => {
+                    await using var connection = new OracleConnection(_effectiveConnectionString);
+                    await connection.OpenAsync(token);
+                    await using var command = connection.CreateCommand();
+                    command.BindByName = true;
+                    command.ArrayBindCount = rowIds.Count;
+                    command.CommandTimeout = ResolveCommandTimeout();
+                    command.CommandText = sql;
+                    command.Parameters.Add("p_completedStatus", OracleDbType.Varchar2, FillArray(profile.CompletedStatusValue, rowIds.Count), ParameterDirection.Input);
+                    if (!string.IsNullOrWhiteSpace(profile.WriteBackCompletedTimeColumnName)) {
+                        var completedTimeLocal = DateTime.Now;
+                        command.Parameters.Add(
+                            "p_completedTimeLocal",
+                            OracleDbType.TimeStamp,
+                            FillArray(completedTimeLocal, rowIds.Count),
+                            ParameterDirection.Input);
+                    }
 
-                if (!string.IsNullOrWhiteSpace(profile.WriteBackBatchIdColumnName)) {
-                    command.Parameters.Add(
-                        "p_batchId",
-                        OracleDbType.Varchar2,
-                        FillArray(batchId, rowIds.Count),
-                        ParameterDirection.Input);
-                }
+                    if (!string.IsNullOrWhiteSpace(profile.WriteBackBatchIdColumnName)) {
+                        command.Parameters.Add(
+                            "p_batchId",
+                            OracleDbType.Varchar2,
+                            FillArray(batchId, rowIds.Count),
+                            ParameterDirection.Input);
+                    }
 
-                command.Parameters.Add("p_rowid", OracleDbType.Varchar2, rowIds.ToArray(), ParameterDirection.Input);
-                var affectedRows = await command.ExecuteNonQueryAsync(token);
-                logger.LogInformation(
-                    "状态驱动远端回写完成。TableCode={TableCode}, BatchId={BatchId}, SourceTable={SourceTable}, RequestedRows={RequestedRows}, AffectedRows={AffectedRows}, CompletedTimeColumn={CompletedTimeColumn}, BatchIdColumn={BatchIdColumn}",
-                    definition.TableCode,
-                    batchId,
-                    definition.SourceTable,
-                    rowIds.Count,
-                    affectedRows,
-                    profile.WriteBackCompletedTimeColumnName ?? "未配置",
-                    profile.WriteBackBatchIdColumnName ?? "未配置");
-                return affectedRows;
-            },
-            ct);
+                    command.Parameters.Add("p_rowid", OracleDbType.Varchar2, rowIds.ToArray(), ParameterDirection.Input);
+                    var affectedRows = await command.ExecuteNonQueryAsync(token);
+                    logger.LogInformation(
+                        "状态驱动远端回写完成。TableCode={TableCode}, BatchId={BatchId}, SourceTable={SourceTable}, RequestedRows={RequestedRows}, AffectedRows={AffectedRows}, CompletedTimeColumn={CompletedTimeColumn}, BatchIdColumn={BatchIdColumn}",
+                        definition.TableCode,
+                        batchId,
+                        definition.SourceTable,
+                        rowIds.Count,
+                        affectedRows,
+                        profile.WriteBackCompletedTimeColumnName ?? "未配置",
+                        profile.WriteBackBatchIdColumnName ?? "未配置");
+                    return affectedRows;
+                },
+                ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) {
+            logger.LogWarning(
+                "状态驱动远端回写已取消。TableCode={TableCode}, BatchId={BatchId}, SourceTable={SourceTable}, RequestedRows={RequestedRows}, FailureReason={FailureReason}",
+                definition.TableCode,
+                batchId,
+                definition.SourceTable,
+                rowIds.Count,
+                "调用方取消令牌触发回写终止。");
+            throw;
+        }
+        catch (Exception ex) {
+            logger.LogError(
+                ex,
+                "状态驱动远端回写执行异常。TableCode={TableCode}, BatchId={BatchId}, SourceTable={SourceTable}, RequestedRows={RequestedRows}, FailureReason={FailureReason}",
+                definition.TableCode,
+                batchId,
+                definition.SourceTable,
+                rowIds.Count,
+                ex.Message);
+            throw;
+        }
     }
 
     /// <summary>

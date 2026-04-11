@@ -170,23 +170,26 @@ public class RemoteStatusConsumeService(
                 if (writeBackCount < rowIds.Count) {
                     result.WriteBackFailCount += rowIds.Count - writeBackCount;
                     logger.LogWarning(
-                        "状态驱动远端回写存在未命中行。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, RowIdCount={RowIdCount}, WriteBackCount={WriteBackCount}",
+                        "状态驱动远端回写存在未命中行。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, RowIdCount={RowIdCount}, WriteBackCount={WriteBackCount}, FailedRowIdCount={FailedRowIdCount}, FailureReason={FailureReason}",
                         definition.TableCode,
                         batchId,
                         currentPageNo,
                         rowIds.Count,
-                        writeBackCount);
+                        writeBackCount,
+                        rowIds.Count - writeBackCount,
+                        "数据库返回受影响行数小于请求回写行数，部分 ROWID 可能不存在或状态已变化。");
                 }
             }
             catch (Exception ex) {
                 result.WriteBackFailCount += rowIds.Count;
                 logger.LogError(
                     ex,
-                    "状态驱动远端回写失败，已隔离到页级。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, FailedRowIdCount={FailedRowIdCount}",
+                    "状态驱动远端回写失败，已隔离到页级。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, FailedRowIdCount={FailedRowIdCount}, FailureReason={FailureReason}",
                     definition.TableCode,
                     batchId,
                     currentPageNo,
-                    rowIds.Count);
+                    rowIds.Count,
+                    ex.Message);
                 if (shouldUseFixedFirstPage) {
                     logger.LogWarning(
                         "状态驱动消费提前结束：固定第1页模式下远端回写失败，停止本批次以避免重复追加。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, FailedRowIdCount={FailedRowIdCount}",

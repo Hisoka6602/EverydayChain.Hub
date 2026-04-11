@@ -15,6 +15,12 @@ public class FakeOracleRemoteStatusWriter : IOracleRemoteStatusWriter
     /// <summary>最近一次回写批次号。</summary>
     public string LastBatchId { get; private set; } = string.Empty;
 
+    /// <summary>是否在回写时主动抛出异常。</summary>
+    public bool ThrowOnWriteBack { get; set; }
+
+    /// <summary>主动抛出异常时使用的错误信息。</summary>
+    public string ThrowMessage { get; set; } = "模拟 Oracle 回写异常";
+
     /// <inheritdoc/>
     public Task<int> WriteBackByRowIdAsync(
         SyncTableDefinition definition,
@@ -23,6 +29,10 @@ public class FakeOracleRemoteStatusWriter : IOracleRemoteStatusWriter
         IReadOnlyList<string> rowIds,
         CancellationToken ct)
     {
+        if (ThrowOnWriteBack) {
+            throw new InvalidOperationException(ThrowMessage);
+        }
+
         LastBatchId = batchId;
         TotalWriteBackRows += rowIds.Count;
         return Task.FromResult(rowIds.Count);
