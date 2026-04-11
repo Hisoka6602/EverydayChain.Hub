@@ -13,6 +13,14 @@ public interface IShardTableProvisioner
     Task EnsureShardTableAsync(string suffix, CancellationToken cancellationToken);
 
     /// <summary>
+    /// 确保指定逻辑表在指定后缀下的分表存在；若不存在则自动创建。
+    /// </summary>
+    /// <param name="logicalTable">逻辑表名。</param>
+    /// <param name="suffix">分表后缀，例如 <c>_202603</c>。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    Task EnsureShardTableAsync(string logicalTable, string suffix, CancellationToken cancellationToken);
+
+    /// <summary>
     /// 批量确保多个分表存在；并发执行，全部完成后返回。
     /// </summary>
     /// <param name="suffixes">分表后缀集合。</param>

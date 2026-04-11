@@ -71,7 +71,7 @@ public class ShardTableProvisioner(
     /// <param name="logicalTable">逻辑表名。</param>
     /// <param name="suffix">分表后缀。</param>
     /// <param name="cancellationToken">取消令牌。</param>
-    private Task EnsureShardTableAsync(string logicalTable, string suffix, CancellationToken cancellationToken) => dangerZoneExecutor.ExecuteAsync(
+    public Task EnsureShardTableAsync(string logicalTable, string suffix, CancellationToken cancellationToken) => dangerZoneExecutor.ExecuteAsync(
         $"ensure-shard-table-{logicalTable}-{suffix}",
         async token =>
         {
