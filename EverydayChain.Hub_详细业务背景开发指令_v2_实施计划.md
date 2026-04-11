@@ -1,476 +1,591 @@
-# EverydayChain.Hub 详细业务背景开发指令 v2 实施计划（PR 级执行版）
+# EverydayChain.Hub 详细业务背景开发指令 v2 实施计划（PR 排期执行版）
 
 > 依据：`EverydayChain.Hub_详细业务背景开发指令_v2.md`
-> 
-> 目标：提供可直接拆分为多个 PR 的执行蓝图；每个 PR 明确“做什么、改多少文件、交付什么、如何验收”，避免串行交付跑偏。
+>
+> 输出目标：将实施工作拆分为可直接排期的多个 PR；每个 PR 都明确业务逻辑链路、复用与参考文件、执行步骤、交付结果、验收标准、建议标题/分支名/评审关注点。
 
 ---
 
-## 1. 全局边界与统一口径
+## 1. 全局业务链路（统一口径）
 
-### 1.1 统一业务主链路
-后台自动同步接单 -> 生成本地业务任务 -> 扫描上传 API -> 请求格口 API -> 落格回传 API -> 本地状态更新 -> 业务回传/补偿。
+### 1.1 主链路
+1. 同步底座将 Oracle 源记录拉取到本地。
+2. 将同步记录物化为业务任务（BusinessTask）。
+3. 设备调用“扫描上传 API”推进任务状态。
+4. 设备调用“请求格口 API”获取目标格口。
+5. 设备调用“落格回传 API”确认实际落格结果。
+6. 系统执行业务回传（与同步自动回写严格分离）。
+7. 回传失败进入补偿重试链路。
 
-### 1.2 不可突破边界（所有 PR 强制）
-- 不做 UI，不做看板，不做报表页面。
-- 不重写同步底座（`SyncOrchestrator`、`SyncExecutionService`、`OracleSourceReader`、`SqlServerSyncUpsertRepository`、`RemoteStatusConsumeService` 等）。
-- 不新增平行同步总入口、平行检查点、平行调度器。
-- Controller 只做入参校验与调用 Application 服务。
-- “同步自动回写（TASKPROCESS/OPENTIME）”与“业务回传”必须分离。
+### 1.2 必须复用的既有底座文件（所有 PR 默认复用）
+- `EverydayChain.Hub.Application/Abstractions/Services/ISyncOrchestrator.cs`
+- `EverydayChain.Hub.Application/Services/SyncOrchestrator.cs`
+- `EverydayChain.Hub.Application/Abstractions/Services/ISyncExecutionService.cs`
+- `EverydayChain.Hub.Application/Services/SyncExecutionService.cs`
+- `EverydayChain.Hub.Infrastructure/Repositories/OracleSourceReader.cs`
+- `EverydayChain.Hub.Infrastructure/Sync/Readers/OracleStatusDrivenSourceReader.cs`
+- `EverydayChain.Hub.Infrastructure/Repositories/SqlServerSyncUpsertRepository.cs`
+- `EverydayChain.Hub.Infrastructure/Sync/Writers/SqlServerAppendOnlyWriter.cs`
+- `EverydayChain.Hub.Infrastructure/Sync/Writers/OracleRemoteStatusWriter.cs`
+- `EverydayChain.Hub.Infrastructure/Sync/Services/RemoteStatusConsumeService.cs`
+- `EverydayChain.Hub.Infrastructure/Repositories/SyncTaskConfigRepository.cs`
+- `EverydayChain.Hub.Host/Workers/SyncBackgroundWorker.cs`
+- `EverydayChain.Hub.Host/Workers/RetentionBackgroundWorker.cs`
+- `EverydayChain.Hub.Host/Program.cs`
 
-### 1.3 全局验收门禁（每个 PR 都要满足）
+### 1.3 全局实施边界
+- 不新增平行同步入口、不重写同步编排。
+- Controller 仅做参数校验与应用服务调用。
+- 同步自动回写（状态消费）与业务回传（业务闭环）分离。
+- 每个 PR 必须附带可执行验收项。
+
+### 1.4 全局统一验收
 - `dotnet build /home/runner/work/EverydayChain.Hub/EverydayChain.Hub/EverydayChain.Hub.sln`
 - `dotnet test /home/runner/work/EverydayChain.Hub/EverydayChain.Hub/EverydayChain.Hub.sln`
-- README 联动更新（涉及新增/删除文件时必须更新文件树与逐项说明）。
-- PR 描述必须包含：范围、交付件、验收结果、未决待确认项。
+- 若 PR 涉及新增/删除文件：联动更新 `README.md` 文件树与逐项说明。
 
 ---
 
-## 2. PR 切分总览（执行顺序）
+## 2. PR 排期总览
 
-| PR | 主题 | 依赖 | 预计改动文件数 | 交付结果摘要 |
+| PR | 阶段 | 依赖 | 预计文件改动 | 建议分支名 |
 |---|---|---|---|---|
-| PR-01 | 统一业务任务模型与转换服务 | 无 | 新增 8，修改 4，合计约 12 | 建立业务任务主实体与转换入口 |
-| PR-02 | 业务语义与接口基线文档 | PR-01 | 新增 5，修改 2，合计约 7 | 固化状态语义/条码规则/API 基线 |
-| PR-03 | Host API 承载骨架（含契约） | PR-02 | 新增 12，修改 4，合计约 16 | 打通 API 宿主，保留 Worker 共存 |
-| PR-04 | 条码解析与扫描输入模型 | PR-03 | 新增 8，修改 3，合计约 11 | 提供标准化条码解析结果 |
-| PR-05 | 扫描匹配与任务执行服务 | PR-04 | 新增 10，修改 6，合计约 16 | 扫描上传业务链路可用 |
-| PR-06 | 请求格口服务 | PR-05 | 新增 4，修改 4，合计约 8 | 请求格口接口可返回目标格口 |
-| PR-07 | 落格回传服务 | PR-06 | 新增 4，修改 5，合计约 9 | 落格回传后更新业务状态 |
-| PR-08 | 业务回传服务（非同步自动回写） | PR-07 | 新增 4，修改 6，合计约 10 | 已落格任务可执行业务回传 |
-| PR-09 | 扫描日志与落格日志实体落库 | PR-07 | 新增 6，修改 5，合计约 11 | 扫描/落格成功失败均有审计 |
-| PR-10 | 异常规则（波次/多标签/回流） | PR-07 | 新增 8，修改 5，合计约 13 | 异常决策链路可配置可审计 |
-| PR-11 | 补偿服务 | PR-08,PR-10 | 新增 3，修改 5，合计约 8 | 回传失败任务支持重试闭环 |
-| PR-12 | 稳定化收口与联调验收 | PR-03~PR-11 | 新增 0~2，修改 6~10，合计约 8~12 | 全链路联调、文档收口、验收归档 |
+| PR-01 | 统一业务任务模型 | 无 | 新增 8 / 修改 4 / 合计 12 | `feature/pr01-business-task-model` |
+| PR-02 | 语义与接口基线文档 | PR-01 | 新增 5 / 修改 2 / 合计 7 | `feature/pr02-semantic-baseline` |
+| PR-03 | Host API 承载骨架 | PR-02 | 新增 12 / 修改 4 / 合计 16 | `feature/pr03-host-api-bootstrap` |
+| PR-04 | 条码解析与扫描输入 | PR-03 | 新增 8 / 修改 3 / 合计 11 | `feature/pr04-barcode-and-scan-model` |
+| PR-05 | 扫描匹配与任务执行 | PR-04 | 新增 10 / 修改 6 / 合计 16 | `feature/pr05-scan-match-and-execution` |
+| PR-06 | 请求格口服务 | PR-05 | 新增 4 / 修改 4 / 合计 8 | `feature/pr06-chute-resolve` |
+| PR-07 | 落格回传服务 | PR-06 | 新增 4 / 修改 5 / 合计 9 | `feature/pr07-drop-feedback` |
+| PR-08 | 业务回传服务 | PR-07 | 新增 4 / 修改 6 / 合计 10 | `feature/pr08-wms-feedback` |
+| PR-09 | 扫描/落格日志落库 | PR-07 | 新增 6 / 修改 5 / 合计 11 | `feature/pr09-scan-drop-logs` |
+| PR-10 | 异常规则链路 | PR-07 | 新增 8 / 修改 5 / 合计 13 | `feature/pr10-exception-rules` |
+| PR-11 | 补偿重试链路 | PR-08,PR-10 | 新增 3 / 修改 5 / 合计 8 | `feature/pr11-compensation` |
+| PR-12 | 联调收口与验收归档 | PR-03~PR-11 | 新增 0~2 / 修改 6~10 / 合计 8~12 | `feature/pr12-stabilization` |
 
-> 说明：文件数为实施计划值，允许 ±2 浮动；超出需在 PR 描述写明原因。
-
----
-
-## 3. PR 级执行明细
-
-## PR-01：统一业务任务模型与转换服务（P0）
-
-### 3.1 预计改动文件
-- **新增（8）**
-  1. `EverydayChain.Hub.Domain/BusinessTasks/BusinessTaskEntity.cs`
-  2. `EverydayChain.Hub.Domain/BusinessTasks/BusinessTaskStatus.cs`
-  3. `EverydayChain.Hub.Domain/BusinessTasks/BusinessTaskType.cs`
-  4. `EverydayChain.Hub.Domain/BusinessTasks/BusinessTaskSourceType.cs`
-  5. `EverydayChain.Hub.Application/BusinessTasks/Abstractions/IBusinessTaskMaterializer.cs`
-  6. `EverydayChain.Hub.Application/BusinessTasks/Services/BusinessTaskMaterializer.cs`
-  7. `EverydayChain.Hub.Tests/BusinessTasks/BusinessTaskMaterializerTests.cs`
-  8. `EverydayChain.Hub.Tests/BusinessTasks/BusinessTaskEntityValidationTests.cs`
-- **修改（4）**
-  - `EverydayChain.Hub.Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`
-  - `EverydayChain.Hub.Application/EverydayChain.Hub.Application.csproj`
-  - `EverydayChain.Hub.Domain/EverydayChain.Hub.Domain.csproj`
-  - `README.md`
-
-### 3.2 执行步骤
-1. 建立 `BusinessTasks` 领域目录与实体/枚举。
-2. 实现 `BusinessTaskMaterializer`（仅映射与默认状态赋值）。
-3. 注入 DI。
-4. 增加单元测试覆盖拆零/整件映射、默认状态、空值保护。
-5. 联动 README。
-
-### 3.3 交付结果
-- 形成“同步记录 -> 业务任务”的统一入口，后续 API 不再直接依赖同步原始表语义。
-
-### 3.4 验收标准
-- `BusinessTaskStatus` 覆盖 Created/Scanned/Dropped/FeedbackPending 等状态。
-- `BusinessTaskMaterializer` 不出现扫描、格口、落格业务逻辑。
-- 单元测试通过且覆盖关键字段映射。
+> 说明：预计改动为排期预算，允许 ±2 文件浮动；超出需在 PR 描述说明原因。
 
 ---
 
-## PR-02：业务语义与接口基线文档（P0）
+## 3. 每个 PR 的执行清单（可直接用于排期）
 
-### 3.5 预计改动文件
-- **新增（5）**
-  1. `WMS状态语义基线.md`
-  2. `条码规则基线.md`
-  3. `对外API接口基线.md`
-  4. `拆零业务字段语义基线.md`
-  5. `整件业务字段语义基线.md`
-- **修改（2）**
-  - `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`
-  - `README.md`
+## PR-01：统一业务任务模型
 
-### 3.6 执行步骤
-1. 将状态语义、条码语义、接口语义固化为基线文档。
-2. 对每个 API 补齐路由、方法、入参、出参、幂等语义、状态变化。
-3. 在实施计划中标注这些文档作为后续 PR 约束依据。
+### 建议标题
+`feat(domain): 新增业务任务主模型与物化服务`
 
-### 3.7 交付结果
-- 后续所有 PR 都有统一语义锚点，减少实现分叉。
+### 业务逻辑与调用链路
+`同步记录` -> `BusinessTaskMaterializer` -> `BusinessTaskEntity`（初始状态） -> `任务仓储入口（后续 PR 接入）`。
 
-### 3.8 验收标准
-- 文档之间术语一致（TASKPROCESS/STATUS/Drop/Feedback）。
-- 三个 API 均有成功失败语义与幂等规则。
+### 复用文件
+- `EverydayChain.Hub.Application/Services/SyncExecutionService.cs`
+- `EverydayChain.Hub.Infrastructure/Repositories/SqlServerSyncUpsertRepository.cs`
 
----
+### 参考文件
+- `EverydayChain.Hub.Domain/Options/SyncTableOptions.cs`（字段建模风格）
+- `EverydayChain.Hub.Tests/Repositories/SyncTaskConfigRepositoryTests.cs`（测试组织风格）
 
-## PR-03：Host API 承载骨架（P1）
+### 执行步骤
+1. 新增 BusinessTask 领域实体与状态枚举。
+2. 新增物化服务接口与实现，仅做映射与默认赋值。
+3. 注册 DI。
+4. 增加物化与实体校验测试。
 
-### 3.9 预计改动文件
-- **新增（12）**
-  - `EverydayChain.Hub.Host/Controllers/ScanController.cs`
-  - `EverydayChain.Hub.Host/Controllers/ChuteController.cs`
-  - `EverydayChain.Hub.Host/Controllers/DropFeedbackController.cs`
-  - `EverydayChain.Hub.Host/Contracts/Requests/ScanUploadRequest.cs`
-  - `EverydayChain.Hub.Host/Contracts/Requests/ChuteRequestRequest.cs`
-  - `EverydayChain.Hub.Host/Contracts/Requests/DropFeedbackRequest.cs`
-  - `EverydayChain.Hub.Host/Contracts/Responses/ScanUploadResponse.cs`
-  - `EverydayChain.Hub.Host/Contracts/Responses/ChuteRequestResponse.cs`
-  - `EverydayChain.Hub.Host/Contracts/Responses/DropFeedbackResponse.cs`
-  - `EverydayChain.Hub.Tests/Host/Controllers/ScanControllerTests.cs`
-  - `EverydayChain.Hub.Tests/Host/Controllers/ChuteControllerTests.cs`
-  - `EverydayChain.Hub.Tests/Host/Controllers/DropFeedbackControllerTests.cs`
-- **修改（4）**
-  - `EverydayChain.Hub.Host/Program.cs`
-  - `EverydayChain.Hub.Host/EverydayChain.Hub.Host.csproj`
-  - `EverydayChain.Hub.Host/appsettings.json`
-  - `README.md`
+### 预计改动文件
+- 新增 8，修改 4，合计约 12。
 
-### 3.10 执行步骤
-1. 在 Host 中启用 Controllers/Swagger。
-2. 保留现有 Worker 注册，确保 API 与 Worker 共存。
-3. 加入请求/响应契约，补齐中文注释。
-4. 完成控制器最小行为测试。
+### 交付结果
+- 形成统一业务任务主实体，后续 API 与规则均围绕该实体推进。
 
-### 3.11 交付结果
-- 对外 HTTP 接口承载完成，具备后续业务接线点。
+### 验收标准
+- 状态枚举覆盖 Created/Scanned/Dropped/FeedbackPending。
+- 物化服务不包含扫描、格口、落格业务。
+- 单测覆盖必填字段与默认状态。
 
-### 3.12 验收标准
-- 启动后 Worker 与 API 同时运行。
-- Controller 不含业务规则，只有入参校验与服务调用。
-- Swagger 可见中文参数说明。
+### 评审人关注点
+- 领域模型是否侵入同步实现细节。
+- 状态定义是否可支撑后续链路。
 
 ---
 
-## PR-04：条码解析与扫描输入模型（P1）
+## PR-02：语义与接口基线文档
 
-### 3.13 预计改动文件
-- **新增（8）**
-  - `EverydayChain.Hub.Domain/Barcodes/BarcodeType.cs`
-  - `EverydayChain.Hub.Domain/Barcodes/BarcodeParseResult.cs`
-  - `EverydayChain.Hub.Application/ScanProcessing/Models/ScanEventArgs.cs`
-  - `EverydayChain.Hub.Application/ScanProcessing/Models/ScanMeasurementInfo.cs`
-  - `EverydayChain.Hub.Application/Barcodes/Abstractions/IBarcodeParser.cs`
-  - `EverydayChain.Hub.Application/Barcodes/Services/BarcodeParser.cs`
-  - `EverydayChain.Hub.Tests/Barcodes/BarcodeParserTests.cs`
-  - `EverydayChain.Hub.Tests/ScanProcessing/ScanEventArgsTests.cs`
-- **修改（3）**
-  - `EverydayChain.Hub.Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`
-  - `EverydayChain.Hub.Application/EverydayChain.Hub.Application.csproj`
-  - `README.md`
+### 建议标题
+`docs(baseline): 固化状态语义、条码规则与API契约基线`
 
-### 3.14 执行步骤
-1. 定义条码类型枚举与解析结果模型。
-2. 实现解析服务（类型识别、无效码过滤、结构提取）。
-3. 定义扫描输入模型（`record class`）。
-4. 增加解析规则测试。
+### 业务逻辑与调用链路
+`业务术语定义` -> `状态迁移规则` -> `API 输入输出契约` -> `后续 PR 实现约束`。
 
-### 3.15 交付结果
-- 扫描上传链路有可复用的标准化条码解析能力。
+### 复用文件
+- `EverydayChain.Hub_详细业务背景开发指令_v2.md`
+- `Oracle到SQLServer同步架构设计.md`
 
-### 3.16 验收标准
-- 解析服务可区分拆零/整件/无效码。
-- `ScanEventArgs` 与测量信息模型可覆盖 API 输入。
+### 参考文件
+- `README.md`（文档组织方式）
+- `Oracle到SQLServer同步实施计划.md`（计划拆分表达方式）
 
----
+### 执行步骤
+1. 固化状态语义文档。
+2. 固化条码规则文档。
+3. 固化三类 API 基线文档。
+4. 在总计划中建立引用关系。
 
-## PR-05：扫描匹配与任务执行（P1）
+### 预计改动文件
+- 新增 5，修改 2，合计约 7。
 
-### 3.17 预计改动文件
-- **新增（10）**
-  - `EverydayChain.Hub.Application/ScanProcessing/Abstractions/IScanMatchService.cs`
-  - `EverydayChain.Hub.Application/ScanProcessing/Models/ScanMatchResult.cs`
-  - `EverydayChain.Hub.Application/ScanProcessing/Services/ScanMatchService.cs`
-  - `EverydayChain.Hub.Application/TaskExecution/Abstractions/ITaskExecutionService.cs`
-  - `EverydayChain.Hub.Application/TaskExecution/Services/TaskExecutionService.cs`
-  - `EverydayChain.Hub.Application/Abstractions/Persistence/IBusinessTaskRepository.cs`
-  - `EverydayChain.Hub.Infrastructure/Repositories/BusinessTaskRepository.cs`
-  - `EverydayChain.Hub.Tests/ScanProcessing/ScanMatchServiceTests.cs`
-  - `EverydayChain.Hub.Tests/TaskExecution/TaskExecutionServiceTests.cs`
-  - `EverydayChain.Hub.Tests/Repositories/BusinessTaskRepositoryTests.cs`
-- **修改（6）**
-  - `EverydayChain.Hub.Host/Controllers/ScanController.cs`
-  - `EverydayChain.Hub.Infrastructure/Persistence/HubDbContext.cs`
-  - `EverydayChain.Hub.Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`
-  - `EverydayChain.Hub.Infrastructure/Migrations/*`（新增迁移文件）
-  - `EverydayChain.Hub.Host/appsettings.json`
-  - `README.md`
+### 交付结果
+- 后续 PR 有统一术语和验收标准，降低语义漂移。
 
-### 3.18 执行步骤
-1. 建立扫描匹配与任务执行服务。
-2. 增加业务任务仓储抽象与实现。
-3. 扫描接口接入解析 -> 匹配 -> 执行。
-4. 增加 EF 映射与迁移。
+### 验收标准
+- 三个 API 均定义幂等语义与失败语义。
+- 同步回写与业务回传边界清晰。
 
-### 3.19 交付结果
-- 扫描上传可真正更新业务任务状态、计数、测量信息。
-
-### 3.20 验收标准
-- 匹配成功/失败都产生明确结果。
-- 扫描次数、扫描时间、状态迁移正确。
-- 数据库迁移可应用且不破坏既有表。
+### 评审人关注点
+- 文档术语是否前后一致。
+- 是否可直接映射到代码实现。
 
 ---
 
-## PR-06：请求格口服务（P1）
+## PR-03：Host API 承载骨架
 
-### 3.21 预计改动文件
-- **新增（4）**
-  - `EverydayChain.Hub.Application/Chutes/Abstractions/IChuteResolveService.cs`
-  - `EverydayChain.Hub.Application/Chutes/Services/ChuteResolveService.cs`
-  - `EverydayChain.Hub.Application/Chutes/Models/ChuteResolveResult.cs`
-  - `EverydayChain.Hub.Tests/Chutes/ChuteResolveServiceTests.cs`
-- **修改（4）**
-  - `EverydayChain.Hub.Host/Controllers/ChuteController.cs`
-  - `EverydayChain.Hub.Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`
-  - `EverydayChain.Hub.Host/Contracts/Responses/ChuteRequestResponse.cs`
-  - `README.md`
+### 建议标题
+`feat(host): 新增扫描/格口/落格三类API控制器骨架`
 
-### 3.22 执行步骤
-1. 实现格口解析服务。
-2. 将请求格口 API 接入该服务。
-3. 补充无任务/异常任务分支测试。
+### 业务逻辑与调用链路
+`外部 HTTP 请求` -> `Controller 参数校验` -> `Application 服务接口` -> `返回标准响应`。
 
-### 3.23 交付结果
-- 请求格口接口可依据本地任务返回目标格口与异常原因。
+### 复用文件
+- `EverydayChain.Hub.Host/Program.cs`
+- `EverydayChain.Hub.Host/Workers/SyncBackgroundWorker.cs`
+- `EverydayChain.Hub.Host/Workers/RetentionBackgroundWorker.cs`
 
-### 3.24 验收标准
-- 返回结果包含 `IsSuccess/TargetChuteCode/TaskId/FailureReason`。
-- 不写入“已落格”状态。
+### 参考文件
+- `EverydayChain.Hub.Host/appsettings.json`（配置说明风格）
+- `EverydayChain.Hub.Application/Abstractions/Services/ISyncExecutionService.cs`（接口分层风格）
 
----
+### 执行步骤
+1. 启用 Controllers 与 Swagger。
+2. 新增三类 Controller 与请求响应契约。
+3. 保持 Worker 注册不变。
+4. 增加 Controller 基础行为测试。
 
-## PR-07：落格回传服务（P2）
+### 预计改动文件
+- 新增 12，修改 4，合计约 16。
 
-### 3.25 预计改动文件
-- **新增（4）**
-  - `EverydayChain.Hub.Application/DropFeedback/Abstractions/IDropFeedbackService.cs`
-  - `EverydayChain.Hub.Application/DropFeedback/Services/DropFeedbackService.cs`
-  - `EverydayChain.Hub.Domain/DropFeedback/DropFeedbackResult.cs`
-  - `EverydayChain.Hub.Tests/DropFeedback/DropFeedbackServiceTests.cs`
-- **修改（5）**
-  - `EverydayChain.Hub.Host/Controllers/DropFeedbackController.cs`
-  - `EverydayChain.Hub.Domain/BusinessTasks/BusinessTaskStatus.cs`
-  - `EverydayChain.Hub.Infrastructure/Repositories/BusinessTaskRepository.cs`
-  - `EverydayChain.Hub.Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`
-  - `README.md`
+### 交付结果
+- API 承载能力可用，后续业务服务可逐步接入。
 
-### 3.26 执行步骤
-1. 实现落格回传服务。
-2. 接口接入 `TaskId/Barcode` 双路径定位任务。
-3. 更新落格状态、落格时间、失败原因。
+### 验收标准
+- Worker 与 API 可共存运行。
+- Controller 不承载业务规则。
+- Swagger 中文注释可见。
 
-### 3.27 交付结果
-- 外部“真实落格完成”后，本地任务状态可正确推进。
-
-### 3.28 验收标准
-- 成功回传进入 `Dropped`，失败回传进入 `Exception`。
-- 回传后可进入待业务回传状态。
+### 评审人关注点
+- Host 层是否越层写业务逻辑。
+- Program 启动项是否破坏现有 Worker。
 
 ---
 
-## PR-08：业务回传服务（P2）
+## PR-04：条码解析与扫描输入
 
-### 3.29 预计改动文件
-- **新增（4）**
-  - `EverydayChain.Hub.Application/Feedback/Abstractions/IWmsFeedbackService.cs`
-  - `EverydayChain.Hub.Application/Feedback/Services/WmsFeedbackService.cs`
-  - `EverydayChain.Hub.Infrastructure/Feedback/OracleWmsFeedbackWriter.cs`
-  - `EverydayChain.Hub.Tests/Feedback/WmsFeedbackServiceTests.cs`
-- **修改（6）**
-  - `EverydayChain.Hub.Application/BusinessTasks/BusinessTaskEntity.cs`
-  - `EverydayChain.Hub.Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`
-  - `EverydayChain.Hub.Host/Program.cs`（注册后台回传任务时）
-  - `EverydayChain.Hub.Host/appsettings.json`
-  - `EverydayChain.Hub.Infrastructure/Repositories/BusinessTaskRepository.cs`
-  - `README.md`
+### 建议标题
+`feat(application): 新增条码解析服务与扫描输入模型`
 
-### 3.30 执行步骤
-1. 查询已落格待回传任务。
-2. 组装业务回传 payload。
-3. 调用 Oracle 写入器回写。
-4. 回填本地回传状态与时间。
+### 业务逻辑与调用链路
+`扫描请求` -> `IBarcodeParser` -> `BarcodeParseResult` -> `ScanEventArgs` -> `后续匹配服务`。
 
-### 3.31 交付结果
-- 形成“落格完成 -> 业务回传 -> 本地回填”的闭环。
+### 复用文件
+- `EverydayChain.Hub.Host/Controllers/ScanController.cs`（PR-03 新增）
+- `EverydayChain.Hub.Application/Abstractions/Sync/IOracleStatusDrivenSourceReader.cs`
 
-### 3.32 验收标准
-- 不复用/不改写同步层自动回写链路。
-- 仅处理待回传任务，具备幂等保护。
+### 参考文件
+- `EverydayChain.Hub.Infrastructure/Repositories/SyncTaskConfigRepository.cs`（参数校验与规范化风格）
 
----
+### 执行步骤
+1. 定义条码类型与解析结果。
+2. 实现解析服务。
+3. 定义扫描输入模型。
+4. 接入 DI 并补测试。
 
-## PR-09：扫描日志与落格日志（P1/P2）
+### 预计改动文件
+- 新增 8，修改 3，合计约 11。
 
-### 3.33 预计改动文件
-- **新增（6）**
-  - `EverydayChain.Hub.Domain/Aggregates/ScanLogAggregate/ScanLogEntity.cs`
-  - `EverydayChain.Hub.Domain/Aggregates/DropLogAggregate/DropLogEntity.cs`
-  - `EverydayChain.Hub.Infrastructure/Persistence/EntityConfigurations/ScanLogEntityTypeConfiguration.cs`
-  - `EverydayChain.Hub.Infrastructure/Persistence/EntityConfigurations/DropLogEntityTypeConfiguration.cs`
-  - `EverydayChain.Hub.Tests/Logs/ScanLogPersistenceTests.cs`
-  - `EverydayChain.Hub.Tests/Logs/DropLogPersistenceTests.cs`
-- **修改（5）**
-  - `EverydayChain.Hub.Infrastructure/Persistence/HubDbContext.cs`
-  - `EverydayChain.Hub.Infrastructure/Migrations/*`（新增迁移文件）
-  - `EverydayChain.Hub.Application/TaskExecution/Services/TaskExecutionService.cs`
-  - `EverydayChain.Hub.Application/DropFeedback/Services/DropFeedbackService.cs`
-  - `README.md`
+### 交付结果
+- 扫描数据在进入业务匹配前完成标准化。
 
-### 3.34 执行步骤
-1. 新增日志聚合实体与 EF 映射。
-2. 扫描/落格服务接入日志写入。
-3. 增加迁移与持久化测试。
+### 验收标准
+- 可区分拆零/整件/无效码。
+- 对无效码返回统一错误语义。
 
-### 3.35 交付结果
-- 扫描、落格全链路有业务审计数据。
-
-### 3.36 验收标准
-- 成功与失败都产生日志记录。
-- 日志字段含任务标识、时间、结果、原因。
+### 评审人关注点
+- 条码解析规则是否可扩展。
+- 模型是否包含后续链路所需字段。
 
 ---
 
-## PR-10：异常规则（P2）
+## PR-05：扫描匹配与任务执行
 
-### 3.37 预计改动文件
-- **新增（8）**
-  - `EverydayChain.Hub.Application/WaveCleanup/Abstractions/IWaveCleanupService.cs`
-  - `EverydayChain.Hub.Application/WaveCleanup/Services/WaveCleanupService.cs`
-  - `EverydayChain.Hub.Domain/MultiLabel/MultiLabelDecisionResult.cs`
-  - `EverydayChain.Hub.Application/MultiLabel/Abstractions/IMultiLabelDecisionService.cs`
-  - `EverydayChain.Hub.Application/MultiLabel/Services/MultiLabelDecisionService.cs`
-  - `EverydayChain.Hub.Domain/Recirculation/RecirculationDecisionResult.cs`
-  - `EverydayChain.Hub.Application/Recirculation/Services/RecirculationService.cs`
-  - `EverydayChain.Hub.Tests/Rules/ExceptionRulesTests.cs`
-- **修改（5）**
-  - `EverydayChain.Hub.Domain/BusinessTasks/BusinessTaskEntity.cs`
-  - `EverydayChain.Hub.Application/TaskExecution/Services/TaskExecutionService.cs`
-  - `EverydayChain.Hub.Host/appsettings.json`
-  - `EverydayChain.Hub.Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`
-  - `README.md`
+### 建议标题
+`feat(application): 打通扫描匹配与任务执行状态推进`
 
-### 3.38 执行步骤
-1. 实现波次清理、多标签、回流规则服务。
-2. 在任务执行链路挂接规则判定。
-3. 补充 dry-run 与日志审计路径。
+### 业务逻辑与调用链路
+`ScanController` -> `IScanMatchService` -> `ITaskExecutionService` -> `IBusinessTaskRepository` -> `状态更新`。
 
-### 3.39 交付结果
-- 异常分支可统一决策、可追踪、可审计。
+### 复用文件
+- `EverydayChain.Hub.Application/Services/SyncExecutionService.cs`
+- `EverydayChain.Hub.Infrastructure/Persistence/HubDbContext.cs`
+- `EverydayChain.Hub.Infrastructure/Repositories/SqlServerSyncUpsertRepository.cs`
 
-### 3.40 验收标准
-- 三类规则都有可测试的输入输出。
-- dry-run 不做破坏性写入。
+### 参考文件
+- `EverydayChain.Hub.Infrastructure/Repositories/InMemorySyncBatchRepository.cs`（仓储实现风格）
+- `EverydayChain.Hub.Tests/Repositories/InMemorySqlServerSyncUpsertRepository.cs`（测试替身风格）
+
+### 执行步骤
+1. 新增扫描匹配服务与执行服务。
+2. 新增业务任务仓储抽象与实现。
+3. 扫描接口接入执行链路。
+4. 补 EF 映射与迁移、测试。
+
+### 预计改动文件
+- 新增 10，修改 6，合计约 16。
+
+### 交付结果
+- 扫描上传触发业务任务状态推进。
+
+### 验收标准
+- 匹配成功/失败均有明确结果。
+- 扫描次数、状态、时间正确落库。
+
+### 评审人关注点
+- Application 抽象是否放在 `Application/Abstractions`。
+- 迁移是否仅覆盖新增业务表/字段。
 
 ---
 
-## PR-11：补偿服务（P2）
+## PR-06：请求格口服务
 
-### 3.41 预计改动文件
-- **新增（3）**
-  - `EverydayChain.Hub.Application/Compensation/Abstractions/ICompensationService.cs`
-  - `EverydayChain.Hub.Application/Compensation/Services/CompensationService.cs`
-  - `EverydayChain.Hub.Tests/Compensation/CompensationServiceTests.cs`
-- **修改（5）**
-  - `EverydayChain.Hub.Application/Feedback/Services/WmsFeedbackService.cs`
-  - `EverydayChain.Hub.Infrastructure/Repositories/BusinessTaskRepository.cs`
-  - `EverydayChain.Hub.Host/Program.cs`（后台补偿入口）
-  - `EverydayChain.Hub.Host/appsettings.json`
-  - `README.md`
+### 建议标题
+`feat(application): 新增请求格口解析服务`
 
-### 3.42 执行步骤
-1. 识别回传失败任务。
+### 业务逻辑与调用链路
+`ChuteController` -> `IChuteResolveService` -> `业务任务读取` -> `格口规则计算` -> `返回格口结果`。
+
+### 复用文件
+- `EverydayChain.Hub.Host/Controllers/ChuteController.cs`
+- `EverydayChain.Hub.Application/TaskExecution/Services/TaskExecutionService.cs`
+
+### 参考文件
+- `EverydayChain.Hub.Infrastructure/Repositories/SyncTaskConfigRepository.cs`（配置驱动解析思路）
+
+### 执行步骤
+1. 新增格口解析接口与实现。
+2. 将 Chute API 接入解析服务。
+3. 增加无任务、异常任务分支测试。
+
+### 预计改动文件
+- 新增 4，修改 4，合计约 8。
+
+### 交付结果
+- 请求格口 API 可返回目标格口与失败原因。
+
+### 验收标准
+- 返回结构包含任务标识与格口编码。
+- 不在本 PR 写入落格状态。
+
+### 评审人关注点
+- 格口请求是否保持“只查询不确认落格”。
+- 响应契约是否稳定可前后兼容。
+
+---
+
+## PR-07：落格回传服务
+
+### 建议标题
+`feat(application): 新增落格回传服务与状态闭环`
+
+### 业务逻辑与调用链路
+`DropFeedbackController` -> `IDropFeedbackService` -> `任务定位(TaskId/Barcode)` -> `Dropped/Exception 状态写入`。
+
+### 复用文件
+- `EverydayChain.Hub.Host/Controllers/DropFeedbackController.cs`
+- `EverydayChain.Hub.Infrastructure/Repositories/BusinessTaskRepository.cs`（PR-05 新增）
+
+### 参考文件
+- `EverydayChain.Hub.Infrastructure/Sync/Writers/OracleRemoteStatusWriter.cs`（回写审计字段处理风格）
+
+### 执行步骤
+1. 新增落格回传服务接口与实现。
+2. 接入 Controller 并支持双定位路径。
+3. 补充成功/失败回传测试。
+
+### 预计改动文件
+- 新增 4，修改 5，合计约 9。
+
+### 交付结果
+- 实际落格结果可反映到本地任务生命周期。
+
+### 验收标准
+- 成功进入 Dropped，失败进入 Exception。
+- 回传失败原因与时间可追踪。
+
+### 评审人关注点
+- 状态机是否出现非法跳转。
+- 双定位策略是否存在歧义。
+
+---
+
+## PR-08：业务回传服务
+
+### 建议标题
+`feat(infrastructure): 新增业务回传写入器与回填流程`
+
+### 业务逻辑与调用链路
+`WmsFeedbackService` -> `查询待回传任务` -> `OracleWmsFeedbackWriter` -> `回传结果回填`。
+
+### 复用文件
+- `EverydayChain.Hub.Application/Abstractions/Sync/IOracleRemoteStatusWriter.cs`（边界参照）
+- `EverydayChain.Hub.Infrastructure/Sync/Writers/OracleRemoteStatusWriter.cs`（Oracle 写入风格参照）
+
+### 参考文件
+- `EverydayChain.Hub.Infrastructure/Sync/Services/RemoteStatusConsumeService.cs`（批处理与写回节奏参照）
+
+### 执行步骤
+1. 新增业务回传服务与 Oracle 写入器。
+2. 增加待回传任务筛选与幂等控制。
+3. 回填回传状态与回传时间。
+4. 补测试。
+
+### 预计改动文件
+- 新增 4，修改 6，合计约 10。
+
+### 交付结果
+- 形成落格后业务回传闭环，不影响同步自动回写。
+
+### 验收标准
+- 仅处理待回传任务。
+- 回传成功/失败状态可区分、可重试。
+
+### 评审人关注点
+- 是否误复用同步自动回写通道。
+- Oracle 写入是否有审计字段与幂等策略。
+
+---
+
+## PR-09：扫描/落格日志落库
+
+### 建议标题
+`feat(domain+infra): 新增扫描日志与落格日志聚合`
+
+### 业务逻辑与调用链路
+`扫描执行/落格回传` -> `日志聚合实体` -> `EF 配置` -> `日志表落库`。
+
+### 复用文件
+- `EverydayChain.Hub.Infrastructure/Persistence/HubDbContext.cs`
+- `EverydayChain.Hub.Application/TaskExecution/Services/TaskExecutionService.cs`
+- `EverydayChain.Hub.Application/DropFeedback/Services/DropFeedbackService.cs`
+
+### 参考文件
+- 现有 `Infrastructure/Persistence/EntityConfigurations/*`（实体配置风格）
+- 现有 `Infrastructure/Migrations/*`（迁移命名风格）
+
+### 执行步骤
+1. 新增扫描日志与落格日志实体。
+2. 新增 EF 配置并接入 DbContext。
+3. 在关键服务写入日志。
+4. 增加迁移与持久化测试。
+
+### 预计改动文件
+- 新增 6，修改 5，合计约 11。
+
+### 交付结果
+- 扫描与落格全链路具备审计轨迹。
+
+### 验收标准
+- 成功与失败都落日志。
+- 日志包含任务标识、结果、原因、时间。
+
+### 评审人关注点
+- 热路径写日志是否造成性能风险。
+- 日志字段是否满足排障最小闭环。
+
+---
+
+## PR-10：异常规则链路（波次/多标签/回流）
+
+### 建议标题
+`feat(application): 新增异常规则服务并接入任务执行链路`
+
+### 业务逻辑与调用链路
+`任务执行` -> `波次清理规则` -> `多标签决策` -> `回流决策` -> `执行结果`。
+
+### 复用文件
+- `EverydayChain.Hub.Application/TaskExecution/Services/TaskExecutionService.cs`
+- `EverydayChain.Hub.Host/appsettings.json`（规则配置承载）
+
+### 参考文件
+- `EverydayChain.Hub.Infrastructure/Repositories/SyncTaskConfigRepository.cs`（配置解析与校验模式）
+
+### 执行步骤
+1. 新增三类规则抽象与实现。
+2. 在任务执行中挂接规则判定。
+3. 支持 dry-run 与审计输出。
+4. 增加规则测试。
+
+### 预计改动文件
+- 新增 8，修改 5，合计约 13。
+
+### 交付结果
+- 异常业务分支可配置、可测试、可追踪。
+
+### 验收标准
+- 三类规则均可独立验证输入输出。
+- dry-run 不执行破坏性操作。
+
+### 评审人关注点
+- 规则优先级是否有冲突。
+- 配置缺省值与异常分支是否可预期。
+
+---
+
+## PR-11：补偿重试链路
+
+### 建议标题
+`feat(application): 新增业务回传补偿服务`
+
+### 业务逻辑与调用链路
+`补偿入口` -> `识别回传失败任务` -> `重试回传` -> `更新补偿状态与日志`。
+
+### 复用文件
+- `EverydayChain.Hub.Application/Feedback/Services/WmsFeedbackService.cs`
+- `EverydayChain.Hub.Infrastructure/Repositories/BusinessTaskRepository.cs`
+- `EverydayChain.Hub.Host/Program.cs`
+
+### 参考文件
+- `EverydayChain.Hub.Host/Workers/RetentionBackgroundWorker.cs`（后台任务组织方式）
+- `EverydayChain.Hub.Infrastructure/Sync/Services/RemoteStatusConsumeService.cs`（批次处理风格）
+
+### 执行步骤
+1. 新增补偿服务接口与实现。
 2. 支持按任务、按批次重试。
-3. 重试结果落日志与状态回填。
+3. 记录补偿结果并回填任务状态。
+4. 增加补偿测试。
 
-### 3.43 交付结果
-- 业务回传失败有自动/半自动补偿通道。
+### 预计改动文件
+- 新增 3，修改 5，合计约 8。
 
-### 3.44 验收标准
-- 补偿可重入、可追踪、可配置限流。
-- 重试成功后状态正确关闭，失败保留可重试标识。
+### 交付结果
+- 回传失败任务具备可追踪重试闭环。
+
+### 验收标准
+- 补偿可重入，重复触发不产生脏写。
+- 成功关闭任务，失败保留待补偿标记。
+
+### 评审人关注点
+- 补偿重试是否有上限与节流。
+- 失败日志是否足以支持人工介入。
 
 ---
 
-## PR-12：稳定化收口与联调验收（P0）
+## PR-12：联调收口与验收归档
 
-### 3.45 预计改动文件
-- **新增（0~2）**
-  - 可能新增联调清单或回归报告文档
-- **修改（6~10）**
-  - `README.md`
-  - `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`
-  - `对外API接口基线.md`
-  - `WMS状态语义基线.md`
-  - `EverydayChain.Hub.Host/appsettings.json`
-  - `EverydayChain.Hub.Tests/*`（补齐联调回归）
+### 建议标题
+`chore(release): 全链路联调收口与验收归档`
 
-### 3.46 执行步骤
-1. 执行全链路联调（扫描 -> 格口 -> 落格 -> 回传 -> 补偿）。
-2. 统一清理跨 PR 术语与文档偏差。
-3. 收敛测试缺口，补齐回归用例。
-4. 出具最终验收清单。
+### 业务逻辑与调用链路
+`扫描上传` -> `请求格口` -> `落格回传` -> `业务回传` -> `补偿重试`（失败路径）-> `最终状态一致性校验`。
 
-### 3.47 交付结果
-- 可对外说明“已实现能力、未实现能力、边界与后续计划”。
+### 复用文件
+- `EverydayChain.Hub.Host/Program.cs`
+- `EverydayChain.Hub.Host/appsettings.json`
+- `EverydayChain.Hub.Tests/*`
 
-### 3.48 验收标准
-- 所有核心链路可跑通。
+### 参考文件
+- `README.md`（收口说明格式）
+- `逐文件代码检查台账.md`（验收记录表达方式）
+
+### 执行步骤
+1. 执行端到端联调与回归。
+2. 对齐文档、配置、代码术语。
+3. 补充缺口测试并归档验收项。
+4. 输出“已实现/未实现/后续计划”。
+
+### 预计改动文件
+- 新增 0~2，修改 6~10，合计约 8~12。
+
+### 交付结果
+- 形成可发布、可验收、可交接的最终版本。
+
+### 验收标准
+- 主链路与失败补偿链路均跑通。
 - 构建测试全绿。
-- 文档、代码、配置三者一致。
+- 文档与代码一致。
+
+### 评审人关注点
+- 是否仍存在跨层实现泄漏。
+- 是否存在遗漏的待确认项。
 
 ---
 
-## 4. 每个 PR 必填交付模板（直接复制到 PR 描述）
+## 4. PR 标题/分支/评审关注点汇总清单（可直接排期）
+
+| PR | 建议标题 | 建议分支名 | 评审关注点 |
+|---|---|---|---|
+| PR-01 | `feat(domain): 新增业务任务主模型与物化服务` | `feature/pr01-business-task-model` | 领域边界、状态建模完整性 |
+| PR-02 | `docs(baseline): 固化状态语义、条码规则与API契约基线` | `feature/pr02-semantic-baseline` | 术语一致性、实现可映射性 |
+| PR-03 | `feat(host): 新增扫描/格口/落格三类API控制器骨架` | `feature/pr03-host-api-bootstrap` | Host 是否越层、Worker 共存 |
+| PR-04 | `feat(application): 新增条码解析服务与扫描输入模型` | `feature/pr04-barcode-and-scan-model` | 解析扩展性、输入模型完备性 |
+| PR-05 | `feat(application): 打通扫描匹配与任务执行状态推进` | `feature/pr05-scan-match-and-execution` | 抽象归属、迁移准确性 |
+| PR-06 | `feat(application): 新增请求格口解析服务` | `feature/pr06-chute-resolve` | 查询职责纯度、响应契约稳定 |
+| PR-07 | `feat(application): 新增落格回传服务与状态闭环` | `feature/pr07-drop-feedback` | 状态机合法性、定位策略 |
+| PR-08 | `feat(infrastructure): 新增业务回传写入器与回填流程` | `feature/pr08-wms-feedback` | 同步回写与业务回传隔离 |
+| PR-09 | `feat(domain+infra): 新增扫描日志与落格日志聚合` | `feature/pr09-scan-drop-logs` | 热路径性能、审计字段完整 |
+| PR-10 | `feat(application): 新增异常规则服务并接入任务执行链路` | `feature/pr10-exception-rules` | 规则优先级、配置边界 |
+| PR-11 | `feat(application): 新增业务回传补偿服务` | `feature/pr11-compensation` | 重试幂等、失败可观测性 |
+| PR-12 | `chore(release): 全链路联调收口与验收归档` | `feature/pr12-stabilization` | 端到端一致性、遗留风险清零 |
+
+---
+
+## 5. 每个 PR 描述模板（统一）
 
 ```md
 ## 本 PR 范围
 - 目标：
 - 不在范围：
 
-## 改动文件统计
-- 新增：X 个
-- 修改：Y 个
-- 删除：Z 个
-- 合计：X+Y+Z 个
+## 业务链路
+- 输入：
+- 处理：
+- 输出：
 
-## 主要交付结果
+## 复用文件
 1. 
 2. 
-3. 
 
-## 验收结果
-- [ ] 构建通过
-- [ ] 测试通过
-- [ ] 业务验收点 1
-- [ ] 业务验收点 2
-- [ ] 未引入平行同步实现
-- [ ] README 与基线文档已联动
+## 参考文件
+1. 
+2. 
+
+## 改动文件统计
+- 新增：X
+- 修改：Y
+- 删除：Z
+- 合计：X+Y+Z
+
+## 交付结果
+1. 
+2. 
+
+## 验收标准
+- [ ] build 通过
+- [ ] test 通过
+- [ ] 本 PR 验收点 1
+- [ ] 本 PR 验收点 2
+
+## 评审关注点
+1. 
+2. 
 
 ## 待确认项
 1. 
 2. 
-
-## 风险与回滚
-- 风险：
-- 回滚方式：
 ```
-
----
-
-## 5. 关键待确认项（不确认不实施）
-
-1. 业务任务主键生成与外部幂等键（是否统一使用 `TaskId + TraceId`）。
-2. 三个 API 的鉴权机制与调用方身份透传字段。
-3. 业务回传 Oracle 目标表、字段、失败码语义。
-4. 多标签与回流冲突时的优先级规则。
-5. 补偿策略的频率、上限与告警阈值。
-
-> 规则：待确认项未关闭时，仅允许实施不依赖该决策的内容。
