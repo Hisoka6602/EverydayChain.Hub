@@ -29,6 +29,10 @@ public class SqlServerAppendOnlyWriter(
     private const int AppendTimeoutSeconds = 180;
     /// <summary>状态驱动追加写入慢调用阈值（毫秒）。</summary>
     private const int SlowAppendWarningThresholdMs = 3000;
+    /// <summary>分表就绪缓存最大条目数，超出时清理已完成的旧条目，防止长时间运行进程内存单调增长。</summary>
+    private const int MaxShardReadyCacheEntries = 200;
+    /// <summary>分表就绪缓存清理目标条目数，清理时保留至此数量以减少频繁触发清理。</summary>
+    private const int TargetShardReadyCacheEntries = 100;
 
     /// <inheritdoc/>
     public async Task<int> AppendAsync(
@@ -96,24 +100,50 @@ public class SqlServerAppendOnlyWriter(
     }
 
     /// <summary>
-    /// 按分表后缀确保一次分表存在性检查，降低分页写入链路元数据开销。
+    /// 按逻辑表+后缀确保分表存在性仅检查一次，降低分页写入链路元数据开销。
+    /// 调用方取消等待不会移除缓存键；仅在分表确认任务自身出错或被取消时才清除缓存以允许重试。
     /// </summary>
     /// <param name="logicalTable">逻辑表名。</param>
     /// <param name="shardSuffix">分表后缀。</param>
-    /// <param name="ct">取消令牌。</param>
+    /// <param name="ct">取消令牌，传递给首次分表确认调用；后续等待者仅用于等待超时控制。</param>
     private async Task EnsureShardPreparedOnceAsync(string logicalTable, string shardSuffix, CancellationToken ct) {
         var cacheKey = $"{logicalTable}:{shardSuffix}";
         var lazyTask = _shardReadyTasks.GetOrAdd(
             cacheKey,
             _ => new Lazy<Task>(
-                () => shardTableProvisioner.EnsureShardTableAsync(logicalTable, shardSuffix, CancellationToken.None),
+                () => shardTableProvisioner.EnsureShardTableAsync(logicalTable, shardSuffix, ct),
                 LazyThreadSafetyMode.ExecutionAndPublication));
+        TrimShardReadyCacheIfNeeded();
         try {
             await lazyTask.Value.WaitAsync(ct);
         }
         catch {
-            _shardReadyTasks.TryRemove(cacheKey, out _);
+            // 仅在分表确认任务自身出错或取消时移除缓存，允许后续请求重试。
+            // 调用方取消等待（OperationCanceledException 来自 ct）但任务仍在运行时，保留缓存键。
+            if (lazyTask.Value.IsFaulted || lazyTask.Value.IsCanceled) {
+                _shardReadyTasks.TryRemove(cacheKey, out _);
+            }
             throw;
+        }
+    }
+
+    /// <summary>
+    /// 当分表就绪缓存超过上限时，优先清理已成功完成的旧条目，防止长时间运行进程内存单调增长。
+    /// 仅在条目数超过 <see cref="MaxShardReadyCacheEntries"/> 时触发清理，以降低热路径中的遍历频率。
+    /// 多线程可能同时触发此方法，但 <see cref="ConcurrentDictionary{TKey,TValue}"/> 保证
+    /// <see cref="ConcurrentDictionary{TKey,TValue}.TryRemove(TKey,out TValue)"/> 是线程安全的；
+    /// 即使多线程并发过度清理，分表确认为幂等操作，不影响正确性。
+    /// </summary>
+    private void TrimShardReadyCacheIfNeeded() {
+        if (_shardReadyTasks.Count <= MaxShardReadyCacheEntries) return;
+        var excess = _shardReadyTasks.Count - TargetShardReadyCacheEntries;
+        var toRemove = _shardReadyTasks
+            .Where(kv => kv.Value.IsValueCreated && kv.Value.Value.IsCompletedSuccessfully)
+            .Select(kv => kv.Key)
+            .Take(excess)
+            .ToList();
+        foreach (var key in toRemove) {
+            _shardReadyTasks.TryRemove(key, out _);
         }
     }
 
