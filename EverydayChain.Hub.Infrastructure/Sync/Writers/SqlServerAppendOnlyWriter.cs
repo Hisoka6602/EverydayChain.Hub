@@ -1,4 +1,5 @@
 using System.Data;
+using System.Collections.Concurrent;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -21,9 +22,13 @@ public class SqlServerAppendOnlyWriter(
 
     /// <summary>分表配置快照。</summary>
     private readonly ShardingOptions _shardingOptions = shardingOptions.Value;
+    /// <summary>按逻辑表+后缀缓存分表就绪任务，避免每页重复执行分表确认。</summary>
+    private readonly ConcurrentDictionary<string, Lazy<Task>> _shardReadyTasks = new(StringComparer.Ordinal);
 
     /// <summary>状态驱动追加写入超时秒数。</summary>
     private const int AppendTimeoutSeconds = 180;
+    /// <summary>状态驱动追加写入慢调用阈值（毫秒）。</summary>
+    private const int SlowAppendWarningThresholdMs = 3000;
 
     /// <inheritdoc/>
     public async Task<int> AppendAsync(
@@ -37,7 +42,7 @@ public class SqlServerAppendOnlyWriter(
 
         EnsureSafeIdentifier(targetLogicalTable, nameof(targetLogicalTable));
         var shardSuffix = ResolveShardSuffix();
-        await shardTableProvisioner.EnsureShardTableAsync(shardSuffix, ct);
+        await EnsureShardPreparedOnceAsync(targetLogicalTable, shardSuffix, ct);
         var destination = BuildTargetTableFullName(targetLogicalTable, shardSuffix);
         var payload = BuildPayloadDataTable(rows);
         return await dangerZoneExecutor.ExecuteAsync(
@@ -56,12 +61,14 @@ public class SqlServerAppendOnlyWriter(
     /// <param name="ct">取消令牌。</param>
     /// <returns>写入行数。</returns>
     private async Task<int> AppendCoreAsync(string tableCode, string destination, DataTable payload, CancellationToken ct) {
+        var appendStopwatch = System.Diagnostics.Stopwatch.StartNew();
         await using var connection = new SqlConnection(_shardingOptions.ConnectionString);
         await connection.OpenAsync(ct);
         using var bulkCopy = new SqlBulkCopy(connection) {
             DestinationTableName = destination,
             BatchSize = Math.Min(payload.Rows.Count, 2000),
             BulkCopyTimeout = AppendTimeoutSeconds,
+            EnableStreaming = true,
         };
 
         foreach (DataColumn column in payload.Columns) {
@@ -69,12 +76,45 @@ public class SqlServerAppendOnlyWriter(
         }
 
         await bulkCopy.WriteToServerAsync(payload, ct);
+        appendStopwatch.Stop();
         logger.LogInformation(
-            "状态驱动追加写入完成。TableCode={TableCode}, TargetTable={TargetTable}, Rows={Rows}",
+            "状态驱动追加写入完成。TableCode={TableCode}, TargetTable={TargetTable}, Rows={Rows}, AppendElapsedMs={AppendElapsedMs}",
             tableCode,
             destination,
-            payload.Rows.Count);
+            payload.Rows.Count,
+            appendStopwatch.ElapsedMilliseconds);
+        if (appendStopwatch.ElapsedMilliseconds >= SlowAppendWarningThresholdMs) {
+            logger.LogWarning(
+                "状态驱动追加写入耗时较高。TableCode={TableCode}, TargetTable={TargetTable}, Rows={Rows}, AppendElapsedMs={AppendElapsedMs}, SlowThresholdMs={SlowThresholdMs}",
+                tableCode,
+                destination,
+                payload.Rows.Count,
+                appendStopwatch.ElapsedMilliseconds,
+                SlowAppendWarningThresholdMs);
+        }
         return payload.Rows.Count;
+    }
+
+    /// <summary>
+    /// 按分表后缀确保一次分表存在性检查，降低分页写入链路元数据开销。
+    /// </summary>
+    /// <param name="logicalTable">逻辑表名。</param>
+    /// <param name="shardSuffix">分表后缀。</param>
+    /// <param name="ct">取消令牌。</param>
+    private async Task EnsureShardPreparedOnceAsync(string logicalTable, string shardSuffix, CancellationToken ct) {
+        var cacheKey = $"{logicalTable}:{shardSuffix}";
+        var lazyTask = _shardReadyTasks.GetOrAdd(
+            cacheKey,
+            _ => new Lazy<Task>(
+                () => shardTableProvisioner.EnsureShardTableAsync(logicalTable, shardSuffix, CancellationToken.None),
+                LazyThreadSafetyMode.ExecutionAndPublication));
+        try {
+            await lazyTask.Value.WaitAsync(ct);
+        }
+        catch {
+            _shardReadyTasks.TryRemove(cacheKey, out _);
+            throw;
+        }
     }
 
     /// <summary>
