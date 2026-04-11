@@ -1,6 +1,13 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- **同步数据专属日志落盘**：`nlog.config` 新增 `sync-file` 专属滚动文件目标（`sync-${shortdate}.log`），将同步后台任务、编排服务、执行服务、基础设施同步组件的日志额外路由至同步专属文件，同时保留写入通用日志文件。
+- **同步批次步骤耗时记录（KeyedMerge）**：`SyncExecutionService.ExecuteBatchAsync` 新增七维步骤计时（BatchInitMs / ReadMs / StagingMs / MergeMs / DeletionMs / PersistMs / CheckpointMs），批次成功时输出 `同步批次步骤耗时` 日志，便于定位各阶段性能瓶颈。
+- **同步批次步骤耗时记录（StatusDriven）**：`SyncExecutionService.ExecuteStatusDrivenBatchAsync` 新增四维步骤计时（BatchInitMs / ConsumeMs / PersistMs / CheckpointMs），批次成功时输出 `状态驱动批次步骤耗时` 日志。
+- **CursorColumn 支持 StatusDriven 模式**：`IOracleStatusDrivenSourceReader.ReadPendingPageAsync` 与 `IRemoteStatusConsumeService.ConsumeAsync` 新增 `SyncWindow window` 参数；当 `CursorColumn` 非空时，Oracle 读取 SQL 追加时间范围过滤，避免全表状态扫描；`appsettings.json` 中 `CursorColumn` 注释已更新。
+- **修复 StatusDriven 追加写入重复键错误**：`ISqlServerAppendOnlyWriter.AppendAsync` 新增 `IReadOnlyList<string> uniqueKeys` 参数；当唯一键非空时改用"暂存临时表 + NOT EXISTS 条件插入"幂等追加策略，彻底解决"追加成功但远端回写失败后重试"场景下的 `SqlBulkCopy` 重复键冲突。
+- **验证状态回写配置路径**：确认 `StatusColumnName`、`CompletedStatusValue`、`ShouldWriteBackRemoteStatus` 均通过配置链正确传递和使用，根本原因为"追加后回写失败"重试场景，由幂等追加修复。
+- 构建验证：0 Warning 0 Error，62/64 单元测试通过（2 项为预存在失败与本次变更无关）。
 - 状态驱动本地追加写入锁竞争优化：移除 `SqlBulkCopyOptions.TableLock`，避免并发表同步/查询场景下出现表级锁等待导致“设备占用低但响应慢”。
 - 状态驱动本地追加写入可观测性增强：新增 `AppendElapsedMs` 指标日志与慢写告警阈值日志，便于区分锁等待、网络等待与真实 CPU/IO 瓶颈。
 - 状态驱动分表确认进一步优化：`IShardTableProvisioner` 新增“按逻辑表+后缀”确认接口，`SqlServerAppendOnlyWriter` 改为仅确认当前目标逻辑表，避免一次写入触发全部纳管表的分表检查。
@@ -275,7 +282,7 @@
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖，并在启动阶段从启用同步表配置提取逻辑表名集合，完成安全校验与空配置异常拦截。
 - `20260408020833_RebuildInitialHubSchema.cs`：初始化迁移，定义 `sorting_task_trace`、`IDX_PICKTOLIGHT_CARTON1`、`IDX_PICKTOWCS2` 三张聚合表结构及索引。
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
-- `nlog.config`：NLog 日志配置，输出至控制台与滚动日志文件（按日切割，单文件上限 10 MB，保留 30 天）。
+- `nlog.config`：NLog 日志配置，输出至控制台与两个滚动日志文件：通用日志（`hub-${shortdate}.log`，按日切割，单文件上限 10 MB，保留 30 天）；同步专属日志（`sync-${shortdate}.log`，仅收录同步链路相关组件日志，便于独立分析同步性能问题）。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
 - `EverydayChain.Hub.Tests/Services/DangerZoneExecutorTests.cs`：危险操作隔离器取消语义测试，覆盖调用方取消与非调用方取消的日志等级分支。

@@ -14,7 +14,11 @@ public interface IRemoteStatusConsumeService
     /// </summary>
     /// <param name="definition">同步表定义，包含源表信息与状态消费配置。</param>
     /// <param name="batchId">当前批次编号，用于日志关联。</param>
+    /// <param name="window">
+    /// 当前同步时间窗口。当 <see cref="SyncTableDefinition.CursorColumn"/> 非空时，
+    /// 用于向 Oracle 读取器追加游标列时间范围过滤，避免全表状态扫描。
+    /// </param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>本轮消费结果统计。</returns>
-    Task<RemoteStatusConsumeResult> ConsumeAsync(SyncTableDefinition definition, string batchId, CancellationToken ct);
+    Task<RemoteStatusConsumeResult> ConsumeAsync(SyncTableDefinition definition, string batchId, SyncWindow window, CancellationToken ct);
 }

@@ -24,7 +24,7 @@ public class RemoteStatusConsumeService(
     private const int SlowStepWarningThresholdMs = 3000;
 
     /// <inheritdoc/>
-    public async Task<RemoteStatusConsumeResult> ConsumeAsync(SyncTableDefinition definition, string batchId, CancellationToken ct) {
+    public async Task<RemoteStatusConsumeResult> ConsumeAsync(SyncTableDefinition definition, string batchId, SyncWindow window, CancellationToken ct) {
         if (definition.SyncMode != SyncMode.StatusDriven) {
             throw new InvalidOperationException($"表 {definition.TableCode} 的同步模式不是 StatusDriven，禁止调用状态驱动消费链路。 ");
         }
@@ -35,6 +35,33 @@ public class RemoteStatusConsumeService(
 
         var profile = definition.StatusConsumeProfile;
         var normalizedExcludedColumns = SyncColumnFilter.NormalizeColumns(definition.ExcludedColumns);
+        var hasCursorFilter = !string.IsNullOrWhiteSpace(definition.CursorColumn);
+        if (hasCursorFilter) {
+            var hasValidWindow = window.WindowStartLocal != default
+                                 && window.WindowEndLocal != default
+                                 && window.WindowStartLocal <= window.WindowEndLocal;
+            if (!hasValidWindow) {
+                logger.LogError(
+                    "状态驱动消费游标时间窗口无效。TableCode={TableCode}, BatchId={BatchId}, CursorColumn={CursorColumn}, WindowStart={WindowStart}, WindowEnd={WindowEnd}, FailureReason={FailureReason}",
+                    definition.TableCode,
+                    batchId,
+                    definition.CursorColumn,
+                    window.WindowStartLocal,
+                    window.WindowEndLocal,
+                    "CursorColumn 非空时，WindowStart/WindowEnd 必须为有效本地时间且起始不得晚于结束。");
+                throw new InvalidOperationException(
+                    $"表 {definition.TableCode} 的状态驱动游标时间窗口无效：WindowStart={window.WindowStartLocal}, WindowEnd={window.WindowEndLocal}。");
+            }
+
+            logger.LogInformation(
+                "状态驱动消费启用游标列时间范围过滤。TableCode={TableCode}, BatchId={BatchId}, CursorColumn={CursorColumn}, WindowStart={WindowStart}, WindowEnd={WindowEnd}",
+                definition.TableCode,
+                batchId,
+                definition.CursorColumn,
+                window.WindowStartLocal,
+                window.WindowEndLocal);
+        }
+
         var result = new RemoteStatusConsumeResult();
         var pageNo = 1;
         var shouldUseFixedFirstPage = profile.ShouldWriteBackRemoteStatus;
@@ -51,6 +78,7 @@ public class RemoteStatusConsumeService(
                 currentPageNo,
                 profile.BatchSize,
                 normalizedExcludedColumns,
+                window,
                 ct);
             if (currentPageNo == 1 || currentPageNo % PageProgressLogInterval == 0) {
                 readStopwatch.Stop();
@@ -86,9 +114,9 @@ public class RemoteStatusConsumeService(
             result.PageCount++;
             result.ReadCount += rows.Count;
 
-            // 步骤2：本地仅追加写入目标表（禁止 merge/delete）。
+            // 步骤2：本地仅追加写入目标表（使用唯一键幂等去重，防止回写失败重试时产生重复键冲突）。
             var appendStopwatch = Stopwatch.StartNew();
-            var appendCount = await appendOnlyWriter.AppendAsync(definition.TableCode, definition.TargetLogicalTable, rows, ct);
+            var appendCount = await appendOnlyWriter.AppendAsync(definition.TableCode, definition.TargetLogicalTable, rows, definition.UniqueKeys, ct);
             appendStopwatch.Stop();
             result.AppendCount += appendCount;
             if (appendStopwatch.ElapsedMilliseconds >= SlowStepWarningThresholdMs) {
@@ -158,23 +186,26 @@ public class RemoteStatusConsumeService(
                 if (writeBackCount < rowIds.Count) {
                     result.WriteBackFailCount += rowIds.Count - writeBackCount;
                     logger.LogWarning(
-                        "状态驱动远端回写存在未命中行。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, RowIdCount={RowIdCount}, WriteBackCount={WriteBackCount}",
+                        "状态驱动远端回写存在未命中行。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, RowIdCount={RowIdCount}, WriteBackCount={WriteBackCount}, FailedRowIdCount={FailedRowIdCount}, FailureReason={FailureReason}",
                         definition.TableCode,
                         batchId,
                         currentPageNo,
                         rowIds.Count,
-                        writeBackCount);
+                        writeBackCount,
+                        rowIds.Count - writeBackCount,
+                        "数据库返回受影响行数小于请求回写行数，部分 ROWID 可能不存在或状态已变化。");
                 }
             }
             catch (Exception ex) {
                 result.WriteBackFailCount += rowIds.Count;
                 logger.LogError(
                     ex,
-                    "状态驱动远端回写失败，已隔离到页级。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, FailedRowIdCount={FailedRowIdCount}",
+                    "状态驱动远端回写失败，已隔离到页级。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, FailedRowIdCount={FailedRowIdCount}, FailureReason={FailureReason}",
                     definition.TableCode,
                     batchId,
                     currentPageNo,
-                    rowIds.Count);
+                    rowIds.Count,
+                    ex.Message);
                 if (shouldUseFixedFirstPage) {
                     logger.LogWarning(
                         "状态驱动消费提前结束：固定第1页模式下远端回写失败，停止本批次以避免重复追加。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, FailedRowIdCount={FailedRowIdCount}",

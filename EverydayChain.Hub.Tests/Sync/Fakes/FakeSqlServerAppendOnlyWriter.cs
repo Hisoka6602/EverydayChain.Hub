@@ -15,6 +15,7 @@ public class FakeSqlServerAppendOnlyWriter : ISqlServerAppendOnlyWriter
         string tableCode,
         string targetLogicalTable,
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows,
+        IReadOnlyList<string> uniqueKeys,
         CancellationToken ct)
     {
         TotalAppended += rows.Count;
