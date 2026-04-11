@@ -173,7 +173,7 @@ public class SqlServerAppendOnlyWriter(
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) {
             appendStopwatch.Stop();
-            await TryRollbackAsync(transaction, ct);
+            await TryRollbackAsync(transaction);
             logger.LogWarning(
                 "状态驱动追加写入已取消。TableCode={TableCode}, TargetTable={TargetTable}, CandidateRows={CandidateRows}, AppendElapsedMs={AppendElapsedMs}, FailureReason={FailureReason}",
                 tableCode,
@@ -185,7 +185,7 @@ public class SqlServerAppendOnlyWriter(
         }
         catch (Exception ex) {
             appendStopwatch.Stop();
-            await TryRollbackAsync(transaction, ct);
+            await TryRollbackAsync(transaction);
             logger.LogError(
                 ex,
                 "状态驱动追加写入失败。TableCode={TableCode}, TargetTable={TargetTable}, CandidateRows={CandidateRows}, AppendElapsedMs={AppendElapsedMs}, FailureReason={FailureReason}",
@@ -235,7 +235,7 @@ WHERE NOT EXISTS (
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in uniqueKeys) {
             if (string.IsNullOrWhiteSpace(key)) {
-                throw new InvalidOperationException("状态驱动幂等追加失败：UniqueKeys 存在空白列名。 ");
+                throw new InvalidOperationException("状态驱动幂等追加失败：UniqueKeys 存在空白列名。");
             }
 
             var trimmed = key.Trim();
@@ -245,10 +245,6 @@ WHERE NOT EXISTS (
             }
         }
 
-        if (normalized.Count == 0) {
-            throw new InvalidOperationException("状态驱动幂等追加失败：UniqueKeys 为空。 ");
-        }
-
         return normalized;
     }
 
@@ -256,10 +252,9 @@ WHERE NOT EXISTS (
     /// 安全回滚事务。
     /// </summary>
     /// <param name="transaction">事务实例。</param>
-    /// <param name="ct">取消令牌。</param>
-    private async Task TryRollbackAsync(SqlTransaction transaction, CancellationToken ct) {
+    private async Task TryRollbackAsync(SqlTransaction transaction) {
         try {
-            await transaction.RollbackAsync(ct);
+            await transaction.RollbackAsync(CancellationToken.None);
         }
         catch (Exception rollbackEx) {
             logger.LogError(

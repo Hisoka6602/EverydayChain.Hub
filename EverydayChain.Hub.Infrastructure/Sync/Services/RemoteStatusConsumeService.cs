@@ -49,7 +49,8 @@ public class RemoteStatusConsumeService(
                     window.WindowStartLocal,
                     window.WindowEndLocal,
                     "CursorColumn 非空时，WindowStart/WindowEnd 必须为有效本地时间且起始不得晚于结束。");
-                throw new InvalidOperationException($"表 {definition.TableCode} 的状态驱动游标时间窗口无效。 ");
+                throw new InvalidOperationException(
+                    $"表 {definition.TableCode} 的状态驱动游标时间窗口无效：WindowStart={window.WindowStartLocal}, WindowEnd={window.WindowEndLocal}。");
             }
 
             logger.LogInformation(
