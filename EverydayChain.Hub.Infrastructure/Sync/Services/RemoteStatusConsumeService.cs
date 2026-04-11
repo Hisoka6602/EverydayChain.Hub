@@ -37,6 +37,21 @@ public class RemoteStatusConsumeService(
         var normalizedExcludedColumns = SyncColumnFilter.NormalizeColumns(definition.ExcludedColumns);
         var hasCursorFilter = !string.IsNullOrWhiteSpace(definition.CursorColumn);
         if (hasCursorFilter) {
+            var hasValidWindow = window.WindowStartLocal != default
+                                 && window.WindowEndLocal != default
+                                 && window.WindowStartLocal <= window.WindowEndLocal;
+            if (!hasValidWindow) {
+                logger.LogError(
+                    "状态驱动消费游标时间窗口无效。TableCode={TableCode}, BatchId={BatchId}, CursorColumn={CursorColumn}, WindowStart={WindowStart}, WindowEnd={WindowEnd}, FailureReason={FailureReason}",
+                    definition.TableCode,
+                    batchId,
+                    definition.CursorColumn,
+                    window.WindowStartLocal,
+                    window.WindowEndLocal,
+                    "CursorColumn 非空时，WindowStart/WindowEnd 必须为有效本地时间且起始不得晚于结束。");
+                throw new InvalidOperationException($"表 {definition.TableCode} 的状态驱动游标时间窗口无效。 ");
+            }
+
             logger.LogInformation(
                 "状态驱动消费启用游标列时间范围过滤。TableCode={TableCode}, BatchId={BatchId}, CursorColumn={CursorColumn}, WindowStart={WindowStart}, WindowEnd={WindowEnd}",
                 definition.TableCode,

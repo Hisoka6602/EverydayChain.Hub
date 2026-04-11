@@ -17,9 +17,11 @@ public interface IOracleStatusDrivenSourceReader
     /// <param name="pageSize">分页大小。</param>
     /// <param name="normalizedExcludedColumns">规范化排除列集合。</param>
     /// <param name="window">
-    /// 同步时间窗口（可为 default）。当 <see cref="SyncTableDefinition.CursorColumn"/> 非空时，
-    /// 追加游标列时间范围条件 <c>CursorColumn &gt;= WindowStart AND CursorColumn &lt;= WindowEnd</c>，
-    /// 以避免全表状态扫描。CursorColumn 为空时此参数被忽略。
+    /// 同步时间窗口。当 <see cref="SyncTableDefinition.CursorColumn"/> 非空时，
+    /// 此参数必须为有效窗口且开始时间不得晚于结束时间；实现会追加
+    /// <c>CursorColumn &gt;= WindowStart AND CursorColumn &lt;= WindowEnd</c>
+    /// 的游标列时间范围条件，以避免全表状态扫描。
+    /// 当 <see cref="SyncTableDefinition.CursorColumn"/> 为空时，此参数会被忽略，此时方可传入 default。
     /// </param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>数据行集合（包含 __RowId）。</returns>

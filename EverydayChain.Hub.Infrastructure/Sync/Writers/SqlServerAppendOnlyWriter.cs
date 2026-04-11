@@ -50,13 +50,14 @@ public class SqlServerAppendOnlyWriter(
         await EnsureShardPreparedOnceAsync(targetLogicalTable, shardSuffix, ct);
         var destination = BuildTargetTableFullName(targetLogicalTable, shardSuffix);
         var payload = BuildPayloadDataTable(rows);
+        var normalizedUniqueKeys = NormalizeUniqueKeys(uniqueKeys);
         return await dangerZoneExecutor.ExecuteAsync(
            $"SqlServerStatusAppend:{tableCode}",
-           token => uniqueKeys.Count > 0
-               ? AppendDeduplicatedAsync(tableCode, destination, payload, uniqueKeys, token)
+           token => normalizedUniqueKeys.Count > 0
+               ? AppendDeduplicatedAsync(tableCode, destination, payload, normalizedUniqueKeys, token)
                : AppendCoreAsync(tableCode, destination, payload, token),
-           ct,
-           AppendTimeoutSeconds);
+            ct,
+            AppendTimeoutSeconds);
     }
 
     /// <summary>
@@ -112,59 +113,89 @@ public class SqlServerAppendOnlyWriter(
     /// 转义方括号标识符，可安全直接嵌入 SQL）。
     /// </param>
     /// <param name="payload">待写入数据。</param>
-    /// <param name="uniqueKeys">业务唯一键列名集合，用于 NOT EXISTS 子查询。各列名已由调用方在配置加载时通过标识符校验。</param>
+    /// <param name="uniqueKeys">业务唯一键列名集合（已在当前类完成空白过滤与标识符安全校验），用于 NOT EXISTS 子查询。</param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>实际插入行数（跳过重复行后）。</returns>
     private async Task<int> AppendDeduplicatedAsync(string tableCode, string destination, DataTable payload, IReadOnlyList<string> uniqueKeys, CancellationToken ct) {
         var appendStopwatch = System.Diagnostics.Stopwatch.StartNew();
         await using var connection = new SqlConnection(_shardingOptions.ConnectionString);
         await connection.OpenAsync(ct);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        try {
+            // 步骤1：从目标表克隆结构到本连接作用域临时表（不继承约束，允许写入重复行）。
+            const string tempTable = "#hub_stage";
+            await using var createCmd = connection.CreateCommand();
+            createCmd.Transaction = transaction;
+            createCmd.CommandTimeout = AppendTimeoutSeconds;
+            createCmd.CommandText = $"SELECT TOP 0 * INTO {tempTable} FROM {destination}";
+            await createCmd.ExecuteNonQueryAsync(ct);
 
-        // 步骤1：从目标表克隆结构到本连接作用域临时表（不继承约束，允许写入重复行）。
-        const string tempTable = "#hub_stage";
-        await using var createCmd = connection.CreateCommand();
-        createCmd.CommandTimeout = AppendTimeoutSeconds;
-        createCmd.CommandText = $"SELECT TOP 0 * INTO {tempTable} FROM {destination}";
-        await createCmd.ExecuteNonQueryAsync(ct);
+            // 步骤2：BulkCopy 到临时表，并纳入同一事务消除“判断不存在后被并发插入”竞态。
+            using var bulkCopy = new SqlBulkCopy(connection, SqlBulkCopyOptions.Default, transaction) {
+                DestinationTableName = tempTable,
+                BatchSize = Math.Min(payload.Rows.Count, 2000),
+                BulkCopyTimeout = AppendTimeoutSeconds,
+                EnableStreaming = true,
+            };
+            foreach (DataColumn column in payload.Columns) {
+                bulkCopy.ColumnMappings.Add(column.ColumnName, column.ColumnName);
+            }
+            await bulkCopy.WriteToServerAsync(payload, ct);
 
-        // 步骤2：BulkCopy 到临时表。
-        using var bulkCopy = new SqlBulkCopy(connection) {
-            DestinationTableName = tempTable,
-            BatchSize = Math.Min(payload.Rows.Count, 2000),
-            BulkCopyTimeout = AppendTimeoutSeconds,
-            EnableStreaming = true,
-        };
-        foreach (DataColumn column in payload.Columns) {
-            bulkCopy.ColumnMappings.Add(column.ColumnName, column.ColumnName);
+            // 步骤3：条件插入——仅插入目标表中不存在相同唯一键的行。
+            var insertSql = BuildConditionalInsertSql(destination, tempTable, payload.Columns, uniqueKeys);
+            await using var insertCmd = connection.CreateCommand();
+            insertCmd.Transaction = transaction;
+            insertCmd.CommandTimeout = AppendTimeoutSeconds;
+            insertCmd.CommandText = insertSql;
+            var inserted = await insertCmd.ExecuteNonQueryAsync(ct);
+            await transaction.CommitAsync(ct);
+
+            appendStopwatch.Stop();
+            logger.LogInformation(
+                "状态驱动追加写入完成（幂等去重）。TableCode={TableCode}, TargetTable={TargetTable}, CandidateRows={CandidateRows}, InsertedRows={InsertedRows}, SkippedRows={SkippedRows}, AppendElapsedMs={AppendElapsedMs}",
+                tableCode,
+                destination,
+                payload.Rows.Count,
+                inserted,
+                payload.Rows.Count - inserted,
+                appendStopwatch.ElapsedMilliseconds);
+            if (appendStopwatch.ElapsedMilliseconds >= SlowAppendWarningThresholdMs) {
+                logger.LogWarning(
+                    "状态驱动追加写入耗时较高。TableCode={TableCode}, TargetTable={TargetTable}, CandidateRows={CandidateRows}, AppendElapsedMs={AppendElapsedMs}, SlowThresholdMs={SlowThresholdMs}",
+                    tableCode,
+                    destination,
+                    payload.Rows.Count,
+                    appendStopwatch.ElapsedMilliseconds,
+                    SlowAppendWarningThresholdMs);
+            }
+            return inserted;
         }
-        await bulkCopy.WriteToServerAsync(payload, ct);
-
-        // 步骤3：条件插入——仅插入目标表中不存在相同唯一键的行。
-        var insertSql = BuildConditionalInsertSql(destination, tempTable, payload.Columns, uniqueKeys);
-        await using var insertCmd = connection.CreateCommand();
-        insertCmd.CommandTimeout = AppendTimeoutSeconds;
-        insertCmd.CommandText = insertSql;
-        var inserted = await insertCmd.ExecuteNonQueryAsync(ct);
-
-        appendStopwatch.Stop();
-        logger.LogInformation(
-            "状态驱动追加写入完成（幂等去重）。TableCode={TableCode}, TargetTable={TargetTable}, CandidateRows={CandidateRows}, InsertedRows={InsertedRows}, SkippedRows={SkippedRows}, AppendElapsedMs={AppendElapsedMs}",
-            tableCode,
-            destination,
-            payload.Rows.Count,
-            inserted,
-            payload.Rows.Count - inserted,
-            appendStopwatch.ElapsedMilliseconds);
-        if (appendStopwatch.ElapsedMilliseconds >= SlowAppendWarningThresholdMs) {
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) {
+            appendStopwatch.Stop();
+            await TryRollbackAsync(transaction, ct);
             logger.LogWarning(
-                "状态驱动追加写入耗时较高。TableCode={TableCode}, TargetTable={TargetTable}, CandidateRows={CandidateRows}, AppendElapsedMs={AppendElapsedMs}, SlowThresholdMs={SlowThresholdMs}",
+                "状态驱动追加写入已取消。TableCode={TableCode}, TargetTable={TargetTable}, CandidateRows={CandidateRows}, AppendElapsedMs={AppendElapsedMs}, FailureReason={FailureReason}",
                 tableCode,
                 destination,
                 payload.Rows.Count,
                 appendStopwatch.ElapsedMilliseconds,
-                SlowAppendWarningThresholdMs);
+                "调用方取消令牌触发写入终止。");
+            throw;
         }
-        return inserted;
+        catch (Exception ex) {
+            appendStopwatch.Stop();
+            await TryRollbackAsync(transaction, ct);
+            logger.LogError(
+                ex,
+                "状态驱动追加写入失败。TableCode={TableCode}, TargetTable={TargetTable}, CandidateRows={CandidateRows}, AppendElapsedMs={AppendElapsedMs}, FailureReason={FailureReason}",
+                tableCode,
+                destination,
+                payload.Rows.Count,
+                appendStopwatch.ElapsedMilliseconds,
+                ex.Message);
+            throw;
+        }
     }
 
     /// <summary>
@@ -184,10 +215,58 @@ public class SqlServerAppendOnlyWriter(
 INSERT INTO {destination} ({colList})
 SELECT {colList} FROM {tempTable} s
 WHERE NOT EXISTS (
-    SELECT 1 FROM {destination} t
+    SELECT 1 FROM {destination} t WITH (UPDLOCK, HOLDLOCK)
     WHERE {joinConditions}
 )
 """;
+    }
+
+    /// <summary>
+    /// 规范化唯一键列名集合并执行安全校验。
+    /// </summary>
+    /// <param name="uniqueKeys">原始唯一键列名集合。</param>
+    /// <returns>规范化后的唯一键列名集合。</returns>
+    private static IReadOnlyList<string> NormalizeUniqueKeys(IReadOnlyList<string> uniqueKeys) {
+        if (uniqueKeys.Count == 0) {
+            return uniqueKeys;
+        }
+
+        var normalized = new List<string>(uniqueKeys.Count);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in uniqueKeys) {
+            if (string.IsNullOrWhiteSpace(key)) {
+                throw new InvalidOperationException("状态驱动幂等追加失败：UniqueKeys 存在空白列名。 ");
+            }
+
+            var trimmed = key.Trim();
+            EnsureSafeIdentifier(trimmed, nameof(uniqueKeys));
+            if (seen.Add(trimmed)) {
+                normalized.Add(trimmed);
+            }
+        }
+
+        if (normalized.Count == 0) {
+            throw new InvalidOperationException("状态驱动幂等追加失败：UniqueKeys 为空。 ");
+        }
+
+        return normalized;
+    }
+
+    /// <summary>
+    /// 安全回滚事务。
+    /// </summary>
+    /// <param name="transaction">事务实例。</param>
+    /// <param name="ct">取消令牌。</param>
+    private async Task TryRollbackAsync(SqlTransaction transaction, CancellationToken ct) {
+        try {
+            await transaction.RollbackAsync(ct);
+        }
+        catch (Exception rollbackEx) {
+            logger.LogError(
+                rollbackEx,
+                "状态驱动追加写入事务回滚失败。FailureReason={FailureReason}",
+                rollbackEx.Message);
+        }
     }
 
     /// <summary>

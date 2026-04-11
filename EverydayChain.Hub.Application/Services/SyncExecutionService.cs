@@ -86,6 +86,7 @@ public class SyncExecutionService(
             batchInitElapsedMs = stepSw.ElapsedMilliseconds;
 
             var pageNo = 1;
+            var processedPageCount = 0;
             while (!ct.IsCancellationRequested)
             {
                 // 步骤1：按窗口分页读取源端增量数据。
@@ -203,9 +204,11 @@ public class SyncExecutionService(
 
                 if (readResult.Rows.Count < context.Definition.PageSize)
                 {
+                    processedPageCount++;
                     break;
                 }
 
+                processedPageCount++;
                 pageNo++;
             }
 
@@ -260,7 +263,7 @@ public class SyncExecutionService(
                 "同步批次步骤耗时。TableCode={TableCode}, BatchId={BatchId}, PageCount={PageCount}, BatchInitMs={BatchInitMs}, ReadMs={ReadMs}, StagingMs={StagingMs}, MergeMs={MergeMs}, DeletionMs={DeletionMs}, PersistMs={PersistMs}, CheckpointMs={CheckpointMs}, TotalMs={TotalMs}",
                 context.Definition.TableCode,
                 context.BatchId,
-                pageNo,
+                processedPageCount,
                 batchInitElapsedMs,
                 readElapsedMs,
                 stagingElapsedMs,

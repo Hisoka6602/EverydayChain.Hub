@@ -158,6 +158,29 @@ public class RemoteStatusConsumeServiceTests
     }
 
     /// <summary>
+    /// 配置游标过滤时，default 时间窗口应被拒绝并输出失败日志。
+    /// </summary>
+    [Fact]
+    public async Task ConsumeAsync_WhenCursorColumnConfiguredAndWindowInvalid_ShouldThrow()
+    {
+        var reader = new FakeOracleStatusDrivenSourceReader();
+        var appendWriter = new FakeSqlServerAppendOnlyWriter();
+        var remoteWriter = new FakeOracleRemoteStatusWriter();
+        var logger = new TestLogger<RemoteStatusConsumeService>();
+        var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, logger);
+        var definition = BuildStatusDrivenDefinitionWithCursorColumn();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.ConsumeAsync(definition, "BATCH-005", default, CancellationToken.None));
+
+        Assert.Contains("游标时间窗口无效", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            logger.Logs,
+            x => x.Level == LogLevel.Error
+                 && x.Message.Contains("状态驱动消费游标时间窗口无效", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     /// 构建状态驱动测试定义。
     /// </summary>
     /// <returns>同步表定义。</returns>
@@ -205,5 +228,16 @@ public class RemoteStatusConsumeServiceTests
                 BatchSize = 5000,
             },
         };
+    }
+
+    /// <summary>
+    /// 构建启用游标列过滤的状态驱动测试定义。
+    /// </summary>
+    /// <returns>同步表定义。</returns>
+    private static SyncTableDefinition BuildStatusDrivenDefinitionWithCursorColumn()
+    {
+        var definition = BuildStatusDrivenDefinition();
+        definition.CursorColumn = "ADDTIME";
+        return definition;
     }
 }
