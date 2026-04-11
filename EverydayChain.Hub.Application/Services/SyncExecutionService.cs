@@ -518,7 +518,7 @@ public class SyncExecutionService(
 
             // StatusDriven 主流程：委托给专用消费服务完成分页读取→追加→可选回写。
             stepSw.Restart();
-            var consumeResult = await remoteStatusConsumeService.ConsumeAsync(context.Definition, context.BatchId, ct);
+            var consumeResult = await remoteStatusConsumeService.ConsumeAsync(context.Definition, context.BatchId, context.Window, ct);
             consumeElapsedMs = stepSw.ElapsedMilliseconds;
 
             // StatusDriven 不产生变更日志与删除日志，写入空集合保持链路一致。
@@ -558,6 +558,15 @@ public class SyncExecutionService(
                 FailureRate = consumeResult.WriteBackFailCount > 0 ? (double)consumeResult.WriteBackFailCount / Math.Max(1, consumeResult.ReadCount) : 0,
             };
             await batchRepository.CompleteBatchAsync(batchResult, DateTime.Now, ct);
+            logger.LogInformation(
+                "状态驱动批次步骤耗时。TableCode={TableCode}, BatchId={BatchId}, BatchInitMs={BatchInitMs}, ConsumeMs={ConsumeMs}, PersistMs={PersistMs}, CheckpointMs={CheckpointMs}, TotalMs={TotalMs}",
+                context.Definition.TableCode,
+                context.BatchId,
+                batchInitElapsedMs,
+                consumeElapsedMs,
+                persistElapsedMs,
+                checkpointElapsedMs,
+                stopwatch.ElapsedMilliseconds);
             logger.LogInformation(
                 "状态驱动消费同步指标。TableCode={TableCode}, BatchId={BatchId}, ReadCount={ReadCount}, AppendCount={AppendCount}, WriteBackCount={WriteBackCount}, WriteBackFailCount={WriteBackFailCount}, SkippedWriteBackCount={SkippedWriteBackCount}, PageCount={PageCount}, LagMinutes={LagMinutes}, ThroughputRowsPerSecond={ThroughputRowsPerSecond}",
                 batchResult.TableCode,

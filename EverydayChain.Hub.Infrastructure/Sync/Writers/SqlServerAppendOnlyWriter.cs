@@ -39,6 +39,7 @@ public class SqlServerAppendOnlyWriter(
         string tableCode,
         string targetLogicalTable,
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows,
+        IReadOnlyList<string> uniqueKeys,
         CancellationToken ct) {
         if (rows.Count == 0) {
             return 0;
@@ -51,16 +52,18 @@ public class SqlServerAppendOnlyWriter(
         var payload = BuildPayloadDataTable(rows);
         return await dangerZoneExecutor.ExecuteAsync(
            $"SqlServerStatusAppend:{tableCode}",
-           token => AppendCoreAsync(tableCode, destination, payload, token),
+           token => uniqueKeys.Count > 0
+               ? AppendDeduplicatedAsync(tableCode, destination, payload, uniqueKeys, token)
+               : AppendCoreAsync(tableCode, destination, payload, token),
            ct,
            AppendTimeoutSeconds);
     }
 
     /// <summary>
-    /// 执行真实 SQL Server 批量追加写入。
+    /// 执行真实 SQL Server 批量追加写入（无去重，仅在 uniqueKeys 为空时使用）。
     /// </summary>
     /// <param name="tableCode">表编码。</param>
-    /// <param name="destination">目标全表名。</param>
+    /// <param name="destination">目标全表名（由 <see cref="BuildTargetTableFullName"/> 构建，已通过 <see cref="EscapeIdentifier"/> 转义标识符）。</param>
     /// <param name="payload">待写入数据。</param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>写入行数。</returns>
@@ -97,6 +100,94 @@ public class SqlServerAppendOnlyWriter(
                 SlowAppendWarningThresholdMs);
         }
         return payload.Rows.Count;
+    }
+
+    /// <summary>
+    /// 幂等追加写入：先将数据 BulkCopy 到临时表，再通过 NOT EXISTS 条件插入目标表，跳过已存在行。
+    /// 适用于 statusDriven 场景下"追加成功但回写远端失败后重试"时可能产生的重复行。
+    /// </summary>
+    /// <param name="tableCode">表编码。</param>
+    /// <param name="destination">
+    /// 目标全表名（由 <see cref="BuildTargetTableFullName"/> 构建，已通过 <see cref="EscapeIdentifier"/>
+    /// 转义方括号标识符，可安全直接嵌入 SQL）。
+    /// </param>
+    /// <param name="payload">待写入数据。</param>
+    /// <param name="uniqueKeys">业务唯一键列名集合，用于 NOT EXISTS 子查询。各列名已由调用方在配置加载时通过标识符校验。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>实际插入行数（跳过重复行后）。</returns>
+    private async Task<int> AppendDeduplicatedAsync(string tableCode, string destination, DataTable payload, IReadOnlyList<string> uniqueKeys, CancellationToken ct) {
+        var appendStopwatch = System.Diagnostics.Stopwatch.StartNew();
+        await using var connection = new SqlConnection(_shardingOptions.ConnectionString);
+        await connection.OpenAsync(ct);
+
+        // 步骤1：从目标表克隆结构到本连接作用域临时表（不继承约束，允许写入重复行）。
+        const string tempTable = "#hub_stage";
+        await using var createCmd = connection.CreateCommand();
+        createCmd.CommandTimeout = AppendTimeoutSeconds;
+        createCmd.CommandText = $"SELECT TOP 0 * INTO {tempTable} FROM {destination}";
+        await createCmd.ExecuteNonQueryAsync(ct);
+
+        // 步骤2：BulkCopy 到临时表。
+        using var bulkCopy = new SqlBulkCopy(connection) {
+            DestinationTableName = tempTable,
+            BatchSize = Math.Min(payload.Rows.Count, 2000),
+            BulkCopyTimeout = AppendTimeoutSeconds,
+            EnableStreaming = true,
+        };
+        foreach (DataColumn column in payload.Columns) {
+            bulkCopy.ColumnMappings.Add(column.ColumnName, column.ColumnName);
+        }
+        await bulkCopy.WriteToServerAsync(payload, ct);
+
+        // 步骤3：条件插入——仅插入目标表中不存在相同唯一键的行。
+        var insertSql = BuildConditionalInsertSql(destination, tempTable, payload.Columns, uniqueKeys);
+        await using var insertCmd = connection.CreateCommand();
+        insertCmd.CommandTimeout = AppendTimeoutSeconds;
+        insertCmd.CommandText = insertSql;
+        var inserted = await insertCmd.ExecuteNonQueryAsync(ct);
+
+        appendStopwatch.Stop();
+        logger.LogInformation(
+            "状态驱动追加写入完成（幂等去重）。TableCode={TableCode}, TargetTable={TargetTable}, CandidateRows={CandidateRows}, InsertedRows={InsertedRows}, SkippedRows={SkippedRows}, AppendElapsedMs={AppendElapsedMs}",
+            tableCode,
+            destination,
+            payload.Rows.Count,
+            inserted,
+            payload.Rows.Count - inserted,
+            appendStopwatch.ElapsedMilliseconds);
+        if (appendStopwatch.ElapsedMilliseconds >= SlowAppendWarningThresholdMs) {
+            logger.LogWarning(
+                "状态驱动追加写入耗时较高。TableCode={TableCode}, TargetTable={TargetTable}, CandidateRows={CandidateRows}, AppendElapsedMs={AppendElapsedMs}, SlowThresholdMs={SlowThresholdMs}",
+                tableCode,
+                destination,
+                payload.Rows.Count,
+                appendStopwatch.ElapsedMilliseconds,
+                SlowAppendWarningThresholdMs);
+        }
+        return inserted;
+    }
+
+    /// <summary>
+    /// 构建条件插入 SQL：将临时表中不存在于目标表的行插入目标表。
+    /// </summary>
+    /// <param name="destination">目标全表名。</param>
+    /// <param name="tempTable">临时表名。</param>
+    /// <param name="columns">待插入列集合（已排除 __RowId）。</param>
+    /// <param name="uniqueKeys">业务唯一键列名集合。</param>
+    /// <returns>条件插入 SQL 文本。</returns>
+    private static string BuildConditionalInsertSql(string destination, string tempTable, DataColumnCollection columns, IReadOnlyList<string> uniqueKeys) {
+        var colList = string.Join(", ", columns.Cast<DataColumn>().Select(c => $"[{EscapeIdentifier(c.ColumnName)}]"));
+        var joinConditions = string.Join(
+            " AND ",
+            uniqueKeys.Select(k => $"t.[{EscapeIdentifier(k)}] = s.[{EscapeIdentifier(k)}]"));
+        return $"""
+INSERT INTO {destination} ({colList})
+SELECT {colList} FROM {tempTable} s
+WHERE NOT EXISTS (
+    SELECT 1 FROM {destination} t
+    WHERE {joinConditions}
+)
+""";
     }
 
     /// <summary>

@@ -41,7 +41,7 @@ public class RemoteStatusConsumeServiceTests
         var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, logger);
         var definition = BuildStatusDrivenDefinition();
 
-        var result = await service.ConsumeAsync(definition, "BATCH-001", CancellationToken.None);
+        var result = await service.ConsumeAsync(definition, "BATCH-001", default, CancellationToken.None);
 
         Assert.Equal(2, result.ReadCount);
         Assert.Equal(2, result.AppendCount);
@@ -76,7 +76,7 @@ public class RemoteStatusConsumeServiceTests
         var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, logger);
         var definition = BuildStatusDrivenDefinition();
 
-        var result = await service.ConsumeAsync(definition, "BATCH-002", CancellationToken.None);
+        var result = await service.ConsumeAsync(definition, "BATCH-002", default, CancellationToken.None);
 
         Assert.Equal([1, 1], reader.RequestedPageNos);
         Assert.Equal(1, result.AppendCount);
@@ -107,7 +107,7 @@ public class RemoteStatusConsumeServiceTests
         var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, logger);
         var definition = BuildStatusDrivenDefinitionWithWriteBackDisabled();
 
-        var result = await service.ConsumeAsync(definition, "BATCH-003", CancellationToken.None);
+        var result = await service.ConsumeAsync(definition, "BATCH-003", default, CancellationToken.None);
 
         Assert.Equal(1, result.ReadCount);
         Assert.Equal(1, result.AppendCount);
