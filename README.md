@@ -1,6 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 更新 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`：补齐业务逻辑与调用链路，逐个 PR 明确“输入->处理->输出”。
+- 计划文档新增每个 PR 的“复用文件清单 + 参考文件清单 + 预计改动文件数 + 交付结果 + 验收标准”，可直接用于实施排期与范围控制。
+- 计划文档新增“每个 PR 的建议标题 + 建议分支名 + 评审关注点”汇总清单，并提供统一 PR 描述模板。
 - **同步数据专属日志落盘**：`nlog.config` 新增 `sync-file` 专属滚动文件目标（`sync-${shortdate}.log`），将同步后台任务、编排服务、执行服务、基础设施同步组件的日志额外路由至同步专属文件，同时保留写入通用日志文件。
 - **同步批次步骤耗时记录（KeyedMerge）**：`SyncExecutionService.ExecuteBatchAsync` 新增七维步骤计时（BatchInitMs / ReadMs / StagingMs / MergeMs / DeletionMs / PersistMs / CheckpointMs），批次成功时输出 `同步批次步骤耗时` 日志，便于定位各阶段性能瓶颈。
 - **同步批次步骤耗时记录（StatusDriven）**：`SyncExecutionService.ExecuteStatusDrivenBatchAsync` 新增四维步骤计时（BatchInitMs / ConsumeMs / PersistMs / CheckpointMs），批次成功时输出 `状态驱动批次步骤耗时` 日志。
@@ -29,6 +32,14 @@
 - 建议将状态驱动 `StatusBatchSize` 与本地追加耗时联动到自动调谐（AutoTune）策略，实现批大小动态收敛并避免触发短超时。
 - 续审机制已通过批次 H 完成新一轮 20 项全面合规扫描闭环验证，建议后续将合规性扫描纳入 CI 自动化，在每次 PR 提交时自动触发逐文件入账检查。
 
+## 后续可完善点
+- 可将实施计划中的“统一验收清单”和“漂移拦截点”沉淀为 CI 自动检查项，降低多 PR 串行交付的人工审查成本。
+- 可在 SQL Server 侧增加等待事件采样（LCK_* / WRITELOG / PAGEIOLATCH_*）并与 `AppendElapsedMs` 对齐，实现“低资源占用慢请求”的自动归因告警。
+- 可将 `RemoteStatusConsumeService` 的状态驱动追加链路接入 AutoTune 闭环（按页耗时/失败率动态调整 `StatusBatchSize`），与 KeyedMerge 的调优能力对齐。
+- 可将状态驱动写入的“分表确认缓存”从进程内缓存扩展为跨重启持久化缓存，并增加后台预热策略，进一步缩短冷启动首批写入耗时。
+- 建议将状态驱动 `StatusBatchSize` 与本地追加耗时联动到自动调谐（AutoTune）策略，实现批大小动态收敛并避免触发短超时。
+- 续审机制已通过批次 H 完成新一轮 20 项全面合规扫描闭环验证，建议后续将合规性扫描纳入 CI 自动化，在每次 PR 提交时自动触发逐文件入账检查。
+
 ## 解决方案文件树与职责
 ```text
 .
@@ -49,6 +60,7 @@
 ├── Oracle到SQLServer同步实施计划.md
 ├── 兼容现有实现的可切换同步模式改造分析与执行步骤.md
 ├── EverydayChain.Hub_详细业务背景开发指令_v2.md
+├── EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md
 ├── scripts
 │   ├── health-check.sh
 │   ├── disaster-recovery.sh
@@ -312,6 +324,7 @@
 - `Oracle到SQLServer同步架构设计.md`：定义外部 Oracle DB First 只读同步到本地 SQL Server 的详细落地方案。
 - `Oracle到SQLServer同步实施计划.md`：按 PR 拆分同步架构落地步骤的进度跟踪文档。
 - `EverydayChain.Hub_详细业务背景开发指令_v2.md`：项目详细业务背景与开发指令参考文档 v2，记录业务领域知识与 Copilot 开发约定。
+- `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`：详细业务背景指令 v2 的实施总计划，定义多 PR 阶段目标、依赖顺序、验收门禁、风险拦截与待确认项，确保跨阶段执行保持一致目标。
 - `兼容现有实现的可切换同步模式改造分析与执行步骤.md`：基于现有代码的双模式改造分析文档，明确保留链路、StatusDriven 停用项、分层新增文件与实施步骤。
 - `ShardingOptions.cs`：分表配置模型，仅保留连接、Schema 与自动预建月数等基础配置。
 - `AutoTuneOptions.cs`：批量写入自动调谐配置，从 `AutoTune` 节点绑定，覆盖初始/最小/最大批量、步长、慢阈值与采样窗口等参数。
