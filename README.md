@@ -1,7 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 执行续审批次 I（`逐文件全量审查实施方案.md`）：在续审批次 A-H 全仓 171/171 文件覆盖完成基础上，核对实际文件数（git ls-files = 173），发现 2 个漏入账文件：新增 `Infrastructure/Services/OracleConnectionStringResolver.cs` 与根目录 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`。
+- 执行续审批次 I（`逐文件全量审查实施方案.md`）：在续审批次 A-H 全仓 171/171 文件覆盖完成基础上，核对实际文件数（git ls-files = 173），发现 2 个漏入账文件：新增 `EverydayChain.Hub.Infrastructure/Services/OracleConnectionStringResolver.cs` 与根目录 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`。
 - 修复测试回归（2 项）：`BuildConnectionString_WhenConnectionStringIsBlank` 更新为期望 `InvalidOperationException`（空连接串快速失败语义一致）；恢复 `SyncTaskConfigRepository.BuildStatusConsumeProfile` 中非 null 空白 PendingStatusValue 的校验抛出。
 - 更新 README：文件树补充 `OracleConnectionStringResolver.cs` 条目与逐项说明。
 - 更新 `逐文件代码检查台账.md`：总文件数 171→173，新增续审批次 I 记录，更新当前阶段描述。
