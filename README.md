@@ -1,11 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 执行续审批次 I（`逐文件全量审查实施方案.md`）：在续审批次 A-H 全仓 171/171 文件覆盖完成基础上，核对实际文件数（git ls-files = 173），发现 2 个漏入账文件：新增 `EverydayChain.Hub.Infrastructure/Services/OracleConnectionStringResolver.cs` 与根目录 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`。
-- 修复测试回归（2 项）：`BuildConnectionString_WhenConnectionStringIsBlank` 更新为期望 `InvalidOperationException`（空连接串快速失败语义一致）；恢复 `SyncTaskConfigRepository.BuildStatusConsumeProfile` 中非 null 空白 PendingStatusValue 的校验抛出。
-- 更新 README：文件树补充 `OracleConnectionStringResolver.cs` 条目与逐项说明。
-- 更新 `逐文件代码检查台账.md`：总文件数 171→173，新增续审批次 I 记录，更新当前阶段描述。
-- 更新 `逐文件全量审查实施方案.md`：补充批次 I 执行记录章节与验收清单条目。
+- 执行续审批次 J（`逐文件全量审查实施方案.md`）：在续审批次 A-I 全仓 173/173 文件覆盖完成基础上，核对实际文件数（git ls-files = 173，与台账一致），执行 20 项全面合规扫描，发现 0 个新问题，全部规则扫描通过。
+- 更新 `逐文件代码检查台账.md`：新增续审批次 J 记录，更新当前阶段描述。
+- 更新 `逐文件全量审查实施方案.md`：补充批次 J 执行记录章节与验收清单条目。
 - 构建验证：0 Warning 0 Error，66/66 单元测试通过。
 ## 后续可完善点
 - 可将实施计划中的"统一验收清单"和"漂移拦截点"沉淀为 CI 自动检查项，降低多 PR 串行交付的人工审查成本。
@@ -13,7 +11,7 @@
 - 可将 `RemoteStatusConsumeService` 的状态驱动追加链路接入 AutoTune 闭环（按页耗时/失败率动态调整 `StatusBatchSize`），与 KeyedMerge 的调优能力对齐。
 - 可将状态驱动写入的"分表确认缓存"从进程内缓存扩展为跨重启持久化缓存，并增加后台预热策略，进一步缩短冷启动首批写入耗时。
 - 建议将状态驱动 `StatusBatchSize` 与本地追加耗时联动到自动调谐（AutoTune）策略，实现批大小动态收敛并避免触发短超时。
-- 续审机制已通过批次 I 完成全仓 173/173 文件入账与全面合规扫描闭环验证，建议后续将合规性扫描纳入 CI 自动化，在每次 PR 提交时自动触发逐文件入账检查。
+- 续审机制已通过批次 J 完成全仓 173/173 文件入账与全面合规扫描闭环验证，建议后续将合规性扫描纳入 CI 自动化，在每次 PR 提交时自动触发逐文件入账检查。
 
 
 ## 解决方案文件树与职责
