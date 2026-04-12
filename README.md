@@ -1,44 +1,20 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 更新 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`：补齐业务逻辑与调用链路，逐个 PR 明确“输入->处理->输出”。
-- 计划文档新增每个 PR 的“复用文件清单 + 参考文件清单 + 预计改动文件数 + 交付结果 + 验收标准”，可直接用于实施排期与范围控制。
-- 计划文档新增“每个 PR 的建议标题 + 建议分支名 + 评审关注点”汇总清单，并提供统一 PR 描述模板。
-- **同步数据专属日志落盘**：`nlog.config` 新增 `sync-file` 专属滚动文件目标（`sync-${shortdate}.log`），将同步后台任务、编排服务、执行服务、基础设施同步组件的日志额外路由至同步专属文件，同时保留写入通用日志文件。
-- **同步批次步骤耗时记录（KeyedMerge）**：`SyncExecutionService.ExecuteBatchAsync` 新增七维步骤计时（BatchInitMs / ReadMs / StagingMs / MergeMs / DeletionMs / PersistMs / CheckpointMs），批次成功时输出 `同步批次步骤耗时` 日志，便于定位各阶段性能瓶颈。
-- **同步批次步骤耗时记录（StatusDriven）**：`SyncExecutionService.ExecuteStatusDrivenBatchAsync` 新增四维步骤计时（BatchInitMs / ConsumeMs / PersistMs / CheckpointMs），批次成功时输出 `状态驱动批次步骤耗时` 日志。
-- **CursorColumn 支持 StatusDriven 模式**：`IOracleStatusDrivenSourceReader.ReadPendingPageAsync` 与 `IRemoteStatusConsumeService.ConsumeAsync` 新增 `SyncWindow window` 参数；当 `CursorColumn` 非空时，Oracle 读取 SQL 追加时间范围过滤，避免全表状态扫描；`appsettings.json` 中 `CursorColumn` 注释已更新。
-- **修复 StatusDriven 追加写入重复键错误**：`ISqlServerAppendOnlyWriter.AppendAsync` 新增 `IReadOnlyList<string> uniqueKeys` 参数；当唯一键非空时改用"暂存临时表 + NOT EXISTS 条件插入"幂等追加策略，彻底解决"追加成功但远端回写失败后重试"场景下的 `SqlBulkCopy` 重复键冲突。
-- **验证状态回写配置路径**：确认 `StatusColumnName`、`CompletedStatusValue`、`ShouldWriteBackRemoteStatus` 均通过配置链正确传递和使用，根本原因为"追加后回写失败"重试场景，由幂等追加修复。
-- 构建验证：0 Warning 0 Error，62/64 单元测试通过（2 项为预存在失败与本次变更无关）。
-- 状态驱动本地追加写入锁竞争优化：移除 `SqlBulkCopyOptions.TableLock`，避免并发表同步/查询场景下出现表级锁等待导致“设备占用低但响应慢”。
-- 状态驱动本地追加写入可观测性增强：新增 `AppendElapsedMs` 指标日志与慢写告警阈值日志，便于区分锁等待、网络等待与真实 CPU/IO 瓶颈。
-- 状态驱动分表确认进一步优化：`IShardTableProvisioner` 新增“按逻辑表+后缀”确认接口，`SqlServerAppendOnlyWriter` 改为仅确认当前目标逻辑表，避免一次写入触发全部纳管表的分表检查。
-- 状态驱动分表缓存粒度升级：分表就绪缓存键从“仅后缀”调整为“逻辑表+后缀”，降低多表并发时跨表干扰，保留短超时和并发能力。
-- 状态驱动本地追加写入性能优化：`SqlServerAppendOnlyWriter` 新增“按逻辑表+后缀一次性预热缓存”，避免每页都重复触发分表确认 SQL，降低元数据检查开销与锁竞争概率。
-- 状态驱动本地追加写入通道优化：`SqlBulkCopy` 保留 `EnableStreaming` 并移除 `TableLock`，在保留短超时策略前提下优先降低锁等待风险。
-- 修复 `EnsureShardPreparedOnceAsync` 取消令牌传递：将分表确认调用由 `CancellationToken.None` 改为传入 `ct`，首次调用方取消意图可正确传递至 DDL 操作。
-- 修复分表就绪缓存失效逻辑：区分“调用方取消等待”与“任务自身出错/取消”，仅在任务 `IsFaulted || IsCanceled` 时清除缓存，解决因请求超时导致缓存频繁失效并触发重复 DDL 的问题。
-- 新增分表就绪缓存上限策略：引入 `MaxShardReadyCacheEntries`（默认 200）与 `TrimShardReadyCacheIfNeeded` 方法，防止长时间运行进程中月度分表后缀持续累积导致内存单调增长。
-- 执行续审批次 H（`逐文件全量审查实施方案.md`）：在续审批次 A-G 全仓 171/171 文件覆盖完成基础上，执行新一轮 20 项全面合规验证，涵盖 UTC 禁用、命名空间一致性、分层引用约束、类名约束、Polly 重试策略、安全执行器唯一性等全部规范要求，未发现新问题。
-- 构建验证：0 Warning 0 Error，64/64 单元测试通过。
-- 更新 `逐文件代码检查台账.md`：补充批次 H 记录（20 项检查），更新当前阶段描述。
-- 更新 `逐文件全量审查实施方案.md`：补充批次 H 执行记录章节与验收清单条目。
-
+- 执行续审批次 I（`逐文件全量审查实施方案.md`）：在续审批次 A-H 全仓 171/171 文件覆盖完成基础上，核对实际文件数（git ls-files = 173），发现 2 个漏入账文件：新增 `EverydayChain.Hub.Infrastructure/Services/OracleConnectionStringResolver.cs` 与根目录 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`。
+- 修复测试回归（2 项）：`BuildConnectionString_WhenConnectionStringIsBlank` 更新为期望 `InvalidOperationException`（空连接串快速失败语义一致）；恢复 `SyncTaskConfigRepository.BuildStatusConsumeProfile` 中非 null 空白 PendingStatusValue 的校验抛出。
+- 更新 README：文件树补充 `OracleConnectionStringResolver.cs` 条目与逐项说明。
+- 更新 `逐文件代码检查台账.md`：总文件数 171→173，新增续审批次 I 记录，更新当前阶段描述。
+- 更新 `逐文件全量审查实施方案.md`：补充批次 I 执行记录章节与验收清单条目。
+- 构建验证：0 Warning 0 Error，66/66 单元测试通过。
 ## 后续可完善点
-- 可在 SQL Server 侧增加等待事件采样（LCK_* / WRITELOG / PAGEIOLATCH_*）并与 `AppendElapsedMs` 对齐，实现“低资源占用慢请求”的自动归因告警。
+- 可将实施计划中的"统一验收清单"和"漂移拦截点"沉淀为 CI 自动检查项，降低多 PR 串行交付的人工审查成本。
+- 可在 SQL Server 侧增加等待事件采样（LCK_* / WRITELOG / PAGEIOLATCH_*）并与 `AppendElapsedMs` 对齐，实现"低资源占用慢请求"的自动归因告警。
 - 可将 `RemoteStatusConsumeService` 的状态驱动追加链路接入 AutoTune 闭环（按页耗时/失败率动态调整 `StatusBatchSize`），与 KeyedMerge 的调优能力对齐。
-- 可将状态驱动写入的“分表确认缓存”从进程内缓存扩展为跨重启持久化缓存，并增加后台预热策略，进一步缩短冷启动首批写入耗时。
+- 可将状态驱动写入的"分表确认缓存"从进程内缓存扩展为跨重启持久化缓存，并增加后台预热策略，进一步缩短冷启动首批写入耗时。
 - 建议将状态驱动 `StatusBatchSize` 与本地追加耗时联动到自动调谐（AutoTune）策略，实现批大小动态收敛并避免触发短超时。
-- 续审机制已通过批次 H 完成新一轮 20 项全面合规扫描闭环验证，建议后续将合规性扫描纳入 CI 自动化，在每次 PR 提交时自动触发逐文件入账检查。
+- 续审机制已通过批次 I 完成全仓 173/173 文件入账与全面合规扫描闭环验证，建议后续将合规性扫描纳入 CI 自动化，在每次 PR 提交时自动触发逐文件入账检查。
 
-## 后续可完善点
-- 可将实施计划中的“统一验收清单”和“漂移拦截点”沉淀为 CI 自动检查项，降低多 PR 串行交付的人工审查成本。
-- 可在 SQL Server 侧增加等待事件采样（LCK_* / WRITELOG / PAGEIOLATCH_*）并与 `AppendElapsedMs` 对齐，实现“低资源占用慢请求”的自动归因告警。
-- 可将 `RemoteStatusConsumeService` 的状态驱动追加链路接入 AutoTune 闭环（按页耗时/失败率动态调整 `StatusBatchSize`），与 KeyedMerge 的调优能力对齐。
-- 可将状态驱动写入的“分表确认缓存”从进程内缓存扩展为跨重启持久化缓存，并增加后台预热策略，进一步缩短冷启动首批写入耗时。
-- 建议将状态驱动 `StatusBatchSize` 与本地追加耗时联动到自动调谐（AutoTune）策略，实现批大小动态收敛并避免触发短超时。
-- 续审机制已通过批次 H 完成新一轮 20 项全面合规扫描闭环验证，建议后续将合规性扫描纳入 CI 自动化，在每次 PR 提交时自动触发逐文件入账检查。
 
 ## 解决方案文件树与职责
 ```text
@@ -188,7 +164,8 @@
 │       ├── SqlExecutionTuner.cs
 │       ├── ISortingTaskTraceWriter.cs
 │       ├── SortingTaskTraceWriter.cs
-│       └── NonRetryableDangerZoneException.cs
+│       ├── NonRetryableDangerZoneException.cs
+│       └── OracleConnectionStringResolver.cs
 ├── EverydayChain.Hub.Tests
 │   ├── EverydayChain.Hub.Tests.csproj
 │   ├── Repositories/OracleSourceReaderTests.cs
@@ -273,6 +250,7 @@
 - `SqlExecutionTuner.cs`：基于失败率和耗时进行批量窗口升降调谐；采样窗口大小与失败率阈值均来自 `AutoTuneOptions`。
 - `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断），弹性参数来自 `DangerZoneOptions`。
 - `NonRetryableDangerZoneException.cs`：危险隔离器“不可重试异常”标记类型，用于识别配置类确定性失败并快速失败。
+- `OracleConnectionStringResolver.cs`：Oracle 连接串解析器（Infrastructure 内部工具类），统一处理 `Database`/`DatabaseMode` 对 Data Source 的 EZCONNECT 覆写逻辑；支持 Auto/ServiceName/SID 三种模式，复杂 DESCRIPTION 描述符场景下快速失败。
 - `IRuntimeStorageGuard.cs` + `RuntimeStorageGuard.cs`：运行期存储守护服务，负责启动阶段的磁盘空间、目录权限、关键文件可读写自检，并在检查点/目标快照写入前执行磁盘阈值校验与告警阻断；同时提供单表内存水位监控与节流告警能力。
 - `SortingTaskTraceWriter.cs`：按分表后缀分组写入，并将执行结果回传给调谐器。
 - `SyncTaskConfigRepository.cs`：从 `SyncJob` 配置节读取表定义，校验 `StartTimeLocal` 禁止 `Z` 与 offset，校验 `ExcludedColumns` 不得与 `UniqueKeys`、`CursorColumn`、软删除关键列冲突，并解析优先级与多表并发上限；新增 `SyncMode` 与 StatusDriven 参数映射、默认值填充及中文错误校验。

@@ -13,10 +13,10 @@ namespace EverydayChain.Hub.Tests.Repositories;
 public class OracleSourceReaderTests
 {
     /// <summary>
-    /// 连接串为空时应返回空文本。
+    /// 连接串为空白时应抛出 InvalidOperationException（连接串不可为空，应快速失败）。
     /// </summary>
     [Fact]
-    public void BuildConnectionString_WhenConnectionStringIsBlank_ShouldReturnEmpty()
+    public void BuildConnectionString_WhenConnectionStringIsBlank_ShouldThrow()
     {
         var options = new OracleOptions
         {
@@ -24,8 +24,9 @@ public class OracleSourceReaderTests
             Database = "ORCL"
         };
 
-        var result = InvokeBuildConnectionString(options);
-        Assert.Equal(string.Empty, result);
+        var action = () => InvokeBuildConnectionString(options);
+        var exception = Assert.Throws<TargetInvocationException>(action);
+        Assert.IsType<InvalidOperationException>(exception.InnerException);
     }
 
     /// <summary>
