@@ -98,4 +98,20 @@ public class BusinessTaskEntity : IEntity<long>
     /// 更新时间（本地时间）。
     /// </summary>
     public DateTime UpdatedTimeLocal { get; set; }
+
+    /// <summary>
+    /// 波次编码，来自上游批次/波次标识；用于波次清理规则定位该批次所有任务，最大 64 字符；不参与波次管理时为空。
+    /// </summary>
+    [MaxLength(64)]
+    public string? WaveCode { get; set; }
+
+    /// <summary>
+    /// 是否已被标记为回流；由回流规则服务在扫描重试超限时置为 true。
+    /// </summary>
+    public bool IsRecirculated { get; set; }
+
+    /// <summary>
+    /// 扫描重试次数；每次扫描上传失败时由任务执行服务递增，用于触发回流判定。
+    /// </summary>
+    public int ScanRetryCount { get; set; }
 }

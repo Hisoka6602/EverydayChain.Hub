@@ -99,4 +99,30 @@ public class BusinessTaskRepository : IBusinessTaskRepository
             .Take(maxCount)
             .ToListAsync(ct);
     }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BusinessTaskEntity>> FindByWaveCodeAsync(string waveCode, CancellationToken ct)
+    {
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var db = await _contextFactory.CreateDbContextAsync(ct);
+        return await db.BusinessTasks
+            .AsNoTracking()
+            .Where(x => x.WaveCode == waveCode)
+            .OrderBy(x => x.CreatedTimeLocal)
+            .ToListAsync(ct);
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BusinessTaskEntity>> FindActiveByBarcodeAsync(string barcode, CancellationToken ct)
+    {
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var db = await _contextFactory.CreateDbContextAsync(ct);
+        return await db.BusinessTasks
+            .AsNoTracking()
+            .Where(x => x.Barcode == barcode
+                && x.Status != Domain.Enums.BusinessTaskStatus.Dropped
+                && x.Status != Domain.Enums.BusinessTaskStatus.Exception)
+            .OrderBy(x => x.CreatedTimeLocal)
+            .ToListAsync(ct);
+    }
 }

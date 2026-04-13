@@ -1,14 +1,14 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 实施 PR-08（业务回传服务）：新增 `WmsFeedbackOptions` 配置实体；新增 `IWmsOracleFeedbackGateway` 应用层外部集成抽象（`Application/Abstractions/Integrations/`，遵循网关命名规范）；新增 `IWmsFeedbackService` 应用服务抽象（`Application/Abstractions/Services/`）；新增 `WmsFeedbackApplicationResult` 结果模型；新增 `WmsFeedbackService` 实现（`Application/Feedback/Services/`）；新增 `OracleWmsFeedbackGateway` 基础设施实现（`Infrastructure/Integrations/`）；`IBusinessTaskRepository` 新增 `FindPendingFeedbackAsync` 与 `FindFailedFeedbackAsync` 方法；`DropFeedbackService` 落格成功时同步置 `FeedbackStatus=Pending`；`appsettings.json` 增加 `WmsFeedback` 配置节（默认 `Enabled=false`，待确认目标表后再开启）；`ServiceCollectionExtensions` 注册新 DI；新增 `WmsFeedbackServiceTests` 测试 4 例（含 `CapturingWmsOracleFeedbackGateway` 替身）。
-- 实施 PR-09（扫描/落格日志落库）：新增 `ScanLogEntity`（`Domain/Aggregates/ScanLogAggregate/`）与 `DropLogEntity`（`Domain/Aggregates/DropLogAggregate/`）聚合根实体；新增 `IScanLogRepository`、`IDropLogRepository` 仓储抽象；新增 `ScanLogEntityTypeConfiguration`、`DropLogEntityTypeConfiguration` EF 配置；`HubDbContext` 新增 `ScanLogs`、`DropLogs` DbSet；新增 `ScanLogRepository`、`DropLogRepository` EF Core 实现；新增 EF 迁移 `20260413160852_AddScanDropLogTables`（`scan_logs`/`drop_logs` 表及索引）；`TaskExecutionService` 注入 `IScanLogRepository` 并在扫描成功/失败时写扫描日志；`DropFeedbackService` 注入 `IDropLogRepository` 并在落格成功/失败时写落格日志（日志写入失败不影响主流程）；新增 `ScanDropLogTests` 测试 4 例；测试替身新增 `InMemoryScanLogRepository`、`InMemoryDropLogRepository`；`ScanIngressServiceTests`、`TaskExecutionServiceTests`、`DropFeedbackServiceTests` 更新构造方法入参适配。
-- 新增测试合计 10 例，总计 122/122 测试通过。
-- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过（0 Warning 0 Error，122/122）。
+- 实施 PR-10（异常规则链路）：新增 `ExceptionRuleOptions`（含 `WaveCleanupRuleOptions`、`MultiLabelRuleOptions`、`RecirculationRuleOptions`）配置实体（`Domain/Options/`）；新增 `MultiLabelDecisionResult` 领域模型（`Domain/MultiLabel/`）；新增 `RecirculationDecisionResult` 领域模型（`Domain/Recirculation/`）；新增 `IWaveCleanupService` 接口（`Application/WaveCleanup/Abstractions/`）与 `WaveCleanupService` 实现（`Application/WaveCleanup/Services/`）；新增 `IMultiLabelDecisionService` 接口（`Application/MultiLabel/Abstractions/`）与 `MultiLabelDecisionService` 实现（`Application/MultiLabel/Services/`）；新增 `IRecirculationService` 接口（`Application/Recirculation/Abstractions/`）与 `RecirculationService` 实现（`Application/Recirculation/Services/`）；`BusinessTaskEntity` 新增 `WaveCode`、`IsRecirculated`、`ScanRetryCount` 字段；`IBusinessTaskRepository` 新增 `FindByWaveCodeAsync`、`FindActiveByBarcodeAsync` 方法；新增 EF 迁移 `20260413185000_AddExceptionRuleFields`；`ServiceCollectionExtensions` 注册三个新服务；`appsettings.json` 增加 `ExceptionRule` 配置节（含全局开关与 dry-run 支持）；新增 `ExceptionRuleTests` 测试 16 例。
+- 实施 PR-15（M3 里程碑全量审查：回传与审计阶段）：PR-08 与 PR-09 均已完成，构建与测试全绿（0 Warning 0 Error，138/138 测试通过），M3 里程碑审查结论归档到逐文件代码检查台账。
+- 新增测试合计 16 例，总计 138/138 测试通过。
+- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过（0 Warning 0 Error，138/138）。
 ## 后续可完善点
-- 冻结业务回传目标 Oracle 表与幂等键组合后，将 `WmsFeedback.Enabled` 置 `true` 并配置真实 Schema/Table/BusinessKeyColumn 完成端到端联调。
-- 推进 PR-09 中里程碑 M3 验收（PR-08 + PR-09 完成）。
-- 继续推进 PR-10（异常规则链路）、PR-11（补偿重试）与 PR-12（WmsFeedbackBackgroundWorker）。
+- 继续推进 PR-11（补偿重试链路）、PR-12（联调收口）。
+- 推进 PR-16（M4 里程碑审查，依赖 PR-10 + PR-11 完成后）。
+- 开启异常规则：生产环境确认规则参数后，将 `ExceptionRule.Enabled` 置 `true`，建议先用 `DryRun=true` 观察审计日志再正式启用。
 
 ## 解决方案文件树与职责
 ```text
@@ -83,6 +83,9 @@
 │   ├── Options/SyncRetentionOptions.cs
 │   ├── Options/SyncTableOptions.cs
 │   └── Options/WmsFeedbackOptions.cs
+│   └── Options/ExceptionRuleOptions.cs
+│   └── MultiLabel/MultiLabelDecisionResult.cs
+│   └── Recirculation/RecirculationDecisionResult.cs
 ├── EverydayChain.Hub.Application
 │   ├── EverydayChain.Hub.Application.csproj
 │   ├── Models/SyncExecutionContext.cs
@@ -139,6 +142,12 @@
 │   ├── Abstractions/Services/IDropFeedbackService.cs
 │   ├── Abstractions/Services/IWmsFeedbackService.cs
 │   ├── Abstractions/Integrations/IWmsOracleFeedbackGateway.cs
+│   ├── WaveCleanup/Abstractions/IWaveCleanupService.cs
+│   ├── WaveCleanup/Services/WaveCleanupService.cs
+│   ├── MultiLabel/Abstractions/IMultiLabelDecisionService.cs
+│   ├── MultiLabel/Services/MultiLabelDecisionService.cs
+│   ├── Recirculation/Abstractions/IRecirculationService.cs
+│   ├── Recirculation/Services/RecirculationService.cs
 │   ├── Models/RemoteStatusConsumeResult.cs
 │   ├── Services/SyncOrchestrator.cs
 │   ├── Services/SyncWindowCalculator.cs
@@ -349,6 +358,17 @@
 - `Infrastructure/Persistence/EntityConfigurations/DropLogEntityTypeConfiguration.cs`：落格日志 EF Fluent API 配置，映射 `drop_logs` 表，定义字段约束与查询索引。
 - `20260413160852_AddScanDropLogTables.cs`：新增 `scan_logs` 与 `drop_logs` 表的 EF 迁移，包含所有字段与索引定义。
 - `EverydayChain.Hub.Tests/Services/WmsFeedbackServiceTests.cs`：业务回传服务单元测试，覆盖无待回传任务空结果、写入成功置 Completed、写入器异常置 Failed、batchSize 限制、Enabled=false 直接短路、writtenRows 不一致整批失败六个场景；含 `CapturingWmsOracleFeedbackGateway` 捕获替身。
+- `Domain/Options/ExceptionRuleOptions.cs`：异常规则配置实体，包含 `WaveCleanupRuleOptions`、`MultiLabelRuleOptions`、`RecirculationRuleOptions` 三个子配置，支持全局开关与 dry-run 模式。
+- `Domain/MultiLabel/MultiLabelDecisionResult.cs`：多标签决策结果领域模型，包含是否多标签、决策状态、选用/舍弃任务编码与推荐目标状态。
+- `Domain/Recirculation/RecirculationDecisionResult.cs`：回流决策结果领域模型，包含是否需要回流、触发原因、扫描重试次数与推荐目标状态。
+- `Application/WaveCleanup/Abstractions/IWaveCleanupService.cs`：波次清理服务接口与 `WaveCleanupResult` 结果模型，按波次编码识别并清理非终态任务。
+- `Application/WaveCleanup/Services/WaveCleanupService.cs`：波次清理服务实现，支持 dry-run 模式（仅记录审计日志不执行变更）。
+- `Application/MultiLabel/Abstractions/IMultiLabelDecisionService.cs`：多标签决策服务接口，对给定条码的所有关联活跃任务执行策略决策。
+- `Application/MultiLabel/Services/MultiLabelDecisionService.cs`：多标签决策服务实现，支持 UseFirst/UseLatest/MarkException 三种策略。
+- `Application/Recirculation/Abstractions/IRecirculationService.cs`：回流规则服务接口，对指定任务执行回流判定。
+- `Application/Recirculation/Services/RecirculationService.cs`：回流规则服务实现，按扫描重试次数超限判定回流，支持 dry-run 模式。
+- `20260413185000_AddExceptionRuleFields.cs`：新增 `WaveCode`、`IsRecirculated`、`ScanRetryCount` 列及 `IX_business_tasks_WaveCode` 索引的 EF 迁移。
+- `EverydayChain.Hub.Tests/Services/ExceptionRuleTests.cs`：异常规则服务单元测试，覆盖波次清理、多标签决策与回流规则的主要路径共 16 个场景。
 - `EverydayChain.Hub.Tests/Services/ScanDropLogTests.cs`：扫描/落格日志落库测试，覆盖扫描成功写日志、扫描失败写日志、落格成功写日志+FeedbackPending、落格失败写日志四个场景。
 - `EverydayChain.Hub.Tests/Services/InMemoryScanLogRepository.cs`：扫描日志仓储内存替身。
 - `EverydayChain.Hub.Tests/Services/InMemoryDropLogRepository.cs`：落格日志仓储内存替身。

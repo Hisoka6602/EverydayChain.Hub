@@ -60,4 +60,20 @@ public interface IBusinessTaskRepository
     /// <param name="ct">取消令牌。</param>
     /// <returns>回传失败的业务任务列表。</returns>
     Task<IReadOnlyList<BusinessTaskEntity>> FindFailedFeedbackAsync(int maxCount, CancellationToken ct);
+
+    /// <summary>
+    /// 按波次编码查询所有业务任务（包括终态与非终态），按创建时间升序。
+    /// </summary>
+    /// <param name="waveCode">波次编码。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>该波次的所有业务任务列表。</returns>
+    Task<IReadOnlyList<BusinessTaskEntity>> FindByWaveCodeAsync(string waveCode, CancellationToken ct);
+
+    /// <summary>
+    /// 按条码查询所有非终态业务任务，用于多标签场景检测，按创建时间升序。
+    /// </summary>
+    /// <param name="barcode">条码文本。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>该条码关联的所有非终态业务任务列表。</returns>
+    Task<IReadOnlyList<BusinessTaskEntity>> FindActiveByBarcodeAsync(string barcode, CancellationToken ct);
 }

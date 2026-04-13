@@ -77,4 +77,26 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
             .ToList();
         return Task.FromResult(result);
     }
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<BusinessTaskEntity>> FindByWaveCodeAsync(string waveCode, CancellationToken ct)
+    {
+        IReadOnlyList<BusinessTaskEntity> result = _tasks
+            .Where(x => string.Equals(x.WaveCode, waveCode, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(x => x.CreatedTimeLocal)
+            .ToList();
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<BusinessTaskEntity>> FindActiveByBarcodeAsync(string barcode, CancellationToken ct)
+    {
+        IReadOnlyList<BusinessTaskEntity> result = _tasks
+            .Where(x => string.Equals(x.Barcode, barcode, StringComparison.OrdinalIgnoreCase)
+                && x.Status != BusinessTaskStatus.Dropped
+                && x.Status != BusinessTaskStatus.Exception)
+            .OrderBy(x => x.CreatedTimeLocal)
+            .ToList();
+        return Task.FromResult(result);
+    }
 }
