@@ -18,4 +18,34 @@ public sealed class ScanUploadApplicationRequest {
     /// 扫描时间（本地时间）。
     /// </summary>
     public DateTime ScanTimeLocal { get; set; }
+
+    /// <summary>
+    /// 链路追踪标识，长度范围 0~64。
+    /// </summary>
+    public string TraceId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 包裹长度，单位毫米，范围 >= 0。
+    /// </summary>
+    public decimal? LengthMm { get; set; }
+
+    /// <summary>
+    /// 包裹宽度，单位毫米，范围 >= 0。
+    /// </summary>
+    public decimal? WidthMm { get; set; }
+
+    /// <summary>
+    /// 包裹高度，单位毫米，范围 >= 0。
+    /// </summary>
+    public decimal? HeightMm { get; set; }
+
+    /// <summary>
+    /// 包裹体积，单位立方毫米，范围 >= 0。
+    /// </summary>
+    public decimal? VolumeMm3 { get; set; }
+
+    /// <summary>
+    /// 包裹重量，单位克，范围 >= 0。
+    /// </summary>
+    public decimal? WeightGram { get; set; }
 }
