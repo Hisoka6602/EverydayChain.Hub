@@ -77,4 +77,50 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
             .ToList();
         return Task.FromResult(result);
     }
+
+    /// <inheritdoc/>
+    public Task<int> BulkMarkExceptionByWaveCodeAsync(
+        string waveCode,
+        BusinessTaskStatus targetStatus,
+        string failureReasonPrefix,
+        DateTime updatedTimeLocal,
+        CancellationToken ct)
+    {
+        var targets = _tasks
+            .Where(x => string.Equals(x.WaveCode, waveCode, StringComparison.OrdinalIgnoreCase)
+                && x.Status != BusinessTaskStatus.Dropped
+                && x.Status != BusinessTaskStatus.Exception)
+            .ToList();
+
+        foreach (var task in targets)
+        {
+            task.Status = targetStatus;
+            task.FailureReason = failureReasonPrefix;
+            task.UpdatedTimeLocal = updatedTimeLocal;
+        }
+
+        return Task.FromResult(targets.Count);
+    }
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<BusinessTaskEntity>> FindByWaveCodeAsync(string waveCode, CancellationToken ct)
+    {
+        IReadOnlyList<BusinessTaskEntity> result = _tasks
+            .Where(x => string.Equals(x.WaveCode, waveCode, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(x => x.CreatedTimeLocal)
+            .ToList();
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<BusinessTaskEntity>> FindActiveByBarcodeAsync(string barcode, CancellationToken ct)
+    {
+        IReadOnlyList<BusinessTaskEntity> result = _tasks
+            .Where(x => string.Equals(x.Barcode, barcode, StringComparison.OrdinalIgnoreCase)
+                && x.Status != BusinessTaskStatus.Dropped
+                && x.Status != BusinessTaskStatus.Exception)
+            .OrderBy(x => x.CreatedTimeLocal)
+            .ToList();
+        return Task.FromResult(result);
+    }
 }

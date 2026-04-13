@@ -1,4 +1,5 @@
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
+using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Application.Abstractions.Persistence;
 
@@ -60,4 +61,37 @@ public interface IBusinessTaskRepository
     /// <param name="ct">取消令牌。</param>
     /// <returns>回传失败的业务任务列表。</returns>
     Task<IReadOnlyList<BusinessTaskEntity>> FindFailedFeedbackAsync(int maxCount, CancellationToken ct);
+
+    /// <summary>
+    /// 按波次编码批量更新所有非终态业务任务的状态、失败原因与更新时间。
+    /// 在单次数据库往返内完成，用于波次清理场景的高效批处理。
+    /// </summary>
+    /// <param name="waveCode">波次编码。</param>
+    /// <param name="targetStatus">目标状态。</param>
+    /// <param name="failureReasonPrefix">失败原因前缀，实现时可在末尾附加原状态或波次信息。</param>
+    /// <param name="updatedTimeLocal">更新时间（本地时间）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>实际更新的行数。</returns>
+    Task<int> BulkMarkExceptionByWaveCodeAsync(
+        string waveCode,
+        BusinessTaskStatus targetStatus,
+        string failureReasonPrefix,
+        DateTime updatedTimeLocal,
+        CancellationToken ct);
+
+    /// <summary>
+    /// 按波次编码查询所有业务任务（包括终态与非终态），按创建时间升序。
+    /// </summary>
+    /// <param name="waveCode">波次编码。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>该波次的所有业务任务列表。</returns>
+    Task<IReadOnlyList<BusinessTaskEntity>> FindByWaveCodeAsync(string waveCode, CancellationToken ct);
+
+    /// <summary>
+    /// 按条码查询所有非终态业务任务，用于多标签场景检测，按创建时间升序。
+    /// </summary>
+    /// <param name="barcode">条码文本。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>该条码关联的所有非终态业务任务列表。</returns>
+    Task<IReadOnlyList<BusinessTaskEntity>> FindActiveByBarcodeAsync(string barcode, CancellationToken ct);
 }

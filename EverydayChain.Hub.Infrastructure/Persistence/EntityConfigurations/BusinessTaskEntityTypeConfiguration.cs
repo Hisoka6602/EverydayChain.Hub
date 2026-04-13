@@ -50,5 +50,7 @@ public class BusinessTaskEntityTypeConfiguration : IEntityTypeConfiguration<Busi
         builder.HasIndex(x => x.Barcode);
         builder.HasIndex(x => x.Status);
         builder.HasIndex(x => x.CreatedTimeLocal);
+        builder.Property(x => x.WaveCode).HasMaxLength(64);
+        builder.HasIndex(x => x.WaveCode);
     }
 }

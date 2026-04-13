@@ -20,6 +20,12 @@ using EverydayChain.Hub.Infrastructure.Sync.Writers;
 using EverydayChain.Hub.Application.Abstractions.Integrations;
 using EverydayChain.Hub.Application.Feedback.Services;
 using EverydayChain.Hub.Infrastructure.Integrations;
+using EverydayChain.Hub.Application.WaveCleanup.Abstractions;
+using EverydayChain.Hub.Application.WaveCleanup.Services;
+using EverydayChain.Hub.Application.MultiLabel.Abstractions;
+using EverydayChain.Hub.Application.MultiLabel.Services;
+using EverydayChain.Hub.Application.Recirculation.Abstractions;
+using EverydayChain.Hub.Application.Recirculation.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -46,6 +52,7 @@ public static class ServiceCollectionExtensions {
         services.Configure<RetentionJobOptions>(configuration.GetSection(RetentionJobOptions.SectionName));
         services.Configure<OracleOptions>(configuration.GetSection(OracleOptions.SectionName));
         services.Configure<WmsFeedbackOptions>(configuration.GetSection(WmsFeedbackOptions.SectionName));
+        services.Configure<ExceptionRuleOptions>(configuration.GetSection(ExceptionRuleOptions.SectionName));
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
         var syncOptions = configuration.GetSection(SyncJobOptions.SectionName).Get<SyncJobOptions>() ?? new SyncJobOptions();
@@ -105,6 +112,22 @@ public static class ServiceCollectionExtensions {
                 sp.GetRequiredService<IWmsOracleFeedbackGateway>(),
                 sp.GetRequiredService<IOptions<WmsFeedbackOptions>>().Value,
                 sp.GetRequiredService<ILogger<WmsFeedbackService>>()));
+        // PR-10：注册异常规则服务（波次清理、多标签决策、回流规则）。
+        services.AddSingleton<IWaveCleanupService>(sp =>
+            new WaveCleanupService(
+                sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<IOptions<ExceptionRuleOptions>>().Value,
+                sp.GetRequiredService<ILogger<WaveCleanupService>>()));
+        services.AddSingleton<IMultiLabelDecisionService>(sp =>
+            new MultiLabelDecisionService(
+                sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<IOptions<ExceptionRuleOptions>>().Value,
+                sp.GetRequiredService<ILogger<MultiLabelDecisionService>>()));
+        services.AddSingleton<IRecirculationService>(sp =>
+            new RecirculationService(
+                sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<IOptions<ExceptionRuleOptions>>().Value,
+                sp.GetRequiredService<ILogger<RecirculationService>>()));
 
         return services;
     }

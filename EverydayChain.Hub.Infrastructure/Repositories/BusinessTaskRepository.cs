@@ -99,4 +99,51 @@ public class BusinessTaskRepository : IBusinessTaskRepository
             .Take(maxCount)
             .ToListAsync(ct);
     }
+
+    /// <inheritdoc/>
+    public async Task<int> BulkMarkExceptionByWaveCodeAsync(
+        string waveCode,
+        BusinessTaskStatus targetStatus,
+        string failureReasonPrefix,
+        DateTime updatedTimeLocal,
+        CancellationToken ct)
+    {
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var db = await _contextFactory.CreateDbContextAsync(ct);
+        return await db.BusinessTasks
+            .Where(x => x.WaveCode == waveCode
+                && x.Status != BusinessTaskStatus.Dropped
+                && x.Status != BusinessTaskStatus.Exception)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Status, targetStatus)
+                .SetProperty(x => x.FailureReason, failureReasonPrefix)
+                .SetProperty(x => x.UpdatedTimeLocal, updatedTimeLocal),
+                ct);
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BusinessTaskEntity>> FindByWaveCodeAsync(string waveCode, CancellationToken ct)
+    {
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var db = await _contextFactory.CreateDbContextAsync(ct);
+        return await db.BusinessTasks
+            .AsNoTracking()
+            .Where(x => x.WaveCode == waveCode)
+            .OrderBy(x => x.CreatedTimeLocal)
+            .ToListAsync(ct);
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BusinessTaskEntity>> FindActiveByBarcodeAsync(string barcode, CancellationToken ct)
+    {
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var db = await _contextFactory.CreateDbContextAsync(ct);
+        return await db.BusinessTasks
+            .AsNoTracking()
+            .Where(x => x.Barcode == barcode
+                && x.Status != Domain.Enums.BusinessTaskStatus.Dropped
+                && x.Status != Domain.Enums.BusinessTaskStatus.Exception)
+            .OrderBy(x => x.CreatedTimeLocal)
+            .ToListAsync(ct);
+    }
 }

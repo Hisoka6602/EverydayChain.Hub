@@ -89,6 +89,13 @@ public sealed class TaskExecutionService : ITaskExecutionService
         if (task.Status != BusinessTaskStatus.Created && task.Status != BusinessTaskStatus.Scanned)
         {
             var reason = $"任务当前状态 [{task.Status}] 不允许推进到已扫描。";
+            var now = DateTime.Now;
+
+            // 状态校验失败时递增扫描重试次数，为回流规则提供判定依据。
+            task.ScanRetryCount++;
+            task.UpdatedTimeLocal = now;
+            await _businessTaskRepository.UpdateAsync(task, ct);
+
             await WriteScanLogSilentlyAsync(
                 businessTaskId: task.Id,
                 taskCode: task.TaskCode,
