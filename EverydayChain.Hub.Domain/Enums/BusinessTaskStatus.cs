@@ -30,4 +30,10 @@ public enum BusinessTaskStatus
     /// </summary>
     [Description("待回传")]
     FeedbackPending = 4,
+
+    /// <summary>
+    /// 异常：任务在落格或处理过程中发生异常，需人工介入或补偿。
+    /// </summary>
+    [Description("异常")]
+    Exception = 5,
 }

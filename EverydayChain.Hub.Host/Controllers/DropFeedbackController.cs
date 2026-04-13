@@ -36,8 +36,8 @@ public sealed class DropFeedbackController : ControllerBase {
     [ProducesResponseType(typeof(ApiResponse<DropFeedbackResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<DropFeedbackResponse>), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ApiResponse<DropFeedbackResponse>>> ConfirmAsync([FromBody] DropFeedbackRequest request, CancellationToken cancellationToken) {
-        if (string.IsNullOrWhiteSpace(request.Barcode)) {
-            return BadRequest(ApiResponse<DropFeedbackResponse>.Fail("条码不能为空。"));
+        if (string.IsNullOrWhiteSpace(request.Barcode) && string.IsNullOrWhiteSpace(request.TaskCode)) {
+            return BadRequest(ApiResponse<DropFeedbackResponse>.Fail("任务编码与条码不能同时为空，至少提供一项。"));
         }
 
         if (string.IsNullOrWhiteSpace(request.ActualChuteCode)) {
@@ -51,9 +51,11 @@ public sealed class DropFeedbackController : ControllerBase {
         var normalizedTaskCode = TaskCodeNormalizer.NormalizeOrEmpty(request.TaskCode);
         var applicationResult = await dropFeedbackService.ExecuteAsync(new DropFeedbackApplicationRequest {
             TaskCode = normalizedTaskCode,
-            Barcode = request.Barcode.Trim(),
+            Barcode = (request.Barcode ?? string.Empty).Trim(),
             ActualChuteCode = request.ActualChuteCode.Trim(),
-            DropTimeLocal = normalizedDropTime
+            DropTimeLocal = normalizedDropTime,
+            IsSuccess = request.IsSuccess,
+            FailureReason = request.FailureReason
         }, cancellationToken);
 
         var response = new DropFeedbackResponse {

@@ -1,0 +1,54 @@
+using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace EverydayChain.Hub.Infrastructure.Persistence.EntityConfigurations;
+
+/// <summary>
+/// <see cref="BusinessTaskEntity"/> 的 EF Core Fluent API 类型配置。
+/// 该表为非分片固定表，始终使用固定表名 <c>business_tasks</c>。
+/// </summary>
+public class BusinessTaskEntityTypeConfiguration : IEntityTypeConfiguration<BusinessTaskEntity>
+{
+    /// <summary>目标表名（固定，不含分片后缀）。</summary>
+    private readonly string _tableName;
+
+    /// <summary>目标 Schema 名称。</summary>
+    private readonly string _schema;
+
+    /// <summary>
+    /// 初始化配置实例。
+    /// </summary>
+    /// <param name="tableName">完整表名，例如 <c>business_tasks</c>。</param>
+    /// <param name="schema">数据库 Schema，例如 <c>dbo</c>。</param>
+    public BusinessTaskEntityTypeConfiguration(string tableName, string schema)
+    {
+        _tableName = tableName;
+        _schema = schema;
+    }
+
+    /// <inheritdoc/>
+    public void Configure(EntityTypeBuilder<BusinessTaskEntity> builder)
+    {
+        builder.ToTable(_tableName, _schema);
+        builder.HasKey(x => x.Id).IsClustered();
+        builder.Property(x => x.Id).ValueGeneratedOnAdd();
+        builder.Property(x => x.TaskCode).HasMaxLength(64).IsRequired();
+        builder.Property(x => x.SourceTableCode).HasMaxLength(64).IsRequired();
+        builder.Property(x => x.BusinessKey).HasMaxLength(256).IsRequired();
+        builder.Property(x => x.Barcode).HasMaxLength(128);
+        builder.Property(x => x.TargetChuteCode).HasMaxLength(64);
+        builder.Property(x => x.ActualChuteCode).HasMaxLength(64);
+        builder.Property(x => x.DeviceCode).HasMaxLength(64);
+        builder.Property(x => x.TraceId).HasMaxLength(64);
+        builder.Property(x => x.FailureReason).HasMaxLength(256);
+        builder.Property(x => x.Status).IsRequired();
+        builder.Property(x => x.FeedbackStatus).IsRequired();
+        builder.Property(x => x.CreatedTimeLocal).IsRequired();
+        builder.Property(x => x.UpdatedTimeLocal).IsRequired();
+        builder.HasIndex(x => x.TaskCode).IsUnique();
+        builder.HasIndex(x => x.Barcode);
+        builder.HasIndex(x => x.Status);
+        builder.HasIndex(x => x.CreatedTimeLocal);
+    }
+}
