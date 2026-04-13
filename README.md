@@ -5,7 +5,7 @@
 - 核对实施计划与代码落地一致性：确认 PR-04~PR-12 对应核心实现尚未开始，未出现“计划已标记但代码未落地”的偏差。
 - 更新 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`：将 PR-13 状态补全为“已完成（M1 里程碑检验通过）”，并同步更新总览进度口径。
 - 里程碑结论：M1 依赖 PR-01~PR-03，当前已满足进入条件且已完成检验归档，可按依赖顺序推进 PR-04。
-- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过；统一摘要口径为“构建：0 Warning 0 Error；测试：66/66 单元测试通过”。
+- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过；统一摘要口径为“构建：0 Warning 0 Error；测试：单测通过数/失败数见对应执行记录（本次执行记录为 66/66 通过）”。
 ## 后续可完善点
 - 按依赖顺序推进 PR-04（条码解析与扫描输入）。
 - 在进入 PR-05 前先冻结“业务任务持久化建表/复用”方案，避免后续迁移返工。
