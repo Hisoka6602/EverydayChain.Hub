@@ -1,15 +1,14 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 通读现有仓库代码并对照 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 完成执行进度盘点，明确当前从 PR-01 开始实施。
-- 新增 PR-01 业务任务主模型：`BusinessTaskStatus` 与 `BusinessTaskEntity`。
-- 新增 PR-01 物化服务：`IBusinessTaskMaterializer`、`BusinessTaskMaterializer`、`BusinessTaskMaterializeRequest`，并完成 DI 注册。
-- 新增 `BusinessTaskMaterializer` 单元测试，覆盖默认状态与必填校验。
-- 更新 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`：补全 PR 总览“当前状态”与“待确认项”，并登记 PR-01 已完成。
+- 通读现有仓库代码并对照 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 盘点执行进度，确认当前已完成 PR-01，并在本 PR 完成 PR-02 文档基线交付。
+- 新增 5 份语义基线文档：`WMS状态语义基线.md`、`条码规则基线.md`、`对外API接口基线.md`、`拆零业务字段语义基线.md`、`整件业务字段语义基线.md`。
+- 更新 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`：将 PR-02 状态标记为“已完成”，并补充交付文件清单。
+- 联动更新 `README.md` 文件树与“各层级与各文件作用说明（逐项）”章节，登记新增文档用途。
 - 构建验证：0 Warning 0 Error，70/70 单元测试通过。
 ## 后续可完善点
-- 按待确认项先固化 PR-02 文档目录与命名规范，再推进接口基线文档拆分。
-- 在 PR-03 前冻结三类 API 的认证与幂等键来源，避免接口返工。
+- 在 PR-03 前冻结三类 API 的认证方式与幂等键来源，避免接口返工。
+- 在 PR-03 实施时按基线文档补齐 Host 控制器骨架与中文 Swagger 注释。
 - 在 PR-05 前确认业务任务持久化方案（新表或复用现有聚合映射），并提前评审迁移脚本边界。
 
 
@@ -34,6 +33,11 @@
 ├── 兼容现有实现的可切换同步模式改造分析与执行步骤.md
 ├── EverydayChain.Hub_详细业务背景开发指令_v2.md
 ├── EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md
+├── WMS状态语义基线.md
+├── 条码规则基线.md
+├── 对外API接口基线.md
+├── 拆零业务字段语义基线.md
+├── 整件业务字段语义基线.md
 ├── scripts
 │   ├── health-check.sh
 │   ├── disaster-recovery.sh
@@ -223,6 +227,11 @@
 - `逐文件代码检查方案.md`：逐文件审查执行方案，定义检查范围、单文件检查维度、无遗漏对账流程、问题分级与分批 PR 策略，支持“本 PR 不改代码”的审查场景。
 - `逐文件全量审查实施方案.md`：续审执行方案，要求先核对首轮已处理内容，再对首轮台账未覆盖文件执行补审并闭环。
 - `逐文件代码检查台账.md`：逐文件检查台账（首轮 155 文件 + 续审批次 A 补齐 15 文件），记录每文件检查状态（未检查/进行中/已完成）、问题编号与修复状态，供后续 PR 复核追溯。
+- `WMS状态语义基线.md`：固化读取状态、回传状态、自动回写字段与业务回传字段边界，统一同步链路与业务链路语义。
+- `条码规则基线.md`：固化条码输入约束、条码类型、解析输出与失败语义，约束扫描链路判定口径。
+- `对外API接口基线.md`：固化扫描上传、请求格口、落格回传 3 类接口的路由、方法、入参出参、成功失败语义、幂等要求与状态变化。
+- `拆零业务字段语义基线.md`：固化拆零业务任务关键字段语义与状态推进约束，避免链路间字段理解偏差。
+- `整件业务字段语义基线.md`：固化整件业务任务关键字段语义与状态推进约束，统一与拆零路径的状态机口径。
 - `SyncTableDefinition.cs` / `SyncWindow.cs` / `SyncCheckpoint.cs` / `SyncBatchResult.cs`：定义同步链路执行、窗口与结果统计的核心领域模型。
 - `SyncBatch.cs` / `SyncChangeLog.cs` / `SyncDeletionLog.cs`：定义批次状态跟踪、变更审计与删除审计的数据模型。
 - `SyncBusinessKeyBuilder.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：同步业务键构建共享组件，按 `UniqueKeys` 配置将行数据拼接为 `|` 分隔的业务键文本，供 Upsert 与删除识别阶段统一调用。
