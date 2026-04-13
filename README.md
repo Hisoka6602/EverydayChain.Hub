@@ -98,7 +98,6 @@
 │   ├── Models/SyncTargetStateRow.cs
 │   ├── Models/BusinessTaskMaterializeRequest.cs
 │   ├── Models/BarcodeParseResult.cs
-│   ├── Models/ScanEventArgs.cs
 │   ├── Models/ScanUploadApplicationRequest.cs
 │   ├── Models/ScanUploadApplicationResult.cs
 │   ├── Models/ChuteResolveApplicationRequest.cs
@@ -292,7 +291,7 @@
 - `BusinessTaskEntity.cs`（`Domain/Aggregates/BusinessTaskAggregate`）：统一业务任务聚合根实体，承载任务编码、来源表、业务键、条码与本地状态时间字段。
 - `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs` + `SyncTargetStateRow.cs`：同步执行、删除识别与轻量幂等状态存储的数据契约模型。
 - `BusinessTaskMaterializeRequest.cs`：业务任务物化输入模型，统一约束任务编码、来源表编码、业务键、条码与物化时间字段。
-- `ScanUploadApplicationRequest.cs` / `ScanUploadApplicationResult.cs` / `BarcodeParseResult.cs` / `ScanEventArgs.cs` / `ChuteResolveApplicationRequest.cs` / `ChuteResolveApplicationResult.cs` / `DropFeedbackApplicationRequest.cs` / `DropFeedbackApplicationResult.cs`：扫描、格口、落格链路的应用层输入输出模型；其中 PR-04 新增条码解析结果与扫描事件模型，统一隔离 Host 契约与 Application 用例编排输入输出。
+- `ScanUploadApplicationRequest.cs` / `ScanUploadApplicationResult.cs` / `BarcodeParseResult.cs` / `ChuteResolveApplicationRequest.cs` / `ChuteResolveApplicationResult.cs` / `DropFeedbackApplicationRequest.cs` / `DropFeedbackApplicationResult.cs`：扫描、格口、落格链路的应用层输入输出模型；其中 PR-04 新增条码解析结果模型，统一隔离 Host 契约与 Application 用例编排输入输出。
 - `Application/Abstractions/Services/IBusinessTaskMaterializer.cs` + `Application/Services/BusinessTaskMaterializer.cs`：业务任务物化服务抽象与实现，仅执行字段映射、文本规范化和默认状态赋值，不承载扫描/格口/落格业务规则。
 - `Application/Abstractions/Services/IBarcodeParser.cs` + `Application/Services/BarcodeParser.cs`：条码解析服务抽象与实现，统一输出拆零（Split）/整件（FullCase）/无效（Unknown）分类及失败语义（InvalidBarcode、UnsupportedBarcodeType、ParseError）。
 - `Application/Abstractions/Services/IScanIngressService.cs` + `Application/Services/ScanIngressService.cs`：扫描上传应用服务，当前负责条码解析接入、扫描输入标准化与统一失败语义输出，不承载匹配与持久化逻辑。

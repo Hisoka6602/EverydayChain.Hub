@@ -52,7 +52,7 @@ public sealed class ScanController : ControllerBase {
             Barcode = request.Barcode.Trim(),
             DeviceCode = request.DeviceCode.Trim(),
             ScanTimeLocal = normalizedScanTime,
-            TraceId = request.TraceId.Trim(),
+            TraceId = (request.TraceId ?? string.Empty).Trim(),
             LengthMm = request.LengthMm,
             WidthMm = request.WidthMm,
             HeightMm = request.HeightMm,
@@ -68,7 +68,10 @@ public sealed class ScanController : ControllerBase {
         };
 
         if (!applicationResult.IsAccepted) {
-            return BadRequest(ApiResponse<ScanUploadResponse>.Fail(applicationResult.FailureReason, response));
+            var failureMessage = string.IsNullOrWhiteSpace(applicationResult.Message)
+                ? applicationResult.FailureReason
+                : applicationResult.Message;
+            return BadRequest(ApiResponse<ScanUploadResponse>.Fail(failureMessage, response));
         }
 
         return Ok(ApiResponse<ScanUploadResponse>.Success(response, applicationResult.Message));

@@ -266,7 +266,6 @@
   - `EverydayChain.Hub.Application/Abstractions/Services/IBarcodeParser.cs`
   - `EverydayChain.Hub.Application/Services/BarcodeParser.cs`
   - `EverydayChain.Hub.Application/Models/BarcodeParseResult.cs`
-  - `EverydayChain.Hub.Application/Models/ScanEventArgs.cs`
   - `EverydayChain.Hub.Application/Services/ScanIngressService.cs`
   - `EverydayChain.Hub.Application/Models/ScanUploadApplicationRequest.cs`
   - `EverydayChain.Hub.Application/Models/ScanUploadApplicationResult.cs`
@@ -281,7 +280,7 @@
 `feat(application): 新增条码解析服务与扫描输入模型`
 
 ### 业务逻辑与调用链路
-`扫描请求` -> `IBarcodeParser` -> `BarcodeParseResult` -> `ScanEventArgs` -> `后续匹配服务`。
+`扫描请求` -> `IBarcodeParser` -> `BarcodeParseResult` -> `后续匹配服务`。
 
 ### 复用文件
 - `EverydayChain.Hub.Host/Controllers/ScanController.cs`（PR-03 新增）

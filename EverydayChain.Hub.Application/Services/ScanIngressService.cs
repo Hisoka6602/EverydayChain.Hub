@@ -40,12 +40,11 @@ public sealed class ScanIngressService : IScanIngressService {
             });
         }
 
-        var scanEventArgs = BuildScanEventArgs(request, parseResult);
         var taskCodeCandidate = string.IsNullOrWhiteSpace(request.DeviceCode)
             ? string.Empty
             : $"{request.DeviceCode}-{request.ScanTimeLocal:yyyyMMddHHmmss}";
         var normalizedTaskCode = string.IsNullOrWhiteSpace(taskCodeCandidate)
-            ? $"TASK-{scanEventArgs.NormalizedBarcode}"
+            ? $"TASK-{parseResult.NormalizedBarcode}"
             : taskCodeCandidate;
         var result = new ScanUploadApplicationResult {
             IsAccepted = true,
@@ -55,28 +54,6 @@ public sealed class ScanIngressService : IScanIngressService {
             Message = "扫描请求已受理，条码解析已完成，后续阶段将接入匹配与状态推进链路。"
         };
         return Task.FromResult(result);
-    }
-
-    /// <summary>
-    /// 构建扫描事件输入模型。
-    /// </summary>
-    /// <param name="request">扫描上传请求。</param>
-    /// <param name="parseResult">条码解析结果。</param>
-    /// <returns>扫描事件输入模型。</returns>
-    private static ScanEventArgs BuildScanEventArgs(ScanUploadApplicationRequest request, BarcodeParseResult parseResult) {
-        return new ScanEventArgs {
-            RawBarcode = request.Barcode,
-            NormalizedBarcode = parseResult.NormalizedBarcode,
-            BarcodeType = parseResult.BarcodeType,
-            DeviceCode = request.DeviceCode,
-            ScanTimeLocal = request.ScanTimeLocal,
-            TraceId = request.TraceId,
-            LengthMm = request.LengthMm,
-            WidthMm = request.WidthMm,
-            HeightMm = request.HeightMm,
-            VolumeMm3 = request.VolumeMm3,
-            WeightGram = request.WeightGram
-        };
     }
 
     /// <summary>

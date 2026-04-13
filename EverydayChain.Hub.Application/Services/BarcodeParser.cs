@@ -1,6 +1,7 @@
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Enums;
+using NLog;
 
 namespace EverydayChain.Hub.Application.Services;
 
@@ -9,6 +10,11 @@ namespace EverydayChain.Hub.Application.Services;
 /// </summary>
 public sealed class BarcodeParser : IBarcodeParser
 {
+    /// <summary>
+    /// 条码解析日志记录器。
+    /// </summary>
+    private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
     /// <summary>
     /// 解析条码文本并返回统一语义结果。
     /// </summary>
@@ -39,7 +45,8 @@ public sealed class BarcodeParser : IBarcodeParser
         }
         catch (Exception exception)
         {
-            return BuildFailureResult(BarcodeParseFailureReason.ParseError, $"条码解析异常：{exception.Message}");
+            Logger.Error(exception, "条码解析异常。");
+            return BuildFailureResult(BarcodeParseFailureReason.ParseError, "条码解析异常。");
         }
     }
 
