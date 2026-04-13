@@ -17,6 +17,9 @@ using EverydayChain.Hub.Application.TaskExecution.Services;
 using EverydayChain.Hub.Infrastructure.Sync.Readers;
 using EverydayChain.Hub.Infrastructure.Sync.Services;
 using EverydayChain.Hub.Infrastructure.Sync.Writers;
+using EverydayChain.Hub.Application.Abstractions.Integrations;
+using EverydayChain.Hub.Application.Feedback.Services;
+using EverydayChain.Hub.Infrastructure.Integrations;
 
 namespace EverydayChain.Hub.Infrastructure.DependencyInjection;
 
@@ -40,6 +43,7 @@ public static class ServiceCollectionExtensions {
         services.Configure<SyncJobOptions>(configuration.GetSection(SyncJobOptions.SectionName));
         services.Configure<RetentionJobOptions>(configuration.GetSection(RetentionJobOptions.SectionName));
         services.Configure<OracleOptions>(configuration.GetSection(OracleOptions.SectionName));
+        services.Configure<WmsFeedbackOptions>(configuration.GetSection(WmsFeedbackOptions.SectionName));
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
         var syncOptions = configuration.GetSection(SyncJobOptions.SectionName).Get<SyncJobOptions>() ?? new SyncJobOptions();
@@ -80,6 +84,9 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IBusinessTaskRepository, BusinessTaskRepository>();
         services.AddSingleton<IScanMatchService, ScanMatchService>();
         services.AddSingleton<ITaskExecutionService, TaskExecutionService>();
+        // PR-09：注册扫描日志与落格日志仓储。
+        services.AddSingleton<IScanLogRepository, ScanLogRepository>();
+        services.AddSingleton<IDropLogRepository, DropLogRepository>();
         // 注册 API 骨架服务：扫描上传、请求格口、落格回传（PR-05/06/07 接入真实实现）。
         services.AddSingleton<IScanIngressService, ScanIngressService>();
         services.AddSingleton<IChuteQueryService, ChuteQueryService>();
@@ -88,6 +95,9 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IRetentionExecutionService, RetentionExecutionService>();
         services.AddSingleton<ISyncExecutionService, SyncExecutionService>();
         services.AddSingleton<ISyncOrchestrator, SyncOrchestrator>();
+        // PR-08：注册 WMS Oracle 回传网关与业务回传服务。
+        services.AddSingleton<IWmsOracleFeedbackGateway, OracleWmsFeedbackGateway>();
+        services.AddSingleton<IWmsFeedbackService, WmsFeedbackService>();
 
         return services;
     }

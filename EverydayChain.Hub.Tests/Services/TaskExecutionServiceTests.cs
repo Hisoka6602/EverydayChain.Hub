@@ -3,6 +3,7 @@ using EverydayChain.Hub.Application.ScanMatch.Services;
 using EverydayChain.Hub.Application.TaskExecution.Services;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EverydayChain.Hub.Tests.Services;
 
@@ -17,8 +18,9 @@ public sealed class TaskExecutionServiceTests
     private static (TaskExecutionService Service, InMemoryBusinessTaskRepository Repository) CreateService()
     {
         var repo = new InMemoryBusinessTaskRepository();
+        var scanLogRepo = new InMemoryScanLogRepository();
         var matchService = new ScanMatchService(repo);
-        var execService = new TaskExecutionService(matchService, repo);
+        var execService = new TaskExecutionService(matchService, repo, scanLogRepo, NullLogger<TaskExecutionService>.Instance);
         return (execService, repo);
     }
 

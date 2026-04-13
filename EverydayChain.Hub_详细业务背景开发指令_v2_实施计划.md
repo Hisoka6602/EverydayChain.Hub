@@ -59,8 +59,8 @@
 | PR-05 | 扫描匹配与任务执行 | PR-04 | 新增 10 / 修改 6 / 合计 16 | `feature/pr05-scan-match-and-execution` | ✅ 已完成（本 PR） |
 | PR-06 | 请求格口服务 | PR-05 | 新增 4 / 修改 4 / 合计 8 | `feature/pr06-chute-resolve` | ✅ 已完成（本 PR） |
 | PR-07 | 落格回传服务 | PR-06 | 新增 4 / 修改 5 / 合计 9 | `feature/pr07-drop-feedback` | ✅ 已完成（本 PR） |
-| PR-08 | 业务回传服务 | PR-07 | 新增 4 / 修改 6 / 合计 10 | `feature/pr08-wms-feedback` | ⏳ 未开始 |
-| PR-09 | 扫描/落格日志落库 | PR-07 | 新增 6 / 修改 5 / 合计 11 | `feature/pr09-scan-drop-logs` | ⏳ 未开始 |
+| PR-08 | 业务回传服务 | PR-07 | 新增 4 / 修改 6 / 合计 10 | `feature/pr08-wms-feedback` | ✅ 已完成（本 PR） |
+| PR-09 | 扫描/落格日志落库 | PR-07 | 新增 6 / 修改 5 / 合计 11 | `feature/pr09-scan-drop-logs` | ✅ 已完成（本 PR） |
 | PR-10 | 异常规则链路 | PR-07 | 新增 8 / 修改 5 / 合计 13 | `feature/pr10-exception-rules` | ⏳ 未开始 |
 | PR-11 | 补偿重试链路 | PR-08,PR-10 | 新增 3 / 修改 5 / 合计 8 | `feature/pr11-compensation` | ⏳ 未开始 |
 | PR-12 | 联调收口与验收归档 | PR-03~PR-11 | 新增 0~2 / 修改 6~10 / 合计 8~12 | `feature/pr12-stabilization` | ⏳ 未开始 |

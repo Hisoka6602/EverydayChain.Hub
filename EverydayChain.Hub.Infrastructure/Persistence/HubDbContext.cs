@@ -1,4 +1,6 @@
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
+using EverydayChain.Hub.Domain.Aggregates.DropLogAggregate;
+using EverydayChain.Hub.Domain.Aggregates.ScanLogAggregate;
 using EverydayChain.Hub.Domain.Aggregates.SortingTaskTraceAggregate;
 using EverydayChain.Hub.Domain.Aggregates.WmsPickToWcsAggregate;
 using EverydayChain.Hub.Domain.Aggregates.WmsSplitPickToLightCartonAggregate;
@@ -24,6 +26,10 @@ public class HubDbContext : DbContext
     private const string WmsPickToWcsLogicalTable = "IDX_PICKTOWCS2";
     /// <summary>业务任务固定表名（非分片，不含后缀）。</summary>
     private const string BusinessTaskLogicalTable = "business_tasks";
+    /// <summary>扫描日志固定表名（非分片，不含后缀）。</summary>
+    private const string ScanLogLogicalTable = "scan_logs";
+    /// <summary>落格日志固定表名（非分片，不含后缀）。</summary>
+    private const string DropLogLogicalTable = "drop_logs";
 
     /// <summary>分表配置快照，用于动态拼接表名与 Schema。</summary>
     private readonly ShardingOptions _shardingOptions;
@@ -55,6 +61,16 @@ public class HubDbContext : DbContext
     /// </summary>
     public DbSet<BusinessTaskEntity> BusinessTasks => Set<BusinessTaskEntity>();
 
+    /// <summary>
+    /// 扫描日志实体集，映射到固定表 <c>scan_logs</c>（非分片）。
+    /// </summary>
+    public DbSet<ScanLogEntity> ScanLogs => Set<ScanLogEntity>();
+
+    /// <summary>
+    /// 落格日志实体集，映射到固定表 <c>drop_logs</c>（非分片）。
+    /// </summary>
+    public DbSet<DropLogEntity> DropLogs => Set<DropLogEntity>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -68,6 +84,9 @@ public class HubDbContext : DbContext
         ConfigureWmsPickToWcsEntity(modelBuilder, wmsPickToWcsTableName);
         // 业务任务使用固定表名，不随分片后缀变化。
         modelBuilder.ApplyConfiguration(new BusinessTaskEntityTypeConfiguration(BusinessTaskLogicalTable, _shardingOptions.Schema));
+        // 扫描日志与落格日志使用固定表名，不随分片后缀变化。
+        modelBuilder.ApplyConfiguration(new ScanLogEntityTypeConfiguration(ScanLogLogicalTable, _shardingOptions.Schema));
+        modelBuilder.ApplyConfiguration(new DropLogEntityTypeConfiguration(DropLogLogicalTable, _shardingOptions.Schema));
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
+using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Tests.Services;
 
@@ -53,5 +54,27 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<BusinessTaskEntity>> FindPendingFeedbackAsync(int maxCount, CancellationToken ct)
+    {
+        IReadOnlyList<BusinessTaskEntity> result = _tasks
+            .Where(x => x.FeedbackStatus == BusinessTaskFeedbackStatus.Pending)
+            .OrderBy(x => x.CreatedTimeLocal)
+            .Take(maxCount)
+            .ToList();
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<BusinessTaskEntity>> FindFailedFeedbackAsync(int maxCount, CancellationToken ct)
+    {
+        IReadOnlyList<BusinessTaskEntity> result = _tasks
+            .Where(x => x.FeedbackStatus == BusinessTaskFeedbackStatus.Failed)
+            .OrderBy(x => x.CreatedTimeLocal)
+            .Take(maxCount)
+            .ToList();
+        return Task.FromResult(result);
     }
 }

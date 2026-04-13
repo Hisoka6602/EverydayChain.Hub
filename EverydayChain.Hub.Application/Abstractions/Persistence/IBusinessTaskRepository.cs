@@ -44,4 +44,20 @@ public interface IBusinessTaskRepository
     /// <param name="entity">业务任务实体（Id 必须有效）。</param>
     /// <param name="ct">取消令牌。</param>
     Task UpdateAsync(BusinessTaskEntity entity, CancellationToken ct);
+
+    /// <summary>
+    /// 查询回传状态为"待回传"的业务任务列表，按创建时间升序。
+    /// </summary>
+    /// <param name="maxCount">最多返回的记录数。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>待回传的业务任务列表。</returns>
+    Task<IReadOnlyList<BusinessTaskEntity>> FindPendingFeedbackAsync(int maxCount, CancellationToken ct);
+
+    /// <summary>
+    /// 查询回传状态为"回传失败"的业务任务列表，按创建时间升序（用于补偿重试）。
+    /// </summary>
+    /// <param name="maxCount">最多返回的记录数。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>回传失败的业务任务列表。</returns>
+    Task<IReadOnlyList<BusinessTaskEntity>> FindFailedFeedbackAsync(int maxCount, CancellationToken ct);
 }
