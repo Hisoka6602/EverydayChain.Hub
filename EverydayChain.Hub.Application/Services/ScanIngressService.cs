@@ -5,55 +5,67 @@ using EverydayChain.Hub.Domain.Enums;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 扫描上传应用服务骨架实现。
+/// 扫描上传应用服务实现，协调条码解析、任务匹配与状态推进链路。
 /// </summary>
 public sealed class ScanIngressService : IScanIngressService {
     /// <summary>
     /// 条码解析服务。
     /// </summary>
-    private readonly IBarcodeParser barcodeParser;
+    private readonly IBarcodeParser _barcodeParser;
+
+    /// <summary>
+    /// 任务执行服务。
+    /// </summary>
+    private readonly ITaskExecutionService _taskExecutionService;
 
     /// <summary>
     /// 初始化扫描上传应用服务。
     /// </summary>
     /// <param name="barcodeParser">条码解析服务。</param>
-    public ScanIngressService(IBarcodeParser barcodeParser) {
-        this.barcodeParser = barcodeParser;
+    /// <param name="taskExecutionService">任务执行服务。</param>
+    public ScanIngressService(IBarcodeParser barcodeParser, ITaskExecutionService taskExecutionService) {
+        _barcodeParser = barcodeParser;
+        _taskExecutionService = taskExecutionService;
     }
 
     /// <summary>
-    /// 处理扫描上传请求并返回标准化结果。
+    /// 处理扫描上传请求：解析条码、匹配任务、推进状态并返回标准化结果。
     /// </summary>
     /// <param name="request">扫描上传请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>处理结果。</returns>
-    public Task<ScanUploadApplicationResult> ExecuteAsync(ScanUploadApplicationRequest request, CancellationToken cancellationToken) {
-        _ = cancellationToken;
-        var parseResult = barcodeParser.Parse(request.Barcode);
+    public async Task<ScanUploadApplicationResult> ExecuteAsync(ScanUploadApplicationRequest request, CancellationToken cancellationToken) {
+        // 步骤 1：解析条码。
+        var parseResult = _barcodeParser.Parse(request.Barcode);
         if (!parseResult.IsValid) {
-            return Task.FromResult(new ScanUploadApplicationResult {
+            return new ScanUploadApplicationResult {
                 IsAccepted = false,
                 TaskCode = string.Empty,
                 BarcodeType = BarcodeType.Unknown.ToString(),
                 FailureReason = ConvertFailureReasonToCode(parseResult.FailureReason),
                 Message = parseResult.FailureMessage
-            });
+            };
         }
 
-        var taskCodeCandidate = string.IsNullOrWhiteSpace(request.DeviceCode)
-            ? string.Empty
-            : $"{request.DeviceCode}-{request.ScanTimeLocal:yyyyMMddHHmmss}";
-        var normalizedTaskCode = string.IsNullOrWhiteSpace(taskCodeCandidate)
-            ? $"TASK-{parseResult.NormalizedBarcode}"
-            : taskCodeCandidate;
-        var result = new ScanUploadApplicationResult {
+        // 步骤 2：匹配任务并推进状态。
+        var execResult = await _taskExecutionService.MarkScannedAsync(request, cancellationToken);
+        if (!execResult.IsSuccess) {
+            return new ScanUploadApplicationResult {
+                IsAccepted = false,
+                TaskCode = execResult.TaskCode,
+                BarcodeType = parseResult.BarcodeType.ToString(),
+                FailureReason = "TaskNotMatchedOrInvalidState",
+                Message = execResult.FailureReason
+            };
+        }
+
+        return new ScanUploadApplicationResult {
             IsAccepted = true,
-            TaskCode = normalizedTaskCode,
+            TaskCode = execResult.TaskCode,
             BarcodeType = parseResult.BarcodeType.ToString(),
             FailureReason = string.Empty,
-            Message = "扫描请求已受理，条码解析已完成，后续阶段将接入匹配与状态推进链路。"
+            Message = $"扫描请求已受理，任务 [{execResult.TaskCode}] 状态已更新为 {execResult.TaskStatus}。"
         };
-        return Task.FromResult(result);
     }
 
     /// <summary>

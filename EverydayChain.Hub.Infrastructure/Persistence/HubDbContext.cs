@@ -1,3 +1,4 @@
+using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Aggregates.SortingTaskTraceAggregate;
 using EverydayChain.Hub.Domain.Aggregates.WmsPickToWcsAggregate;
 using EverydayChain.Hub.Domain.Aggregates.WmsSplitPickToLightCartonAggregate;
@@ -21,6 +22,8 @@ public class HubDbContext : DbContext
     private const string WmsSplitPickToLightCartonLogicalTable = "IDX_PICKTOLIGHT_CARTON1";
     /// <summary>WMS 下发至 WCS 分拣任务默认逻辑表名（沿用遗留系统表命名）。</summary>
     private const string WmsPickToWcsLogicalTable = "IDX_PICKTOWCS2";
+    /// <summary>业务任务固定表名（非分片，不含后缀）。</summary>
+    private const string BusinessTaskLogicalTable = "business_tasks";
 
     /// <summary>分表配置快照，用于动态拼接表名与 Schema。</summary>
     private readonly ShardingOptions _shardingOptions;
@@ -47,6 +50,10 @@ public class HubDbContext : DbContext
     /// WMS 下发至 WCS 分拣任务实体集，实际映射到当前作用域对应的分表。
     /// </summary>
     public DbSet<WmsPickToWcsEntity> WmsPickToWcsTasks => Set<WmsPickToWcsEntity>();
+    /// <summary>
+    /// 业务任务实体集，映射到固定表 <c>business_tasks</c>（非分片）。
+    /// </summary>
+    public DbSet<BusinessTaskEntity> BusinessTasks => Set<BusinessTaskEntity>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -59,6 +66,8 @@ public class HubDbContext : DbContext
         modelBuilder.ApplyConfiguration(new SortingTaskTraceEntityTypeConfiguration(sortingTaskTraceTableName, _shardingOptions.Schema));
         ConfigureWmsSplitPickToLightCartonEntity(modelBuilder, wmsSplitPickToLightCartonTableName);
         ConfigureWmsPickToWcsEntity(modelBuilder, wmsPickToWcsTableName);
+        // 业务任务使用固定表名，不随分片后缀变化。
+        modelBuilder.ApplyConfiguration(new BusinessTaskEntityTypeConfiguration(BusinessTaskLogicalTable, _shardingOptions.Schema));
     }
 
     /// <summary>

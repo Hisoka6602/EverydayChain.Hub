@@ -40,9 +40,54 @@ public class BusinessTaskEntity : IEntity<long>
     public string? Barcode { get; set; }
 
     /// <summary>
+    /// 目标格口编码，由格口规则计算得出，最大 64 字符；未分配格口时可为空。
+    /// </summary>
+    [MaxLength(64)]
+    public string? TargetChuteCode { get; set; }
+
+    /// <summary>
+    /// 实际落格编码，落格回传时写入，最大 64 字符；尚未落格时可为空。
+    /// </summary>
+    [MaxLength(64)]
+    public string? ActualChuteCode { get; set; }
+
+    /// <summary>
+    /// 扫描设备编码，最大 64 字符；尚未扫描时可为空。
+    /// </summary>
+    [MaxLength(64)]
+    public string? DeviceCode { get; set; }
+
+    /// <summary>
+    /// 链路追踪标识，最大 64 字符；可为空。
+    /// </summary>
+    [MaxLength(64)]
+    public string? TraceId { get; set; }
+
+    /// <summary>
+    /// 失败原因文本，最大 256 字符；正常状态下为空。
+    /// </summary>
+    [MaxLength(256)]
+    public string? FailureReason { get; set; }
+
+    /// <summary>
     /// 任务当前状态。
     /// </summary>
     public BusinessTaskStatus Status { get; set; } = BusinessTaskStatus.Created;
+
+    /// <summary>
+    /// 业务回传状态，标识回传进度。
+    /// </summary>
+    public BusinessTaskFeedbackStatus FeedbackStatus { get; set; } = BusinessTaskFeedbackStatus.NotRequired;
+
+    /// <summary>
+    /// 扫描时间（本地时间）；尚未扫描时为空。
+    /// </summary>
+    public DateTime? ScannedAtLocal { get; set; }
+
+    /// <summary>
+    /// 落格时间（本地时间）；尚未落格时为空。
+    /// </summary>
+    public DateTime? DroppedAtLocal { get; set; }
 
     /// <summary>
     /// 创建时间（本地时间）。

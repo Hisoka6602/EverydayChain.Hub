@@ -1,0 +1,88 @@
+using EverydayChain.Hub.Application.Abstractions.Persistence;
+using EverydayChain.Hub.Application.Abstractions.Services;
+using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Domain.Enums;
+
+namespace EverydayChain.Hub.Application.TaskExecution.Services;
+
+/// <summary>
+/// 任务执行服务实现，负责推进业务任务状态并持久化。
+/// </summary>
+public sealed class TaskExecutionService : ITaskExecutionService
+{
+    /// <summary>
+    /// 扫描匹配服务。
+    /// </summary>
+    private readonly IScanMatchService _scanMatchService;
+
+    /// <summary>
+    /// 业务任务仓储。
+    /// </summary>
+    private readonly IBusinessTaskRepository _businessTaskRepository;
+
+    /// <summary>
+    /// 初始化任务执行服务。
+    /// </summary>
+    /// <param name="scanMatchService">扫描匹配服务。</param>
+    /// <param name="businessTaskRepository">业务任务仓储。</param>
+    public TaskExecutionService(IScanMatchService scanMatchService, IBusinessTaskRepository businessTaskRepository)
+    {
+        _scanMatchService = scanMatchService;
+        _businessTaskRepository = businessTaskRepository;
+    }
+
+    /// <summary>
+    /// 将业务任务标记为已扫描，推进状态为 <see cref="BusinessTaskStatus.Scanned"/>。
+    /// 步骤：1. 按条码匹配任务；2. 检查当前状态是否允许推进；3. 更新状态与扫描信息；4. 持久化。
+    /// </summary>
+    /// <param name="request">扫描上传请求，包含条码、设备编码等信息。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>任务执行结果。</returns>
+    public async Task<TaskExecutionResult> MarkScannedAsync(ScanUploadApplicationRequest request, CancellationToken ct)
+    {
+        // 步骤 1：按条码匹配任务。
+        var matchResult = await _scanMatchService.MatchByBarcodeAsync(request.Barcode, ct);
+        if (!matchResult.IsMatched || matchResult.Task == null)
+        {
+            return new TaskExecutionResult
+            {
+                IsSuccess = false,
+                FailureReason = matchResult.FailureReason
+            };
+        }
+
+        var task = matchResult.Task;
+
+        // 步骤 2：检查当前状态是否允许推进到已扫描。
+        if (task.Status != BusinessTaskStatus.Created && task.Status != BusinessTaskStatus.Scanned)
+        {
+            return new TaskExecutionResult
+            {
+                IsSuccess = false,
+                TaskId = task.Id,
+                TaskCode = task.TaskCode,
+                TaskStatus = task.Status.ToString(),
+                FailureReason = $"任务当前状态 [{task.Status}] 不允许推进到已扫描。"
+            };
+        }
+
+        // 步骤 3：更新状态与扫描信息。
+        task.Status = BusinessTaskStatus.Scanned;
+        task.ScannedAtLocal = request.ScanTimeLocal;
+        task.DeviceCode = string.IsNullOrWhiteSpace(request.DeviceCode) ? task.DeviceCode : request.DeviceCode.Trim();
+        task.TraceId = string.IsNullOrWhiteSpace(request.TraceId) ? task.TraceId : request.TraceId.Trim();
+        task.Barcode = string.IsNullOrWhiteSpace(task.Barcode) ? request.Barcode.Trim() : task.Barcode;
+        task.UpdatedTimeLocal = DateTime.Now;
+
+        // 步骤 4：持久化。
+        await _businessTaskRepository.UpdateAsync(task, ct);
+
+        return new TaskExecutionResult
+        {
+            IsSuccess = true,
+            TaskId = task.Id,
+            TaskCode = task.TaskCode,
+            TaskStatus = task.Status.ToString()
+        };
+    }
+}

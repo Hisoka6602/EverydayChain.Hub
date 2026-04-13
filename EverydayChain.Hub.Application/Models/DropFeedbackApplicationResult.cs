@@ -23,4 +23,9 @@ public sealed class DropFeedbackApplicationResult {
     /// 结果描述。
     /// </summary>
     public string Message { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 失败原因；成功时为空。
+    /// </summary>
+    public string FailureReason { get; set; } = string.Empty;
 }

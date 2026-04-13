@@ -12,6 +12,8 @@ using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Abstractions.Sync;
+using EverydayChain.Hub.Application.ScanMatch.Services;
+using EverydayChain.Hub.Application.TaskExecution.Services;
 using EverydayChain.Hub.Infrastructure.Sync.Readers;
 using EverydayChain.Hub.Infrastructure.Sync.Services;
 using EverydayChain.Hub.Infrastructure.Sync.Writers;
@@ -75,7 +77,10 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<ISyncWindowCalculator, SyncWindowCalculator>();
         services.AddSingleton<IBusinessTaskMaterializer, BusinessTaskMaterializer>();
         services.AddSingleton<IBarcodeParser, BarcodeParser>();
-        // 注册 PR-03 API 骨架服务：扫描上传、请求格口、落格回传。
+        services.AddSingleton<IBusinessTaskRepository, BusinessTaskRepository>();
+        services.AddSingleton<IScanMatchService, ScanMatchService>();
+        services.AddSingleton<ITaskExecutionService, TaskExecutionService>();
+        // 注册 API 骨架服务：扫描上传、请求格口、落格回传（PR-05/06/07 接入真实实现）。
         services.AddSingleton<IScanIngressService, ScanIngressService>();
         services.AddSingleton<IChuteQueryService, ChuteQueryService>();
         services.AddSingleton<IDropFeedbackService, DropFeedbackService>();

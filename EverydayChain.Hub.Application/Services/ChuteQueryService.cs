@@ -1,30 +1,80 @@
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 请求格口应用服务骨架实现。
+/// 请求格口应用服务实现，按条码或任务编码查询任务并返回目标格口。
 /// </summary>
 public sealed class ChuteQueryService : IChuteQueryService {
     /// <summary>
-    /// 按请求参数返回目标格口骨架结果。
+    /// 业务任务仓储。
+    /// </summary>
+    private readonly IBusinessTaskRepository _businessTaskRepository;
+
+    /// <summary>
+    /// 初始化请求格口应用服务。
+    /// </summary>
+    /// <param name="businessTaskRepository">业务任务仓储。</param>
+    public ChuteQueryService(IBusinessTaskRepository businessTaskRepository) {
+        _businessTaskRepository = businessTaskRepository;
+    }
+
+    /// <summary>
+    /// 按任务编码或条码查询目标格口。
+    /// 步骤：1. 优先按任务编码查找；2. 任务编码为空时按条码查找；3. 校验任务状态；4. 返回目标格口。
     /// </summary>
     /// <param name="request">请求参数。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>格口解析结果。</returns>
-    public Task<ChuteResolveApplicationResult> ExecuteAsync(ChuteResolveApplicationRequest request, CancellationToken cancellationToken) {
-        _ = cancellationToken;
-        var normalizedTaskCode = string.IsNullOrWhiteSpace(request.TaskCode)
-            ? $"TASK-{request.Barcode}"
-            : request.TaskCode;
-        var result = new ChuteResolveApplicationResult {
-            IsResolved = true,
-            TaskCode = normalizedTaskCode,
-            ChuteCode = "CHUTE-PLACEHOLDER",
-            Message = "格口请求已受理，后续阶段将接入真实格口规则。"
-        };
+    public async Task<ChuteResolveApplicationResult> ExecuteAsync(ChuteResolveApplicationRequest request, CancellationToken cancellationToken) {
+        // 步骤 1：优先按任务编码查找任务。
+        var task = !string.IsNullOrWhiteSpace(request.TaskCode)
+            ? await _businessTaskRepository.FindByTaskCodeAsync(request.TaskCode.Trim(), cancellationToken)
+            : null;
 
-        return Task.FromResult(result);
+        // 步骤 2：任务编码为空或未命中时，按条码查找任务。
+        if (task == null && !string.IsNullOrWhiteSpace(request.Barcode)) {
+            task = await _businessTaskRepository.FindByBarcodeAsync(request.Barcode.Trim(), cancellationToken);
+        }
+
+        // 步骤 3：任务不存在时返回失败。
+        if (task == null) {
+            return new ChuteResolveApplicationResult {
+                IsResolved = false,
+                TaskCode = string.Empty,
+                ChuteCode = string.Empty,
+                Message = $"未找到条码 [{request.Barcode}] 或任务编码 [{request.TaskCode}] 对应的业务任务。"
+            };
+        }
+
+        // 步骤 4：校验任务状态，仅已扫描任务可请求格口。
+        if (task.Status != BusinessTaskStatus.Scanned) {
+            return new ChuteResolveApplicationResult {
+                IsResolved = false,
+                TaskCode = task.TaskCode,
+                ChuteCode = string.Empty,
+                Message = $"任务 [{task.TaskCode}] 当前状态 [{task.Status}] 不允许请求格口，仅已扫描任务可查询格口。"
+            };
+        }
+
+        // 步骤 5：返回目标格口，目标格口为空时返回失败。
+        if (string.IsNullOrWhiteSpace(task.TargetChuteCode)) {
+            return new ChuteResolveApplicationResult {
+                IsResolved = false,
+                TaskCode = task.TaskCode,
+                ChuteCode = string.Empty,
+                Message = $"任务 [{task.TaskCode}] 尚未分配目标格口。"
+            };
+        }
+
+        return new ChuteResolveApplicationResult {
+            IsResolved = true,
+            TaskCode = task.TaskCode,
+            ChuteCode = task.TargetChuteCode,
+            Message = $"任务 [{task.TaskCode}] 目标格口已确认：{task.TargetChuteCode}。"
+        };
     }
 }
