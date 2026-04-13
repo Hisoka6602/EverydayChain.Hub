@@ -12,6 +12,8 @@
 | 请求格口 | `/api/tasks/request-chute` | `POST` | 查询并返回目标格口 |
 | 落格回传 | `/api/tasks/drop-feedback` | `POST` | 回传真实落格结果并推进任务状态 |
 
+> 路由命名口径：沿用需求文档的动作型路径，三类接口均采用“动作语义”命名。
+
 ## 3. 扫描上传 API
 
 ### 3.1 入参
@@ -71,13 +73,18 @@
 ## 5. 落格回传 API
 
 ### 5.1 入参
-- `TaskId`（与 `Barcode` 至少提供一项）
-- `Barcode`（与 `TaskId` 至少提供一项）
+- `TaskId`（必填之一，与 `Barcode` 至少提供一项）
+- `Barcode`（必填之一，与 `TaskId` 至少提供一项）
 - `ChuteCode`
 - `DroppedAtLocal`（必填，本地时间）
 - `IsSuccess`（必填）
 - `FailureReason`（失败时）
 - `TraceId`（建议）
+
+### 5.1.1 双定位字段规则
+- 仅提供 `TaskId`：按 `TaskId` 定位任务。
+- 仅提供 `Barcode`：按 `Barcode` 定位任务。
+- 同时提供 `TaskId` 与 `Barcode`：优先按 `TaskId` 定位，并校验 `Barcode` 必须与任务一致；不一致则返回失败（参数冲突）。
 
 ### 5.2 出参
 - `IsSuccess`
@@ -88,6 +95,7 @@
 ### 5.3 成功/失败语义
 - 成功：任务落格结果已写入，本地状态推进完成。
 - 失败：任务定位失败、状态机非法跳转、参数冲突或业务规则拒绝。
+- 参数冲突：`TaskId` 与 `Barcode` 同时提供但不匹配。
 
 ### 5.4 幂等要求
 - 同一落格事件重复回传时，必须可重入且不重复推进状态。
