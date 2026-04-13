@@ -162,6 +162,54 @@ public sealed class ExceptionRuleTests
     }
 
     /// <summary>
+    /// TargetStatusOnCleanup 配置为合法枚举值时，清理应按配置目标状态执行（此处以 Exception 为例）。
+    /// </summary>
+    [Fact]
+    public async Task WaveCleanup_ShouldUseConfiguredTargetStatus()
+    {
+        var repo = new InMemoryBusinessTaskRepository();
+        var options = new ExceptionRuleOptions
+        {
+            Enabled = true,
+            DryRun = false,
+            WaveCleanup = new WaveCleanupRuleOptions { Enabled = true, TargetStatusOnCleanup = "Exception" }
+        };
+        var service = new WaveCleanupService(repo, options, NullLogger<WaveCleanupService>.Instance);
+
+        await repo.SaveAsync(BuildTask("T1", BusinessTaskStatus.Created, waveCode: "WAVE002"), CancellationToken.None);
+
+        var result = await service.CleanByWaveCodeAsync("WAVE002", CancellationToken.None);
+
+        Assert.Equal(1, result.CleanedCount);
+        var t1 = await repo.FindByTaskCodeAsync("T1", CancellationToken.None);
+        Assert.Equal(BusinessTaskStatus.Exception, t1!.Status);
+    }
+
+    /// <summary>
+    /// TargetStatusOnCleanup 配置为非法值时，清理应回退为 Exception 并正常执行（不抛出异常）。
+    /// </summary>
+    [Fact]
+    public async Task WaveCleanup_ShouldFallbackToException_WhenTargetStatusInvalid()
+    {
+        var repo = new InMemoryBusinessTaskRepository();
+        var options = new ExceptionRuleOptions
+        {
+            Enabled = true,
+            DryRun = false,
+            WaveCleanup = new WaveCleanupRuleOptions { Enabled = true, TargetStatusOnCleanup = "InvalidStatus" }
+        };
+        var service = new WaveCleanupService(repo, options, NullLogger<WaveCleanupService>.Instance);
+
+        await repo.SaveAsync(BuildTask("T1", BusinessTaskStatus.Created, waveCode: "WAVE003"), CancellationToken.None);
+
+        var result = await service.CleanByWaveCodeAsync("WAVE003", CancellationToken.None);
+
+        Assert.Equal(1, result.CleanedCount);
+        var t1 = await repo.FindByTaskCodeAsync("T1", CancellationToken.None);
+        Assert.Equal(BusinessTaskStatus.Exception, t1!.Status);
+    }
+
+    /// <summary>
     /// dry-run 模式下，波次清理应识别任务但不执行状态变更。
     /// </summary>
     [Fact]

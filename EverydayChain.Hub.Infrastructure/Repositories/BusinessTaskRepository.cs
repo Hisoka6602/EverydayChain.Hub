@@ -101,6 +101,27 @@ public class BusinessTaskRepository : IBusinessTaskRepository
     }
 
     /// <inheritdoc/>
+    public async Task<int> BulkMarkExceptionByWaveCodeAsync(
+        string waveCode,
+        BusinessTaskStatus targetStatus,
+        string failureReasonPrefix,
+        DateTime updatedTimeLocal,
+        CancellationToken ct)
+    {
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var db = await _contextFactory.CreateDbContextAsync(ct);
+        return await db.BusinessTasks
+            .Where(x => x.WaveCode == waveCode
+                && x.Status != BusinessTaskStatus.Dropped
+                && x.Status != BusinessTaskStatus.Exception)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Status, targetStatus)
+                .SetProperty(x => x.FailureReason, failureReasonPrefix)
+                .SetProperty(x => x.UpdatedTimeLocal, updatedTimeLocal),
+                ct);
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<BusinessTaskEntity>> FindByWaveCodeAsync(string waveCode, CancellationToken ct)
     {
         using var scope = TableSuffixScope.Use(string.Empty);

@@ -1,7 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 实施 PR-10（异常规则链路）：新增 `ExceptionRuleOptions`（含 `WaveCleanupRuleOptions`、`MultiLabelRuleOptions`、`RecirculationRuleOptions`）配置实体（`Domain/Options/`）；新增 `MultiLabelDecisionResult` 领域模型（`Domain/MultiLabel/`）；新增 `RecirculationDecisionResult` 领域模型（`Domain/Recirculation/`）；新增 `IWaveCleanupService` 接口（`Application/WaveCleanup/Abstractions/`）与 `WaveCleanupService` 实现（`Application/WaveCleanup/Services/`）；新增 `IMultiLabelDecisionService` 接口（`Application/MultiLabel/Abstractions/`）与 `MultiLabelDecisionService` 实现（`Application/MultiLabel/Services/`）；新增 `IRecirculationService` 接口（`Application/Recirculation/Abstractions/`）与 `RecirculationService` 实现（`Application/Recirculation/Services/`）；`BusinessTaskEntity` 新增 `WaveCode`、`IsRecirculated`、`ScanRetryCount` 字段；`IBusinessTaskRepository` 新增 `FindByWaveCodeAsync`、`FindActiveByBarcodeAsync` 方法；新增 EF 迁移 `20260413185000_AddExceptionRuleFields`；`ServiceCollectionExtensions` 注册三个新服务；`appsettings.json` 增加 `ExceptionRule` 配置节（含全局开关与 dry-run 支持）；新增 `ExceptionRuleTests` 测试 16 例。
+- 实施 PR-10（异常规则链路）：新增 `ExceptionRuleOptions`/`WaveCleanupRuleOptions`/`MultiLabelRuleOptions`/`RecirculationRuleOptions` 配置实体（`Domain/Options/`，每类独立文件）；新增 `MultiLabelDecisionResult` 领域模型（`Domain/MultiLabel/`）；新增 `RecirculationDecisionResult` 领域模型（`Domain/Recirculation/`）；新增 `IWaveCleanupService` 接口（`Application/WaveCleanup/Abstractions/`）与 `WaveCleanupResult`（独立文件）及 `WaveCleanupService` 实现（支持批量更新 + TargetStatusOnCleanup 配置应用）；新增 `IMultiLabelDecisionService` 接口（`Application/MultiLabel/Abstractions/`）与 `MultiLabelDecisionService` 实现；新增 `IRecirculationService` 接口（`Application/Recirculation/Abstractions/`）与 `RecirculationService` 实现；`BusinessTaskEntity` 新增 `WaveCode`、`IsRecirculated`、`ScanRetryCount` 字段；`TaskExecutionService` 在扫描状态校验失败时递增 `ScanRetryCount`（为回流规则提供判定依据）；`IBusinessTaskRepository` 新增 `FindByWaveCodeAsync`、`FindActiveByBarcodeAsync`、`BulkMarkExceptionByWaveCodeAsync` 方法；新增 EF 迁移 `20260413185000_AddExceptionRuleFields`；`ServiceCollectionExtensions` 注册三个新服务；`appsettings.json` 增加 `ExceptionRule` 配置节（含全局开关与 dry-run 支持）；新增 `ExceptionRuleTests` 测试 16 例。
 - 实施 PR-15（M3 里程碑全量审查：回传与审计阶段）：PR-08 与 PR-09 均已完成，构建与测试全绿（0 Warning 0 Error，138/138 测试通过），M3 里程碑审查结论归档到逐文件代码检查台账。
 - 新增测试合计 16 例，总计 138/138 测试通过。
 - 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过（0 Warning 0 Error，138/138）。
@@ -82,9 +82,12 @@
 │   ├── Options/SyncJobOptions.cs
 │   ├── Options/SyncRetentionOptions.cs
 │   ├── Options/SyncTableOptions.cs
-│   └── Options/WmsFeedbackOptions.cs
-│   └── Options/ExceptionRuleOptions.cs
-│   └── MultiLabel/MultiLabelDecisionResult.cs
+│   ├── Options/WmsFeedbackOptions.cs
+│   ├── Options/ExceptionRuleOptions.cs
+│   ├── Options/WaveCleanupRuleOptions.cs
+│   ├── Options/MultiLabelRuleOptions.cs
+│   ├── Options/RecirculationRuleOptions.cs
+│   ├── MultiLabel/MultiLabelDecisionResult.cs
 │   └── Recirculation/RecirculationDecisionResult.cs
 ├── EverydayChain.Hub.Application
 │   ├── EverydayChain.Hub.Application.csproj
@@ -143,6 +146,7 @@
 │   ├── Abstractions/Services/IWmsFeedbackService.cs
 │   ├── Abstractions/Integrations/IWmsOracleFeedbackGateway.cs
 │   ├── WaveCleanup/Abstractions/IWaveCleanupService.cs
+│   ├── WaveCleanup/Abstractions/WaveCleanupResult.cs
 │   ├── WaveCleanup/Services/WaveCleanupService.cs
 │   ├── MultiLabel/Abstractions/IMultiLabelDecisionService.cs
 │   ├── MultiLabel/Services/MultiLabelDecisionService.cs
@@ -358,11 +362,15 @@
 - `Infrastructure/Persistence/EntityConfigurations/DropLogEntityTypeConfiguration.cs`：落格日志 EF Fluent API 配置，映射 `drop_logs` 表，定义字段约束与查询索引。
 - `20260413160852_AddScanDropLogTables.cs`：新增 `scan_logs` 与 `drop_logs` 表的 EF 迁移，包含所有字段与索引定义。
 - `EverydayChain.Hub.Tests/Services/WmsFeedbackServiceTests.cs`：业务回传服务单元测试，覆盖无待回传任务空结果、写入成功置 Completed、写入器异常置 Failed、batchSize 限制、Enabled=false 直接短路、writtenRows 不一致整批失败六个场景；含 `CapturingWmsOracleFeedbackGateway` 捕获替身。
-- `Domain/Options/ExceptionRuleOptions.cs`：异常规则配置实体，包含 `WaveCleanupRuleOptions`、`MultiLabelRuleOptions`、`RecirculationRuleOptions` 三个子配置，支持全局开关与 dry-run 模式。
+- `Domain/Options/ExceptionRuleOptions.cs`：异常规则根配置实体，包含全局开关与 dry-run 标志，持有三个子配置实例。
+- `Domain/Options/WaveCleanupRuleOptions.cs`：波次清理子配置，定义启用开关与 `TargetStatusOnCleanup`（可填项：Exception）。
+- `Domain/Options/MultiLabelRuleOptions.cs`：多标签决策子配置，定义启用开关与策略（可填项：UseFirst、UseLatest、MarkException）。
+- `Domain/Options/RecirculationRuleOptions.cs`：回流规则子配置，定义启用开关与 `MaxScanRetries`（可填范围：1~100）。
 - `Domain/MultiLabel/MultiLabelDecisionResult.cs`：多标签决策结果领域模型，包含是否多标签、决策状态、选用/舍弃任务编码与推荐目标状态。
 - `Domain/Recirculation/RecirculationDecisionResult.cs`：回流决策结果领域模型，包含是否需要回流、触发原因、扫描重试次数与推荐目标状态。
-- `Application/WaveCleanup/Abstractions/IWaveCleanupService.cs`：波次清理服务接口与 `WaveCleanupResult` 结果模型，按波次编码识别并清理非终态任务。
-- `Application/WaveCleanup/Services/WaveCleanupService.cs`：波次清理服务实现，支持 dry-run 模式（仅记录审计日志不执行变更）。
+- `Application/WaveCleanup/Abstractions/IWaveCleanupService.cs`：波次清理服务接口，声明按波次编码清理非终态任务的契约。
+- `Application/WaveCleanup/Abstractions/WaveCleanupResult.cs`：波次清理结果模型，包含识别数、清理数、dry-run 标志与执行摘要。
+- `Application/WaveCleanup/Services/WaveCleanupService.cs`：波次清理服务实现，支持 dry-run 模式并使用单次批量更新避免 N+1。
 - `Application/MultiLabel/Abstractions/IMultiLabelDecisionService.cs`：多标签决策服务接口，对给定条码的所有关联活跃任务执行策略决策。
 - `Application/MultiLabel/Services/MultiLabelDecisionService.cs`：多标签决策服务实现，支持 UseFirst/UseLatest/MarkException 三种策略。
 - `Application/Recirculation/Abstractions/IRecirculationService.cs`：回流规则服务接口，对指定任务执行回流判定。

@@ -79,6 +79,30 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     }
 
     /// <inheritdoc/>
+    public Task<int> BulkMarkExceptionByWaveCodeAsync(
+        string waveCode,
+        BusinessTaskStatus targetStatus,
+        string failureReasonPrefix,
+        DateTime updatedTimeLocal,
+        CancellationToken ct)
+    {
+        var targets = _tasks
+            .Where(x => string.Equals(x.WaveCode, waveCode, StringComparison.OrdinalIgnoreCase)
+                && x.Status != BusinessTaskStatus.Dropped
+                && x.Status != BusinessTaskStatus.Exception)
+            .ToList();
+
+        foreach (var task in targets)
+        {
+            task.Status = targetStatus;
+            task.FailureReason = failureReasonPrefix;
+            task.UpdatedTimeLocal = updatedTimeLocal;
+        }
+
+        return Task.FromResult(targets.Count);
+    }
+
+    /// <inheritdoc/>
     public Task<IReadOnlyList<BusinessTaskEntity>> FindByWaveCodeAsync(string waveCode, CancellationToken ct)
     {
         IReadOnlyList<BusinessTaskEntity> result = _tasks
