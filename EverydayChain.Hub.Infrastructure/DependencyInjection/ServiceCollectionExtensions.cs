@@ -73,6 +73,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IOracleRemoteStatusWriter, OracleRemoteStatusWriter>();
         services.AddSingleton<IRemoteStatusConsumeService, RemoteStatusConsumeService>();
         services.AddSingleton<ISyncWindowCalculator, SyncWindowCalculator>();
+        services.AddSingleton<IBusinessTaskMaterializer, BusinessTaskMaterializer>();
         services.AddSingleton<IDeletionExecutionService, DeletionExecutionService>();
         services.AddSingleton<IRetentionExecutionService, RetentionExecutionService>();
         services.AddSingleton<ISyncExecutionService, SyncExecutionService>();

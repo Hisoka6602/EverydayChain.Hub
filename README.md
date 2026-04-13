@@ -1,17 +1,16 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 执行续审批次 J（`逐文件全量审查实施方案.md`）：在续审批次 A-I 全仓 173/173 文件覆盖完成基础上，核对实际文件数（git ls-files = 173，与台账一致），执行 20 项全面合规扫描，发现 0 个新问题，全部规则扫描通过。
-- 更新 `逐文件代码检查台账.md`：新增续审批次 J 记录，更新当前阶段描述。
-- 更新 `逐文件全量审查实施方案.md`：补充批次 J 执行记录章节与验收清单条目。
-- 构建验证：0 Warning 0 Error，66/66 单元测试通过。
+- 通读现有仓库代码并对照 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 完成执行进度盘点，明确当前从 PR-01 开始实施。
+- 新增 PR-01 业务任务主模型：`BusinessTaskStatus` 与 `BusinessTaskEntity`。
+- 新增 PR-01 物化服务：`IBusinessTaskMaterializer`、`BusinessTaskMaterializer`、`BusinessTaskMaterializeRequest`，并完成 DI 注册。
+- 新增 `BusinessTaskMaterializer` 单元测试，覆盖默认状态与必填校验。
+- 更新 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`：补全 PR 总览“当前状态”与“待确认项”，并登记 PR-01 已完成。
+- 构建验证：0 Warning 0 Error，70/70 单元测试通过。
 ## 后续可完善点
-- 可将实施计划中的"统一验收清单"和"漂移拦截点"沉淀为 CI 自动检查项，降低多 PR 串行交付的人工审查成本。
-- 可在 SQL Server 侧增加等待事件采样（LCK_* / WRITELOG / PAGEIOLATCH_*）并与 `AppendElapsedMs` 对齐，实现"低资源占用慢请求"的自动归因告警。
-- 可将 `RemoteStatusConsumeService` 的状态驱动追加链路接入 AutoTune 闭环（按页耗时/失败率动态调整 `StatusBatchSize`），与 KeyedMerge 的调优能力对齐。
-- 可将状态驱动写入的"分表确认缓存"从进程内缓存扩展为跨重启持久化缓存，并增加后台预热策略，进一步缩短冷启动首批写入耗时。
-- 建议将状态驱动 `StatusBatchSize` 与本地追加耗时联动到自动调谐（AutoTune）策略，实现批大小动态收敛并避免触发短超时。
-- 续审机制已通过批次 J 完成全仓 173/173 文件入账与全面合规扫描闭环验证，建议后续将合规性扫描纳入 CI 自动化，在每次 PR 提交时自动触发逐文件入账检查。
+- 按待确认项先固化 PR-02 文档目录与命名规范，再推进接口基线文档拆分。
+- 在 PR-03 前冻结三类 API 的认证与幂等键来源，避免接口返工。
+- 在 PR-05 前确认业务任务持久化方案（新表或复用现有聚合映射），并提前评审迁移脚本边界。
 
 
 ## 解决方案文件树与职责
@@ -53,6 +52,7 @@
 │   ├── Enums/SyncBatchStatus.cs
 │   ├── Enums/SyncChangeOperationType.cs
 │   ├── Enums/SyncTablePriority.cs
+│   ├── Enums/BusinessTaskStatus.cs
 │   ├── Sync/SyncTableDefinition.cs
 │   ├── Sync/Models/RemoteStatusConsumeProfile.cs
 │   ├── Sync/SyncWindow.cs
@@ -62,6 +62,7 @@
 │   ├── Sync/SyncChangeLog.cs
 │   ├── Sync/SyncDeletionLog.cs
 │   ├── Aggregates/SortingTaskTraceAggregate/SortingTaskTraceEntity.cs
+│   ├── Aggregates/BusinessTaskAggregate/BusinessTaskEntity.cs
 │   ├── Aggregates/WmsPickToWcsAggregate/WmsPickToWcsEntity.cs
 │   ├── Aggregates/WmsSplitPickToLightCartonAggregate/WmsSplitPickToLightCartonEntity.cs
 │   ├── Options/AutoTuneOptions.cs
@@ -86,6 +87,7 @@
 │   ├── Models/SyncDeletionCandidate.cs
 │   ├── Models/SyncKeyReadRequest.cs
 │   ├── Models/SyncTargetStateRow.cs
+│   ├── Models/BusinessTaskMaterializeRequest.cs
 │   ├── Abstractions/Persistence/ISyncTaskConfigRepository.cs
 │   ├── Abstractions/Persistence/IOracleSourceReader.cs
 │   ├── Abstractions/Persistence/ISyncStagingRepository.cs
@@ -106,10 +108,12 @@
 │   ├── Abstractions/Services/ISyncExecutionService.cs
 │   ├── Abstractions/Services/IDeletionExecutionService.cs
 │   ├── Abstractions/Services/IRetentionExecutionService.cs
+│   ├── Abstractions/Services/IBusinessTaskMaterializer.cs
 │   ├── Models/RemoteStatusConsumeResult.cs
 │   ├── Services/SyncOrchestrator.cs
 │   ├── Services/SyncWindowCalculator.cs
 │   ├── Services/SyncExecutionService.cs
+│   ├── Services/BusinessTaskMaterializer.cs
 │   ├── Services/DeletionExecutionService.cs
 │   └── Services/RetentionExecutionService.cs
 ├── EverydayChain.Hub.SharedKernel
@@ -185,6 +189,7 @@
 │       ├── PassThroughSqlExecutionTuner.cs
 │       ├── RecordingShardTableProvisioner.cs
 │       ├── ServiceCollectionExtensionsTests.cs
+│       ├── BusinessTaskMaterializerTests.cs
 │       ├── ShardTableProvisionerTests.cs
 │       ├── SortingTaskTraceWriterTests.cs
 │       ├── TestLogger.cs
@@ -226,10 +231,14 @@
 - `LogicalTableNameNormalizer.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：逻辑表名规范化与安全校验共享组件，统一执行去空白、SQL 标识符校验与异常信息输出。
 - `BoundedConcurrentQueueHelper.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：有界并发队列淘汰辅助工具，仅执行一次 O(n) `Count` 遍历并缓存结果，供需要内存容量保护的队列实现统一复用。
 - `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs` / `SyncTablePriority.cs`：同步模式、删除策略、滞后控制、批次状态、变更操作类型与调度优先级枚举，均含中文 XML 注释与 `Description`。
+- `BusinessTaskStatus.cs`：业务任务生命周期状态枚举，覆盖 Created、Scanned、Dropped、FeedbackPending，并提供中文 `Description` 说明。
 - `RemoteStatusConsumeProfile.cs`（`EverydayChain.Hub.Domain/Sync/Models`）：StatusDriven 消费配置模型，统一承载状态列、待处理值、完成值、回写开关与批次大小。
 - `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`SyncTable`、`SyncDelete`、`SyncRetention`、`RetentionJob`、`Oracle` 等），供 Infrastructure 绑定读取。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
+- `BusinessTaskEntity.cs`（`Domain/Aggregates/BusinessTaskAggregate`）：统一业务任务聚合根实体，承载任务编码、来源表、业务键、条码与本地状态时间字段。
 - `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs` + `SyncTargetStateRow.cs`：同步执行、删除识别与轻量幂等状态存储的数据契约模型。
+- `BusinessTaskMaterializeRequest.cs`：业务任务物化输入模型，统一约束任务编码、来源表编码、业务键、条码与物化时间字段。
+- `Application/Abstractions/Services/IBusinessTaskMaterializer.cs` + `Application/Services/BusinessTaskMaterializer.cs`：业务任务物化服务抽象与实现，仅执行字段映射、文本规范化和默认状态赋值，不承载扫描/格口/落格业务规则。
 - `Application/Abstractions/Sync/IOracleRemoteStatusWriter.cs` / `IOracleStatusDrivenSourceReader.cs` / `ISqlServerAppendOnlyWriter.cs`：定义 StatusDriven 模式中 Oracle 远端状态回写、Oracle 状态驱动源读取与 SQL Server 仅追加写入的外部协作能力抽象，遵循 Application 层外部协作抽象放置规则。
 - `Application/Abstractions/Sync/IRemoteStatusConsumeService.cs` + `Application/Models/RemoteStatusConsumeResult.cs`：定义 StatusDriven 模式执行入口（应用编排抽象）与读取/追加/回写统计模型。
 - `Application/Abstractions/Persistence/ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。
@@ -280,6 +289,7 @@
 - `EverydayChain.Hub.Tests/Services/AutoMigrationServiceTests.cs`：分表预建后缀策略测试，断言启动预建不再包含无后缀基础表。
 - `EverydayChain.Hub.Tests/Services/FixedBootstrapShardSuffixResolver.cs`：分表后缀解析器测试替身，固定返回可控启动后缀集合用于自动迁移后缀策略测试。
 - `EverydayChain.Hub.Tests/Services/ServiceCollectionExtensionsTests.cs`：逻辑表名构建测试，覆盖非法标识符与空启用集合异常场景。
+- `EverydayChain.Hub.Tests/Services/BusinessTaskMaterializerTests.cs`：业务任务物化服务测试，覆盖默认状态赋值、时间赋值与必填字段空白校验分支。
 - `EverydayChain.Hub.Tests/Services/SortingTaskTraceWriterTests.cs`：分表写入器兜底建表测试，覆盖首次写入先建表与同月重复写入幂等建表触发场景。
 - `EverydayChain.Hub.Tests/Services/RecordingShardTableProvisioner.cs`：分表预建器测试替身，记录触发后缀以验证建表调用次数与后缀分发行为。
 - `EverydayChain.Hub.Tests/Services/PassThroughSqlExecutionTuner.cs`：SQL 调谐器测试替身，提供恒定批大小用于隔离写入器行为测试。
