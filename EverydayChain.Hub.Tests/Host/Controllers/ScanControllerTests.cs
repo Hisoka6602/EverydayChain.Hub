@@ -10,6 +10,11 @@ namespace EverydayChain.Hub.Tests.Host.Controllers;
 /// </summary>
 public sealed class ScanControllerTests {
     /// <summary>
+    /// 非本地时间语义枚举值。
+    /// </summary>
+    private const DateTimeKind NonLocalKind = (DateTimeKind)1;
+
+    /// <summary>
     /// 条码为空时应返回 BadRequest。
     /// </summary>
     [Fact]
@@ -35,7 +40,7 @@ public sealed class ScanControllerTests {
         var request = new ScanUploadRequest {
             Barcode = "BC001",
             DeviceCode = "DVC-01",
-            ScanTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 13, 12, 0, 0), (DateTimeKind)1)
+            ScanTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 13, 12, 0, 0), NonLocalKind)
         };
 
         var actionResult = await controller.UploadAsync(request, CancellationToken.None);

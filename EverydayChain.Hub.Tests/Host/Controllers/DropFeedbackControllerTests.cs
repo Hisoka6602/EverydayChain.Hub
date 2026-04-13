@@ -10,6 +10,11 @@ namespace EverydayChain.Hub.Tests.Host.Controllers;
 /// </summary>
 public sealed class DropFeedbackControllerTests {
     /// <summary>
+    /// 非本地时间语义枚举值。
+    /// </summary>
+    private const DateTimeKind NonLocalKind = (DateTimeKind)1;
+
+    /// <summary>
     /// 实际落格编码为空时应返回 BadRequest。
     /// </summary>
     [Fact]
@@ -37,7 +42,7 @@ public sealed class DropFeedbackControllerTests {
             Barcode = "BC001",
             ActualChuteCode = "CHUTE-01",
             TaskCode = "TASK-001",
-            DropTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 13, 12, 0, 0), (DateTimeKind)1)
+            DropTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 13, 12, 0, 0), NonLocalKind)
         };
 
         var actionResult = await controller.ConfirmAsync(request, CancellationToken.None);

@@ -7,11 +7,16 @@ namespace EverydayChain.Hub.Tests.Services;
 /// </summary>
 public sealed class LocalDateTimeNormalizerTests {
     /// <summary>
+    /// 非本地时间语义枚举值。
+    /// </summary>
+    private const DateTimeKind NonLocalKind = (DateTimeKind)1;
+
+    /// <summary>
     /// 非本地时间语义应被拒绝。
     /// </summary>
     [Fact]
     public void TryNormalize_ShouldRejectNonLocalKind() {
-        var input = DateTime.SpecifyKind(new DateTime(2026, 4, 13, 12, 0, 0), (DateTimeKind)1);
+        var input = DateTime.SpecifyKind(new DateTime(2026, 4, 13, 12, 0, 0), NonLocalKind);
 
         var passed = LocalDateTimeNormalizer.TryNormalize(input, "仅支持本地时间语义", out _, out var message);
 
