@@ -16,8 +16,8 @@ public sealed class DropFeedbackService : IDropFeedbackService {
     public Task<DropFeedbackApplicationResult> ExecuteAsync(DropFeedbackApplicationRequest request, CancellationToken cancellationToken) {
         _ = cancellationToken;
         var normalizedTaskCode = string.IsNullOrWhiteSpace(request.TaskCode)
-            ? $"TASK-{request.Barcode.Trim()}"
-            : request.TaskCode.Trim();
+            ? $"TASK-{request.Barcode}"
+            : request.TaskCode;
         var result = new DropFeedbackApplicationResult {
             IsAccepted = true,
             TaskCode = normalizedTaskCode,

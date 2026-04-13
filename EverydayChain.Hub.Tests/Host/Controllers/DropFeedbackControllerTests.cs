@@ -28,6 +28,24 @@ public sealed class DropFeedbackControllerTests {
     }
 
     /// <summary>
+    /// 落格时间为 UTC 时应返回 BadRequest。
+    /// </summary>
+    [Fact]
+    public async Task ConfirmAsync_ShouldReturnBadRequest_WhenDropTimeIsUtc() {
+        var controller = new DropFeedbackController(new StubDropFeedbackService());
+        var request = new DropFeedbackRequest {
+            Barcode = "BC001",
+            ActualChuteCode = "CHUTE-01",
+            TaskCode = "TASK-001",
+            DropTimeLocal = new DateTime(2026, 4, 13, 12, 0, 0, DateTimeKind.Utc)
+        };
+
+        var actionResult = await controller.ConfirmAsync(request, CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+    }
+
+    /// <summary>
     /// 有效请求时应返回 Ok。
     /// </summary>
     [Fact]

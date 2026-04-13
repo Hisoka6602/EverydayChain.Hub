@@ -16,8 +16,8 @@ public sealed class ChuteQueryService : IChuteQueryService {
     public Task<ChuteResolveApplicationResult> ExecuteAsync(ChuteResolveApplicationRequest request, CancellationToken cancellationToken) {
         _ = cancellationToken;
         var normalizedTaskCode = string.IsNullOrWhiteSpace(request.TaskCode)
-            ? $"TASK-{request.Barcode.Trim()}"
-            : request.TaskCode.Trim();
+            ? $"TASK-{request.Barcode}"
+            : request.TaskCode;
         var result = new ChuteResolveApplicationResult {
             IsResolved = true,
             TaskCode = normalizedTaskCode,

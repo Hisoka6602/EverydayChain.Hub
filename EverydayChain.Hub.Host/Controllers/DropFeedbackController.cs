@@ -43,7 +43,11 @@ public sealed class DropFeedbackController : ControllerBase {
             return BadRequest(ApiResponse<DropFeedbackResponse>.Fail("实际落格编码不能为空。"));
         }
 
-        var normalizedDropTime = request.DropTimeLocal == default ? DateTime.Now : request.DropTimeLocal;
+        if (request.DropTimeLocal.Kind == DateTimeKind.Utc) {
+            return BadRequest(ApiResponse<DropFeedbackResponse>.Fail("落格时间必须为本地时间，禁止传入 UTC 时间。"));
+        }
+
+        var normalizedDropTime = NormalizeLocalTime(request.DropTimeLocal);
         var applicationResult = await dropFeedbackService.ExecuteAsync(new DropFeedbackApplicationRequest {
             TaskCode = request.TaskCode,
             Barcode = request.Barcode.Trim(),
@@ -58,5 +62,22 @@ public sealed class DropFeedbackController : ControllerBase {
         };
 
         return Ok(ApiResponse<DropFeedbackResponse>.Success(response, applicationResult.Message));
+    }
+
+    /// <summary>
+    /// 规范化本地时间输入。
+    /// </summary>
+    /// <param name="candidateTime">候选时间。</param>
+    /// <returns>规范化后的本地时间。</returns>
+    private static DateTime NormalizeLocalTime(DateTime candidateTime) {
+        if (candidateTime == DateTime.MinValue) {
+            return DateTime.Now;
+        }
+
+        if (candidateTime.Kind == DateTimeKind.Unspecified) {
+            return DateTime.SpecifyKind(candidateTime, DateTimeKind.Local);
+        }
+
+        return candidateTime;
     }
 }
