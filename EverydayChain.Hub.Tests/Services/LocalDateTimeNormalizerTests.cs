@@ -7,16 +7,16 @@ namespace EverydayChain.Hub.Tests.Services;
 /// </summary>
 public sealed class LocalDateTimeNormalizerTests {
     /// <summary>
-    /// UTC 时间应被拒绝。
+    /// 非本地时间语义应被拒绝。
     /// </summary>
     [Fact]
-    public void TryNormalize_ShouldRejectUtcTime() {
-        var input = new DateTime(2026, 4, 13, 12, 0, 0, DateTimeKind.Utc);
+    public void TryNormalize_ShouldRejectNonLocalKind() {
+        var input = DateTime.SpecifyKind(new DateTime(2026, 4, 13, 12, 0, 0), (DateTimeKind)1);
 
-        var passed = LocalDateTimeNormalizer.TryNormalize(input, "UTC 不允许", out _, out var message);
+        var passed = LocalDateTimeNormalizer.TryNormalize(input, "仅支持本地时间语义", out _, out var message);
 
         Assert.False(passed);
-        Assert.Equal("UTC 不允许", message);
+        Assert.Equal("仅支持本地时间语义", message);
     }
 
     /// <summary>
@@ -26,7 +26,7 @@ public sealed class LocalDateTimeNormalizerTests {
     public void TryNormalize_ShouldConvertUnspecifiedToLocal() {
         var input = new DateTime(2026, 4, 13, 12, 0, 0, DateTimeKind.Unspecified);
 
-        var passed = LocalDateTimeNormalizer.TryNormalize(input, "UTC 不允许", out var normalized, out var message);
+        var passed = LocalDateTimeNormalizer.TryNormalize(input, "仅支持本地时间语义", out var normalized, out var message);
 
         Assert.True(passed);
         Assert.Equal(string.Empty, message);
@@ -41,7 +41,7 @@ public sealed class LocalDateTimeNormalizerTests {
     public void TryNormalize_ShouldFallbackToNow_WhenMinValue() {
         var before = DateTime.Now;
 
-        var passed = LocalDateTimeNormalizer.TryNormalize(DateTime.MinValue, "UTC 不允许", out var normalized, out _);
+        var passed = LocalDateTimeNormalizer.TryNormalize(DateTime.MinValue, "仅支持本地时间语义", out var normalized, out _);
         var after = DateTime.Now;
 
         Assert.True(passed);

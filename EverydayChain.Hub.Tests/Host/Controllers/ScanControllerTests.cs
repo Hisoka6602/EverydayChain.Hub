@@ -27,15 +27,15 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 扫描时间为 UTC 时应返回 BadRequest。
+    /// 扫描时间语义不是本地或未指定时应返回 BadRequest。
     /// </summary>
     [Fact]
-    public async Task UploadAsync_ShouldReturnBadRequest_WhenScanTimeIsUtc() {
+    public async Task UploadAsync_ShouldReturnBadRequest_WhenScanTimeKindIsNonLocal() {
         var controller = new ScanController(new StubScanIngressService());
         var request = new ScanUploadRequest {
             Barcode = "BC001",
             DeviceCode = "DVC-01",
-            ScanTimeLocal = new DateTime(2026, 4, 13, 12, 0, 0, DateTimeKind.Utc)
+            ScanTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 13, 12, 0, 0), (DateTimeKind)1)
         };
 
         var actionResult = await controller.UploadAsync(request, CancellationToken.None);
