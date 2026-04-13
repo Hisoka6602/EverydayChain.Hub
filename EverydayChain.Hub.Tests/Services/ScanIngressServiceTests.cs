@@ -6,6 +6,7 @@ using EverydayChain.Hub.Application.TaskExecution.Services;
 using EverydayChain.Hub.Application.ScanMatch.Services;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EverydayChain.Hub.Tests.Services;
 
@@ -23,8 +24,9 @@ public sealed class ScanIngressServiceTests
     {
         var barcodeParser = new BarcodeParser();
         var repo = repository ?? new InMemoryBusinessTaskRepository();
+        var scanLogRepo = new InMemoryScanLogRepository();
         var matchService = new ScanMatchService(repo);
-        var execService = new TaskExecutionService(matchService, repo);
+        var execService = new TaskExecutionService(matchService, repo, scanLogRepo, NullLogger<TaskExecutionService>.Instance);
         return new ScanIngressService(barcodeParser, execService);
     }
 

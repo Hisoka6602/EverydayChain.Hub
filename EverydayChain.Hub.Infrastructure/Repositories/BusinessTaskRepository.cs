@@ -1,5 +1,6 @@
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
+using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using Microsoft.EntityFrameworkCore;
@@ -71,5 +72,31 @@ public class BusinessTaskRepository : IBusinessTaskRepository
         await using var db = await _contextFactory.CreateDbContextAsync(ct);
         db.BusinessTasks.Update(entity);
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BusinessTaskEntity>> FindPendingFeedbackAsync(int maxCount, CancellationToken ct)
+    {
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var db = await _contextFactory.CreateDbContextAsync(ct);
+        return await db.BusinessTasks
+            .AsNoTracking()
+            .Where(x => x.FeedbackStatus == BusinessTaskFeedbackStatus.Pending)
+            .OrderBy(x => x.CreatedTimeLocal)
+            .Take(maxCount)
+            .ToListAsync(ct);
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BusinessTaskEntity>> FindFailedFeedbackAsync(int maxCount, CancellationToken ct)
+    {
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var db = await _contextFactory.CreateDbContextAsync(ct);
+        return await db.BusinessTasks
+            .AsNoTracking()
+            .Where(x => x.FeedbackStatus == BusinessTaskFeedbackStatus.Failed)
+            .OrderBy(x => x.CreatedTimeLocal)
+            .Take(maxCount)
+            .ToListAsync(ct);
     }
 }

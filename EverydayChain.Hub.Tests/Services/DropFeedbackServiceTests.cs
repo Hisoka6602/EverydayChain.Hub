@@ -2,6 +2,7 @@ using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Services;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EverydayChain.Hub.Tests.Services;
 
@@ -16,7 +17,8 @@ public sealed class DropFeedbackServiceTests
     private static (DropFeedbackService Service, InMemoryBusinessTaskRepository Repository) CreateService()
     {
         var repo = new InMemoryBusinessTaskRepository();
-        var service = new DropFeedbackService(repo);
+        var dropLogRepo = new InMemoryDropLogRepository();
+        var service = new DropFeedbackService(repo, dropLogRepo, NullLogger<DropFeedbackService>.Instance);
         return (service, repo);
     }
 

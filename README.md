@@ -1,16 +1,14 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 通读现有仓库代码并对照 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 盘点执行进度，确认当前已完成 PR-01、PR-02、PR-03、PR-04、PR-13（5/17）；M2 依赖 PR-04~PR-07，当前尚未满足，本次实施 PR-05/06/07。
-- 实施 PR-05（扫描匹配与任务执行）：新增 `IBusinessTaskRepository`、`IScanMatchService`、`ITaskExecutionService` 接口；新增 `ScanMatchService`、`TaskExecutionService` 实现；`ScanIngressService` 接入真实匹配与状态推进链路；新增 `BusinessTaskRepository` EF Core 实现；`BusinessTaskEntity` 增加 `TargetChuteCode`、`ActualChuteCode`、`DeviceCode`、`TraceId`、`FailureReason`、`ScannedAtLocal`、`DroppedAtLocal`、`FeedbackStatus` 字段；新增 EF 迁移 `20260413144042_AddBusinessTaskTable`。
-- 实施 PR-06（请求格口服务）：`ChuteQueryService` 接入 `IBusinessTaskRepository` 实现真实任务查询与格口返回，替换原占位实现；覆盖无任务/状态非法/无目标格口异常分支。
-- 实施 PR-07（落格回传服务）：`DropFeedbackService` 接入 `IBusinessTaskRepository` 实现双定位策略（TaskCode 优先、Barcode 回退）、参数冲突校验与状态机推进（成功→Dropped，失败→Exception）；`DropFeedbackApplicationRequest` 新增 `IsSuccess`、`FailureReason` 字段；`DropFeedbackRequest` 更新为支持双定位与落格成功标识；`BusinessTaskStatus` 新增 `Exception` 枚举项；新增 `BusinessTaskFeedbackStatus` 枚举。
-- 新增测试：`ScanMatchServiceTests`、`TaskExecutionServiceTests`、`ChuteQueryServiceTests`、`DropFeedbackServiceTests`（合计新增 19 个测试用例，总计 112 通过）。
-- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过（0 Warning 0 Error，112/112 测试通过）。
+- 实施 PR-08（业务回传服务）：新增 `WmsFeedbackOptions` 配置实体；新增 `IWmsOracleFeedbackGateway` 应用层外部集成抽象（`Application/Abstractions/Integrations/`，遵循网关命名规范）；新增 `IWmsFeedbackService` 应用服务抽象（`Application/Abstractions/Services/`）；新增 `WmsFeedbackApplicationResult` 结果模型；新增 `WmsFeedbackService` 实现（`Application/Feedback/Services/`）；新增 `OracleWmsFeedbackGateway` 基础设施实现（`Infrastructure/Integrations/`）；`IBusinessTaskRepository` 新增 `FindPendingFeedbackAsync` 与 `FindFailedFeedbackAsync` 方法；`DropFeedbackService` 落格成功时同步置 `FeedbackStatus=Pending`；`appsettings.json` 增加 `WmsFeedback` 配置节（默认 `Enabled=false`，待确认目标表后再开启）；`ServiceCollectionExtensions` 注册新 DI；新增 `WmsFeedbackServiceTests` 测试 4 例（含 `CapturingWmsOracleFeedbackGateway` 替身）。
+- 实施 PR-09（扫描/落格日志落库）：新增 `ScanLogEntity`（`Domain/Aggregates/ScanLogAggregate/`）与 `DropLogEntity`（`Domain/Aggregates/DropLogAggregate/`）聚合根实体；新增 `IScanLogRepository`、`IDropLogRepository` 仓储抽象；新增 `ScanLogEntityTypeConfiguration`、`DropLogEntityTypeConfiguration` EF 配置；`HubDbContext` 新增 `ScanLogs`、`DropLogs` DbSet；新增 `ScanLogRepository`、`DropLogRepository` EF Core 实现；新增 EF 迁移 `20260413160852_AddScanDropLogTables`（`scan_logs`/`drop_logs` 表及索引）；`TaskExecutionService` 注入 `IScanLogRepository` 并在扫描成功/失败时写扫描日志；`DropFeedbackService` 注入 `IDropLogRepository` 并在落格成功/失败时写落格日志（日志写入失败不影响主流程）；新增 `ScanDropLogTests` 测试 4 例；测试替身新增 `InMemoryScanLogRepository`、`InMemoryDropLogRepository`；`ScanIngressServiceTests`、`TaskExecutionServiceTests`、`DropFeedbackServiceTests` 更新构造方法入参适配。
+- 新增测试合计 10 例，总计 122/122 测试通过。
+- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过（0 Warning 0 Error，122/122）。
 ## 后续可完善点
-- 按依赖顺序推进 PR-08（业务回传 WMS Oracle）。
-- 在进入 PR-08 前先冻结业务回传 Oracle 目标表与幂等键组合，降低联调阶段不确定性。
-
+- 冻结业务回传目标 Oracle 表与幂等键组合后，将 `WmsFeedback.Enabled` 置 `true` 并配置真实 Schema/Table/BusinessKeyColumn 完成端到端联调。
+- 推进 PR-09 中里程碑 M3 验收（PR-08 + PR-09 完成）。
+- 继续推进 PR-10（异常规则链路）、PR-11（补偿重试）与 PR-12（WmsFeedbackBackgroundWorker）。
 
 ## 解决方案文件树与职责
 ```text
@@ -70,6 +68,8 @@
 │   ├── Sync/SyncDeletionLog.cs
 │   ├── Aggregates/SortingTaskTraceAggregate/SortingTaskTraceEntity.cs
 │   ├── Aggregates/BusinessTaskAggregate/BusinessTaskEntity.cs
+│   ├── Aggregates/ScanLogAggregate/ScanLogEntity.cs
+│   ├── Aggregates/DropLogAggregate/DropLogEntity.cs
 │   ├── Aggregates/WmsPickToWcsAggregate/WmsPickToWcsEntity.cs
 │   ├── Aggregates/WmsSplitPickToLightCartonAggregate/WmsSplitPickToLightCartonEntity.cs
 │   ├── Options/AutoTuneOptions.cs
@@ -81,7 +81,8 @@
 │   ├── Options/SyncDeleteOptions.cs
 │   ├── Options/SyncJobOptions.cs
 │   ├── Options/SyncRetentionOptions.cs
-│   └── Options/SyncTableOptions.cs
+│   ├── Options/SyncTableOptions.cs
+│   └── Options/WmsFeedbackOptions.cs
 ├── EverydayChain.Hub.Application
 │   ├── EverydayChain.Hub.Application.csproj
 │   ├── Models/SyncExecutionContext.cs
@@ -105,6 +106,7 @@
 │   ├── Models/DropFeedbackApplicationResult.cs
 │   ├── Models/ScanMatchResult.cs
 │   ├── Models/TaskExecutionResult.cs
+│   ├── Models/WmsFeedbackApplicationResult.cs
 │   ├── Abstractions/Persistence/ISyncTaskConfigRepository.cs
 │   ├── Abstractions/Persistence/IOracleSourceReader.cs
 │   ├── Abstractions/Persistence/ISyncStagingRepository.cs
@@ -117,6 +119,8 @@
 │   ├── Abstractions/Persistence/IShardTableResolver.cs
 │   ├── Abstractions/Persistence/IShardRetentionRepository.cs
 │   ├── Abstractions/Persistence/IBusinessTaskRepository.cs
+│   ├── Abstractions/Persistence/IScanLogRepository.cs
+│   ├── Abstractions/Persistence/IDropLogRepository.cs
 │   ├── Abstractions/Sync/IOracleRemoteStatusWriter.cs
 │   ├── Abstractions/Sync/IOracleStatusDrivenSourceReader.cs
 │   ├── Abstractions/Sync/ISqlServerAppendOnlyWriter.cs
@@ -133,6 +137,8 @@
 │   ├── Abstractions/Services/IScanIngressService.cs
 │   ├── Abstractions/Services/IChuteQueryService.cs
 │   ├── Abstractions/Services/IDropFeedbackService.cs
+│   ├── Abstractions/Services/IWmsFeedbackService.cs
+│   ├── Abstractions/Integrations/IWmsOracleFeedbackGateway.cs
 │   ├── Models/RemoteStatusConsumeResult.cs
 │   ├── Services/SyncOrchestrator.cs
 │   ├── Services/SyncWindowCalculator.cs
@@ -144,6 +150,7 @@
 │   ├── Services/ScanIngressService.cs
 │   ├── Services/ChuteQueryService.cs
 │   ├── Services/DropFeedbackService.cs
+│   ├── Feedback/Services/WmsFeedbackService.cs
 │   ├── Services/DeletionExecutionService.cs
 │   └── Services/RetentionExecutionService.cs
 ├── EverydayChain.Hub.SharedKernel
@@ -164,6 +171,7 @@
 │   ├── Sync/Writers/SqlServerAppendOnlyWriter.cs
 │   ├── Sync/Writers/OracleRemoteStatusWriter.cs
 │   ├── Sync/Services/RemoteStatusConsumeService.cs
+│   ├── Integrations/OracleWmsFeedbackGateway.cs
 │   ├── Repositories/SyncTaskConfigRepository.cs
 │   ├── Repositories/OracleSourceReader.cs
 │   ├── Repositories/SyncStagingRepository.cs
@@ -176,10 +184,14 @@
 │   ├── Repositories/InMemorySyncChangeLogRepository.cs
 │   ├── Repositories/InMemorySyncDeletionLogRepository.cs
 │   ├── Repositories/BusinessTaskRepository.cs
+│   ├── Repositories/ScanLogRepository.cs
+│   ├── Repositories/DropLogRepository.cs
 │   ├── Persistence/HubDbContext.cs
 │   ├── Persistence/DesignTimeHubDbContextFactory.cs
 │   ├── Persistence/EntityConfigurations/SortingTaskTraceEntityTypeConfiguration.cs
 │   ├── Persistence/EntityConfigurations/BusinessTaskEntityTypeConfiguration.cs
+│   ├── Persistence/EntityConfigurations/ScanLogEntityTypeConfiguration.cs
+│   ├── Persistence/EntityConfigurations/DropLogEntityTypeConfiguration.cs
 │   ├── Persistence/Sharding/TableSuffixScope.cs
 │   ├── Persistence/Sharding/IShardSuffixResolver.cs
 │   ├── Persistence/Sharding/MonthShardSuffixResolver.cs
@@ -188,6 +200,8 @@
 │   ├── Migrations/20260408020833_RebuildInitialHubSchema.Designer.cs
 │   ├── Migrations/20260413144042_AddBusinessTaskTable.cs
 │   ├── Migrations/20260413144042_AddBusinessTaskTable.Designer.cs
+│   ├── Migrations/20260413160852_AddScanDropLogTables.cs
+│   ├── Migrations/20260413160852_AddScanDropLogTables.Designer.cs
 │   ├── Migrations/HubDbContextModelSnapshot.cs
 │   └── Services
 │       ├── IDangerZoneExecutor.cs
@@ -238,6 +252,10 @@
 │       ├── TaskExecutionServiceTests.cs
 │       ├── ChuteQueryServiceTests.cs
 │       ├── DropFeedbackServiceTests.cs
+│       ├── WmsFeedbackServiceTests.cs
+│       ├── ScanDropLogTests.cs
+│       ├── InMemoryScanLogRepository.cs
+│       ├── InMemoryDropLogRepository.cs
 │       ├── ShardTableProvisionerTests.cs
 │       ├── SortingTaskTraceWriterTests.cs
 │       ├── LocalDateTimeNormalizerTests.cs
@@ -318,7 +336,22 @@
 - `Application/Abstractions/Services/IBarcodeParser.cs` + `Application/Services/BarcodeParser.cs`：条码解析服务抽象与实现，统一输出拆零（Split）/整件（FullCase）/无效（Unknown）分类及失败语义（InvalidBarcode、UnsupportedBarcodeType、ParseError）。
 - `Application/Abstractions/Services/IScanIngressService.cs` + `Application/Services/ScanIngressService.cs`：扫描上传应用服务，协调条码解析、任务匹配与状态推进链路，输出标准化受理结果。
 - `Application/Abstractions/Services/IChuteQueryService.cs` + `Application/Services/ChuteQueryService.cs`：请求格口应用服务抽象与实现，按任务编码或条码查询业务任务并返回目标格口，覆盖状态校验与未分配格口异常分支。
-- `Application/Abstractions/Services/IDropFeedbackService.cs` + `Application/Services/DropFeedbackService.cs`：落格回传应用服务抽象与实现，支持双定位（TaskCode/Barcode）、参数冲突校验与状态机推进（成功→Dropped，失败→Exception）。
+- `Application/Abstractions/Services/IDropFeedbackService.cs` + `Application/Services/DropFeedbackService.cs`：落格回传应用服务抽象与实现，支持双定位（TaskCode/Barcode）、参数冲突校验与状态机推进（成功→Dropped+FeedbackPending，失败→Exception），落格成功/失败均写落格日志。
+- `Application/Abstractions/Services/IWmsFeedbackService.cs` + `Application/Feedback/Services/WmsFeedbackService.cs`：业务回传应用服务抽象与实现，查询 `FeedbackStatus=Pending` 任务、批量调用 Oracle 写入器、按结果回填 Completed/Failed。
+- `Application/Abstractions/Integrations/IWmsOracleFeedbackGateway.cs` + `Infrastructure/Integrations/OracleWmsFeedbackGateway.cs`：Oracle WMS 业务回传网关抽象与实现；实现使用数组绑定批量更新，安全标识符校验防止 SQL 注入；`Enabled=false` 时仅记录日志不实际写入 Oracle。
+- `Domain/Options/WmsFeedbackOptions.cs`：业务回传配置实体，定义 Schema、Table、BusinessKeyColumn、FeedbackStatusColumn、FeedbackCompletedValue、FeedbackTimeColumn、ActualChuteColumn、CommandTimeoutSeconds 与 Enabled 开关（默认 false）。
+- `Application/Models/WmsFeedbackApplicationResult.cs`：业务回传执行结果模型，汇总 PendingCount、SuccessCount、FailedCount 与 IsSuccess。
+- `Application/Abstractions/Persistence/IScanLogRepository.cs` + `Infrastructure/Repositories/ScanLogRepository.cs`：扫描日志仓储抽象与 EF Core 实现，写入 `scan_logs` 固定非分片表。
+- `Application/Abstractions/Persistence/IDropLogRepository.cs` + `Infrastructure/Repositories/DropLogRepository.cs`：落格日志仓储抽象与 EF Core 实现，写入 `drop_logs` 固定非分片表。
+- `Domain/Aggregates/ScanLogAggregate/ScanLogEntity.cs`：扫描日志聚合实体，记录条码、匹配结果、失败原因、设备编码、链路追踪、扫描时间等审计字段。
+- `Domain/Aggregates/DropLogAggregate/DropLogEntity.cs`：落格日志聚合实体，记录任务编码、条码、实际格口、成功标志、失败原因、落格时间等审计字段。
+- `Infrastructure/Persistence/EntityConfigurations/ScanLogEntityTypeConfiguration.cs`：扫描日志 EF Fluent API 配置，映射 `scan_logs` 表，定义字段约束与查询索引。
+- `Infrastructure/Persistence/EntityConfigurations/DropLogEntityTypeConfiguration.cs`：落格日志 EF Fluent API 配置，映射 `drop_logs` 表，定义字段约束与查询索引。
+- `20260413160852_AddScanDropLogTables.cs`：新增 `scan_logs` 与 `drop_logs` 表的 EF 迁移，包含所有字段与索引定义。
+- `EverydayChain.Hub.Tests/Services/WmsFeedbackServiceTests.cs`：业务回传服务单元测试，覆盖无待回传任务空结果、写入成功置 Completed、写入器异常置 Failed、batchSize 限制、Enabled=false 直接短路、writtenRows 不一致整批失败六个场景；含 `CapturingWmsOracleFeedbackGateway` 捕获替身。
+- `EverydayChain.Hub.Tests/Services/ScanDropLogTests.cs`：扫描/落格日志落库测试，覆盖扫描成功写日志、扫描失败写日志、落格成功写日志+FeedbackPending、落格失败写日志四个场景。
+- `EverydayChain.Hub.Tests/Services/InMemoryScanLogRepository.cs`：扫描日志仓储内存替身。
+- `EverydayChain.Hub.Tests/Services/InMemoryDropLogRepository.cs`：落格日志仓储内存替身。
 - `Application/Abstractions/Sync/IOracleRemoteStatusWriter.cs` / `IOracleStatusDrivenSourceReader.cs` / `ISqlServerAppendOnlyWriter.cs`：定义 StatusDriven 模式中 Oracle 远端状态回写、Oracle 状态驱动源读取与 SQL Server 仅追加写入的外部协作能力抽象，遵循 Application 层外部协作抽象放置规则。
 - `Application/Abstractions/Sync/IRemoteStatusConsumeService.cs` + `Application/Models/RemoteStatusConsumeResult.cs`：定义 StatusDriven 模式执行入口（应用编排抽象）与读取/追加/回写统计模型。
 - `Application/Abstractions/Persistence/ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。
@@ -359,6 +392,7 @@
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖，并在启动阶段从启用同步表配置提取逻辑表名集合，完成安全校验与空配置异常拦截。
 - `20260408020833_RebuildInitialHubSchema.cs`：初始化迁移，定义 `sorting_task_trace`、`IDX_PICKTOLIGHT_CARTON1`、`IDX_PICKTOWCS2` 三张聚合表结构及索引。
 - `20260413144042_AddBusinessTaskTable.cs`：新增 `business_tasks` 固定表迁移，包含任务编码、条码、格口、扫描落格时间、状态、回传状态等字段及唯一索引。
+- `20260413160852_AddScanDropLogTables.cs`：新增 `scan_logs` 与 `drop_logs` 表迁移，包含审计字段与查询索引。
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
 - `nlog.config`：NLog 日志配置，输出至控制台与两个滚动日志文件：通用日志（`hub-${shortdate}.log`，按日切割，单文件上限 10 MB，保留 30 天）；同步专属日志（`sync-${shortdate}.log`，仅收录同步链路相关组件日志，便于独立分析同步性能问题）。
 - `Program.cs`（Host）：Host 启动入口，现已支持 API + Worker 共存，启用 Controllers、Swagger（中文注释）并保留自动迁移与同步后台任务注册。

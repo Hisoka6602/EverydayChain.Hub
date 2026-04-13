@@ -1,7 +1,9 @@
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Domain.Aggregates.DropLogAggregate;
 using EverydayChain.Hub.Domain.Enums;
+using Microsoft.Extensions.Logging;
 
 namespace EverydayChain.Hub.Application.Services;
 
@@ -15,16 +17,33 @@ public sealed class DropFeedbackService : IDropFeedbackService {
     private readonly IBusinessTaskRepository _businessTaskRepository;
 
     /// <summary>
+    /// 落格日志仓储。
+    /// </summary>
+    private readonly IDropLogRepository _dropLogRepository;
+
+    /// <summary>
+    /// 日志记录器。
+    /// </summary>
+    private readonly ILogger<DropFeedbackService> _logger;
+
+    /// <summary>
     /// 初始化落格回传应用服务。
     /// </summary>
     /// <param name="businessTaskRepository">业务任务仓储。</param>
-    public DropFeedbackService(IBusinessTaskRepository businessTaskRepository) {
+    /// <param name="dropLogRepository">落格日志仓储。</param>
+    /// <param name="logger">日志记录器。</param>
+    public DropFeedbackService(
+        IBusinessTaskRepository businessTaskRepository,
+        IDropLogRepository dropLogRepository,
+        ILogger<DropFeedbackService> logger) {
         _businessTaskRepository = businessTaskRepository;
+        _dropLogRepository = dropLogRepository;
+        _logger = logger;
     }
 
     /// <summary>
     /// 处理落格回传：定位任务、校验状态、推进状态机并持久化。
-    /// 步骤：1. 按任务编码或条码定位任务；2. 校验参数一致性；3. 推进状态；4. 持久化；5. 返回结果。
+    /// 步骤：1. 按任务编码或条码定位任务；2. 校验参数一致性；3. 推进状态；4. 持久化；5. 写落格日志；6. 返回结果。
     /// </summary>
     /// <param name="request">落格回传请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
@@ -85,6 +104,7 @@ public sealed class DropFeedbackService : IDropFeedbackService {
         // 步骤 4：推进状态机。
         if (request.IsSuccess) {
             task.Status = BusinessTaskStatus.Dropped;
+            task.FeedbackStatus = BusinessTaskFeedbackStatus.Pending;
             task.ActualChuteCode = string.IsNullOrWhiteSpace(request.ActualChuteCode) ? task.ActualChuteCode : request.ActualChuteCode.Trim();
             task.DroppedAtLocal = request.DropTimeLocal;
         } else {
@@ -97,6 +117,17 @@ public sealed class DropFeedbackService : IDropFeedbackService {
         // 步骤 5：持久化。
         await _businessTaskRepository.UpdateAsync(task, cancellationToken);
 
+        // 步骤 6：写落格日志（成功与失败均记录，异常不影响主流程）。
+        await WriteDropLogSilentlyAsync(
+            businessTaskId: task.Id,
+            taskCode: task.TaskCode,
+            barcode: request.Barcode,
+            actualChuteCode: request.ActualChuteCode,
+            isSuccess: request.IsSuccess,
+            failureReason: request.IsSuccess ? null : request.FailureReason,
+            dropTimeLocal: request.DropTimeLocal,
+            ct: cancellationToken);
+
         return new DropFeedbackApplicationResult {
             IsAccepted = true,
             TaskCode = task.TaskCode,
@@ -105,5 +136,43 @@ public sealed class DropFeedbackService : IDropFeedbackService {
                 ? $"任务 [{task.TaskCode}] 落格成功，已推进到 {task.Status}。"
                 : $"任务 [{task.TaskCode}] 落格异常，已推进到 {task.Status}。"
         };
+    }
+
+    /// <summary>
+    /// 静默写入落格日志，异常时仅记录日志不影响主流程。
+    /// </summary>
+    private async Task WriteDropLogSilentlyAsync(
+        long businessTaskId,
+        string taskCode,
+        string? barcode,
+        string? actualChuteCode,
+        bool isSuccess,
+        string? failureReason,
+        DateTime? dropTimeLocal,
+        CancellationToken ct)
+    {
+        try
+        {
+            var log = new DropLogEntity
+            {
+                BusinessTaskId = businessTaskId,
+                TaskCode = taskCode,
+                Barcode = string.IsNullOrWhiteSpace(barcode) ? null : barcode.Trim(),
+                ActualChuteCode = string.IsNullOrWhiteSpace(actualChuteCode) ? null : actualChuteCode.Trim(),
+                IsSuccess = isSuccess,
+                FailureReason = string.IsNullOrWhiteSpace(failureReason) ? null : failureReason.Trim(),
+                DropTimeLocal = dropTimeLocal,
+                CreatedTimeLocal = DateTime.Now
+            };
+            await _dropLogRepository.SaveAsync(log, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "落格日志写入失败，不影响主流程。TaskCode={TaskCode}", taskCode);
+        }
     }
 }
