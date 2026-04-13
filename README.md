@@ -1,15 +1,17 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 通读现有仓库代码并对照 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 盘点执行进度，确认当前已完成 PR-01，并在本 PR 完成 PR-02 文档基线交付。
-- 新增 5 份语义基线文档：`WMS状态语义基线.md`、`条码规则基线.md`、`对外API接口基线.md`、`拆零业务字段语义基线.md`、`整件业务字段语义基线.md`。
-- 更新 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`：将 PR-02 状态标记为“已完成”，并补充交付文件清单。
-- 联动更新 `README.md` 文件树与“各层级与各文件作用说明（逐项）”章节，登记新增文档用途。
-- 构建验证：0 Warning 0 Error，70/70 单元测试通过。
+- 通读现有仓库代码并对照 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 盘点执行进度，确认当前已完成 PR-01、PR-02，并在本 PR 完成 PR-03 Host API 承载骨架交付。
+- 新增 Host API 骨架能力：`ScanController`、`ChuteController`、`DropFeedbackController` 与请求/响应契约，Controller 仅做入参校验与应用服务调用。
+- 将 Host 启动方式扩展为 API + Worker 共存：启用 Controllers、Swagger（中文注释展示）并保留 `AutoMigrationHostedService`、`SyncBackgroundWorker`、`RetentionBackgroundWorker`。
+- 新增应用层骨架服务抽象与实现：`IScanIngressService`、`IChuteQueryService`、`IDropFeedbackService` 及对应实现，并在 DI 中完成注册。
+- 新增 Controller 基础行为测试，覆盖参数校验与标准响应路径。
+- 更新 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`：将 PR-03 状态标记为“已完成”，并补充交付文件清单。
+- 构建验证：0 Warning 0 Error，新增测试通过。
 ## 后续可完善点
-- 在 PR-03 前冻结三类 API 的认证方式与幂等键来源，避免接口返工。
-- 在 PR-03 实施时按基线文档补齐 Host 控制器骨架与中文 Swagger 注释。
-- 在 PR-05 前确认业务任务持久化方案（新表或复用现有聚合映射），并提前评审迁移脚本边界。
+- 在 PR-04 接入条码类型识别与标准化解析，替换当前 API 骨架返回值中的占位策略。
+- 在 PR-05 接入任务匹配与状态推进持久化，实现扫描上传到业务任务状态变更的闭环。
+- 在 PR-03 待确认项中补齐三类 API 的认证方式与幂等键来源，并在 Controller 层统一落地。
 
 
 ## 解决方案文件树与职责
@@ -92,6 +94,12 @@
 │   ├── Models/SyncKeyReadRequest.cs
 │   ├── Models/SyncTargetStateRow.cs
 │   ├── Models/BusinessTaskMaterializeRequest.cs
+│   ├── Models/ScanUploadApplicationRequest.cs
+│   ├── Models/ScanUploadApplicationResult.cs
+│   ├── Models/ChuteResolveApplicationRequest.cs
+│   ├── Models/ChuteResolveApplicationResult.cs
+│   ├── Models/DropFeedbackApplicationRequest.cs
+│   ├── Models/DropFeedbackApplicationResult.cs
 │   ├── Abstractions/Persistence/ISyncTaskConfigRepository.cs
 │   ├── Abstractions/Persistence/IOracleSourceReader.cs
 │   ├── Abstractions/Persistence/ISyncStagingRepository.cs
@@ -113,11 +121,17 @@
 │   ├── Abstractions/Services/IDeletionExecutionService.cs
 │   ├── Abstractions/Services/IRetentionExecutionService.cs
 │   ├── Abstractions/Services/IBusinessTaskMaterializer.cs
+│   ├── Abstractions/Services/IScanIngressService.cs
+│   ├── Abstractions/Services/IChuteQueryService.cs
+│   ├── Abstractions/Services/IDropFeedbackService.cs
 │   ├── Models/RemoteStatusConsumeResult.cs
 │   ├── Services/SyncOrchestrator.cs
 │   ├── Services/SyncWindowCalculator.cs
 │   ├── Services/SyncExecutionService.cs
 │   ├── Services/BusinessTaskMaterializer.cs
+│   ├── Services/ScanIngressService.cs
+│   ├── Services/ChuteQueryService.cs
+│   ├── Services/DropFeedbackService.cs
 │   ├── Services/DeletionExecutionService.cs
 │   └── Services/RetentionExecutionService.cs
 ├── EverydayChain.Hub.SharedKernel
@@ -184,6 +198,12 @@
 │   ├── Sync/Fakes/FakeOracleStatusDrivenSourceReader.cs
 │   ├── Sync/Fakes/FakeSqlServerAppendOnlyWriter.cs
 │   ├── Sync/Fakes/FakeOracleRemoteStatusWriter.cs
+│   ├── Host/Controllers/ScanControllerTests.cs
+│   ├── Host/Controllers/ChuteControllerTests.cs
+│   ├── Host/Controllers/DropFeedbackControllerTests.cs
+│   ├── Host/Controllers/StubScanIngressService.cs
+│   ├── Host/Controllers/StubChuteQueryService.cs
+│   ├── Host/Controllers/StubDropFeedbackService.cs
 │   └── Services
 │       ├── AutoMigrationServiceTests.cs
 │       ├── DangerZoneExecutorTests.cs
@@ -202,6 +222,16 @@
 └── EverydayChain.Hub.Host
     ├── EverydayChain.Hub.Host.csproj
     ├── Program.cs
+    ├── Controllers/ScanController.cs
+    ├── Controllers/ChuteController.cs
+    ├── Controllers/DropFeedbackController.cs
+    ├── Contracts/Requests/ScanUploadRequest.cs
+    ├── Contracts/Requests/ChuteResolveRequest.cs
+    ├── Contracts/Requests/DropFeedbackRequest.cs
+    ├── Contracts/Responses/ApiResponse.cs
+    ├── Contracts/Responses/ScanUploadResponse.cs
+    ├── Contracts/Responses/ChuteResolveResponse.cs
+    ├── Contracts/Responses/DropFeedbackResponse.cs
     ├── Workers/SyncBackgroundWorker.cs
     ├── Workers/RetentionBackgroundWorker.cs
     ├── Workers/AutoMigrationHostedService.cs
@@ -247,7 +277,11 @@
 - `BusinessTaskEntity.cs`（`Domain/Aggregates/BusinessTaskAggregate`）：统一业务任务聚合根实体，承载任务编码、来源表、业务键、条码与本地状态时间字段。
 - `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs` + `SyncTargetStateRow.cs`：同步执行、删除识别与轻量幂等状态存储的数据契约模型。
 - `BusinessTaskMaterializeRequest.cs`：业务任务物化输入模型，统一约束任务编码、来源表编码、业务键、条码与物化时间字段。
+- `ScanUploadApplicationRequest.cs` / `ScanUploadApplicationResult.cs` / `ChuteResolveApplicationRequest.cs` / `ChuteResolveApplicationResult.cs` / `DropFeedbackApplicationRequest.cs` / `DropFeedbackApplicationResult.cs`：PR-03 API 骨架对应的应用层请求/响应模型，统一隔离 Host 契约与 Application 用例编排输入输出。
 - `Application/Abstractions/Services/IBusinessTaskMaterializer.cs` + `Application/Services/BusinessTaskMaterializer.cs`：业务任务物化服务抽象与实现，仅执行字段映射、文本规范化和默认状态赋值，不承载扫描/格口/落格业务规则。
+- `Application/Abstractions/Services/IScanIngressService.cs` + `Application/Services/ScanIngressService.cs`：扫描上传骨架服务抽象与实现，当前负责基础归一化与标准响应生成，不承载匹配与持久化逻辑。
+- `Application/Abstractions/Services/IChuteQueryService.cs` + `Application/Services/ChuteQueryService.cs`：请求格口骨架服务抽象与实现，当前负责基础入参映射与占位格口响应。
+- `Application/Abstractions/Services/IDropFeedbackService.cs` + `Application/Services/DropFeedbackService.cs`：落格回传骨架服务抽象与实现，当前负责回传请求受理与标准状态响应。
 - `Application/Abstractions/Sync/IOracleRemoteStatusWriter.cs` / `IOracleStatusDrivenSourceReader.cs` / `ISqlServerAppendOnlyWriter.cs`：定义 StatusDriven 模式中 Oracle 远端状态回写、Oracle 状态驱动源读取与 SQL Server 仅追加写入的外部协作能力抽象，遵循 Application 层外部协作抽象放置规则。
 - `Application/Abstractions/Sync/IRemoteStatusConsumeService.cs` + `Application/Models/RemoteStatusConsumeResult.cs`：定义 StatusDriven 模式执行入口（应用编排抽象）与读取/追加/回写统计模型。
 - `Application/Abstractions/Persistence/ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。
@@ -289,8 +323,12 @@
 - `20260408020833_RebuildInitialHubSchema.cs`：初始化迁移，定义 `sorting_task_trace`、`IDX_PICKTOLIGHT_CARTON1`、`IDX_PICKTOWCS2` 三张聚合表结构及索引。
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
 - `nlog.config`：NLog 日志配置，输出至控制台与两个滚动日志文件：通用日志（`hub-${shortdate}.log`，按日切割，单文件上限 10 MB，保留 30 天）；同步专属日志（`sync-${shortdate}.log`，仅收录同步链路相关组件日志，便于独立分析同步性能问题）。
+- `Program.cs`（Host）：Host 启动入口，现已支持 API + Worker 共存，启用 Controllers、Swagger（中文注释）并保留自动迁移与同步后台任务注册。
+- `Host/Controllers/ScanController.cs` / `ChuteController.cs` / `DropFeedbackController.cs`：三类对外 API 控制器，仅做入参校验、调用应用服务与统一响应封装。
+- `Host/Contracts/Requests/*.cs` + `Host/Contracts/Responses/*.cs`：三类 API 的输入输出契约与统一响应包装，配合 Swagger 提供中文参数说明。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
+- `EverydayChain.Hub.Tests/Host/Controllers/*Tests.cs`：PR-03 新增 Controller 基础行为测试，覆盖空参校验与标准成功响应路径。
 - `EverydayChain.Hub.Tests/Services/DangerZoneExecutorTests.cs`：危险操作隔离器取消语义测试，覆盖调用方取消与非调用方取消的日志等级分支。
 - `EverydayChain.Hub.Tests/Services/TestLogger.cs`：通用测试日志记录器，集中承载日志采集替身，避免在测试文件内重复声明嵌套日志类型。
 - `EverydayChain.Hub.Tests/Services/LoggerNullScope.cs`：测试日志空作用域单例，供测试日志记录器复用，避免重复创建无状态作用域实例。

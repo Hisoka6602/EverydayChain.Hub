@@ -54,7 +54,7 @@
 |---|---|---|---|---|---|
 | PR-01 | 统一业务任务模型 | 无 | 新增 8 / 修改 4 / 合计 12 | `feature/pr01-business-task-model` | ✅ 本 PR 已完成 |
 | PR-02 | 语义与接口基线文档 | PR-01 | 新增 5 / 修改 2 / 合计 7 | `feature/pr02-semantic-baseline` | ✅ 本 PR 已完成 |
-| PR-03 | Host API 承载骨架 | PR-02 | 新增 12 / 修改 4 / 合计 16 | `feature/pr03-host-api-bootstrap` | ⏳ 未开始 |
+| PR-03 | Host API 承载骨架 | PR-02 | 新增 12 / 修改 4 / 合计 16 | `feature/pr03-host-api-bootstrap` | ✅ 本 PR 已完成 |
 | PR-04 | 条码解析与扫描输入 | PR-03 | 新增 8 / 修改 3 / 合计 11 | `feature/pr04-barcode-and-scan-model` | ⏳ 未开始 |
 | PR-05 | 扫描匹配与任务执行 | PR-04 | 新增 10 / 修改 6 / 合计 16 | `feature/pr05-scan-match-and-execution` | ⏳ 未开始 |
 | PR-06 | 请求格口服务 | PR-05 | 新增 4 / 修改 4 / 合计 8 | `feature/pr06-chute-resolve` | ⏳ 未开始 |
@@ -72,7 +72,7 @@
 
 > 说明：预计改动为排期预算，允许 ±2 文件浮动；超出需在 PR 描述说明原因。
 >
-> 进度盘点口径：已先通读当前仓库代码并核对现状，当前已完成 PR-01、PR-02，后续按依赖顺序推进。
+> 进度盘点口径：已先通读当前仓库代码并核对现状，当前已完成 PR-01、PR-02、PR-03，后续按依赖顺序推进。
 
 ### 2.1 待确认项（未确认前不默认实现）
 1. PR-02 文档基线是否需要拆分到独立目录（如 `docs/baseline/`）并定义固定文件命名规范。
@@ -184,6 +184,33 @@
 ---
 
 ## PR-03：Host API 承载骨架
+
+### 执行状态
+- ✅ 已完成（本 PR）
+- 验证结果：`dotnet build` 通过、`dotnet test` 通过。
+- 交付文件：
+  - `EverydayChain.Hub.Host/Program.cs`
+  - `EverydayChain.Hub.Host/EverydayChain.Hub.Host.csproj`
+  - `EverydayChain.Hub.Host/Controllers/ScanController.cs`
+  - `EverydayChain.Hub.Host/Controllers/ChuteController.cs`
+  - `EverydayChain.Hub.Host/Controllers/DropFeedbackController.cs`
+  - `EverydayChain.Hub.Host/Contracts/Requests/ScanUploadRequest.cs`
+  - `EverydayChain.Hub.Host/Contracts/Requests/ChuteResolveRequest.cs`
+  - `EverydayChain.Hub.Host/Contracts/Requests/DropFeedbackRequest.cs`
+  - `EverydayChain.Hub.Host/Contracts/Responses/ApiResponse.cs`
+  - `EverydayChain.Hub.Host/Contracts/Responses/ScanUploadResponse.cs`
+  - `EverydayChain.Hub.Host/Contracts/Responses/ChuteResolveResponse.cs`
+  - `EverydayChain.Hub.Host/Contracts/Responses/DropFeedbackResponse.cs`
+  - `EverydayChain.Hub.Application/Abstractions/Services/IScanIngressService.cs`
+  - `EverydayChain.Hub.Application/Abstractions/Services/IChuteQueryService.cs`
+  - `EverydayChain.Hub.Application/Abstractions/Services/IDropFeedbackService.cs`
+  - `EverydayChain.Hub.Application/Services/ScanIngressService.cs`
+  - `EverydayChain.Hub.Application/Services/ChuteQueryService.cs`
+  - `EverydayChain.Hub.Application/Services/DropFeedbackService.cs`
+  - `EverydayChain.Hub.Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`
+  - `EverydayChain.Hub.Tests/Host/Controllers/ScanControllerTests.cs`
+  - `EverydayChain.Hub.Tests/Host/Controllers/ChuteControllerTests.cs`
+  - `EverydayChain.Hub.Tests/Host/Controllers/DropFeedbackControllerTests.cs`
 
 ### 建议标题
 `feat(host): 新增扫描/格口/落格三类API控制器骨架`

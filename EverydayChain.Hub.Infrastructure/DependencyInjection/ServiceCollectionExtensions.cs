@@ -74,6 +74,9 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IRemoteStatusConsumeService, RemoteStatusConsumeService>();
         services.AddSingleton<ISyncWindowCalculator, SyncWindowCalculator>();
         services.AddSingleton<IBusinessTaskMaterializer, BusinessTaskMaterializer>();
+        services.AddSingleton<IScanIngressService, ScanIngressService>();
+        services.AddSingleton<IChuteQueryService, ChuteQueryService>();
+        services.AddSingleton<IDropFeedbackService, DropFeedbackService>();
         services.AddSingleton<IDeletionExecutionService, DeletionExecutionService>();
         services.AddSingleton<IRetentionExecutionService, RetentionExecutionService>();
         services.AddSingleton<ISyncExecutionService, SyncExecutionService>();

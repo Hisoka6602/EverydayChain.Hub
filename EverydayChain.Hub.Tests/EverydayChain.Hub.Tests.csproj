@@ -25,6 +25,7 @@
     <ProjectReference Include="..\EverydayChain.Hub.Infrastructure\EverydayChain.Hub.Infrastructure.csproj" />
     <ProjectReference Include="..\EverydayChain.Hub.Application\EverydayChain.Hub.Application.csproj" />
     <ProjectReference Include="..\EverydayChain.Hub.Domain\EverydayChain.Hub.Domain.csproj" />
+    <ProjectReference Include="..\EverydayChain.Hub.Host\EverydayChain.Hub.Host.csproj" />
   </ItemGroup>
 
 </Project>
