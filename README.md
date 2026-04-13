@@ -6,6 +6,9 @@
 - 将 Host 启动方式扩展为 API + Worker 共存：启用 Controllers、Swagger（中文注释展示）并保留 `AutoMigrationHostedService`、`SyncBackgroundWorker`、`RetentionBackgroundWorker`。
 - 新增应用层骨架服务抽象与实现：`IScanIngressService`、`IChuteQueryService`、`IDropFeedbackService` 及对应实现，并在 DI 中完成注册。
 - 新增 Controller 基础行为测试，覆盖参数校验与标准响应路径。
+- 根据审查意见补齐 Host 统一模型校验失败响应包装，确保 DataAnnotations 校验失败返回 `ApiResponse` 结构。
+- 根据审查意见补齐 `TaskCode` 规范化（Trim + 空白视为未提供）并提取 `LocalDateTimeNormalizer` 共享工具消除重复时间规范化逻辑。
+- 根据审查意见将 Swagger 限制为开发/测试环境启用，避免生产环境默认暴露接口元数据。
 - 更新 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`：将 PR-03 状态标记为“已完成”，并补充交付文件清单。
 - 构建验证：0 Warning 0 Error，新增测试通过。
 ## 后续可完善点
@@ -74,6 +77,7 @@
 │   ├── Options/AutoTuneOptions.cs
 │   ├── Options/DangerZoneOptions.cs
 │   ├── Options/OracleOptions.cs
+│   ├── Options/SwaggerOptions.cs
 │   ├── Options/RetentionJobOptions.cs
 │   ├── Options/ShardingOptions.cs
 │   ├── Options/SyncDeleteOptions.cs
@@ -141,7 +145,9 @@
 │       ├── RuntimeStoragePathResolver.cs
 │       ├── BoundedConcurrentQueueHelper.cs
 │       ├── SyncBusinessKeyBuilder.cs
-│       └── SyncColumnFilter.cs
+│       ├── SyncColumnFilter.cs
+│       ├── LocalDateTimeNormalizer.cs
+│       └── TaskCodeNormalizer.cs
 ├── EverydayChain.Hub.Infrastructure
 │   ├── EverydayChain.Hub.Infrastructure.csproj
 │   ├── DependencyInjection/ServiceCollectionExtensions.cs
@@ -216,6 +222,7 @@
 │       ├── BusinessTaskMaterializerTests.cs
 │       ├── ShardTableProvisionerTests.cs
 │       ├── SortingTaskTraceWriterTests.cs
+│       ├── LocalDateTimeNormalizerTests.cs
 │       ├── TestLogger.cs
 │       ├── ThrowingHubDbContextFactory.cs
 │       └── SyncWindowCalculatorTests.cs
@@ -269,10 +276,13 @@
 - `RuntimeStoragePathResolver.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：运行期路径解析共享组件，统一解析检查点、目标快照与存储守护所需的绝对路径。
 - `LogicalTableNameNormalizer.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：逻辑表名规范化与安全校验共享组件，统一执行去空白、SQL 标识符校验与异常信息输出。
 - `BoundedConcurrentQueueHelper.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：有界并发队列淘汰辅助工具，仅执行一次 O(n) `Count` 遍历并缓存结果，供需要内存容量保护的队列实现统一复用。
+- `LocalDateTimeNormalizer.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：本地时间规范化共享工具，统一执行 UTC 拒绝、`MinValue` 回退当前本地时间与 `Unspecified` 转本地时间语义，供 Host API 复用。
+- `TaskCodeNormalizer.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：任务编码规范化共享工具，统一执行去首尾空白与全空白回退空字符串处理，供 Host API 复用。
 - `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs` / `SyncTablePriority.cs`：同步模式、删除策略、滞后控制、批次状态、变更操作类型与调度优先级枚举，均含中文 XML 注释与 `Description`。
 - `BusinessTaskStatus.cs`：业务任务生命周期状态枚举，覆盖 Created、Scanned、Dropped、FeedbackPending，并提供中文 `Description` 说明。
 - `RemoteStatusConsumeProfile.cs`（`EverydayChain.Hub.Domain/Sync/Models`）：StatusDriven 消费配置模型，统一承载状态列、待处理值、完成值、回写开关与批次大小。
 - `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`SyncTable`、`SyncDelete`、`SyncRetention`、`RetentionJob`、`Oracle` 等），供 Infrastructure 绑定读取。
+- `SwaggerOptions.cs`：Swagger 文档配置实体，承载标题、版本、描述与各环境开关（开发/测试/生产）。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
 - `BusinessTaskEntity.cs`（`Domain/Aggregates/BusinessTaskAggregate`）：统一业务任务聚合根实体，承载任务编码、来源表、业务键、条码与本地状态时间字段。
 - `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs` + `SyncTargetStateRow.cs`：同步执行、删除识别与轻量幂等状态存储的数据契约模型。
@@ -338,6 +348,7 @@
 - `EverydayChain.Hub.Tests/Services/ServiceCollectionExtensionsTests.cs`：逻辑表名构建测试，覆盖非法标识符与空启用集合异常场景。
 - `EverydayChain.Hub.Tests/Services/BusinessTaskMaterializerTests.cs`：业务任务物化服务测试，覆盖默认状态赋值、时间赋值与必填字段空白校验分支。
 - `EverydayChain.Hub.Tests/Services/SortingTaskTraceWriterTests.cs`：分表写入器兜底建表测试，覆盖首次写入先建表与同月重复写入幂等建表触发场景。
+- `EverydayChain.Hub.Tests/Services/LocalDateTimeNormalizerTests.cs`：本地时间规范化工具测试，覆盖 UTC 拒绝、`Unspecified` 转本地与 `MinValue` 回退本地当前时间分支。
 - `EverydayChain.Hub.Tests/Services/RecordingShardTableProvisioner.cs`：分表预建器测试替身，记录触发后缀以验证建表调用次数与后缀分发行为。
 - `EverydayChain.Hub.Tests/Services/PassThroughSqlExecutionTuner.cs`：SQL 调谐器测试替身，提供恒定批大小用于隔离写入器行为测试。
 - `EverydayChain.Hub.Tests/Services/ThrowingHubDbContextFactory.cs`：DbContext 工厂测试替身，强制抛错用于验证“先建表后建上下文”调用顺序。

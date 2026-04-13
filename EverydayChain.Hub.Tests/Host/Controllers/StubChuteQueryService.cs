@@ -8,13 +8,18 @@ namespace EverydayChain.Hub.Tests.Host.Controllers;
 /// </summary>
 public sealed class StubChuteQueryService : IChuteQueryService {
     /// <summary>
+    /// 最近一次请求。
+    /// </summary>
+    public ChuteResolveApplicationRequest? LastRequest { get; private set; }
+
+    /// <summary>
     /// 返回固定测试结果。
     /// </summary>
     /// <param name="request">格口请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>固定结果。</returns>
     public Task<ChuteResolveApplicationResult> ExecuteAsync(ChuteResolveApplicationRequest request, CancellationToken cancellationToken) {
-        _ = request;
+        LastRequest = request;
         _ = cancellationToken;
         return Task.FromResult(new ChuteResolveApplicationResult {
             IsResolved = true,

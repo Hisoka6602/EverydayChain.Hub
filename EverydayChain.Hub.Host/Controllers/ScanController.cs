@@ -3,6 +3,7 @@ using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
+using EverydayChain.Hub.SharedKernel.Utilities;
 
 namespace EverydayChain.Hub.Host.Controllers;
 
@@ -43,11 +44,9 @@ public sealed class ScanController : ControllerBase {
             return BadRequest(ApiResponse<ScanUploadResponse>.Fail("设备编码不能为空。"));
         }
 
-        if (request.ScanTimeLocal.Kind == DateTimeKind.Utc) {
-            return BadRequest(ApiResponse<ScanUploadResponse>.Fail("扫描时间必须为本地时间，禁止传入 UTC 时间。"));
+        if (!LocalDateTimeNormalizer.TryNormalize(request.ScanTimeLocal, "扫描时间必须为本地时间，禁止传入 UTC 时间。", out var normalizedScanTime, out var validationMessage)) {
+            return BadRequest(ApiResponse<ScanUploadResponse>.Fail(validationMessage));
         }
-
-        var normalizedScanTime = NormalizeLocalTime(request.ScanTimeLocal);
         var applicationResult = await scanIngressService.ExecuteAsync(new ScanUploadApplicationRequest {
             Barcode = request.Barcode.Trim(),
             DeviceCode = request.DeviceCode.Trim(),
@@ -60,22 +59,5 @@ public sealed class ScanController : ControllerBase {
         };
 
         return Ok(ApiResponse<ScanUploadResponse>.Success(response, applicationResult.Message));
-    }
-
-    /// <summary>
-    /// 规范化本地时间输入。
-    /// </summary>
-    /// <param name="candidateTime">候选时间。</param>
-    /// <returns>规范化后的本地时间。</returns>
-    private static DateTime NormalizeLocalTime(DateTime candidateTime) {
-        if (candidateTime == DateTime.MinValue) {
-            return DateTime.Now;
-        }
-
-        if (candidateTime.Kind == DateTimeKind.Unspecified) {
-            return DateTime.SpecifyKind(candidateTime, DateTimeKind.Local);
-        }
-
-        return candidateTime;
     }
 }

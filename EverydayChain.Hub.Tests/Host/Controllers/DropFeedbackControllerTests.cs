@@ -50,7 +50,8 @@ public sealed class DropFeedbackControllerTests {
     /// </summary>
     [Fact]
     public async Task ConfirmAsync_ShouldReturnOk_WhenRequestIsValid() {
-        var controller = new DropFeedbackController(new StubDropFeedbackService());
+        var stubService = new StubDropFeedbackService();
+        var controller = new DropFeedbackController(stubService);
         var request = new DropFeedbackRequest {
             Barcode = "BC001",
             ActualChuteCode = "CHUTE-01",
@@ -65,5 +66,47 @@ public sealed class DropFeedbackControllerTests {
         Assert.True(response.IsSuccess);
         Assert.NotNull(response.Data);
         Assert.Equal("FeedbackPending", response.Data.Status);
+        Assert.NotNull(stubService.LastRequest);
+        Assert.Equal("TASK-001", stubService.LastRequest!.TaskCode);
+    }
+
+    /// <summary>
+    /// 任务编码包含首尾空白时应规范化为去空白值。
+    /// </summary>
+    [Fact]
+    public async Task ConfirmAsync_ShouldTrimTaskCode_WhenTaskCodeHasPadding() {
+        var stubService = new StubDropFeedbackService();
+        var controller = new DropFeedbackController(stubService);
+        var request = new DropFeedbackRequest {
+            Barcode = "BC001",
+            ActualChuteCode = "CHUTE-01",
+            TaskCode = "  TASK-001  ",
+            DropTimeLocal = DateTime.Now
+        };
+
+        _ = await controller.ConfirmAsync(request, CancellationToken.None);
+
+        Assert.NotNull(stubService.LastRequest);
+        Assert.Equal("TASK-001", stubService.LastRequest!.TaskCode);
+    }
+
+    /// <summary>
+    /// 任务编码全空白时应视为未提供并置为空字符串。
+    /// </summary>
+    [Fact]
+    public async Task ConfirmAsync_ShouldUseEmptyTaskCode_WhenTaskCodeIsWhitespace() {
+        var stubService = new StubDropFeedbackService();
+        var controller = new DropFeedbackController(stubService);
+        var request = new DropFeedbackRequest {
+            Barcode = "BC001",
+            ActualChuteCode = "CHUTE-01",
+            TaskCode = "   ",
+            DropTimeLocal = DateTime.Now
+        };
+
+        _ = await controller.ConfirmAsync(request, CancellationToken.None);
+
+        Assert.NotNull(stubService.LastRequest);
+        Assert.Equal(string.Empty, stubService.LastRequest!.TaskCode);
     }
 }

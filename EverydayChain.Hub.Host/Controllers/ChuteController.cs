@@ -3,6 +3,7 @@ using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
+using EverydayChain.Hub.SharedKernel.Utilities;
 
 namespace EverydayChain.Hub.Host.Controllers;
 
@@ -39,8 +40,9 @@ public sealed class ChuteController : ControllerBase {
             return BadRequest(ApiResponse<ChuteResolveResponse>.Fail("条码不能为空。"));
         }
 
+        var normalizedTaskCode = TaskCodeNormalizer.NormalizeOrEmpty(request.TaskCode);
         var applicationResult = await chuteQueryService.ExecuteAsync(new ChuteResolveApplicationRequest {
-            TaskCode = request.TaskCode,
+            TaskCode = normalizedTaskCode,
             Barcode = request.Barcode.Trim()
         }, cancellationToken);
 
