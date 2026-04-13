@@ -50,33 +50,53 @@
 
 ## 2. PR 排期总览
 
-| PR | 阶段 | 依赖 | 预计文件改动 | 建议分支名 |
-|---|---|---|---|---|
-| PR-01 | 统一业务任务模型 | 无 | 新增 8 / 修改 4 / 合计 12 | `feature/pr01-business-task-model` |
-| PR-02 | 语义与接口基线文档 | PR-01 | 新增 5 / 修改 2 / 合计 7 | `feature/pr02-semantic-baseline` |
-| PR-03 | Host API 承载骨架 | PR-02 | 新增 12 / 修改 4 / 合计 16 | `feature/pr03-host-api-bootstrap` |
-| PR-04 | 条码解析与扫描输入 | PR-03 | 新增 8 / 修改 3 / 合计 11 | `feature/pr04-barcode-and-scan-model` |
-| PR-05 | 扫描匹配与任务执行 | PR-04 | 新增 10 / 修改 6 / 合计 16 | `feature/pr05-scan-match-and-execution` |
-| PR-06 | 请求格口服务 | PR-05 | 新增 4 / 修改 4 / 合计 8 | `feature/pr06-chute-resolve` |
-| PR-07 | 落格回传服务 | PR-06 | 新增 4 / 修改 5 / 合计 9 | `feature/pr07-drop-feedback` |
-| PR-08 | 业务回传服务 | PR-07 | 新增 4 / 修改 6 / 合计 10 | `feature/pr08-wms-feedback` |
-| PR-09 | 扫描/落格日志落库 | PR-07 | 新增 6 / 修改 5 / 合计 11 | `feature/pr09-scan-drop-logs` |
-| PR-10 | 异常规则链路 | PR-07 | 新增 8 / 修改 5 / 合计 13 | `feature/pr10-exception-rules` |
-| PR-11 | 补偿重试链路 | PR-08,PR-10 | 新增 3 / 修改 5 / 合计 8 | `feature/pr11-compensation` |
-| PR-12 | 联调收口与验收归档 | PR-03~PR-11 | 新增 0~2 / 修改 6~10 / 合计 8~12 | `feature/pr12-stabilization` |
-| PR-13 | 里程碑M1全量审查-基础建模阶段 | PR-01~PR-03 | 新增 0 / 修改 2~3 / 合计 2~3 | `feature/pr13-m1-full-review` |
-| PR-14 | 里程碑M2全量审查-主链路打通阶段 | PR-04~PR-07 | 新增 0 / 修改 3~5 / 合计 3~5 | `feature/pr14-m2-full-review` |
-| PR-15 | 里程碑M3全量审查-回传与审计阶段 | PR-08~PR-09 | 新增 0 / 修改 2~4 / 合计 2~4 | `feature/pr15-m3-full-review` |
-| PR-16 | 里程碑M4全量审查-异常与补偿阶段 | PR-10~PR-11 | 新增 0 / 修改 2~4 / 合计 2~4 | `feature/pr16-m4-full-review` |
-| PR-17 | 里程碑M5全量审查-联调收口阶段 | PR-12 | 新增 0 / 修改 1~2 / 合计 1~2 | `feature/pr17-m5-full-review` |
+| PR | 阶段 | 依赖 | 预计文件改动 | 建议分支名 | 当前状态（2026-04-13） |
+|---|---|---|---|---|---|
+| PR-01 | 统一业务任务模型 | 无 | 新增 8 / 修改 4 / 合计 12 | `feature/pr01-business-task-model` | ✅ 本 PR 已完成 |
+| PR-02 | 语义与接口基线文档 | PR-01 | 新增 5 / 修改 2 / 合计 7 | `feature/pr02-semantic-baseline` | ⏳ 未开始 |
+| PR-03 | Host API 承载骨架 | PR-02 | 新增 12 / 修改 4 / 合计 16 | `feature/pr03-host-api-bootstrap` | ⏳ 未开始 |
+| PR-04 | 条码解析与扫描输入 | PR-03 | 新增 8 / 修改 3 / 合计 11 | `feature/pr04-barcode-and-scan-model` | ⏳ 未开始 |
+| PR-05 | 扫描匹配与任务执行 | PR-04 | 新增 10 / 修改 6 / 合计 16 | `feature/pr05-scan-match-and-execution` | ⏳ 未开始 |
+| PR-06 | 请求格口服务 | PR-05 | 新增 4 / 修改 4 / 合计 8 | `feature/pr06-chute-resolve` | ⏳ 未开始 |
+| PR-07 | 落格回传服务 | PR-06 | 新增 4 / 修改 5 / 合计 9 | `feature/pr07-drop-feedback` | ⏳ 未开始 |
+| PR-08 | 业务回传服务 | PR-07 | 新增 4 / 修改 6 / 合计 10 | `feature/pr08-wms-feedback` | ⏳ 未开始 |
+| PR-09 | 扫描/落格日志落库 | PR-07 | 新增 6 / 修改 5 / 合计 11 | `feature/pr09-scan-drop-logs` | ⏳ 未开始 |
+| PR-10 | 异常规则链路 | PR-07 | 新增 8 / 修改 5 / 合计 13 | `feature/pr10-exception-rules` | ⏳ 未开始 |
+| PR-11 | 补偿重试链路 | PR-08,PR-10 | 新增 3 / 修改 5 / 合计 8 | `feature/pr11-compensation` | ⏳ 未开始 |
+| PR-12 | 联调收口与验收归档 | PR-03~PR-11 | 新增 0~2 / 修改 6~10 / 合计 8~12 | `feature/pr12-stabilization` | ⏳ 未开始 |
+| PR-13 | 里程碑M1全量审查-基础建模阶段 | PR-01~PR-03 | 新增 0 / 修改 2~3 / 合计 2~3 | `feature/pr13-m1-full-review` | ⏳ 未开始 |
+| PR-14 | 里程碑M2全量审查-主链路打通阶段 | PR-04~PR-07 | 新增 0 / 修改 3~5 / 合计 3~5 | `feature/pr14-m2-full-review` | ⏳ 未开始 |
+| PR-15 | 里程碑M3全量审查-回传与审计阶段 | PR-08~PR-09 | 新增 0 / 修改 2~4 / 合计 2~4 | `feature/pr15-m3-full-review` | ⏳ 未开始 |
+| PR-16 | 里程碑M4全量审查-异常与补偿阶段 | PR-10~PR-11 | 新增 0 / 修改 2~4 / 合计 2~4 | `feature/pr16-m4-full-review` | ⏳ 未开始 |
+| PR-17 | 里程碑M5全量审查-联调收口阶段 | PR-12 | 新增 0 / 修改 1~2 / 合计 1~2 | `feature/pr17-m5-full-review` | ⏳ 未开始 |
 
 > 说明：预计改动为排期预算，允许 ±2 文件浮动；超出需在 PR 描述说明原因。
+>
+> 进度盘点口径：已先通读当前仓库代码并核对现状，本次 PR 先落地 PR-01，后续按依赖顺序推进。
+
+### 2.1 待确认项（未确认前不默认实现）
+1. PR-02 文档基线是否需要拆分到独立目录（如 `docs/baseline/`）并定义固定文件命名规范。
+2. PR-03 三类 API 的认证方式（内网白名单、签名、Token）与幂等键来源尚未在需求文档中固化。
+3. PR-05 业务任务持久化是否采用新表，或复用现有聚合并建立映射关系，需在进入迁移前确认。
+4. PR-08 业务回传目标 Oracle 表与幂等字段组合尚未明确，需要在实现前冻结契约。
 
 ---
 
 ## 3. 每个 PR 的执行清单（可直接用于排期）
 
 ## PR-01：统一业务任务模型
+
+### 执行状态
+- ✅ 已完成（本 PR）
+- 验证结果：`dotnet build` 通过、`dotnet test` 通过。
+- 交付文件：
+  - `EverydayChain.Hub.Domain/Enums/BusinessTaskStatus.cs`
+  - `EverydayChain.Hub.Domain/Aggregates/BusinessTaskAggregate/BusinessTaskEntity.cs`
+  - `EverydayChain.Hub.Application/Models/BusinessTaskMaterializeRequest.cs`
+  - `EverydayChain.Hub.Application/Abstractions/Services/IBusinessTaskMaterializer.cs`
+  - `EverydayChain.Hub.Application/Services/BusinessTaskMaterializer.cs`
+  - `EverydayChain.Hub.Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`
+  - `EverydayChain.Hub.Tests/Services/BusinessTaskMaterializerTests.cs`
 
 ### 建议标题
 `feat(domain): 新增业务任务主模型与物化服务`
