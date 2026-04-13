@@ -42,8 +42,8 @@
 - 每个 PR 必须附带可执行验收项。
 
 ### 1.4 全局统一验收
-- `dotnet build /home/runner/work/EverydayChain.Hub/EverydayChain.Hub/EverydayChain.Hub.sln`
-- `dotnet test /home/runner/work/EverydayChain.Hub/EverydayChain.Hub/EverydayChain.Hub.sln`
+- `dotnet build EverydayChain.Hub.sln`
+- `dotnet test EverydayChain.Hub.sln`
 - 若 PR 涉及新增/删除文件：联动更新 `README.md` 文件树与逐项说明。
 
 ---
@@ -64,7 +64,7 @@
 | PR-10 | 异常规则链路 | PR-07 | 新增 8 / 修改 5 / 合计 13 | `feature/pr10-exception-rules` | ⏳ 未开始 |
 | PR-11 | 补偿重试链路 | PR-08,PR-10 | 新增 3 / 修改 5 / 合计 8 | `feature/pr11-compensation` | ⏳ 未开始 |
 | PR-12 | 联调收口与验收归档 | PR-03~PR-11 | 新增 0~2 / 修改 6~10 / 合计 8~12 | `feature/pr12-stabilization` | ⏳ 未开始 |
-| PR-13 | 里程碑M1全量审查-基础建模阶段 | PR-01~PR-03 | 新增 0 / 修改 2~3 / 合计 2~3 | `feature/pr13-m1-full-review` | ⏳ 未开始 |
+| PR-13 | 里程碑M1全量审查-基础建模阶段 | PR-01~PR-03 | 新增 0 / 修改 2~3 / 合计 2~3 | `feature/pr13-m1-full-review` | 🚧 本 PR 实施中（M1 里程碑检验） |
 | PR-14 | 里程碑M2全量审查-主链路打通阶段 | PR-04~PR-07 | 新增 0 / 修改 3~5 / 合计 3~5 | `feature/pr14-m2-full-review` | ⏳ 未开始 |
 | PR-15 | 里程碑M3全量审查-回传与审计阶段 | PR-08~PR-09 | 新增 0 / 修改 2~4 / 合计 2~4 | `feature/pr15-m3-full-review` | ⏳ 未开始 |
 | PR-16 | 里程碑M4全量审查-异常与补偿阶段 | PR-10~PR-11 | 新增 0 / 修改 2~4 / 合计 2~4 | `feature/pr16-m4-full-review` | ⏳ 未开始 |
@@ -72,13 +72,18 @@
 
 > 说明：预计改动为排期预算，允许 ±2 文件浮动；超出需在 PR 描述说明原因。
 >
-> 进度盘点口径：已先通读当前仓库代码并核对现状，当前已完成 PR-01、PR-02、PR-03，后续按依赖顺序推进。
+> 进度盘点口径：已先通读当前仓库代码并核对现状，当前已完成 PR-01、PR-02、PR-03（3/17），PR-04~PR-12 尚未开始，当前转入 PR-13 执行 M1 里程碑检验。
 
 ### 2.1 待确认项（未确认前不默认实现）
 1. PR-02 文档基线是否需要拆分到独立目录（如 `docs/baseline/`）并定义固定文件命名规范。
 2. PR-03 三类 API 的认证方式（内网白名单、签名、Token）与幂等键来源尚未在需求文档中固化。
 3. PR-05 业务任务持久化是否采用新表，或复用现有聚合并建立映射关系，需在进入迁移前确认。
 4. PR-08 业务回传目标 Oracle 表与幂等字段组合尚未明确，需要在实现前冻结契约。
+
+### 2.2 执行前代码通读与里程碑时机判断（2026-04-13）
+1. 已通读并核对主干实现文件：`BusinessTaskEntity`、`BusinessTaskMaterializer`、三类 Host Controller、`Program.cs`、`ServiceCollectionExtensions.cs`、`README.md`、`逐文件代码检查台账.md`。
+2. 已通过文件存在性与代码内容核对确认：PR-01/PR-02/PR-03 交付物均已落地；PR-04~PR-12 对应核心实现（条码解析、任务匹配、格口解析、落格回传闭环、业务回传、补偿服务）尚未落地。
+3. 里程碑时机判断：M1 依赖 `PR-01~PR-03`，当前依赖已全部满足，已到达 M1 里程碑检验时刻，应先完成 PR-13 再进入 PR-04。
 
 ---
 
@@ -591,6 +596,12 @@
 ---
 
 ## PR-13：里程碑M1全量审查-基础建模阶段
+
+### 执行状态
+- 🚧 进行中（本 PR）
+- 已完成：执行前代码通读与 PR-01~PR-03 落地核对。
+- 已完成：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 验证通过。
+- 待完成：将 M1 全量审查结论归档到 `逐文件代码检查台账.md` 并形成最终风险结论。
 
 ### 建议标题
 `chore(review): 里程碑M1全量审查与问题闭环`

@@ -1,20 +1,15 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 通读现有仓库代码并对照 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 盘点执行进度，确认当前已完成 PR-01、PR-02，并在本 PR 完成 PR-03 Host API 承载骨架交付。
-- 新增 Host API 骨架能力：`ScanController`、`ChuteController`、`DropFeedbackController` 与请求/响应契约，Controller 仅做入参校验与应用服务调用。
-- 将 Host 启动方式扩展为 API + Worker 共存：启用 Controllers、Swagger（中文注释展示）并保留 `AutoMigrationHostedService`、`SyncBackgroundWorker`、`RetentionBackgroundWorker`。
-- 新增应用层骨架服务抽象与实现：`IScanIngressService`、`IChuteQueryService`、`IDropFeedbackService` 及对应实现，并在 DI 中完成注册。
-- 新增 Controller 基础行为测试，覆盖参数校验与标准响应路径。
-- 根据审查意见补齐 Host 统一模型校验失败响应包装，确保 DataAnnotations 校验失败返回 `ApiResponse` 结构。
-- 根据审查意见补齐 `TaskCode` 规范化（Trim + 空白视为未提供）并提取 `LocalDateTimeNormalizer` 共享工具消除重复时间规范化逻辑。
-- 根据审查意见将 Swagger 限制为开发/测试环境启用，避免生产环境默认暴露接口元数据。
-- 更新 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`：将 PR-03 状态标记为“已完成”，并补充交付文件清单。
-- 构建验证：0 Warning 0 Error，新增测试通过。
+- 通读现有仓库代码并对照 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 盘点执行进度，确认当前已完成 PR-01、PR-02、PR-03（3/17）。
+- 核对实施计划与代码落地一致性：确认 PR-04~PR-12 对应核心实现尚未开始，未出现“计划已标记但代码未落地”的偏差。
+- 更新 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`：将 PR-13 状态调整为“本 PR 实施中（M1 里程碑检验）”，并补充“执行前代码通读与里程碑时机判断”结论。
+- 里程碑结论：M1 依赖 PR-01~PR-03，当前已满足进入条件，已达到里程碑检验时刻，当前 PR 按 PR-13 执行。
+- 构建验证：`dotnet build` 与 `dotnet test` 均通过（0 Error）。
 ## 后续可完善点
-- 在 PR-04 接入条码类型识别与标准化解析，替换当前 API 骨架返回值中的占位策略。
-- 在 PR-05 接入任务匹配与状态推进持久化，实现扫描上传到业务任务状态变更的闭环。
-- 在 PR-03 待确认项中补齐三类 API 的认证方式与幂等键来源，并在 Controller 层统一落地。
+- 完成 PR-13 的 M1 全量审查结论归档后，按依赖顺序推进 PR-04（条码解析与扫描输入）。
+- 在进入 PR-05 前先冻结“业务任务持久化建表/复用”方案，避免后续迁移返工。
+- 在进入 PR-08 前先冻结业务回传 Oracle 目标表与幂等键组合，降低联调阶段不确定性。
 
 
 ## 解决方案文件树与职责
