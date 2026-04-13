@@ -7,16 +7,16 @@ namespace EverydayChain.Hub.Host.Contracts.Requests;
 /// </summary>
 public sealed class DropFeedbackRequest {
     /// <summary>
-    /// 业务任务编码，长度范围 0~64；与 <see cref="Barcode"/> 至少提供一项。
+    /// 业务任务编码，长度范围 0~64；与 <see cref="Barcode"/> 至少提供一项，均可省略但不可同时为 null。
     /// </summary>
     [MaxLength(64)]
-    public string TaskCode { get; set; } = string.Empty;
+    public string? TaskCode { get; set; }
 
     /// <summary>
-    /// 条码文本，长度范围 0~128；与 <see cref="TaskCode"/> 至少提供一项。
+    /// 条码文本，长度范围 0~128；与 <see cref="TaskCode"/> 至少提供一项，均可省略但不可同时为 null。
     /// </summary>
     [MaxLength(128)]
-    public string Barcode { get; set; } = string.Empty;
+    public string? Barcode { get; set; }
 
     /// <summary>
     /// 实际落格编码，长度范围 1~64。
