@@ -3,8 +3,8 @@
 ## 本次更新内容
 - 实施 PR-08（业务回传服务）：新增 `WmsFeedbackOptions` 配置实体；新增 `IWmsOracleFeedbackGateway` 应用层外部集成抽象（`Application/Abstractions/Integrations/`，遵循网关命名规范）；新增 `IWmsFeedbackService` 应用服务抽象（`Application/Abstractions/Services/`）；新增 `WmsFeedbackApplicationResult` 结果模型；新增 `WmsFeedbackService` 实现（`Application/Feedback/Services/`）；新增 `OracleWmsFeedbackGateway` 基础设施实现（`Infrastructure/Integrations/`）；`IBusinessTaskRepository` 新增 `FindPendingFeedbackAsync` 与 `FindFailedFeedbackAsync` 方法；`DropFeedbackService` 落格成功时同步置 `FeedbackStatus=Pending`；`appsettings.json` 增加 `WmsFeedback` 配置节（默认 `Enabled=false`，待确认目标表后再开启）；`ServiceCollectionExtensions` 注册新 DI；新增 `WmsFeedbackServiceTests` 测试 4 例（含 `CapturingWmsOracleFeedbackGateway` 替身）。
 - 实施 PR-09（扫描/落格日志落库）：新增 `ScanLogEntity`（`Domain/Aggregates/ScanLogAggregate/`）与 `DropLogEntity`（`Domain/Aggregates/DropLogAggregate/`）聚合根实体；新增 `IScanLogRepository`、`IDropLogRepository` 仓储抽象；新增 `ScanLogEntityTypeConfiguration`、`DropLogEntityTypeConfiguration` EF 配置；`HubDbContext` 新增 `ScanLogs`、`DropLogs` DbSet；新增 `ScanLogRepository`、`DropLogRepository` EF Core 实现；新增 EF 迁移 `20260413160852_AddScanDropLogTables`（`scan_logs`/`drop_logs` 表及索引）；`TaskExecutionService` 注入 `IScanLogRepository` 并在扫描成功/失败时写扫描日志；`DropFeedbackService` 注入 `IDropLogRepository` 并在落格成功/失败时写落格日志（日志写入失败不影响主流程）；新增 `ScanDropLogTests` 测试 4 例；测试替身新增 `InMemoryScanLogRepository`、`InMemoryDropLogRepository`；`ScanIngressServiceTests`、`TaskExecutionServiceTests`、`DropFeedbackServiceTests` 更新构造方法入参适配。
-- 新增测试合计 8 例，总计 120/120 测试通过。
-- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过（0 Warning 0 Error，120/120）。
+- 新增测试合计 10 例，总计 122/122 测试通过。
+- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过（0 Warning 0 Error，122/122）。
 ## 后续可完善点
 - 冻结业务回传目标 Oracle 表与幂等键组合后，将 `WmsFeedback.Enabled` 置 `true` 并配置真实 Schema/Table/BusinessKeyColumn 完成端到端联调。
 - 推进 PR-09 中里程碑 M3 验收（PR-08 + PR-09 完成）。
@@ -348,7 +348,7 @@
 - `Infrastructure/Persistence/EntityConfigurations/ScanLogEntityTypeConfiguration.cs`：扫描日志 EF Fluent API 配置，映射 `scan_logs` 表，定义字段约束与查询索引。
 - `Infrastructure/Persistence/EntityConfigurations/DropLogEntityTypeConfiguration.cs`：落格日志 EF Fluent API 配置，映射 `drop_logs` 表，定义字段约束与查询索引。
 - `20260413160852_AddScanDropLogTables.cs`：新增 `scan_logs` 与 `drop_logs` 表的 EF 迁移，包含所有字段与索引定义。
-- `EverydayChain.Hub.Tests/Services/WmsFeedbackServiceTests.cs`：业务回传服务单元测试，覆盖无待回传任务空结果、写入成功置 Completed、写入器异常置 Failed、batchSize 限制四个场景；含 `CapturingOracleWmsFeedbackWriter` 捕获替身。
+- `EverydayChain.Hub.Tests/Services/WmsFeedbackServiceTests.cs`：业务回传服务单元测试，覆盖无待回传任务空结果、写入成功置 Completed、写入器异常置 Failed、batchSize 限制、Enabled=false 直接短路、writtenRows 不一致整批失败六个场景；含 `CapturingWmsOracleFeedbackGateway` 捕获替身。
 - `EverydayChain.Hub.Tests/Services/ScanDropLogTests.cs`：扫描/落格日志落库测试，覆盖扫描成功写日志、扫描失败写日志、落格成功写日志+FeedbackPending、落格失败写日志四个场景。
 - `EverydayChain.Hub.Tests/Services/InMemoryScanLogRepository.cs`：扫描日志仓储内存替身。
 - `EverydayChain.Hub.Tests/Services/InMemoryDropLogRepository.cs`：落格日志仓储内存替身。

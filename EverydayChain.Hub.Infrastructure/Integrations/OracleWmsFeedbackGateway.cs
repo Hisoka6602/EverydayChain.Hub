@@ -57,13 +57,13 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
             return 0;
         }
 
-        // 若回传写入未启用，仅记录日志。
+        // 若回传写入未启用，返回 0 表示跳过（任务状态应由调用方保持 Pending 不变）。
         if (!_options.Enabled)
         {
             _logger.LogInformation(
                 "WMS 回传网关：写入开关关闭，跳过 Oracle 写入。TaskCount={TaskCount}",
                 tasks.Count);
-            return tasks.Count;
+            return 0;
         }
 
         EnsureSafeIdentifier(_options.Schema, nameof(_options.Schema));

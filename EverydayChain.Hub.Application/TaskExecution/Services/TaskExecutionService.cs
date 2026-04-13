@@ -172,6 +172,10 @@ public sealed class TaskExecutionService : ITaskExecutionService
             };
             await _scanLogRepository.SaveAsync(log, ct);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "扫描日志写入失败，不影响主流程。BarcodeLength={BarcodeLength}", barcode?.Length ?? 0);

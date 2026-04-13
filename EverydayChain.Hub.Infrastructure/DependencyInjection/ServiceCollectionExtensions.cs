@@ -20,6 +20,8 @@ using EverydayChain.Hub.Infrastructure.Sync.Writers;
 using EverydayChain.Hub.Application.Abstractions.Integrations;
 using EverydayChain.Hub.Application.Feedback.Services;
 using EverydayChain.Hub.Infrastructure.Integrations;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Infrastructure.DependencyInjection;
 
@@ -97,7 +99,12 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<ISyncOrchestrator, SyncOrchestrator>();
         // PR-08：注册 WMS Oracle 回传网关与业务回传服务。
         services.AddSingleton<IWmsOracleFeedbackGateway, OracleWmsFeedbackGateway>();
-        services.AddSingleton<IWmsFeedbackService, WmsFeedbackService>();
+        services.AddSingleton<IWmsFeedbackService>(sp =>
+            new WmsFeedbackService(
+                sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<IWmsOracleFeedbackGateway>(),
+                sp.GetRequiredService<IOptions<WmsFeedbackOptions>>().Value,
+                sp.GetRequiredService<ILogger<WmsFeedbackService>>()));
 
         return services;
     }

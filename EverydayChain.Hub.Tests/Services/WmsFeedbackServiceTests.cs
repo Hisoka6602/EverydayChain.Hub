@@ -2,6 +2,7 @@ using EverydayChain.Hub.Application.Abstractions.Integrations;
 using EverydayChain.Hub.Application.Feedback.Services;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
+using EverydayChain.Hub.Domain.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EverydayChain.Hub.Tests.Services;
@@ -12,13 +13,14 @@ namespace EverydayChain.Hub.Tests.Services;
 public sealed class WmsFeedbackServiceTests
 {
     /// <summary>
-    /// 构建测试用的 WmsFeedbackService，注入内存替身。
+    /// 构建测试用的 WmsFeedbackService，注入内存替身，默认 Enabled=true。
     /// </summary>
-    private static (WmsFeedbackService Service, InMemoryBusinessTaskRepository Repository, CapturingWmsOracleFeedbackGateway Writer) CreateService()
+    private static (WmsFeedbackService Service, InMemoryBusinessTaskRepository Repository, CapturingWmsOracleFeedbackGateway Writer) CreateService(bool enabled = true)
     {
         var repo = new InMemoryBusinessTaskRepository();
         var writer = new CapturingWmsOracleFeedbackGateway();
-        var service = new WmsFeedbackService(repo, writer, NullLogger<WmsFeedbackService>.Instance);
+        var options = new WmsFeedbackOptions { Enabled = enabled };
+        var service = new WmsFeedbackService(repo, writer, options, NullLogger<WmsFeedbackService>.Instance);
         return (service, repo, writer);
     }
 
@@ -130,6 +132,72 @@ public sealed class WmsFeedbackServiceTests
 
         Assert.Equal(2, result.PendingCount);
         Assert.Equal(2, writer.CapturedTasks.Count);
+    }
+
+    /// <summary>
+    /// 回传开关关闭时应直接返回空结果，不消费任何待回传任务。
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_ShouldReturnEmpty_WhenDisabled()
+    {
+        var (service, repo, writer) = CreateService(enabled: false);
+
+        await repo.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "TASK-D01",
+            SourceTableCode = "WMS",
+            BusinessKey = "KD1",
+            Status = BusinessTaskStatus.Dropped,
+            FeedbackStatus = BusinessTaskFeedbackStatus.Pending,
+            CreatedTimeLocal = DateTime.Now,
+            UpdatedTimeLocal = DateTime.Now
+        }, CancellationToken.None);
+
+        var result = await service.ExecuteAsync(100, CancellationToken.None);
+
+        // 开关关闭时应直接短路，不应查询或更新任何任务。
+        Assert.Equal(0, result.PendingCount);
+        Assert.Equal(0, result.SuccessCount);
+        Assert.Equal(0, result.FailedCount);
+        Assert.True(result.IsSuccess);
+        Assert.Empty(writer.CapturedTasks);
+
+        // 任务状态应保持 Pending 不变（未被消费）。
+        var task = await repo.FindByTaskCodeAsync("TASK-D01", CancellationToken.None);
+        Assert.Equal(BusinessTaskFeedbackStatus.Pending, task!.FeedbackStatus);
+    }
+
+    /// <summary>
+    /// Oracle 返回行数与任务数不一致时，应按整批失败处理。
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_ShouldMarkFailed_WhenWrittenRowsMismatch()
+    {
+        var (service, repo, writer) = CreateService();
+
+        await repo.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "TASK-M01",
+            SourceTableCode = "WMS",
+            BusinessKey = "KM1",
+            Status = BusinessTaskStatus.Dropped,
+            FeedbackStatus = BusinessTaskFeedbackStatus.Pending,
+            CreatedTimeLocal = DateTime.Now,
+            UpdatedTimeLocal = DateTime.Now
+        }, CancellationToken.None);
+
+        // 模拟 Oracle 返回 0 行（行数与任务数不一致）。
+        writer.ReturnCount = 0;
+
+        var result = await service.ExecuteAsync(100, CancellationToken.None);
+
+        Assert.Equal(1, result.PendingCount);
+        Assert.Equal(0, result.SuccessCount);
+        Assert.Equal(1, result.FailedCount);
+        Assert.False(result.IsSuccess);
+
+        var updated = await repo.FindByTaskCodeAsync("TASK-M01", CancellationToken.None);
+        Assert.Equal(BusinessTaskFeedbackStatus.Failed, updated!.FeedbackStatus);
     }
 }
 

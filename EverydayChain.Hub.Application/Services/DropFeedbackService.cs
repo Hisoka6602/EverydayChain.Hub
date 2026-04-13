@@ -166,6 +166,10 @@ public sealed class DropFeedbackService : IDropFeedbackService {
             };
             await _dropLogRepository.SaveAsync(log, ct);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "落格日志写入失败，不影响主流程。TaskCode={TaskCode}", taskCode);
