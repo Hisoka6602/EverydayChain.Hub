@@ -1,15 +1,15 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 通读现有仓库代码并对照 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 盘点执行进度，确认当前已完成 PR-01、PR-02、PR-03、PR-13（4/17）。
-- 核对实施计划与代码落地一致性：确认 PR-04~PR-12 对应核心实现尚未开始，未出现“计划已标记但代码未落地”的偏差。
-- 更新 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`：将 PR-13 状态补全为“已完成（M1 里程碑检验通过）”，并同步更新总览进度口径。
-- 里程碑结论：M1 依赖 PR-01~PR-03，当前已满足进入条件且已完成检验归档，可按依赖顺序推进 PR-04。
+- 通读现有仓库代码并对照 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 盘点执行进度，确认当前已完成 PR-01、PR-02、PR-03、PR-04、PR-13（5/17）。
+- 实施 PR-04（条码解析与扫描输入）：新增条码类型与失败语义枚举、条码解析服务抽象与实现、扫描输入模型。
+- 扫描链路接入解析：`ScanIngressService` 接入 `IBarcodeParser` 并统一输出 `InvalidBarcode`/`UnsupportedBarcodeType`/`ParseError` 失败语义；`ScanController` 对解析失败返回 BadRequest。
+- 更新 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md`：补全 PR-04 执行状态与交付文件，并同步里程碑判断（M2 尚未到检验时刻）。
 - 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过。
   - 构建摘要：0 Warning 0 Error。
   - 测试摘要：单测通过数/失败数见对应执行记录（本次执行记录为 66/66 通过）。
 ## 后续可完善点
-- 按依赖顺序推进 PR-04（条码解析与扫描输入）。
+- 按依赖顺序推进 PR-05（扫描匹配与任务执行）。
 - 在进入 PR-05 前先冻结“业务任务持久化建表/复用”方案，避免后续迁移返工。
 - 在进入 PR-08 前先冻结业务回传 Oracle 目标表与幂等键组合，降低联调阶段不确定性。
 
@@ -59,6 +59,8 @@
 │   ├── Enums/SyncChangeOperationType.cs
 │   ├── Enums/SyncTablePriority.cs
 │   ├── Enums/BusinessTaskStatus.cs
+│   ├── Enums/BarcodeType.cs
+│   ├── Enums/BarcodeParseFailureReason.cs
 │   ├── Sync/SyncTableDefinition.cs
 │   ├── Sync/Models/RemoteStatusConsumeProfile.cs
 │   ├── Sync/SyncWindow.cs
@@ -95,6 +97,8 @@
 │   ├── Models/SyncKeyReadRequest.cs
 │   ├── Models/SyncTargetStateRow.cs
 │   ├── Models/BusinessTaskMaterializeRequest.cs
+│   ├── Models/BarcodeParseResult.cs
+│   ├── Models/ScanEventArgs.cs
 │   ├── Models/ScanUploadApplicationRequest.cs
 │   ├── Models/ScanUploadApplicationResult.cs
 │   ├── Models/ChuteResolveApplicationRequest.cs
@@ -122,6 +126,7 @@
 │   ├── Abstractions/Services/IDeletionExecutionService.cs
 │   ├── Abstractions/Services/IRetentionExecutionService.cs
 │   ├── Abstractions/Services/IBusinessTaskMaterializer.cs
+│   ├── Abstractions/Services/IBarcodeParser.cs
 │   ├── Abstractions/Services/IScanIngressService.cs
 │   ├── Abstractions/Services/IChuteQueryService.cs
 │   ├── Abstractions/Services/IDropFeedbackService.cs
@@ -130,6 +135,7 @@
 │   ├── Services/SyncWindowCalculator.cs
 │   ├── Services/SyncExecutionService.cs
 │   ├── Services/BusinessTaskMaterializer.cs
+│   ├── Services/BarcodeParser.cs
 │   ├── Services/ScanIngressService.cs
 │   ├── Services/ChuteQueryService.cs
 │   ├── Services/DropFeedbackService.cs
@@ -217,6 +223,8 @@
 │       ├── RecordingShardTableProvisioner.cs
 │       ├── ServiceCollectionExtensionsTests.cs
 │       ├── BusinessTaskMaterializerTests.cs
+│       ├── BarcodeParserTests.cs
+│       ├── ScanIngressServiceTests.cs
 │       ├── ShardTableProvisionerTests.cs
 │       ├── SortingTaskTraceWriterTests.cs
 │       ├── LocalDateTimeNormalizerTests.cs
@@ -275,7 +283,7 @@
 - `BoundedConcurrentQueueHelper.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：有界并发队列淘汰辅助工具，仅执行一次 O(n) `Count` 遍历并缓存结果，供需要内存容量保护的队列实现统一复用。
 - `LocalDateTimeNormalizer.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：本地时间规范化共享工具，统一执行 UTC 拒绝、`MinValue` 回退当前本地时间与 `Unspecified` 转本地时间语义，供 Host API 复用。
 - `TaskCodeNormalizer.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：任务编码规范化共享工具，统一执行去首尾空白与全空白回退空字符串处理，供 Host API 复用。
-- `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs` / `SyncTablePriority.cs`：同步模式、删除策略、滞后控制、批次状态、变更操作类型与调度优先级枚举，均含中文 XML 注释与 `Description`。
+- `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs` / `SyncTablePriority.cs` / `BarcodeType.cs` / `BarcodeParseFailureReason.cs`：同步模式、删除策略、滞后控制、批次状态、变更操作类型、调度优先级与条码解析语义枚举，均含中文 XML 注释与 `Description`。
 - `BusinessTaskStatus.cs`：业务任务生命周期状态枚举，覆盖 Created、Scanned、Dropped、FeedbackPending，并提供中文 `Description` 说明。
 - `RemoteStatusConsumeProfile.cs`（`EverydayChain.Hub.Domain/Sync/Models`）：StatusDriven 消费配置模型，统一承载状态列、待处理值、完成值、回写开关与批次大小。
 - `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`SyncTable`、`SyncDelete`、`SyncRetention`、`RetentionJob`、`Oracle` 等），供 Infrastructure 绑定读取。
@@ -284,9 +292,10 @@
 - `BusinessTaskEntity.cs`（`Domain/Aggregates/BusinessTaskAggregate`）：统一业务任务聚合根实体，承载任务编码、来源表、业务键、条码与本地状态时间字段。
 - `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs` + `SyncTargetStateRow.cs`：同步执行、删除识别与轻量幂等状态存储的数据契约模型。
 - `BusinessTaskMaterializeRequest.cs`：业务任务物化输入模型，统一约束任务编码、来源表编码、业务键、条码与物化时间字段。
-- `ScanUploadApplicationRequest.cs` / `ScanUploadApplicationResult.cs` / `ChuteResolveApplicationRequest.cs` / `ChuteResolveApplicationResult.cs` / `DropFeedbackApplicationRequest.cs` / `DropFeedbackApplicationResult.cs`：PR-03 API 骨架对应的应用层请求/响应模型，统一隔离 Host 契约与 Application 用例编排输入输出。
+- `ScanUploadApplicationRequest.cs` / `ScanUploadApplicationResult.cs` / `BarcodeParseResult.cs` / `ScanEventArgs.cs` / `ChuteResolveApplicationRequest.cs` / `ChuteResolveApplicationResult.cs` / `DropFeedbackApplicationRequest.cs` / `DropFeedbackApplicationResult.cs`：扫描、格口、落格链路的应用层输入输出模型；其中 PR-04 新增条码解析结果与扫描事件模型，统一隔离 Host 契约与 Application 用例编排输入输出。
 - `Application/Abstractions/Services/IBusinessTaskMaterializer.cs` + `Application/Services/BusinessTaskMaterializer.cs`：业务任务物化服务抽象与实现，仅执行字段映射、文本规范化和默认状态赋值，不承载扫描/格口/落格业务规则。
-- `Application/Abstractions/Services/IScanIngressService.cs` + `Application/Services/ScanIngressService.cs`：扫描上传骨架服务抽象与实现，当前负责基础归一化与标准响应生成，不承载匹配与持久化逻辑。
+- `Application/Abstractions/Services/IBarcodeParser.cs` + `Application/Services/BarcodeParser.cs`：条码解析服务抽象与实现，统一输出拆零（Split）/整件（FullCase）/无效（Unknown）分类及失败语义（InvalidBarcode、UnsupportedBarcodeType、ParseError）。
+- `Application/Abstractions/Services/IScanIngressService.cs` + `Application/Services/ScanIngressService.cs`：扫描上传应用服务，当前负责条码解析接入、扫描输入标准化与统一失败语义输出，不承载匹配与持久化逻辑。
 - `Application/Abstractions/Services/IChuteQueryService.cs` + `Application/Services/ChuteQueryService.cs`：请求格口骨架服务抽象与实现，当前负责基础入参映射与占位格口响应。
 - `Application/Abstractions/Services/IDropFeedbackService.cs` + `Application/Services/DropFeedbackService.cs`：落格回传骨架服务抽象与实现，当前负责回传请求受理与标准状态响应。
 - `Application/Abstractions/Sync/IOracleRemoteStatusWriter.cs` / `IOracleStatusDrivenSourceReader.cs` / `ISqlServerAppendOnlyWriter.cs`：定义 StatusDriven 模式中 Oracle 远端状态回写、Oracle 状态驱动源读取与 SQL Server 仅追加写入的外部协作能力抽象，遵循 Application 层外部协作抽象放置规则。
@@ -344,6 +353,8 @@
 - `EverydayChain.Hub.Tests/Services/FixedBootstrapShardSuffixResolver.cs`：分表后缀解析器测试替身，固定返回可控启动后缀集合用于自动迁移后缀策略测试。
 - `EverydayChain.Hub.Tests/Services/ServiceCollectionExtensionsTests.cs`：逻辑表名构建测试，覆盖非法标识符与空启用集合异常场景。
 - `EverydayChain.Hub.Tests/Services/BusinessTaskMaterializerTests.cs`：业务任务物化服务测试，覆盖默认状态赋值、时间赋值与必填字段空白校验分支。
+- `EverydayChain.Hub.Tests/Services/BarcodeParserTests.cs`：条码解析服务测试，覆盖拆零、整件、不支持条码三类解析分支。
+- `EverydayChain.Hub.Tests/Services/ScanIngressServiceTests.cs`：扫描上传应用服务测试，覆盖无效条码失败语义与有效拆零条码受理分支。
 - `EverydayChain.Hub.Tests/Services/SortingTaskTraceWriterTests.cs`：分表写入器兜底建表测试，覆盖首次写入先建表与同月重复写入幂等建表触发场景。
 - `EverydayChain.Hub.Tests/Services/LocalDateTimeNormalizerTests.cs`：本地时间规范化工具测试，覆盖 UTC 拒绝、`Unspecified` 转本地与 `MinValue` 回退本地当前时间分支。
 - `EverydayChain.Hub.Tests/Services/RecordingShardTableProvisioner.cs`：分表预建器测试替身，记录触发后缀以验证建表调用次数与后缀分发行为。

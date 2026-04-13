@@ -74,6 +74,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IRemoteStatusConsumeService, RemoteStatusConsumeService>();
         services.AddSingleton<ISyncWindowCalculator, SyncWindowCalculator>();
         services.AddSingleton<IBusinessTaskMaterializer, BusinessTaskMaterializer>();
+        services.AddSingleton<IBarcodeParser, BarcodeParser>();
         // 注册 PR-03 API 骨架服务：扫描上传、请求格口、落格回传。
         services.AddSingleton<IScanIngressService, ScanIngressService>();
         services.AddSingleton<IChuteQueryService, ChuteQueryService>();

@@ -55,7 +55,7 @@
 | PR-01 | 统一业务任务模型 | 无 | 新增 8 / 修改 4 / 合计 12 | `feature/pr01-business-task-model` | ✅ 本 PR 已完成 |
 | PR-02 | 语义与接口基线文档 | PR-01 | 新增 5 / 修改 2 / 合计 7 | `feature/pr02-semantic-baseline` | ✅ 本 PR 已完成 |
 | PR-03 | Host API 承载骨架 | PR-02 | 新增 12 / 修改 4 / 合计 16 | `feature/pr03-host-api-bootstrap` | ✅ 本 PR 已完成 |
-| PR-04 | 条码解析与扫描输入 | PR-03 | 新增 8 / 修改 3 / 合计 11 | `feature/pr04-barcode-and-scan-model` | ⏳ 未开始 |
+| PR-04 | 条码解析与扫描输入 | PR-03 | 新增 8 / 修改 3 / 合计 11 | `feature/pr04-barcode-and-scan-model` | ✅ 已完成（本 PR） |
 | PR-05 | 扫描匹配与任务执行 | PR-04 | 新增 10 / 修改 6 / 合计 16 | `feature/pr05-scan-match-and-execution` | ⏳ 未开始 |
 | PR-06 | 请求格口服务 | PR-05 | 新增 4 / 修改 4 / 合计 8 | `feature/pr06-chute-resolve` | ⏳ 未开始 |
 | PR-07 | 落格回传服务 | PR-06 | 新增 4 / 修改 5 / 合计 9 | `feature/pr07-drop-feedback` | ⏳ 未开始 |
@@ -72,7 +72,7 @@
 
 > 说明：预计改动为排期预算，允许 ±2 文件浮动；超出需在 PR 描述说明原因。
 >
-> 进度盘点口径：已先通读当前仓库代码并核对现状，当前已完成 PR-01、PR-02、PR-03、PR-13（4/17），PR-04~PR-12 尚未开始；M1 里程碑检验已完成并通过，下一步按依赖顺序进入 PR-04。
+> 进度盘点口径：已先通读当前仓库代码并核对现状，当前已完成 PR-01、PR-02、PR-03、PR-04、PR-13（5/17）；PR-05~PR-12 尚未开始；M1 里程碑检验已完成并通过，M2 依赖 `PR-04~PR-07` 目前尚未满足（待完成 PR-05~PR-07）。
 
 ### 2.1 待确认项（未确认前不默认实现）
 1. PR-02 文档基线是否需要拆分到独立目录（如 `docs/baseline/`）并定义固定文件命名规范。
@@ -82,8 +82,8 @@
 
 ### 2.2 执行前代码通读与里程碑时机判断（2026-04-13）
 1. 已通读并核对主干实现文件：`BusinessTaskEntity`、`BusinessTaskMaterializer`、三类 Host Controller、`Program.cs`、`ServiceCollectionExtensions.cs`、`README.md`、`逐文件代码检查台账.md`。
-2. 已通过文件存在性与代码内容核对确认：PR-01/PR-02/PR-03 交付物均已落地；PR-04~PR-12 对应核心实现（条码解析、任务匹配、格口解析、落格回传闭环、业务回传、补偿服务）尚未落地。
-3. 里程碑时机判断：M1 依赖 `PR-01~PR-03`，当前依赖已全部满足，已到达 M1 里程碑检验时刻，应先完成 PR-13 再进入 PR-04。
+2. 已通过文件存在性与代码内容核对确认：PR-01/PR-02/PR-03/PR-04 交付物均已落地；PR-05~PR-12 对应核心实现（任务匹配、格口解析、落格回传闭环、业务回传、补偿服务）尚未落地。
+3. 里程碑时机判断：M1 依赖 `PR-01~PR-03` 已完成且已通过；M2 依赖 `PR-04~PR-07`，当前仅完成 PR-04，尚未到达 M2 里程碑检验时刻。
 
 ---
 
@@ -256,6 +256,26 @@
 ---
 
 ## PR-04：条码解析与扫描输入
+
+### 执行状态
+- ✅ 已完成（本 PR）
+- 验证结果：`dotnet build EverydayChain.Hub.sln` 通过、`dotnet test EverydayChain.Hub.sln` 通过。
+- 交付文件：
+  - `EverydayChain.Hub.Domain/Enums/BarcodeType.cs`
+  - `EverydayChain.Hub.Domain/Enums/BarcodeParseFailureReason.cs`
+  - `EverydayChain.Hub.Application/Abstractions/Services/IBarcodeParser.cs`
+  - `EverydayChain.Hub.Application/Services/BarcodeParser.cs`
+  - `EverydayChain.Hub.Application/Models/BarcodeParseResult.cs`
+  - `EverydayChain.Hub.Application/Models/ScanEventArgs.cs`
+  - `EverydayChain.Hub.Application/Services/ScanIngressService.cs`
+  - `EverydayChain.Hub.Application/Models/ScanUploadApplicationRequest.cs`
+  - `EverydayChain.Hub.Application/Models/ScanUploadApplicationResult.cs`
+  - `EverydayChain.Hub.Host/Controllers/ScanController.cs`
+  - `EverydayChain.Hub.Host/Contracts/Requests/ScanUploadRequest.cs`
+  - `EverydayChain.Hub.Host/Contracts/Responses/ScanUploadResponse.cs`
+  - `EverydayChain.Hub.Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`
+  - `EverydayChain.Hub.Tests/Services/BarcodeParserTests.cs`
+  - `EverydayChain.Hub.Tests/Services/ScanIngressServiceTests.cs`
 
 ### 建议标题
 `feat(application): 新增条码解析服务与扫描输入模型`

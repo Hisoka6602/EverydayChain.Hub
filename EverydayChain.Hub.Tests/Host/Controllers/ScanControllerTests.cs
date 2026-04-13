@@ -67,5 +67,7 @@ public sealed class ScanControllerTests {
         Assert.True(response.IsSuccess);
         Assert.NotNull(response.Data);
         Assert.Equal("TASK-001", response.Data.TaskCode);
+        Assert.Equal("Split", response.Data.BarcodeType);
+        Assert.Equal(string.Empty, response.Data.FailureReason);
     }
 }

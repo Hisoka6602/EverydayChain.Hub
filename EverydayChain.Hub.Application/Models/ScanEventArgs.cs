@@ -1,13 +1,26 @@
+using EverydayChain.Hub.Domain.Enums;
+
 namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 扫描上传应用层请求模型。
+/// 扫描事件输入模型，承载后续匹配与执行链路所需字段。
 /// </summary>
-public sealed class ScanUploadApplicationRequest {
+public sealed class ScanEventArgs
+{
     /// <summary>
-    /// 条码文本。
+    /// 原始条码文本。
     /// </summary>
-    public string Barcode { get; set; } = string.Empty;
+    public string RawBarcode { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 标准化条码文本。
+    /// </summary>
+    public string NormalizedBarcode { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 条码类型。
+    /// </summary>
+    public BarcodeType BarcodeType { get; set; } = BarcodeType.Unknown;
 
     /// <summary>
     /// 设备编码。
@@ -20,32 +33,32 @@ public sealed class ScanUploadApplicationRequest {
     public DateTime ScanTimeLocal { get; set; }
 
     /// <summary>
-    /// 链路追踪标识，长度范围 0~64。
+    /// 链路追踪标识。
     /// </summary>
     public string TraceId { get; set; } = string.Empty;
 
     /// <summary>
-    /// 包裹长度，单位毫米，范围 >= 0。
+    /// 包裹长度，单位毫米。
     /// </summary>
     public decimal? LengthMm { get; set; }
 
     /// <summary>
-    /// 包裹宽度，单位毫米，范围 >= 0。
+    /// 包裹宽度，单位毫米。
     /// </summary>
     public decimal? WidthMm { get; set; }
 
     /// <summary>
-    /// 包裹高度，单位毫米，范围 >= 0。
+    /// 包裹高度，单位毫米。
     /// </summary>
     public decimal? HeightMm { get; set; }
 
     /// <summary>
-    /// 包裹体积，单位立方毫米，范围 >= 0。
+    /// 包裹体积，单位立方毫米。
     /// </summary>
     public decimal? VolumeMm3 { get; set; }
 
     /// <summary>
-    /// 包裹重量，单位克，范围 >= 0。
+    /// 包裹重量，单位克。
     /// </summary>
     public decimal? WeightGram { get; set; }
 }

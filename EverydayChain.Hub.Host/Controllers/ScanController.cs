@@ -47,16 +47,29 @@ public sealed class ScanController : ControllerBase {
         if (!LocalDateTimeNormalizer.TryNormalize(request.ScanTimeLocal, "扫描时间必须为本地时间，禁止传入 UTC 时间。", out var normalizedScanTime, out var validationMessage)) {
             return BadRequest(ApiResponse<ScanUploadResponse>.Fail(validationMessage));
         }
+
         var applicationResult = await scanIngressService.ExecuteAsync(new ScanUploadApplicationRequest {
             Barcode = request.Barcode.Trim(),
             DeviceCode = request.DeviceCode.Trim(),
-            ScanTimeLocal = normalizedScanTime
+            ScanTimeLocal = normalizedScanTime,
+            TraceId = request.TraceId.Trim(),
+            LengthMm = request.LengthMm,
+            WidthMm = request.WidthMm,
+            HeightMm = request.HeightMm,
+            VolumeMm3 = request.VolumeMm3,
+            WeightGram = request.WeightGram
         }, cancellationToken);
 
         var response = new ScanUploadResponse {
             IsAccepted = applicationResult.IsAccepted,
-            TaskCode = applicationResult.TaskCode
+            TaskCode = applicationResult.TaskCode,
+            BarcodeType = applicationResult.BarcodeType,
+            FailureReason = applicationResult.FailureReason
         };
+
+        if (!applicationResult.IsAccepted) {
+            return BadRequest(ApiResponse<ScanUploadResponse>.Fail(applicationResult.FailureReason, response));
+        }
 
         return Ok(ApiResponse<ScanUploadResponse>.Success(response, applicationResult.Message));
     }

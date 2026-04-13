@@ -46,4 +46,18 @@ public sealed class ApiResponse<T> {
             Data = default
         };
     }
+
+    /// <summary>
+    /// 生成包含业务数据的失败响应。
+    /// </summary>
+    /// <param name="message">失败消息。</param>
+    /// <param name="data">失败附带数据。</param>
+    /// <returns>失败响应。</returns>
+    public static ApiResponse<T> Fail(string message, T data) {
+        return new ApiResponse<T> {
+            IsSuccess = false,
+            Message = message,
+            Data = data
+        };
+    }
 }

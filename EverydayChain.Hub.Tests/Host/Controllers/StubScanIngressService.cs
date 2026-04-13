@@ -19,6 +19,8 @@ public sealed class StubScanIngressService : IScanIngressService {
         return Task.FromResult(new ScanUploadApplicationResult {
             IsAccepted = true,
             TaskCode = "TASK-001",
+            BarcodeType = "Split",
+            FailureReason = string.Empty,
             Message = "测试成功"
         });
     }
