@@ -92,10 +92,18 @@ public sealed class BarcodeParser : IBarcodeParser
             return false;
         }
 
-        targetChuteCode = normalizedBarcode[prefix.Length..].Trim();
-        if (string.IsNullOrWhiteSpace(targetChuteCode))
+        targetChuteCode = normalizedBarcode[prefix.Length..];
+        if (string.IsNullOrEmpty(targetChuteCode))
         {
             return false;
+        }
+
+        foreach (var character in targetChuteCode)
+        {
+            if (char.IsWhiteSpace(character))
+            {
+                return false;
+            }
         }
 
         return true;

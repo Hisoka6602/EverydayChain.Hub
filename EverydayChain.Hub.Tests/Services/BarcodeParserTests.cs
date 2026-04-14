@@ -57,4 +57,20 @@ public sealed class BarcodeParserTests
         Assert.Equal(string.Empty, result.TargetChuteCode);
         Assert.Equal(BarcodeParseFailureReason.UnsupportedBarcodeType, result.FailureReason);
     }
+
+    /// <summary>
+    /// 条码携带空白格口编码时应返回 UnsupportedBarcodeType。
+    /// </summary>
+    [Fact]
+    public void Parse_ShouldReturnUnsupportedBarcodeType_WhenChuteCodeContainsWhitespace()
+    {
+        var parser = new BarcodeParser();
+
+        var result = parser.Parse("02- A1");
+
+        Assert.False(result.IsValid);
+        Assert.Equal(BarcodeType.Unknown, result.BarcodeType);
+        Assert.Equal(string.Empty, result.TargetChuteCode);
+        Assert.Equal(BarcodeParseFailureReason.UnsupportedBarcodeType, result.FailureReason);
+    }
 }

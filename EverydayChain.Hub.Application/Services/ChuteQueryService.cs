@@ -67,10 +67,19 @@ public sealed class ChuteQueryService : IChuteQueryService {
             };
         }
 
-        // 步骤 5：从条码中解析目标格口；解析失败时返回失败。
-        var barcodeForResolve = string.IsNullOrWhiteSpace(task.Barcode) ? request.Barcode : task.Barcode;
+        // 步骤 5：从任务条码中解析目标格口；解析失败时返回失败。
+        if (string.IsNullOrWhiteSpace(task.Barcode)) {
+            return new ChuteResolveApplicationResult {
+                IsResolved = false,
+                TaskCode = task.TaskCode,
+                ChuteCode = string.Empty,
+                Message = $"任务 [{task.TaskCode}] 条码为空，无法解析目标格口。"
+            };
+        }
+
+        var barcodeForResolve = task.Barcode;
         var parseResult = _barcodeParser.Parse(barcodeForResolve);
-        if (!parseResult.IsValid || string.IsNullOrWhiteSpace(parseResult.TargetChuteCode)) {
+        if (!parseResult.IsValid) {
             return new ChuteResolveApplicationResult {
                 IsResolved = false,
                 TaskCode = task.TaskCode,
