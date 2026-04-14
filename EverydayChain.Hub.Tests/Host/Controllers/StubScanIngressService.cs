@@ -13,6 +13,11 @@ public sealed class StubScanIngressService : IScanIngressService {
     public ScanUploadApplicationRequest? LastRequest { get; private set; }
 
     /// <summary>
+    /// 已接收的全部请求。
+    /// </summary>
+    public List<ScanUploadApplicationRequest> Requests { get; } = [];
+
+    /// <summary>
     /// 测试返回结果，用于在不同测试场景下配置控制器收到的应用层响应。
     /// </summary>
     public ScanUploadApplicationResult Result { get; set; } = new ScanUploadApplicationResult {
@@ -31,6 +36,7 @@ public sealed class StubScanIngressService : IScanIngressService {
     /// <returns>固定结果。</returns>
     public Task<ScanUploadApplicationResult> ExecuteAsync(ScanUploadApplicationRequest request, CancellationToken cancellationToken) {
         LastRequest = request;
+        Requests.Add(request);
         _ = cancellationToken;
         return Task.FromResult(Result);
     }

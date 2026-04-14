@@ -17,9 +17,10 @@
 ## 3. 扫描上传 API
 
 ### 3.1 入参
-- `Barcode`（必填）
-- `ScannedAtLocal`（必填，本地时间）
-- `DeviceCode`（可选）
+- `Barcodes`（推荐，`List<string>`，可提交多个条码）
+- `Barcode`（兼容，单条条码）
+- `ScanTimeLocal`（必填，本地时间）
+- `DeviceCode`（必填）
 - `LengthMm`（可选）
 - `WidthMm`（可选）
 - `HeightMm`（可选）
@@ -27,12 +28,15 @@
 - `WeightGram`（可选）
 - `TraceId`（建议）
 
+> 说明：`Barcodes` 与 `Barcode` 至少提供其一；若为多条码场景，首条条码使用实测尺寸重量，其余条码尺寸重量按 `0` 回写，扫描时间保持一致。
+
 ### 3.2 出参
 - `IsSuccess`
-- `TaskId`
-- `BarcodeType`
-- `IsMatched`
-- `FailureReason`
+- `Data`（`List<ScanUploadResponse>`）
+  - `IsAccepted`
+  - `TaskCode`
+  - `BarcodeType`
+  - `FailureReason`
 
 ### 3.3 成功/失败语义
 - 成功：扫描记录有效，任务匹配与状态推进成功。

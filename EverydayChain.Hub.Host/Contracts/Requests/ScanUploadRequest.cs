@@ -7,11 +7,15 @@ namespace EverydayChain.Hub.Host.Contracts.Requests;
 /// </summary>
 public sealed class ScanUploadRequest {
     /// <summary>
-    /// 条码文本，长度范围 1~128。
+    /// 单条条码文本（兼容字段），长度范围 1~128。
     /// </summary>
-    [Required]
     [MaxLength(128)]
     public string Barcode { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 多条条码文本列表（推荐字段），每项长度范围 1~128。
+    /// </summary>
+    public List<string> Barcodes { get; set; } = [];
 
     /// <summary>
     /// 设备编码，长度范围 1~64。
