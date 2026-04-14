@@ -15,16 +15,24 @@ public sealed class ChuteQueryService : IChuteQueryService {
     private readonly IBusinessTaskRepository _businessTaskRepository;
 
     /// <summary>
+    /// 条码解析服务。
+    /// </summary>
+    private readonly IBarcodeParser _barcodeParser;
+
+    /// <summary>
     /// 初始化请求格口应用服务。
     /// </summary>
     /// <param name="businessTaskRepository">业务任务仓储。</param>
-    public ChuteQueryService(IBusinessTaskRepository businessTaskRepository) {
+    /// <param name="barcodeParser">条码解析服务。</param>
+    public ChuteQueryService(IBusinessTaskRepository businessTaskRepository, IBarcodeParser barcodeParser)
+    {
         _businessTaskRepository = businessTaskRepository;
+        _barcodeParser = barcodeParser;
     }
 
     /// <summary>
     /// 按任务编码或条码查询目标格口。
-    /// 步骤：1. 优先按任务编码查找；2. 任务编码为空时按条码查找；3. 校验任务状态；4. 返回目标格口。
+    /// 步骤：1. 优先按任务编码查找；2. 任务编码为空时按条码查找；3. 校验任务状态；4. 校验条码非空；5. 解析条码中的格口并返回。
     /// </summary>
     /// <param name="request">请求参数。</param>
     /// <param name="cancellationToken">取消令牌。</param>
@@ -60,21 +68,32 @@ public sealed class ChuteQueryService : IChuteQueryService {
             };
         }
 
-        // 步骤 5：返回目标格口，目标格口为空时返回失败。
-        if (string.IsNullOrWhiteSpace(task.TargetChuteCode)) {
+        // 步骤 5：从任务条码中解析目标格口；解析失败时返回失败。
+        if (string.IsNullOrWhiteSpace(task.Barcode)) {
             return new ChuteResolveApplicationResult {
                 IsResolved = false,
                 TaskCode = task.TaskCode,
                 ChuteCode = string.Empty,
-                Message = $"任务 [{task.TaskCode}] 尚未分配目标格口。"
+                Message = $"任务 [{task.TaskCode}] 条码为空，无法解析目标格口。"
+            };
+        }
+
+        var barcodeForResolve = task.Barcode;
+        var parseResult = _barcodeParser.Parse(barcodeForResolve);
+        if (!parseResult.IsValid) {
+            return new ChuteResolveApplicationResult {
+                IsResolved = false,
+                TaskCode = task.TaskCode,
+                ChuteCode = string.Empty,
+                Message = $"任务 [{task.TaskCode}] 条码 [{barcodeForResolve}] 未携带受支持的目标格口信息。"
             };
         }
 
         return new ChuteResolveApplicationResult {
             IsResolved = true,
             TaskCode = task.TaskCode,
-            ChuteCode = task.TargetChuteCode,
-            Message = $"任务 [{task.TaskCode}] 目标格口已确认：{task.TargetChuteCode}。"
+            ChuteCode = parseResult.TargetChuteCode,
+            Message = $"任务 [{task.TaskCode}] 目标格口已确认：{parseResult.TargetChuteCode}。"
         };
     }
 }

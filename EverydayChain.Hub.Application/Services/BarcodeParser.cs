@@ -6,7 +6,7 @@ using NLog;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 条码解析服务，实现拆零、整件与无效码分类。
+/// 条码解析服务，负责拆零与整件分类、目标格口提取及无效码识别。
 /// </summary>
 public sealed class BarcodeParser : IBarcodeParser
 {
@@ -31,14 +31,14 @@ public sealed class BarcodeParser : IBarcodeParser
             }
 
             normalizedBarcode = normalizedBarcode.ToUpperInvariant();
-            if (IsSplitBarcode(normalizedBarcode))
+            if (TryExtractSplitChuteCode(normalizedBarcode, out var splitChuteCode))
             {
-                return BuildSuccessResult(normalizedBarcode, BarcodeType.Split);
+                return BuildSuccessResult(normalizedBarcode, BarcodeType.Split, splitChuteCode);
             }
 
-            if (IsFullCaseBarcode(normalizedBarcode))
+            if (TryExtractFullCaseChuteCode(normalizedBarcode, out var fullCaseChuteCode))
             {
-                return BuildSuccessResult(normalizedBarcode, BarcodeType.FullCase);
+                return BuildSuccessResult(normalizedBarcode, BarcodeType.FullCase, fullCaseChuteCode);
             }
 
             return BuildFailureResult(BarcodeParseFailureReason.UnsupportedBarcodeType, "条码类型不受支持。", normalizedBarcode);
@@ -51,49 +51,62 @@ public sealed class BarcodeParser : IBarcodeParser
     }
 
     /// <summary>
-    /// 判断是否为拆零条码。
+    /// 按“02 + 格口号 + 其余内容”规则提取拆零目标格口。
     /// </summary>
     /// <param name="normalizedBarcode">标准化条码。</param>
-    /// <returns>是拆零条码返回 true，否则返回 false。</returns>
-    private static bool IsSplitBarcode(string normalizedBarcode)
+    /// <param name="targetChuteCode">提取出的目标格口编码。</param>
+    /// <returns>提取成功返回 true，否则返回 false。</returns>
+    /// <remarks>
+    /// 固定前缀长度为 2（02），格口号取第 3 位字符且必须为数字。
+    /// 当前缀不匹配、条码长度不足或格口位非数字时返回 false。
+    /// </remarks>
+    private static bool TryExtractSplitChuteCode(string normalizedBarcode, out string targetChuteCode)
     {
-        return normalizedBarcode.StartsWith("SPLIT-", StringComparison.Ordinal)
-            || normalizedBarcode.StartsWith("S-", StringComparison.Ordinal)
-            || normalizedBarcode.StartsWith("SP", StringComparison.Ordinal);
+        return TryExtractChuteCodeByPrefix(normalizedBarcode, "02", out targetChuteCode);
     }
 
     /// <summary>
-    /// 判断是否为整件条码。
+    /// 按“Z + 格口号 + 其余内容”规则提取整件目标格口。
     /// </summary>
     /// <param name="normalizedBarcode">标准化条码。</param>
-    /// <returns>是整件条码返回 true，否则返回 false。</returns>
-    private static bool IsFullCaseBarcode(string normalizedBarcode)
+    /// <param name="targetChuteCode">提取出的目标格口编码。</param>
+    /// <returns>提取成功返回 true，否则返回 false。</returns>
+    /// <remarks>
+    /// 固定前缀长度为 1（Z），格口号取第 2 位字符且必须为数字。
+    /// 当前缀不匹配、条码长度不足或格口位非数字时返回 false。
+    /// </remarks>
+    private static bool TryExtractFullCaseChuteCode(string normalizedBarcode, out string targetChuteCode)
     {
-        return normalizedBarcode.StartsWith("CASE-", StringComparison.Ordinal)
-            || normalizedBarcode.StartsWith("F-", StringComparison.Ordinal)
-            || IsNumericBarcodeWithSupportedLength(normalizedBarcode);
+        return TryExtractChuteCodeByPrefix(normalizedBarcode, "Z", out targetChuteCode);
     }
 
     /// <summary>
-    /// 判断是否为受支持长度的纯数字条码。
+    /// 按固定前缀提取目标格口编码（前缀后的首位字符）。
     /// </summary>
     /// <param name="normalizedBarcode">标准化条码。</param>
-    /// <returns>符合长度与字符约束返回 true，否则返回 false。</returns>
-    private static bool IsNumericBarcodeWithSupportedLength(string normalizedBarcode)
+    /// <param name="prefix">条码固定前缀。</param>
+    /// <param name="targetChuteCode">提取出的目标格口编码。</param>
+    /// <returns>提取成功返回 true，否则返回 false。</returns>
+    private static bool TryExtractChuteCodeByPrefix(string normalizedBarcode, string prefix, out string targetChuteCode)
     {
-        if (normalizedBarcode.Length is not (12 or 13 or 14 or 18))
+        targetChuteCode = string.Empty;
+        if (!normalizedBarcode.StartsWith(prefix, StringComparison.Ordinal))
         {
             return false;
         }
 
-        foreach (var character in normalizedBarcode)
+        if (normalizedBarcode.Length <= prefix.Length)
         {
-            if (!char.IsAsciiDigit(character))
-            {
-                return false;
-            }
+            return false;
         }
 
+        var chuteCharacter = normalizedBarcode[prefix.Length];
+        if (!char.IsAsciiDigit(chuteCharacter))
+        {
+            return false;
+        }
+
+        targetChuteCode = chuteCharacter.ToString();
         return true;
     }
 
@@ -102,14 +115,16 @@ public sealed class BarcodeParser : IBarcodeParser
     /// </summary>
     /// <param name="normalizedBarcode">标准化条码。</param>
     /// <param name="barcodeType">条码类型。</param>
+    /// <param name="targetChuteCode">目标格口编码。</param>
     /// <returns>成功结果。</returns>
-    private static BarcodeParseResult BuildSuccessResult(string normalizedBarcode, BarcodeType barcodeType)
+    private static BarcodeParseResult BuildSuccessResult(string normalizedBarcode, BarcodeType barcodeType, string targetChuteCode)
     {
         return new BarcodeParseResult
         {
             IsValid = true,
             BarcodeType = barcodeType,
             NormalizedBarcode = normalizedBarcode,
+            TargetChuteCode = targetChuteCode,
             FailureReason = BarcodeParseFailureReason.None,
             FailureMessage = string.Empty
         };
@@ -129,6 +144,7 @@ public sealed class BarcodeParser : IBarcodeParser
             IsValid = false,
             BarcodeType = BarcodeType.Unknown,
             NormalizedBarcode = normalizedBarcode,
+            TargetChuteCode = string.Empty,
             FailureReason = failureReason,
             FailureMessage = failureMessage
         };

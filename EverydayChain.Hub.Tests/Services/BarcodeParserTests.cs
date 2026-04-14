@@ -16,11 +16,12 @@ public sealed class BarcodeParserTests
     {
         var parser = new BarcodeParser();
 
-        var result = parser.Parse("split-0001");
+        var result = parser.Parse("021103013145");
 
         Assert.True(result.IsValid);
         Assert.Equal(BarcodeType.Split, result.BarcodeType);
-        Assert.Equal("SPLIT-0001", result.NormalizedBarcode);
+        Assert.Equal("021103013145", result.NormalizedBarcode);
+        Assert.Equal("1", result.TargetChuteCode);
         Assert.Equal(BarcodeParseFailureReason.None, result.FailureReason);
     }
 
@@ -32,11 +33,12 @@ public sealed class BarcodeParserTests
     {
         var parser = new BarcodeParser();
 
-        var result = parser.Parse("123456789012");
+        var result = parser.Parse("z46030202060001");
 
         Assert.True(result.IsValid);
         Assert.Equal(BarcodeType.FullCase, result.BarcodeType);
-        Assert.Equal("123456789012", result.NormalizedBarcode);
+        Assert.Equal("Z46030202060001", result.NormalizedBarcode);
+        Assert.Equal("4", result.TargetChuteCode);
         Assert.Equal(BarcodeParseFailureReason.None, result.FailureReason);
     }
 
@@ -52,6 +54,23 @@ public sealed class BarcodeParserTests
 
         Assert.False(result.IsValid);
         Assert.Equal(BarcodeType.Unknown, result.BarcodeType);
+        Assert.Equal(string.Empty, result.TargetChuteCode);
+        Assert.Equal(BarcodeParseFailureReason.UnsupportedBarcodeType, result.FailureReason);
+    }
+
+    /// <summary>
+    /// 标识前缀后的首位字符非数字时应返回 UnsupportedBarcodeType。
+    /// </summary>
+    [Fact]
+    public void Parse_ShouldReturnUnsupportedBarcodeType_WhenChuteCodeIsNotDigit()
+    {
+        var parser = new BarcodeParser();
+
+        var result = parser.Parse("02A1103013145");
+
+        Assert.False(result.IsValid);
+        Assert.Equal(BarcodeType.Unknown, result.BarcodeType);
+        Assert.Equal(string.Empty, result.TargetChuteCode);
         Assert.Equal(BarcodeParseFailureReason.UnsupportedBarcodeType, result.FailureReason);
     }
 }

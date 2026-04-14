@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 修正条码与格口规则：条码解析改为固定规则“拆零=`02` 开头取第 3 位数字格口号、整件=`Z` 开头取第 2 位数字格口号”，并新增 `BarcodeParseResult.TargetChuteCode` 输出；请求格口服务改为基于条码解析目标格口（仍保留任务命中与已扫描状态校验）；同步更新 `条码规则基线.md` 与 `对外API接口基线.md`。
 - 实施 PR-10（异常规则链路）：新增 `ExceptionRuleOptions`/`WaveCleanupRuleOptions`/`MultiLabelRuleOptions`/`RecirculationRuleOptions` 配置实体（`Domain/Options/`，每类独立文件）；新增 `MultiLabelDecisionResult` 领域模型（`Domain/MultiLabel/`）；新增 `RecirculationDecisionResult` 领域模型（`Domain/Recirculation/`）；新增 `IWaveCleanupService` 接口（`Application/WaveCleanup/Abstractions/`）与 `WaveCleanupResult`（独立文件）及 `WaveCleanupService` 实现（支持批量更新 + TargetStatusOnCleanup 配置应用）；新增 `IMultiLabelDecisionService` 接口（`Application/MultiLabel/Abstractions/`）与 `MultiLabelDecisionService` 实现；新增 `IRecirculationService` 接口（`Application/Recirculation/Abstractions/`）与 `RecirculationService` 实现；`BusinessTaskEntity` 新增 `WaveCode`、`IsRecirculated`、`ScanRetryCount` 字段；`TaskExecutionService` 在扫描状态校验失败时递增 `ScanRetryCount`（为回流规则提供判定依据）；`IBusinessTaskRepository` 新增 `FindByWaveCodeAsync`、`FindActiveByBarcodeAsync`、`BulkMarkExceptionByWaveCodeAsync` 方法；新增 EF 迁移 `20260413185000_AddExceptionRuleFields`；`ServiceCollectionExtensions` 注册三个新服务；`appsettings.json` 增加 `ExceptionRule` 配置节（含全局开关与 dry-run 支持）；新增 `ExceptionRuleTests` 测试 16 例。
 - 实施 PR-15（M3 里程碑全量审查：回传与审计阶段）：PR-08 与 PR-09 均已完成，构建与测试全绿（0 Warning 0 Error，138/138 测试通过），M3 里程碑审查结论归档到逐文件代码检查台账。
 - 新增测试合计 16 例，总计 138/138 测试通过。
@@ -314,7 +315,7 @@
 - `逐文件全量审查实施方案.md`：续审执行方案，要求先核对首轮已处理内容，再对首轮台账未覆盖文件执行补审并闭环。
 - `逐文件代码检查台账.md`：逐文件检查台账（首轮 155 文件 + 续审批次 A 补齐 15 文件），记录每文件检查状态（未检查/进行中/已完成）、问题编号与修复状态，供后续 PR 复核追溯。
 - `WMS状态语义基线.md`：固化读取状态、回传状态、自动回写字段与业务回传字段边界，统一同步链路与业务链路语义。
-- `条码规则基线.md`：固化条码输入约束、条码类型、解析输出与失败语义，约束扫描链路判定口径。
+- `条码规则基线.md`：固化条码输入约束、固定匹配规则（拆零 `02` 开头取第 3 位格口号 / 整件 `Z` 开头取第 2 位格口号）、解析输出与失败语义，约束扫描链路判定口径。
 - `对外API接口基线.md`：固化扫描上传、请求格口、落格回传 3 类接口的路由、方法、入参出参、成功失败语义、幂等要求与状态变化。
 - `拆零业务字段语义基线.md`：固化拆零业务任务关键字段语义与状态推进约束，避免链路间字段理解偏差。
 - `整件业务字段语义基线.md`：固化整件业务任务关键字段语义与状态推进约束，统一与拆零路径的状态机口径。
@@ -346,9 +347,9 @@
 - `Application/TaskExecution/Services/TaskExecutionService.cs`：任务执行服务实现，按条码匹配任务、校验状态并推进到已扫描并持久化。
 - `Infrastructure/Repositories/BusinessTaskRepository.cs`：业务任务仓储 EF Core 实现，操作 `business_tasks` 固定非分片表。
 - `Infrastructure/Persistence/EntityConfigurations/BusinessTaskEntityTypeConfiguration.cs`：业务任务 EF Fluent API 配置，定义固定表名、字段约束与索引。
-- `Application/Abstractions/Services/IBarcodeParser.cs` + `Application/Services/BarcodeParser.cs`：条码解析服务抽象与实现，统一输出拆零（Split）/整件（FullCase）/无效（Unknown）分类及失败语义（InvalidBarcode、UnsupportedBarcodeType、ParseError）。
+- `Application/Abstractions/Services/IBarcodeParser.cs` + `Application/Services/BarcodeParser.cs`：条码解析服务抽象与实现，按固定规则“拆零 `02` 开头取第 3 位数字、整件 `Z` 开头取第 2 位数字”分类并提取 `TargetChuteCode`，统一输出失败语义（InvalidBarcode、UnsupportedBarcodeType、ParseError）。
 - `Application/Abstractions/Services/IScanIngressService.cs` + `Application/Services/ScanIngressService.cs`：扫描上传应用服务，协调条码解析、任务匹配与状态推进链路，输出标准化受理结果。
-- `Application/Abstractions/Services/IChuteQueryService.cs` + `Application/Services/ChuteQueryService.cs`：请求格口应用服务抽象与实现，按任务编码或条码查询业务任务并返回目标格口，覆盖状态校验与未分配格口异常分支。
+- `Application/Abstractions/Services/IChuteQueryService.cs` + `Application/Services/ChuteQueryService.cs`：请求格口应用服务抽象与实现，按任务编码或条码查询业务任务，在任务已扫描前提下按条码规则解析并返回目标格口，覆盖状态校验与不支持条码异常分支。
 - `Application/Abstractions/Services/IDropFeedbackService.cs` + `Application/Services/DropFeedbackService.cs`：落格回传应用服务抽象与实现，支持双定位（TaskCode/Barcode）、参数冲突校验与状态机推进（成功→Dropped+FeedbackPending，失败→Exception），落格成功/失败均写落格日志。
 - `Application/Abstractions/Services/IWmsFeedbackService.cs` + `Application/Feedback/Services/WmsFeedbackService.cs`：业务回传应用服务抽象与实现，查询 `FeedbackStatus=Pending` 任务、批量调用 Oracle 写入器、按结果回填 Completed/Failed。
 - `Application/Abstractions/Integrations/IWmsOracleFeedbackGateway.cs` + `Infrastructure/Integrations/OracleWmsFeedbackGateway.cs`：Oracle WMS 业务回传网关抽象与实现；实现使用数组绑定批量更新，安全标识符校验防止 SQL 注入；`Enabled=false` 时仅记录日志不实际写入 Oracle。
