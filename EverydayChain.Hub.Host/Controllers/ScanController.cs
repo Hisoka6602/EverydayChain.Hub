@@ -24,6 +24,11 @@ public sealed class ScanController : ControllerBase {
     private const int MaxBarcodeLength = 128;
 
     /// <summary>
+    /// 单次请求允许提交的最大条码数量。
+    /// </summary>
+    private const int MaxBarcodeCountPerRequest = 100;
+
+    /// <summary>
     /// 扫描上传应用服务。
     /// </summary>
     private readonly IScanIngressService scanIngressService;
@@ -109,17 +114,26 @@ public sealed class ScanController : ControllerBase {
     private static bool TryBuildBarcodes(ScanUploadRequest request, out List<string> normalizedBarcodes, out string validationMessage) {
         validationMessage = string.Empty;
         normalizedBarcodes = [];
-        if (request.Barcodes.Count > 0) {
-            foreach (var barcode in request.Barcodes) {
-                if (!string.IsNullOrWhiteSpace(barcode)) {
-                    var trimmedBarcode = barcode.Trim();
-                    if (trimmedBarcode.Length > MaxBarcodeLength) {
-                        validationMessage = "条码长度不能超过 128。";
-                        return false;
-                    }
+        var requestBarcodes = request.Barcodes ?? [];
+        if (requestBarcodes.Count > 0) {
+            if (requestBarcodes.Count > MaxBarcodeCountPerRequest) {
+                validationMessage = $"单次最多允许提交 {MaxBarcodeCountPerRequest} 个条码。";
+                return false;
+            }
 
-                    normalizedBarcodes.Add(trimmedBarcode);
+            foreach (var barcode in requestBarcodes) {
+                if (string.IsNullOrWhiteSpace(barcode)) {
+                    validationMessage = "条码列表中存在空条码，请检查后重试。";
+                    return false;
                 }
+
+                var trimmedBarcode = barcode.Trim();
+                if (trimmedBarcode.Length > MaxBarcodeLength) {
+                    validationMessage = $"条码长度不能超过 {MaxBarcodeLength}。";
+                    return false;
+                }
+
+                normalizedBarcodes.Add(trimmedBarcode);
             }
 
             if (normalizedBarcodes.Count == 0) {
@@ -133,7 +147,7 @@ public sealed class ScanController : ControllerBase {
         if (!string.IsNullOrWhiteSpace(request.Barcode)) {
             var trimmedBarcode = request.Barcode.Trim();
             if (trimmedBarcode.Length > MaxBarcodeLength) {
-                validationMessage = "条码长度不能超过 128。";
+                validationMessage = $"条码长度不能超过 {MaxBarcodeLength}。";
                 return false;
             }
 

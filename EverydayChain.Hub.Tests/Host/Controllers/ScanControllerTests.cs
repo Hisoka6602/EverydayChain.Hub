@@ -128,6 +128,76 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
+    /// 仅传兼容字段 Barcode 时应回退为单条处理。
+    /// </summary>
+    [Fact]
+    public async Task UploadAsync_ShouldFallbackToBarcode_WhenBarcodesIsNull() {
+        var stubService = new StubScanIngressService();
+        var controller = new ScanController(stubService);
+        var fixedScanTime = DateTime.SpecifyKind(new DateTime(2026, 4, 14, 10, 0, 0), DateTimeKind.Local);
+#pragma warning disable CS8625
+        var request = new ScanUploadRequest {
+            Barcodes = null,
+            Barcode = "BC001",
+            DeviceCode = "DVC-01",
+            ScanTimeLocal = fixedScanTime
+        };
+#pragma warning restore CS8625
+
+        var actionResult = await controller.UploadAsync(request, CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+        var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(okResult.Value);
+
+        Assert.True(response.IsSuccess);
+        Assert.NotNull(response.Data);
+        Assert.Single(response.Data);
+        Assert.Single(stubService.Requests);
+        Assert.Equal("BC001", stubService.Requests[0].Barcode);
+    }
+
+    /// <summary>
+    /// 条码列表存在空白项时应直接返回 BadRequest。
+    /// </summary>
+    [Fact]
+    public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodesContainsWhitespaceItem() {
+        var controller = new ScanController(new StubScanIngressService());
+        var fixedScanTime = DateTime.SpecifyKind(new DateTime(2026, 4, 14, 10, 0, 0), DateTimeKind.Local);
+        var request = new ScanUploadRequest {
+            Barcodes = ["BC001", " "],
+            DeviceCode = "DVC-01",
+            ScanTimeLocal = fixedScanTime
+        };
+
+        var actionResult = await controller.UploadAsync(request, CancellationToken.None);
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+        var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(badRequestResult.Value);
+
+        Assert.False(response.IsSuccess);
+        Assert.Equal("条码列表中存在空条码，请检查后重试。", response.Message);
+    }
+
+    /// <summary>
+    /// 超出最大条码数量时应直接返回 BadRequest。
+    /// </summary>
+    [Fact]
+    public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodesExceedLimit() {
+        var controller = new ScanController(new StubScanIngressService());
+        var fixedScanTime = DateTime.SpecifyKind(new DateTime(2026, 4, 14, 10, 0, 0), DateTimeKind.Local);
+        var request = new ScanUploadRequest {
+            Barcodes = Enumerable.Repeat("BC001", 101).ToList(),
+            DeviceCode = "DVC-01",
+            ScanTimeLocal = fixedScanTime
+        };
+
+        var actionResult = await controller.UploadAsync(request, CancellationToken.None);
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+        var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(badRequestResult.Value);
+
+        Assert.False(response.IsSuccess);
+        Assert.Equal("单次最多允许提交 100 个条码。", response.Message);
+    }
+
+    /// <summary>
     /// 多条码请求时非首条条码应使用 0 作为尺寸与重量回写值。
     /// </summary>
     [Fact]
