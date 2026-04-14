@@ -18,6 +18,11 @@ public sealed class BarcodeParseResult
     public string NormalizedBarcode { get; set; } = string.Empty;
 
     /// <summary>
+    /// 从条码中解析出的目标格口编码，解析失败时为空。
+    /// </summary>
+    public string TargetChuteCode { get; set; } = string.Empty;
+
+    /// <summary>
     /// 是否解析有效。
     /// </summary>
     public bool IsValid { get; set; }

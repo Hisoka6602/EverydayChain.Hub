@@ -16,11 +16,12 @@ public sealed class BarcodeParserTests
     {
         var parser = new BarcodeParser();
 
-        var result = parser.Parse("split-0001");
+        var result = parser.Parse("02-A1");
 
         Assert.True(result.IsValid);
         Assert.Equal(BarcodeType.Split, result.BarcodeType);
-        Assert.Equal("SPLIT-0001", result.NormalizedBarcode);
+        Assert.Equal("02-A1", result.NormalizedBarcode);
+        Assert.Equal("A1", result.TargetChuteCode);
         Assert.Equal(BarcodeParseFailureReason.None, result.FailureReason);
     }
 
@@ -32,11 +33,12 @@ public sealed class BarcodeParserTests
     {
         var parser = new BarcodeParser();
 
-        var result = parser.Parse("123456789012");
+        var result = parser.Parse("z-b2");
 
         Assert.True(result.IsValid);
         Assert.Equal(BarcodeType.FullCase, result.BarcodeType);
-        Assert.Equal("123456789012", result.NormalizedBarcode);
+        Assert.Equal("Z-B2", result.NormalizedBarcode);
+        Assert.Equal("B2", result.TargetChuteCode);
         Assert.Equal(BarcodeParseFailureReason.None, result.FailureReason);
     }
 
@@ -52,6 +54,7 @@ public sealed class BarcodeParserTests
 
         Assert.False(result.IsValid);
         Assert.Equal(BarcodeType.Unknown, result.BarcodeType);
+        Assert.Equal(string.Empty, result.TargetChuteCode);
         Assert.Equal(BarcodeParseFailureReason.UnsupportedBarcodeType, result.FailureReason);
     }
 }

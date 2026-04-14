@@ -16,7 +16,7 @@ public sealed class ChuteQueryServiceTests
     private static (ChuteQueryService Service, InMemoryBusinessTaskRepository Repository) CreateService()
     {
         var repo = new InMemoryBusinessTaskRepository();
-        var service = new ChuteQueryService(repo);
+        var service = new ChuteQueryService(repo, new BarcodeParser());
         return (service, repo);
     }
 
@@ -67,10 +67,10 @@ public sealed class ChuteQueryServiceTests
     }
 
     /// <summary>
-    /// 任务已扫描但未分配格口时应返回失败结果。
+    /// 任务已扫描但条码未携带格口时应返回失败结果。
     /// </summary>
     [Fact]
-    public async Task ExecuteAsync_ShouldFail_WhenTargetChuteCodeIsEmpty()
+    public async Task ExecuteAsync_ShouldFail_WhenBarcodeHasNoChuteInfo()
     {
         var (service, repo) = CreateService();
         await repo.SaveAsync(new BusinessTaskEntity
@@ -80,7 +80,6 @@ public sealed class ChuteQueryServiceTests
             BusinessKey = "K2",
             Barcode = "BC-002",
             Status = BusinessTaskStatus.Scanned,
-            TargetChuteCode = null,
             CreatedTimeLocal = DateTime.Now,
             UpdatedTimeLocal = DateTime.Now
         }, CancellationToken.None);
@@ -90,7 +89,7 @@ public sealed class ChuteQueryServiceTests
         var result = await service.ExecuteAsync(request, CancellationToken.None);
 
         Assert.False(result.IsResolved);
-        Assert.Contains("尚未分配目标格口", result.Message);
+        Assert.Contains("未携带受支持的目标格口信息", result.Message);
     }
 
     /// <summary>
@@ -105,14 +104,13 @@ public sealed class ChuteQueryServiceTests
             TaskCode = "TASK-003",
             SourceTableCode = "WMS",
             BusinessKey = "K3",
-            Barcode = "BC-003",
+            Barcode = "02-CHUTE-A1",
             Status = BusinessTaskStatus.Scanned,
-            TargetChuteCode = "CHUTE-A1",
             CreatedTimeLocal = DateTime.Now,
             UpdatedTimeLocal = DateTime.Now
         }, CancellationToken.None);
 
-        var request = new ChuteResolveApplicationRequest { Barcode = "BC-003" };
+        var request = new ChuteResolveApplicationRequest { Barcode = "02-CHUTE-A1" };
 
         var result = await service.ExecuteAsync(request, CancellationToken.None);
 
@@ -133,9 +131,8 @@ public sealed class ChuteQueryServiceTests
             TaskCode = "TASK-004",
             SourceTableCode = "WMS",
             BusinessKey = "K4",
-            Barcode = "BC-004",
+            Barcode = "Z-CHUTE-B2",
             Status = BusinessTaskStatus.Scanned,
-            TargetChuteCode = "CHUTE-B2",
             CreatedTimeLocal = DateTime.Now,
             UpdatedTimeLocal = DateTime.Now
         }, CancellationToken.None);
