@@ -104,19 +104,19 @@ public sealed class ChuteQueryServiceTests
             TaskCode = "TASK-003",
             SourceTableCode = "WMS",
             BusinessKey = "K3",
-            Barcode = "02-CHUTE-A1",
+            Barcode = "021103013145",
             Status = BusinessTaskStatus.Scanned,
             CreatedTimeLocal = DateTime.Now,
             UpdatedTimeLocal = DateTime.Now
         }, CancellationToken.None);
 
-        var request = new ChuteResolveApplicationRequest { Barcode = "02-CHUTE-A1" };
+        var request = new ChuteResolveApplicationRequest { Barcode = "021103013145" };
 
         var result = await service.ExecuteAsync(request, CancellationToken.None);
 
         Assert.True(result.IsResolved);
         Assert.Equal("TASK-003", result.TaskCode);
-        Assert.Equal("CHUTE-A1", result.ChuteCode);
+        Assert.Equal("1", result.ChuteCode);
     }
 
     /// <summary>
@@ -131,7 +131,7 @@ public sealed class ChuteQueryServiceTests
             TaskCode = "TASK-004",
             SourceTableCode = "WMS",
             BusinessKey = "K4",
-            Barcode = "Z-CHUTE-B2",
+            Barcode = "Z46030202060001",
             Status = BusinessTaskStatus.Scanned,
             CreatedTimeLocal = DateTime.Now,
             UpdatedTimeLocal = DateTime.Now
@@ -147,6 +147,6 @@ public sealed class ChuteQueryServiceTests
 
         Assert.True(result.IsResolved);
         Assert.Equal("TASK-004", result.TaskCode);
-        Assert.Equal("CHUTE-B2", result.ChuteCode);
+        Assert.Equal("4", result.ChuteCode);
     }
 }

@@ -24,14 +24,15 @@ public sealed class ChuteQueryService : IChuteQueryService {
     /// </summary>
     /// <param name="businessTaskRepository">业务任务仓储。</param>
     /// <param name="barcodeParser">条码解析服务。</param>
-    public ChuteQueryService(IBusinessTaskRepository businessTaskRepository, IBarcodeParser barcodeParser) {
+    public ChuteQueryService(IBusinessTaskRepository businessTaskRepository, IBarcodeParser barcodeParser)
+    {
         _businessTaskRepository = businessTaskRepository;
         _barcodeParser = barcodeParser;
     }
 
     /// <summary>
     /// 按任务编码或条码查询目标格口。
-    /// 步骤：1. 优先按任务编码查找；2. 任务编码为空时按条码查找；3. 校验任务状态；4. 解析条码中的格口并返回。
+    /// 步骤：1. 优先按任务编码查找；2. 任务编码为空时按条码查找；3. 校验任务状态；4. 校验条码非空；5. 解析条码中的格口并返回。
     /// </summary>
     /// <param name="request">请求参数。</param>
     /// <param name="cancellationToken">取消令牌。</param>

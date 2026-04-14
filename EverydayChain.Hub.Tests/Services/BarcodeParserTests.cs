@@ -16,12 +16,12 @@ public sealed class BarcodeParserTests
     {
         var parser = new BarcodeParser();
 
-        var result = parser.Parse("02-A1");
+        var result = parser.Parse("021103013145");
 
         Assert.True(result.IsValid);
         Assert.Equal(BarcodeType.Split, result.BarcodeType);
-        Assert.Equal("02-A1", result.NormalizedBarcode);
-        Assert.Equal("A1", result.TargetChuteCode);
+        Assert.Equal("021103013145", result.NormalizedBarcode);
+        Assert.Equal("1", result.TargetChuteCode);
         Assert.Equal(BarcodeParseFailureReason.None, result.FailureReason);
     }
 
@@ -33,12 +33,12 @@ public sealed class BarcodeParserTests
     {
         var parser = new BarcodeParser();
 
-        var result = parser.Parse("z-b2");
+        var result = parser.Parse("z46030202060001");
 
         Assert.True(result.IsValid);
         Assert.Equal(BarcodeType.FullCase, result.BarcodeType);
-        Assert.Equal("Z-B2", result.NormalizedBarcode);
-        Assert.Equal("B2", result.TargetChuteCode);
+        Assert.Equal("Z46030202060001", result.NormalizedBarcode);
+        Assert.Equal("4", result.TargetChuteCode);
         Assert.Equal(BarcodeParseFailureReason.None, result.FailureReason);
     }
 
@@ -59,14 +59,14 @@ public sealed class BarcodeParserTests
     }
 
     /// <summary>
-    /// 条码携带空白格口编码时应返回 UnsupportedBarcodeType。
+    /// 标识前缀后的首位字符非数字时应返回 UnsupportedBarcodeType。
     /// </summary>
     [Fact]
-    public void Parse_ShouldReturnUnsupportedBarcodeType_WhenChuteCodeContainsWhitespace()
+    public void Parse_ShouldReturnUnsupportedBarcodeType_WhenChuteCodeIsNotDigit()
     {
         var parser = new BarcodeParser();
 
-        var result = parser.Parse("02- A1");
+        var result = parser.Parse("02A1103013145");
 
         Assert.False(result.IsValid);
         Assert.Equal(BarcodeType.Unknown, result.BarcodeType);

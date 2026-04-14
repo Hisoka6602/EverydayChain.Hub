@@ -60,7 +60,7 @@ public sealed class ScanIngressServiceTests
         var service = CreateService();
         var request = new ScanUploadApplicationRequest
         {
-            Barcode = "02-A1",
+            Barcode = "021103013145",
             DeviceCode = "DVC-01",
             ScanTimeLocal = DateTime.Now
         };
@@ -84,7 +84,7 @@ public sealed class ScanIngressServiceTests
             TaskCode = "TASK-001",
             SourceTableCode = "WMS",
             BusinessKey = "KEY-001",
-            Barcode = "02-A1",
+            Barcode = "021103013145",
             Status = BusinessTaskStatus.Created,
             CreatedTimeLocal = DateTime.Now,
             UpdatedTimeLocal = DateTime.Now
@@ -93,7 +93,7 @@ public sealed class ScanIngressServiceTests
         var service = CreateService(repo);
         var request = new ScanUploadApplicationRequest
         {
-            Barcode = "02-A1",
+            Barcode = "021103013145",
             DeviceCode = "DVC-01",
             ScanTimeLocal = DateTime.Now
         };

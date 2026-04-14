@@ -6,7 +6,7 @@ using NLog;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 条码解析服务，实现拆零、整件、目标格口提取与无效码分类。
+/// 条码解析服务，负责拆零与整件分类、目标格口提取及无效码识别。
 /// </summary>
 public sealed class BarcodeParser : IBarcodeParser
 {
@@ -56,6 +56,10 @@ public sealed class BarcodeParser : IBarcodeParser
     /// <param name="normalizedBarcode">标准化条码。</param>
     /// <param name="targetChuteCode">提取出的目标格口编码。</param>
     /// <returns>提取成功返回 true，否则返回 false。</returns>
+    /// <remarks>
+    /// 固定前缀长度为 2（02），格口号取第 3 位字符且必须为数字。
+    /// 当前缀不匹配、条码长度不足或格口位非数字时返回 false。
+    /// </remarks>
     private static bool TryExtractSplitChuteCode(string normalizedBarcode, out string targetChuteCode)
     {
         return TryExtractChuteCodeByPrefix(normalizedBarcode, "02", out targetChuteCode);
@@ -67,6 +71,10 @@ public sealed class BarcodeParser : IBarcodeParser
     /// <param name="normalizedBarcode">标准化条码。</param>
     /// <param name="targetChuteCode">提取出的目标格口编码。</param>
     /// <returns>提取成功返回 true，否则返回 false。</returns>
+    /// <remarks>
+    /// 固定前缀长度为 1（Z），格口号取第 2 位字符且必须为数字。
+    /// 当前缀不匹配、条码长度不足或格口位非数字时返回 false。
+    /// </remarks>
     private static bool TryExtractFullCaseChuteCode(string normalizedBarcode, out string targetChuteCode)
     {
         return TryExtractChuteCodeByPrefix(normalizedBarcode, "Z", out targetChuteCode);
