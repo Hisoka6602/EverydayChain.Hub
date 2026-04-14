@@ -51,29 +51,29 @@ public sealed class BarcodeParser : IBarcodeParser
     }
 
     /// <summary>
-    /// 按“02-格口号”规则提取拆零目标格口。
+    /// 按“02 + 格口号 + 其余内容”规则提取拆零目标格口。
     /// </summary>
     /// <param name="normalizedBarcode">标准化条码。</param>
     /// <param name="targetChuteCode">提取出的目标格口编码。</param>
     /// <returns>提取成功返回 true，否则返回 false。</returns>
     private static bool TryExtractSplitChuteCode(string normalizedBarcode, out string targetChuteCode)
     {
-        return TryExtractChuteCodeByPrefix(normalizedBarcode, "02-", out targetChuteCode);
+        return TryExtractChuteCodeByPrefix(normalizedBarcode, "02", out targetChuteCode);
     }
 
     /// <summary>
-    /// 按“Z-格口号”规则提取整件目标格口。
+    /// 按“Z + 格口号 + 其余内容”规则提取整件目标格口。
     /// </summary>
     /// <param name="normalizedBarcode">标准化条码。</param>
     /// <param name="targetChuteCode">提取出的目标格口编码。</param>
     /// <returns>提取成功返回 true，否则返回 false。</returns>
     private static bool TryExtractFullCaseChuteCode(string normalizedBarcode, out string targetChuteCode)
     {
-        return TryExtractChuteCodeByPrefix(normalizedBarcode, "Z-", out targetChuteCode);
+        return TryExtractChuteCodeByPrefix(normalizedBarcode, "Z", out targetChuteCode);
     }
 
     /// <summary>
-    /// 按固定前缀提取目标格口编码。
+    /// 按固定前缀提取目标格口编码（前缀后的首位字符）。
     /// </summary>
     /// <param name="normalizedBarcode">标准化条码。</param>
     /// <param name="prefix">条码固定前缀。</param>
@@ -92,20 +92,13 @@ public sealed class BarcodeParser : IBarcodeParser
             return false;
         }
 
-        targetChuteCode = normalizedBarcode[prefix.Length..];
-        if (string.IsNullOrEmpty(targetChuteCode))
+        var chuteCharacter = normalizedBarcode[prefix.Length];
+        if (!char.IsAsciiDigit(chuteCharacter))
         {
             return false;
         }
 
-        foreach (var character in targetChuteCode)
-        {
-            if (char.IsWhiteSpace(character))
-            {
-                return false;
-            }
-        }
-
+        targetChuteCode = chuteCharacter.ToString();
         return true;
     }
 
