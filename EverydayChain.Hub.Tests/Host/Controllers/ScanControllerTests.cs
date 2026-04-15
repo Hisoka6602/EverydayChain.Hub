@@ -22,7 +22,7 @@ public sealed class ScanControllerTests {
     public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodeIsEmpty() {
         var controller = new ScanController(new StubScanIngressService());
         var request = new ScanUploadRequest {
-            Barcode = string.Empty,
+            Barcodes = [],
             DeviceCode = "DVC-01",
             ScanTimeLocal = DateTime.Now
         };
@@ -39,7 +39,7 @@ public sealed class ScanControllerTests {
     public async Task UploadAsync_ShouldReturnBadRequest_WhenScanTimeKindIsNonLocal() {
         var controller = new ScanController(new StubScanIngressService());
         var request = new ScanUploadRequest {
-            Barcode = "BC001",
+            Barcodes = ["BC001"],
             DeviceCode = "DVC-01",
             ScanTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 13, 12, 0, 0), NonLocalKind)
         };
@@ -58,7 +58,7 @@ public sealed class ScanControllerTests {
         var controller = new ScanController(stubService);
 #pragma warning disable CS8625
         var request = new ScanUploadRequest {
-            Barcode = "BC001",
+            Barcodes = ["BC001"],
             DeviceCode = "DVC-01",
             TraceId = null,
             ScanTimeLocal = DateTime.Now
@@ -87,19 +87,20 @@ public sealed class ScanControllerTests {
         };
         var controller = new ScanController(stubService);
         var request = new ScanUploadRequest {
-            Barcode = "BC001",
+            Barcodes = ["BC001"],
             DeviceCode = "DVC-01",
             ScanTimeLocal = DateTime.Now
         };
 
         var actionResult = await controller.UploadAsync(request, CancellationToken.None);
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
-        var response = Assert.IsType<ApiResponse<ScanUploadResponse>>(badRequestResult.Value);
+        var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(badRequestResult.Value);
 
         Assert.False(response.IsSuccess);
         Assert.Equal("条码类型不受支持。", response.Message);
         Assert.NotNull(response.Data);
-        Assert.Equal("UnsupportedBarcodeType", response.Data.FailureReason);
+        Assert.Single(response.Data);
+        Assert.Equal("UnsupportedBarcodeType", response.Data[0].FailureReason);
     }
 
     /// <summary>
@@ -109,19 +110,134 @@ public sealed class ScanControllerTests {
     public async Task UploadAsync_ShouldReturnOk_WhenRequestIsValid() {
         var controller = new ScanController(new StubScanIngressService());
         var request = new ScanUploadRequest {
-            Barcode = "BC001",
+            Barcodes = ["BC001"],
             DeviceCode = "DVC-01",
             ScanTimeLocal = DateTime.Now
         };
 
         var actionResult = await controller.UploadAsync(request, CancellationToken.None);
         var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
-        var response = Assert.IsType<ApiResponse<ScanUploadResponse>>(okResult.Value);
+        var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(okResult.Value);
 
         Assert.True(response.IsSuccess);
         Assert.NotNull(response.Data);
-        Assert.Equal("TASK-001", response.Data.TaskCode);
-        Assert.Equal("Split", response.Data.BarcodeType);
-        Assert.Equal(string.Empty, response.Data.FailureReason);
+        Assert.Single(response.Data);
+        Assert.Equal("TASK-001", response.Data[0].TaskCode);
+        Assert.Equal("Split", response.Data[0].BarcodeType);
+        Assert.Equal(string.Empty, response.Data[0].FailureReason);
+    }
+
+    /// <summary>
+    /// 仅传兼容字段 Barcode 时应回退为单条处理。
+    /// </summary>
+    [Fact]
+    public async Task UploadAsync_ShouldFallbackToBarcode_WhenBarcodesIsNull() {
+        var stubService = new StubScanIngressService();
+        var controller = new ScanController(stubService);
+        var fixedScanTime = DateTime.SpecifyKind(new DateTime(2026, 4, 14, 10, 0, 0), DateTimeKind.Local);
+#pragma warning disable CS8625
+        var request = new ScanUploadRequest {
+            Barcodes = null,
+            Barcode = "BC001",
+            DeviceCode = "DVC-01",
+            ScanTimeLocal = fixedScanTime
+        };
+#pragma warning restore CS8625
+
+        var actionResult = await controller.UploadAsync(request, CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+        var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(okResult.Value);
+
+        Assert.True(response.IsSuccess);
+        Assert.NotNull(response.Data);
+        Assert.Single(response.Data);
+        Assert.Single(stubService.Requests);
+        Assert.Equal("BC001", stubService.Requests[0].Barcode);
+    }
+
+    /// <summary>
+    /// 条码列表存在空白项时应直接返回 BadRequest。
+    /// </summary>
+    [Fact]
+    public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodesContainsWhitespaceItem() {
+        var controller = new ScanController(new StubScanIngressService());
+        var fixedScanTime = DateTime.SpecifyKind(new DateTime(2026, 4, 14, 10, 0, 0), DateTimeKind.Local);
+        var request = new ScanUploadRequest {
+            Barcodes = ["BC001", " "],
+            DeviceCode = "DVC-01",
+            ScanTimeLocal = fixedScanTime
+        };
+
+        var actionResult = await controller.UploadAsync(request, CancellationToken.None);
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+        var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(badRequestResult.Value);
+
+        Assert.False(response.IsSuccess);
+        Assert.Equal("条码列表中存在空条码，请检查后重试。", response.Message);
+    }
+
+    /// <summary>
+    /// 超出最大条码数量时应直接返回 BadRequest。
+    /// </summary>
+    [Fact]
+    public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodesExceedLimit() {
+        var controller = new ScanController(new StubScanIngressService());
+        var fixedScanTime = DateTime.SpecifyKind(new DateTime(2026, 4, 14, 10, 0, 0), DateTimeKind.Local);
+        var request = new ScanUploadRequest {
+            Barcodes = Enumerable.Repeat("BC001", 101).ToList(),
+            DeviceCode = "DVC-01",
+            ScanTimeLocal = fixedScanTime
+        };
+
+        var actionResult = await controller.UploadAsync(request, CancellationToken.None);
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+        var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(badRequestResult.Value);
+
+        Assert.False(response.IsSuccess);
+        Assert.Equal("单次最多允许提交 100 个条码。", response.Message);
+    }
+
+    /// <summary>
+    /// 多条码请求时非首条条码应使用 0 作为尺寸与重量回写值。
+    /// </summary>
+    [Fact]
+    public async Task UploadAsync_ShouldApplyZeroMeasurement_ForNonPrimaryBarcodes() {
+        var stubService = new StubScanIngressService();
+        var controller = new ScanController(stubService);
+        var request = new ScanUploadRequest {
+            Barcodes = ["BC001", "BC002", "BC003"],
+            DeviceCode = "DVC-01",
+            ScanTimeLocal = DateTime.Now,
+            LengthMm = 100,
+            WidthMm = 200,
+            HeightMm = 300,
+            VolumeMm3 = 6000000,
+            WeightGram = 400
+        };
+
+        var actionResult = await controller.UploadAsync(request, CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+        _ = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(okResult.Value);
+
+        Assert.Equal(3, stubService.Requests.Count);
+        Assert.Equal(100, stubService.Requests[0].LengthMm);
+        Assert.Equal(200, stubService.Requests[0].WidthMm);
+        Assert.Equal(300, stubService.Requests[0].HeightMm);
+        Assert.Equal(6000000, stubService.Requests[0].VolumeMm3);
+        Assert.Equal(400, stubService.Requests[0].WeightGram);
+
+        Assert.Equal(0, stubService.Requests[1].LengthMm);
+        Assert.Equal(0, stubService.Requests[1].WidthMm);
+        Assert.Equal(0, stubService.Requests[1].HeightMm);
+        Assert.Equal(0, stubService.Requests[1].VolumeMm3);
+        Assert.Equal(0, stubService.Requests[1].WeightGram);
+        Assert.Equal(stubService.Requests[0].ScanTimeLocal, stubService.Requests[1].ScanTimeLocal);
+
+        Assert.Equal(0, stubService.Requests[2].LengthMm);
+        Assert.Equal(0, stubService.Requests[2].WidthMm);
+        Assert.Equal(0, stubService.Requests[2].HeightMm);
+        Assert.Equal(0, stubService.Requests[2].VolumeMm3);
+        Assert.Equal(0, stubService.Requests[2].WeightGram);
+        Assert.Equal(stubService.Requests[0].ScanTimeLocal, stubService.Requests[2].ScanTimeLocal);
     }
 }

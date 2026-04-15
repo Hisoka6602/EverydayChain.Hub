@@ -14,6 +14,21 @@ namespace EverydayChain.Hub.Host.Controllers;
 [Route("api/v1/scan")]
 public sealed class ScanController : ControllerBase {
     /// <summary>
+    /// 多条码场景下非首条条码的尺寸与重量回写值。
+    /// </summary>
+    private const decimal MultiBarcodeFallbackMeasurementValue = 0M;
+
+    /// <summary>
+    /// 条码最大长度限制。
+    /// </summary>
+    private const int MaxBarcodeLength = 128;
+
+    /// <summary>
+    /// 单次请求允许提交的最大条码数量。
+    /// </summary>
+    private const int MaxBarcodeCountPerRequest = 100;
+
+    /// <summary>
     /// 扫描上传应用服务。
     /// </summary>
     private readonly IScanIngressService scanIngressService;
@@ -33,47 +48,117 @@ public sealed class ScanController : ControllerBase {
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>受理结果。</returns>
     [HttpPost("upload")]
-    [ProducesResponseType(typeof(ApiResponse<ScanUploadResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<ScanUploadResponse>), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<ApiResponse<ScanUploadResponse>>> UploadAsync([FromBody] ScanUploadRequest request, CancellationToken cancellationToken) {
-        if (string.IsNullOrWhiteSpace(request.Barcode)) {
-            return BadRequest(ApiResponse<ScanUploadResponse>.Fail("条码不能为空。"));
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ScanUploadResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ScanUploadResponse>>), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<ScanUploadResponse>>>> UploadAsync([FromBody] ScanUploadRequest request, CancellationToken cancellationToken) {
+        if (!TryBuildBarcodes(request, out var barcodes, out var barcodeValidationMessage)) {
+            return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail(barcodeValidationMessage));
         }
 
         if (string.IsNullOrWhiteSpace(request.DeviceCode)) {
-            return BadRequest(ApiResponse<ScanUploadResponse>.Fail("设备编码不能为空。"));
+            return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail("设备编码不能为空。"));
         }
 
         if (!LocalDateTimeNormalizer.TryNormalize(request.ScanTimeLocal, "扫描时间必须为本地时间，禁止传入 UTC 时间。", out var normalizedScanTime, out var validationMessage)) {
-            return BadRequest(ApiResponse<ScanUploadResponse>.Fail(validationMessage));
+            return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail(validationMessage));
         }
 
-        var applicationResult = await scanIngressService.ExecuteAsync(new ScanUploadApplicationRequest {
-            Barcode = request.Barcode.Trim(),
-            DeviceCode = request.DeviceCode.Trim(),
-            ScanTimeLocal = normalizedScanTime,
-            TraceId = (request.TraceId ?? string.Empty).Trim(),
-            LengthMm = request.LengthMm,
-            WidthMm = request.WidthMm,
-            HeightMm = request.HeightMm,
-            VolumeMm3 = request.VolumeMm3,
-            WeightGram = request.WeightGram
-        }, cancellationToken);
+        var responses = new List<ScanUploadResponse>(barcodes.Count);
+        var hasRejected = false;
+        var firstFailureMessage = string.Empty;
+        for (var i = 0; i < barcodes.Count; i++) {
+            var isPrimaryBarcode = i == 0;
+            var applicationResult = await scanIngressService.ExecuteAsync(new ScanUploadApplicationRequest {
+                Barcode = barcodes[i],
+                DeviceCode = request.DeviceCode.Trim(),
+                ScanTimeLocal = normalizedScanTime,
+                TraceId = (request.TraceId ?? string.Empty).Trim(),
+                LengthMm = isPrimaryBarcode ? request.LengthMm : MultiBarcodeFallbackMeasurementValue,
+                WidthMm = isPrimaryBarcode ? request.WidthMm : MultiBarcodeFallbackMeasurementValue,
+                HeightMm = isPrimaryBarcode ? request.HeightMm : MultiBarcodeFallbackMeasurementValue,
+                VolumeMm3 = isPrimaryBarcode ? request.VolumeMm3 : MultiBarcodeFallbackMeasurementValue,
+                WeightGram = isPrimaryBarcode ? request.WeightGram : MultiBarcodeFallbackMeasurementValue
+            }, cancellationToken);
 
-        var response = new ScanUploadResponse {
-            IsAccepted = applicationResult.IsAccepted,
-            TaskCode = applicationResult.TaskCode,
-            BarcodeType = applicationResult.BarcodeType,
-            FailureReason = applicationResult.FailureReason
-        };
+            responses.Add(new ScanUploadResponse {
+                IsAccepted = applicationResult.IsAccepted,
+                TaskCode = applicationResult.TaskCode,
+                BarcodeType = applicationResult.BarcodeType,
+                FailureReason = applicationResult.FailureReason
+            });
 
-        if (!applicationResult.IsAccepted) {
-            var failureMessage = string.IsNullOrWhiteSpace(applicationResult.Message)
-                ? applicationResult.FailureReason
-                : applicationResult.Message;
-            return BadRequest(ApiResponse<ScanUploadResponse>.Fail(failureMessage, response));
+            if (!applicationResult.IsAccepted) {
+                hasRejected = true;
+                if (string.IsNullOrWhiteSpace(firstFailureMessage)) {
+                    firstFailureMessage = string.IsNullOrWhiteSpace(applicationResult.Message)
+                        ? applicationResult.FailureReason
+                        : applicationResult.Message;
+                }
+            }
         }
 
-        return Ok(ApiResponse<ScanUploadResponse>.Success(response, applicationResult.Message));
+        if (hasRejected) {
+            return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail(firstFailureMessage, responses));
+        }
+
+        return Ok(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Success(responses, $"扫描请求已受理，共处理 {responses.Count} 个条码。"));
+    }
+
+    /// <summary>
+    /// 统一整理请求中的条码列表，优先使用批量条码字段。
+    /// </summary>
+    /// <param name="request">扫描上传请求。</param>
+    /// <param name="normalizedBarcodes">整理后的条码列表。</param>
+    /// <param name="validationMessage">条码校验失败信息。</param>
+    /// <returns>条码是否通过校验。</returns>
+    private static bool TryBuildBarcodes(ScanUploadRequest request, out List<string> normalizedBarcodes, out string validationMessage) {
+        validationMessage = string.Empty;
+        normalizedBarcodes = [];
+        var requestBarcodes = request.Barcodes ?? [];
+        if (requestBarcodes.Count > 0) {
+            if (requestBarcodes.Count > MaxBarcodeCountPerRequest) {
+                validationMessage = $"单次最多允许提交 {MaxBarcodeCountPerRequest} 个条码。";
+                return false;
+            }
+
+            foreach (var barcode in requestBarcodes) {
+                if (string.IsNullOrWhiteSpace(barcode)) {
+                    validationMessage = "条码列表中存在空条码，请检查后重试。";
+                    return false;
+                }
+
+                var trimmedBarcode = barcode.Trim();
+                if (trimmedBarcode.Length > MaxBarcodeLength) {
+                    validationMessage = $"条码长度不能超过 {MaxBarcodeLength}。";
+                    return false;
+                }
+
+                normalizedBarcodes.Add(trimmedBarcode);
+            }
+
+            if (normalizedBarcodes.Count == 0) {
+                validationMessage = "条码不能为空。";
+                return false;
+            }
+
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Barcode)) {
+            var trimmedBarcode = request.Barcode.Trim();
+            if (trimmedBarcode.Length > MaxBarcodeLength) {
+                validationMessage = $"条码长度不能超过 {MaxBarcodeLength}。";
+                return false;
+            }
+
+            normalizedBarcodes.Add(trimmedBarcode);
+        }
+
+        if (normalizedBarcodes.Count == 0) {
+            validationMessage = "条码不能为空。";
+            return false;
+        }
+
+        return true;
     }
 }
