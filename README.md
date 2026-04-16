@@ -13,13 +13,15 @@
 - 新增补偿单元测试 `FeedbackCompensationServiceTests`，覆盖批次成功、批次失败、按任务跳过、按任务单条重试四个场景。
 - 已完成 PR-16（M4）里程碑收口复核：PR-10~PR-11 异常与补偿链路已完成最终全量审查（规则优先级、补偿幂等、重试上限、审计可追溯），阻塞问题清单结论为“无新增阻塞项”。
 - 进度口径更新：当前累计完成 15/17（PR-01~PR-11、PR-13~PR-16），M1~M4 里程碑检验均已完成并通过，可进入 PR-12 开发实施与联调收口阶段。
-- 已启动 PR-12（联调收口与验收归档）：当前阶段从“可进入”更新为“执行中”，本轮已完成收口前回归验证（`dotnet build EverydayChain.Hub.sln`、`dotnet test EverydayChain.Hub.sln --no-build` 通过，0 Warning 0 Error，152/152 单元测试通过）。
+- 已启动 PR-12（联调收口与验收归档）: 当前阶段从“可进入”更新为“执行中”，本轮已完成收口前回归验证（`dotnet build EverydayChain.Hub.sln`、`dotnet test EverydayChain.Hub.sln --no-build` 通过，0 Warning 0 Error，152/152 单元测试通过）。
 - 新增 `.github/workflows/auto-create-pr.yml`：仅在非默认分支推送时触发，自动检查并创建到默认分支的 PR（若同源 PR 已存在则跳过），避免人工漏建 PR。
 - 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，152/152 单元测试通过）。
 ## 后续可完善点
 - 根据产线峰值写入量细化各日志表差异化保留月数，并结合容量监控进行滚动调优。
 - 评估并推进 `InMemorySyncChangeLogRepository`、`InMemorySyncDeletionLogRepository` 的持久化替换，彻底移除同步链路内存仓储。
-- 完成 PR-12（联调收口与验收归档）剩余收口项，并输出“已实现/未实现/后续计划”归档结果。
+- 完成 PR-12（联调收口与验收归档）剩余收口项（详见 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 的 PR-12 章节）：
+  - 端到端联调证据归档（联调执行记录、关键日志、结果汇总）。
+  - 已实现/未实现/后续计划收口归档（`README.md` 与 `逐文件代码检查台账.md` 收口结论同步）。
 - 推进 PR-17（M5 里程碑全量审查，待 PR-12 完成后进入）。
 - 开启补偿后台任务：生产环境确认重试节流参数后，将 `FeedbackCompensationJob.Enabled` 置 `true`。
 
