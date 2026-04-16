@@ -119,7 +119,7 @@ public class SyncBatchRepository(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "标记批次失败失败。BatchId={BatchId}", batchId);
+            logger.LogError(ex, "标记批次失败状态失败。BatchId={BatchId}", batchId);
             throw;
         }
     }
@@ -247,7 +247,7 @@ public class SyncBatchRepository(
     /// <returns>分表后缀。</returns>
     private string ResolveBatchSuffix(DateTime timeLocal)
     {
-        return shardSuffixResolver.Resolve(new DateTimeOffset(timeLocal));
+        return shardSuffixResolver.ResolveLocal(timeLocal);
     }
 
     /// <summary>

@@ -13,6 +13,13 @@ public interface IShardSuffixResolver
     string Resolve(DateTimeOffset timestamp);
 
     /// <summary>
+    /// 根据本地时间语义解析分表后缀；当输入为 <see cref="DateTime.MinValue"/> 时使用当前本地时间。
+    /// </summary>
+    /// <param name="localTime">本地时间。</param>
+    /// <returns>分表后缀字符串。</returns>
+    string ResolveLocal(DateTime localTime);
+
+    /// <summary>
     /// 生成启动时需预创建的分表后缀列表，包含当前月及未来若干月。
     /// </summary>
     /// <param name="localNow">本地当前时间（含偏移）。</param>

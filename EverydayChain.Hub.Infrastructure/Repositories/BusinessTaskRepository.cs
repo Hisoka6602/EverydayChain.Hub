@@ -45,7 +45,7 @@ public class BusinessTaskRepository(
     /// <inheritdoc/>
     public async Task SaveAsync(BusinessTaskEntity entity, CancellationToken ct)
     {
-        var suffix = ResolveSuffix(entity.CreatedTimeLocal);
+        var suffix = shardSuffixResolver.ResolveLocal(entity.CreatedTimeLocal);
         await shardTableProvisioner.EnsureShardTableAsync(suffix, ct);
         using var scope = TableSuffixScope.Use(suffix);
         await using var db = await contextFactory.CreateDbContextAsync(ct);
@@ -210,7 +210,7 @@ public class BusinessTaskRepository(
     {
         if (createdTimeLocal != DateTime.MinValue)
         {
-            var preferredSuffix = ResolveSuffix(createdTimeLocal);
+            var preferredSuffix = shardSuffixResolver.ResolveLocal(createdTimeLocal);
             var preferred = await TryFindByIdInSuffixAsync(id, preferredSuffix, ct);
             if (preferred is not null)
             {
@@ -261,19 +261,9 @@ public class BusinessTaskRepository(
             .Distinct(StringComparer.Ordinal)
             .OrderByDescending(suffix => suffix, StringComparer.Ordinal)
             .ToList();
+        // 兼容历史固定表 business_tasks（无后缀），迁移窗口内保留读取能力。
         suffixes.Add(string.Empty);
         return suffixes;
-    }
-
-    /// <summary>
-    /// 将本地时间解析为分片后缀。
-    /// </summary>
-    /// <param name="timeLocal">本地时间。</param>
-    /// <returns>分片后缀。</returns>
-    private string ResolveSuffix(DateTime timeLocal)
-    {
-        var normalizedLocalTime = timeLocal == DateTime.MinValue ? DateTime.Now : timeLocal;
-        return shardSuffixResolver.Resolve(new DateTimeOffset(normalizedLocalTime));
     }
 
     /// <summary>
