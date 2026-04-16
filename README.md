@@ -12,6 +12,7 @@
 - 实施 PR-11（补偿重试链路）：新增 `IFeedbackCompensationService` 与 `FeedbackCompensationService`（支持按任务编码重试、按批次重试）；新增 `FeedbackCompensationResult` 结果模型；新增 `FeedbackCompensationJobOptions` 配置实体；新增 `FeedbackCompensationBackgroundWorker` 后台任务并接入 `Program.cs` 与 `ServiceCollectionExtensions.cs`；`appsettings.json` 增加 `FeedbackCompensationJob` 配置节。
 - 新增补偿单元测试 `FeedbackCompensationServiceTests`，覆盖批次成功、批次失败、按任务跳过、按任务单条重试四个场景。
 - 已通读代码并更新实施计划进度：当前已完成 14/17（PR-11 已完成），已到达 M4（PR-16）里程碑检验时刻。
+- 新增 `.github/workflows/auto-create-pr.yml`：分支推送后自动检查并创建到默认分支的 PR，避免人工漏建 PR。
 - 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过（0 Warning 0 Error）。
 ## 后续可完善点
 - 根据产线峰值写入量细化各日志表差异化保留月数，并结合容量监控进行滚动调优。
@@ -54,7 +55,8 @@
 │   ├── copilot-instructions.md
 │   ├── DDD分层接口与实现放置规范.md
 │   └── workflows
-│       └── copilot-governance.yml
+│       ├── copilot-governance.yml
+│       └── auto-create-pr.yml
 ├── EverydayChain.Hub.Domain
 │   ├── EverydayChain.Hub.Domain.csproj
 │   ├── Abstractions/IEntity.cs
@@ -324,6 +326,7 @@
 - `.github/copilot-instructions.md`：定义仓库级 Copilot 强制约束，覆盖时间语义、结构规范、文档联动与交付门禁。
 - `.github/DDD分层接口与实现放置规范.md`：DDD 项目接口定义位置、实现类放置位置、依赖方向与目录结构统一规范，覆盖领域/应用/基础设施各层的抽象归属规则。
 - `.github/workflows/copilot-governance.yml`：执行规则自动校验，并强制规则文件与工作流联动修改。
+- `.github/workflows/auto-create-pr.yml`：在非默认分支发生推送时自动检查同源分支 PR 是否存在，若不存在则自动创建到默认分支的 PR。
 - `scripts/health-check.sh`：一键体检脚本，检查磁盘空间、目录权限、关键文件可读写、配置文件格式、日志健康状态、进程存活与压缩归档文件状态，可集成到监控或定时任务。
 - `scripts/disaster-recovery.sh`：灾难恢复脚本，支持检查点重置（checkpoint-reset）、快照从归档恢复（snapshot-restore）、快照备份（snapshot-backup）、归档清理（archive-cleanup）与完全重置（full-reset）；全部操作支持 --dry-run 预览模式。
 - `scripts/stability-drill.sh`：稳定性演练脚本，串联体检与灾备动作（checkpoint-reset、snapshot-backup、snapshot-restore、archive-cleanup），支持 dry-run 与真实执行并自动生成演练记录。
