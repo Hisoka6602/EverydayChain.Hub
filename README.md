@@ -18,14 +18,13 @@
 - 新增 `.github/workflows/auto-create-pr.yml`：仅在非默认分支推送时触发，自动检查并创建到默认分支的 PR（若同源 PR 已存在则跳过），避免人工漏建 PR。
 - 实施同步日志持久化替换：新增 `SyncChangeLogEntity`、`SyncDeletionLogEntity`、`SyncChangeLogRepository`、`SyncDeletionLogRepository` 与迁移 `20260416171508_AddSyncChangeDeletionLogShardTables.cs`，`ISyncChangeLogRepository`/`ISyncDeletionLogRepository` 已切换为 SQL Server 分片持久化实现（`sync_change_logs_{yyyyMM}`、`sync_deletion_logs_{yyyyMM}`）。
 - 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，152/152 单元测试通过）。
-- 已完成本轮“执行前通读代码 + 进度盘点 + 里程碑时机复核”：关键实现与联动文档复核后，累计完成度仍为 15/17，当前仍处于 PR-12 联调收口窗口，尚未进入 PR-17（M5）检验时刻。
-- 已完成自动建 PR 机制复核：`.github/workflows/auto-create-pr.yml` 仍保持“非默认分支 push 自动建单、同源 PR 已存在则跳过”的行为，满足本 PR 自动创建要求。
 ## 后续可完善点
 - 根据产线峰值写入量细化各日志表差异化保留月数，并结合容量监控进行滚动调优。
 - 完成 PR-12（联调收口与验收归档）剩余收口项（详见 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 的 PR-12 章节），包括以下内容：
   - 端到端联调证据归档（联调执行记录、关键日志、结果汇总）。
   - 已实现/未实现/后续计划收口归档（`README.md` 与 `逐文件代码检查台账.md` 收口结论同步，依赖端到端联调证据归档后定稿）。
 - PR-12 待确认项已闭环：联调执行批次编号、关键日志范围与结果汇总统计口径已在实施计划中冻结，后续仅需补齐端到端联调证据并完成收口定稿。
+- PR-12 联调证据归档模板已补齐：实施计划已明确归档目录命名规则与三类必备交付物，下一步按模板填充真实联调证据并定稿。
 - 推进 PR-17（M5 里程碑全量审查，待 PR-12 完成后进入）。
 - 开启补偿后台任务：生产环境确认重试节流参数后，将 `FeedbackCompensationJob.Enabled` 置 `true`。
 
