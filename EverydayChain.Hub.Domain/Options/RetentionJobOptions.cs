@@ -16,4 +16,7 @@ public class RetentionJobOptions
 
     /// <summary>保留期动作总开关，关闭后仅记录跳过日志。</summary>
     public bool AllowDangerousAction { get; set; }
+
+    /// <summary>日志表保留期配置集合（至少保留一个示例元素）。</summary>
+    public List<RetentionLogTableOptions> LogTables { get; set; } = [];
 }

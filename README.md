@@ -1,6 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 新增日志表自动删除配置能力：`RetentionJob.LogTables` 支持对 `sorting_task_trace`、`scan_logs`、`drop_logs`、`sync_batches` 分别配置 `Enabled/KeepMonths/DryRun/AllowDrop`。
+- `RetentionExecutionService` 扩展为“同步表保留期 + 日志表保留期”双入口执行，统一走现有危险动作隔离与回滚脚本生成链路。
+- `appsettings.json` 已补齐日志表清理示例配置，支持逐表启停和保留期参数化。
 - 将 `SyncBatchRepository` 从文件持久化升级为 SQL Server 持久化分片实现：批次数据写入 `sync_batches_{yyyyMM}`，支持 `Pending/InProgress/Completed/Failed` 状态流转与跨分片查询最近失败批次。
 - 新增 `SyncBatchEntity`、`SyncBatchEntityTypeConfiguration` 与迁移 `20260416010041_AddSyncBatchShardTable.cs`，将同步批次纳入自动迁移与自动分表预建链路。
 - 分表纳管集合新增 `sync_batches`，启动阶段通过 `AutoMigrationService + ShardTableProvisioner` 自动迁移与自动分表。
@@ -11,6 +14,7 @@
 - 已通读代码并更新实施计划进度：当前已完成 14/17（PR-11 已完成），已到达 M4（PR-16）里程碑检验时刻。
 - 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过（0 Warning 0 Error）。
 ## 后续可完善点
+- 根据产线峰值写入量细化各日志表差异化保留月数，并结合容量监控进行滚动调优。
 - 评估并推进 `InMemorySyncChangeLogRepository`、`InMemorySyncDeletionLogRepository` 的持久化替换，彻底移除同步链路内存仓储。
 - 推进 PR-12（联调收口与验收归档）。
 - 执行 PR-16（M4 里程碑全量审查，PR-10 + PR-11 依赖已满足）。
@@ -84,6 +88,7 @@
 │   ├── Options/OracleOptions.cs
 │   ├── Options/SwaggerOptions.cs
 │   ├── Options/RetentionJobOptions.cs
+│   ├── Options/RetentionLogTableOptions.cs
 │   ├── Options/ShardingOptions.cs
 │   ├── Options/SyncDeleteOptions.cs
 │   ├── Options/SyncJobOptions.cs
@@ -347,6 +352,7 @@
 - `BusinessTaskFeedbackStatus.cs`：业务回传状态枚举，覆盖 NotRequired、Pending、Completed、Failed，标识任务回传 WMS 的进度。
 - `RemoteStatusConsumeProfile.cs`（`EverydayChain.Hub.Domain/Sync/Models`）：StatusDriven 消费配置模型，统一承载状态列、待处理值、完成值、回写开关与批次大小。
 - `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`SyncTable`、`SyncDelete`、`SyncRetention`、`RetentionJob`、`Oracle` 等），供 Infrastructure 绑定读取。
+- `Domain/Options/RetentionLogTableOptions.cs`：日志表保留期配置实体，定义单日志表 `Enabled`、`LogicalTableName`、`KeepMonths`、`DryRun`、`AllowDrop` 参数。
 - `SwaggerOptions.cs`：Swagger 文档配置实体，承载标题、版本、描述与各环境开关（开发/测试/生产）。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
 - `BusinessTaskEntity.cs`（`Domain/Aggregates/BusinessTaskAggregate`）：统一业务任务聚合根实体，承载任务编码、来源表、业务键、条码、目标格口、实际格口、设备编码、链路追踪、失败原因、扫描时间、落格时间、任务状态、回传状态与本地时间字段。
