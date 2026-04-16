@@ -1,8 +1,8 @@
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.Extensions.Logging;
-using System.Text.RegularExpressions;
 
 namespace EverydayChain.Hub.Application.Services;
 
@@ -16,9 +16,6 @@ public class RetentionExecutionService(
     IReadOnlyList<RetentionLogTableOptions> logRetentionTables,
     ILogger<RetentionExecutionService> logger) : IRetentionExecutionService
 {
-    /// <summary>SQL 标识符安全校验正则（仅允许字母、数字、下划线）。</summary>
-    private static readonly Regex SqlIdentifierRegex = new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
-
     /// <summary>日志表保留期配置快照。</summary>
     private readonly IReadOnlyList<RetentionLogTableOptions> _logRetentionTables = logRetentionTables;
 
@@ -127,8 +124,8 @@ public class RetentionExecutionService(
                 continue;
             }
 
-            var logicalTableName = logTable.LogicalTableName?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(logicalTableName) || !IsSafeSqlIdentifier(logicalTableName))
+            var logicalTableName = LogicalTableNameNormalizer.NormalizeOrNull(logTable.LogicalTableName);
+            if (logicalTableName is null || !LogicalTableNameNormalizer.IsSafeSqlIdentifier(logicalTableName))
             {
                 logger.LogWarning("日志表保留期配置非法，已跳过。LogicalTableName={LogicalTableName}", logTable.LogicalTableName);
                 continue;
@@ -150,17 +147,6 @@ public class RetentionExecutionService(
 
         return targets;
     }
-
-    /// <summary>
-    /// 校验 SQL 标识符是否合法。
-    /// </summary>
-    /// <param name="identifier">待校验标识符。</param>
-    /// <returns>合法返回 <c>true</c>。</returns>
-    private static bool IsSafeSqlIdentifier(string identifier)
-    {
-        return !string.IsNullOrWhiteSpace(identifier) && SqlIdentifierRegex.IsMatch(identifier);
-    }
-
     /// <summary>
     /// 保留期执行目标。
     /// </summary>

@@ -46,7 +46,7 @@ public class BusinessTaskRepository(
     public async Task SaveAsync(BusinessTaskEntity entity, CancellationToken ct)
     {
         var suffix = shardSuffixResolver.ResolveLocal(entity.CreatedTimeLocal);
-        await shardTableProvisioner.EnsureShardTableAsync(suffix, ct);
+        await shardTableProvisioner.EnsureShardTableAsync(BusinessTaskLogicalTable, suffix, ct);
         using var scope = TableSuffixScope.Use(suffix);
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         db.BusinessTasks.Add(entity);
@@ -181,13 +181,21 @@ public class BusinessTaskRepository(
         int maxCount,
         CancellationToken ct)
     {
-        var result = new List<BusinessTaskEntity>();
-        foreach (var suffix in await ListShardSuffixesWithLegacyFallbackAsync(ct))
+        var result = new List<BusinessTaskEntity>(maxCount);
+        var suffixes = await ListShardSuffixesWithLegacyFallbackAsync(ct);
+        foreach (var suffix in suffixes
+                     .OrderBy(static value => string.IsNullOrEmpty(value) ? "!" : value, StringComparer.Ordinal))
         {
+            var remainingCount = maxCount - result.Count;
+            if (remainingCount <= 0)
+            {
+                break;
+            }
+
             using var scope = TableSuffixScope.Use(suffix);
             await using var db = await contextFactory.CreateDbContextAsync(ct);
             var shardRows = await queryBuilder(db.BusinessTasks.AsNoTracking())
-                .Take(maxCount)
+                .Take(remainingCount)
                 .ToListAsync(ct);
             result.AddRange(shardRows);
         }

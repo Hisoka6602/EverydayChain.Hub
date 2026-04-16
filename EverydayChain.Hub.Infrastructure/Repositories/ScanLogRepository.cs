@@ -15,11 +15,14 @@ public class ScanLogRepository(
     IShardSuffixResolver shardSuffixResolver,
     IShardTableProvisioner shardTableProvisioner) : IScanLogRepository
 {
+    /// <summary>扫描日志逻辑表名。</summary>
+    private const string ScanLogLogicalTable = "scan_logs";
+
     /// <inheritdoc/>
     public async Task SaveAsync(ScanLogEntity entity, CancellationToken ct)
     {
         var suffix = shardSuffixResolver.ResolveLocal(entity.CreatedTimeLocal);
-        await shardTableProvisioner.EnsureShardTableAsync(suffix, ct);
+        await shardTableProvisioner.EnsureShardTableAsync(ScanLogLogicalTable, suffix, ct);
         using var scope = TableSuffixScope.Use(suffix);
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         db.ScanLogs.Add(entity);

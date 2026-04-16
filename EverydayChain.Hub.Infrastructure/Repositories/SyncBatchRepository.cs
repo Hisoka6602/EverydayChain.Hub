@@ -36,7 +36,7 @@ public class SyncBatchRepository(
             }
 
             var suffix = ResolveBatchSuffix(batch.WindowEndLocal);
-            await shardTableProvisioner.EnsureShardTableAsync(suffix, ct);
+            await shardTableProvisioner.EnsureShardTableAsync(SyncBatchLogicalTable, suffix, ct);
             using var scope = TableSuffixScope.Use(suffix);
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
             dbContext.SyncBatches.Add(MapToEntity(batch, SyncBatchStatus.Pending));

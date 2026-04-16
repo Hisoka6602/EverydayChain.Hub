@@ -15,11 +15,14 @@ public class DropLogRepository(
     IShardSuffixResolver shardSuffixResolver,
     IShardTableProvisioner shardTableProvisioner) : IDropLogRepository
 {
+    /// <summary>落格日志逻辑表名。</summary>
+    private const string DropLogLogicalTable = "drop_logs";
+
     /// <inheritdoc/>
     public async Task SaveAsync(DropLogEntity entity, CancellationToken ct)
     {
         var suffix = shardSuffixResolver.ResolveLocal(entity.CreatedTimeLocal);
-        await shardTableProvisioner.EnsureShardTableAsync(suffix, ct);
+        await shardTableProvisioner.EnsureShardTableAsync(DropLogLogicalTable, suffix, ct);
         using var scope = TableSuffixScope.Use(suffix);
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         db.DropLogs.Add(entity);
