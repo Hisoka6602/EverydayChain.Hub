@@ -70,7 +70,7 @@
 | PR-09 | 扫描/落格日志落库 | PR-07 | 新增 6 / 修改 5 / 合计 11 | `feature/pr09-scan-drop-logs` | ✅ 已完成（本 PR） |
 | PR-10 | 异常规则链路 | PR-07 | 新增 8 / 修改 5 / 合计 13 | `feature/pr10-exception-rules` | ✅ 已完成（本 PR） |
 | PR-11 | 补偿重试链路 | PR-08,PR-10 | 新增 3 / 修改 5 / 合计 8 | `feature/pr11-compensation` | ✅ 已完成（本 PR） |
-| PR-12 | 联调收口与验收归档 | PR-03~PR-11 | 新增 0~2 / 修改 6~10 / 合计 8~12 | `feature/pr12-stabilization` | ⏳ 未开始 |
+| PR-12 | 联调收口与验收归档 | PR-03~PR-11 | 新增 0~2 / 修改 6~10 / 合计 8~12 | `feature/pr12-stabilization` | 🚧 执行中（本 PR，联调收口已启动） |
 | PR-13 | 里程碑M1全量审查-基础建模阶段 | PR-01~PR-03 | 新增 0 / 修改 2~3 / 合计 2~3 | `feature/pr13-m1-full-review` | ✅ 已完成（M1 里程碑检验通过） |
 | PR-14 | 里程碑M2全量审查-主链路打通阶段 | PR-04~PR-07 | 新增 0 / 修改 3~5 / 合计 3~5 | `feature/pr14-m2-full-review` | ✅ 已完成（本 PR，M2 里程碑验收通过） |
 | PR-15 | 里程碑M3全量审查-回传与审计阶段 | PR-08~PR-09 | 新增 0 / 修改 2~4 / 合计 2~4 | `feature/pr15-m3-full-review` | ✅ 已完成（本 PR，M3 里程碑验收通过） |
@@ -599,7 +599,10 @@
 ## PR-12：联调收口与验收归档
 
 ### 执行状态
-- ⏳ 未开始（依赖 PR-03~PR-11 主功能交付后执行联调收口；PR-13~PR-15 审查结论已完成并可复用）。
+- 🚧 执行中（本 PR）：已启动联调收口与验收归档工作。
+- 已完成前置条件复核：PR-03~PR-11 主功能交付已齐备，PR-13~PR-16 里程碑审查结论可复用，当前累计完成 15/17。
+- 已完成本轮回归验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 通过（0 Warning 0 Error，152/152 单元测试通过）。
+- 已完成文档口径同步启动：`README.md`、`逐文件代码检查台账.md` 与本计划文档已对齐为“PR-12 执行中，PR-17 待 PR-12 完成后进入”。
 
 ### 建议标题
 `chore(release): 全链路联调收口与验收归档`
