@@ -222,8 +222,6 @@
 │   ├── Repositories/SyncBatchRepository.cs
 │   ├── Repositories/SyncChangeLogRepository.cs
 │   ├── Repositories/SyncDeletionLogRepository.cs
-│   ├── Repositories/InMemorySyncChangeLogRepository.cs
-│   ├── Repositories/InMemorySyncDeletionLogRepository.cs
 │   ├── Repositories/BusinessTaskRepository.cs
 │   ├── Repositories/ScanLogRepository.cs
 │   ├── Repositories/DropLogRepository.cs
@@ -460,10 +458,8 @@
 - `SyncCheckpointRepository.cs`：检查点文件持久化实现，读写日志均以 Information 级落盘；写入改为临时文件 + File.Replace/Move 原子替换，防止崩溃产生半写 JSON。
 - `SyncBatchRepository.cs`：同步批次仓储 SQL Server 持久化分片实现，写入 `sync_batches_{yyyyMM}`，支持跨分片查询最近失败批次。
 - `SyncBatchEntity.cs` + `SyncBatchEntityTypeConfiguration.cs`：同步批次实体与映射配置，定义批次状态流转字段、唯一约束与查询索引。
-- `SyncChangeLogRepository.cs`：同步变更日志仓储 SQL Server 持久化分片实现，按 `ChangedTimeLocal` 写入 `sync_change_logs_{yyyyMM}`。
-- `SyncDeletionLogRepository.cs`：同步删除日志仓储 SQL Server 持久化分片实现，按 `DeletedTimeLocal`（为空时按入库时间）写入 `sync_deletion_logs_{yyyyMM}`。
-- `InMemorySyncChangeLogRepository.cs`：同步变更日志仓储内存实现（当前仅保留历史实现文件，不再作为默认 DI 注册）。
-- `InMemorySyncDeletionLogRepository.cs`：同步删除日志仓储内存实现（当前仅保留历史实现文件，不再作为默认 DI 注册）。
+- `SyncChangeLogRepository.cs`：同步变更日志仓储 SQL Server 持久化分片实现，按 `ChangedTimeLocal` 写入 `sync_change_logs_{yyyyMM}`，并已替换及移除原内存实现。
+- `SyncDeletionLogRepository.cs`：同步删除日志仓储 SQL Server 持久化分片实现，按 `DeletedTimeLocal`（为空时按入库时间）写入 `sync_deletion_logs_{yyyyMM}`，并已替换及移除原内存实现。
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖，并在启动阶段从启用同步表配置提取逻辑表名集合，完成安全校验与空配置异常拦截。
 - `20260408020833_RebuildInitialHubSchema.cs`：初始化迁移，定义 `sorting_task_trace`、`IDX_PICKTOLIGHT_CARTON1`、`IDX_PICKTOWCS2` 三张聚合表结构及索引。
 - `20260413144042_AddBusinessTaskTable.cs`：新增 `business_tasks` 迁移基线，作为分片模板来源，包含任务编码、条码、格口、扫描落格时间、状态、回传状态等字段及唯一索引。
