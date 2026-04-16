@@ -615,8 +615,8 @@
   - 当前状态：阶段性草案已输出，待联调证据归档后定稿。
 
 #### 待确认项（进入最终收口前）
-- [x] 联调执行批次确认：归档批次编号采用 `PR12-20260416-V1`，执行窗口采用“本地时间”记录，环境标识采用 `local-debug`（对应本轮 `dotnet build` + `dotnet test --no-build` 回归批次）。
-- [x] 关键日志范围确认：归档 NLog 文件范围统一为 `${basedir}/logs/hub-{yyyy-MM-dd}.log` 与 `${basedir}/logs/sync-{yyyy-MM-dd}.log`，时间段采用批次窗口 `[StartLocalTime, EndLocalTime]`，关键检索词口径采用 `SyncBackgroundWorker`、`WmsFeedbackService`、`FeedbackCompensationBackgroundWorker`、`Error`。
+- [x] 联调执行批次确认：归档批次编号采用 `PR12-20260416-R1`（R 表示收口回归批次），执行窗口采用“本地时间”记录，环境标识采用 `local-debug`（对应本轮 `dotnet build` + `dotnet test --no-build` 回归批次）。
+- [x] 关键日志范围确认：归档 NLog 文件范围统一为 `${basedir}/logs/hub-{shortdate}.log` 与 `${basedir}/logs/sync-{shortdate}.log`，时间段采用批次窗口 `[StartLocalTime, EndLocalTime]`（由实际执行窗口确定，示例：`[2026-04-16 18:00:00, 2026-04-16 18:30:00]`），关键检索词口径采用 `SyncBackgroundWorker`、`WmsFeedbackService`、`FeedbackCompensationBackgroundWorker`、`Error`。
 - [x] 结果汇总口径确认：统计口径统一为“成功=主链路完成且无异常；失败=主链路抛错或业务失败；补偿重试=反馈状态由 Failed 进入重试流程”，验收阈值采用“构建通过 + 测试通过 + 证据链完整”。
 
 #### 阶段性归档（已实现/未实现/后续计划）
