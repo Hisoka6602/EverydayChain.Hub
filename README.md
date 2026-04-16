@@ -11,15 +11,15 @@
 - 移除批次文件落盘残留配置与自检：删除 `SyncJob.BatchFilePath` 与运行期批次文件探针逻辑。
 - 实施 PR-11（补偿重试链路）：新增 `IFeedbackCompensationService` 与 `FeedbackCompensationService`（支持按任务编码重试、按批次重试）；新增 `FeedbackCompensationResult` 结果模型；新增 `FeedbackCompensationJobOptions` 配置实体；新增 `FeedbackCompensationBackgroundWorker` 后台任务并接入 `Program.cs` 与 `ServiceCollectionExtensions.cs`；`appsettings.json` 增加 `FeedbackCompensationJob` 配置节。
 - 新增补偿单元测试 `FeedbackCompensationServiceTests`，覆盖批次成功、批次失败、按任务跳过、按任务单条重试四个场景。
-- 已通读代码并完成本轮执行前复核：按“通读代码→盘点进度→补全计划→里程碑时机判断”闭环再次确认当前已完成 14/17（PR-11 已完成），当前处于 M4（PR-16）里程碑检验阶段。
-- 已完成本次问题单二次复核（2026-04-16 本地时间 23:08）：结论保持一致，当前累计完成 14/17，PR-16（M4）检验时机有效，自动建单工作流状态正常。
+- 已完成 PR-16（M4）里程碑收口复核：PR-10~PR-11 异常与补偿链路已完成最终全量审查（规则优先级、补偿幂等、重试上限、审计可追溯），阻塞问题清单结论为“无新增阻塞项”。
+- 进度口径更新：当前累计完成 15/17（PR-01~PR-11、PR-13~PR-16），M1~M4 里程碑检验均已完成并通过，可进入 PR-12 开发实施与联调收口阶段。
 - 新增 `.github/workflows/auto-create-pr.yml`：仅在非默认分支推送时触发，自动检查并创建到默认分支的 PR（若同源 PR 已存在则跳过），避免人工漏建 PR。
-- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过（0 Warning 0 Error）。
+- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，152/152 单元测试通过）。
 ## 后续可完善点
 - 根据产线峰值写入量细化各日志表差异化保留月数，并结合容量监控进行滚动调优。
 - 评估并推进 `InMemorySyncChangeLogRepository`、`InMemorySyncDeletionLogRepository` 的持久化替换，彻底移除同步链路内存仓储。
 - 推进 PR-12（联调收口与验收归档）。
-- 推进 PR-16（M4 里程碑全量审查，执行中；详细核对结论见 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 的 PR-16 章节）。
+- 推进 PR-17（M5 里程碑全量审查，待 PR-12 完成后进入）。
 - 开启补偿后台任务：生产环境确认重试节流参数后，将 `FeedbackCompensationJob.Enabled` 置 `true`。
 
 ## 解决方案文件树与职责
