@@ -781,7 +781,7 @@
 - 🚧 执行中（本 PR）。
 - 已完成执行前通读、进度盘点与补全：当前累计完成 14/17（PR-01~PR-11、PR-13~PR-15），PR-16 执行中，待执行 PR-12、PR-17。
 - 已完成里程碑时机复核：按总览表定义，M4 依赖 PR-10~PR-11；当前依赖均已满足，且 M1~M3 审查结论已归档，已进入 M4 全量审查窗口。
-- 已复核自动建单能力：本次通过代码审阅方式检查 `.github/workflows/auto-create-pr.yml` 的触发条件与 `actions/github-script` 建单逻辑，确认其可在非默认分支 push 后自动检查并创建到默认分支的 PR（已存在则跳过）。
+- 已复核自动建单能力：本次通过代码审阅方式检查 `.github/workflows/auto-create-pr.yml`，确认触发条件为 `on.push.branches-ignore: main` 且作业门禁为 `if: github.ref_name != github.event.repository.default_branch`；`actions/github-script` 先 `pulls.list` 查询同源 PR，未命中再 `pulls.create` 创建到默认分支，若返回“A pull request already exists”则按已存在分支路径退出。
 
 ### 建议标题
 `chore(review): 里程碑M4全量审查与问题闭环`
