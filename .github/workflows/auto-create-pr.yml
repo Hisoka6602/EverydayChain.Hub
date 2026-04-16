@@ -1,0 +1,105 @@
+name: 自动创建PR
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  create-pr:
+    if: github.ref_name != github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    concurrency:
+      group: auto-create-pr-${{ github.repository }}-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - name: 检查并创建PR到默认分支
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const head = context.ref.replace("refs/heads/", "");
+            const base = context.payload.repository.default_branch;
+            const actor = context.actor;
+            const headOwner = context.payload.repository.owner.login;
+            // GitHub pulls.create 在 PR 已存在时返回的固定错误文本。
+            const pullRequestExistsMessage = "A pull request already exists";
+
+            const { data: existing } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: "open",
+              head: `${headOwner}:${head}`,
+              base,
+              per_page: 1
+            });
+
+            if (existing.length > 0) {
+              core.info(`分支 ${head} 已存在打开的 PR：#${existing[0].number}。`);
+              return;
+            }
+
+            const title = `自动PR: ${head} -> ${base}`;
+            const body = [
+              "## 自动创建说明",
+              `- 来源分支：\`${head}\``,
+              `- 目标分支：\`${base}\``,
+              `- 触发人：@${actor}`,
+              "",
+              "该 PR 由工作流自动创建，用于满足“本 PR 需要自动创建 PR”的交付要求。",
+              "",
+              "## 待补充内容",
+              "- [ ] 详细变更说明",
+              "- [ ] 验收清单（含构建/测试结果）",
+              "- [ ] 实施计划进度更新"
+            ].join("\n");
+
+            try {
+              const { data: created } = await github.rest.pulls.create({
+                owner,
+                repo,
+                title,
+                head,
+                base,
+                body
+              });
+
+              core.info(`已创建 PR #${created.number}: ${created.html_url}`);
+            } catch (error) {
+              if (error?.status === 422) {
+                const messageText = String(error?.message ?? "");
+                const responseErrors = Array.isArray(error?.response?.data?.errors)
+                  ? error.response.data.errors
+                  : [];
+                // 某些场景错误文本出现在 error.message，另一些场景出现在 errors[].message，因此双路径检查。
+                const containsExistsError = responseErrors.some((item) =>
+                  String(item?.message ?? item ?? "").includes(pullRequestExistsMessage));
+                const alreadyExists = messageText.includes(pullRequestExistsMessage) || containsExistsError;
+
+                if (alreadyExists) {
+                  const { data: latest } = await github.rest.pulls.list({
+                    owner,
+                    repo,
+                    state: "open",
+                    head: `${headOwner}:${head}`,
+                    base,
+                    per_page: 1
+                  });
+
+                  if (latest.length > 0) {
+                    core.info(`分支 ${head} 的 PR 已存在：#${latest[0].number} ${latest[0].html_url}`);
+                  } else {
+                    core.warning(`分支 ${head} 收到“PR 已存在”响应，但未查询到打开的 PR，请核查仓库状态。`);
+                  }
+
+                  return;
+                }
+              }
+
+              throw error;
+            }
