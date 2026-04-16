@@ -18,7 +18,7 @@
 - 根据产线峰值写入量细化各日志表差异化保留月数，并结合容量监控进行滚动调优。
 - 评估并推进 `InMemorySyncChangeLogRepository`、`InMemorySyncDeletionLogRepository` 的持久化替换，彻底移除同步链路内存仓储。
 - 推进 PR-12（联调收口与验收归档）。
-- 推进 PR-16（M4 里程碑全量审查，已完成执行前通读与里程碑时机复核）。
+- 推进 PR-16（M4 里程碑全量审查）：当前进度 14/17，PR-10+PR-11 依赖已满足，已完成执行前通读与里程碑时机复核，自动建单能力由 `.github/workflows/auto-create-pr.yml` 覆盖。
 - 开启补偿后台任务：生产环境确认重试节流参数后，将 `FeedbackCompensationJob.Enabled` 置 `true`。
 
 ## 解决方案文件树与职责
