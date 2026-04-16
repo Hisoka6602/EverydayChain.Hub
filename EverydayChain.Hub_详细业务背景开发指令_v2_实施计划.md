@@ -57,7 +57,7 @@
 
 ## 2. PR 排期总览
 
-| PR | 阶段 | 依赖 | 预计文件改动 | 建议分支名 | 当前状态（2026-04-13） |
+| PR | 阶段 | 依赖 | 预计文件改动 | 建议分支名 | 当前状态（2026-04-16） |
 |---|---|---|---|---|---|
 | PR-01 | 统一业务任务模型 | 无 | 新增 8 / 修改 4 / 合计 12 | `feature/pr01-business-task-model` | ✅ 本 PR 已完成 |
 | PR-02 | 语义与接口基线文档 | PR-01 | 新增 5 / 修改 2 / 合计 7 | `feature/pr02-semantic-baseline` | ✅ 本 PR 已完成 |
@@ -69,17 +69,17 @@
 | PR-08 | 业务回传服务 | PR-07 | 新增 4 / 修改 6 / 合计 10 | `feature/pr08-wms-feedback` | ✅ 已完成（本 PR） |
 | PR-09 | 扫描/落格日志落库 | PR-07 | 新增 6 / 修改 5 / 合计 11 | `feature/pr09-scan-drop-logs` | ✅ 已完成（本 PR） |
 | PR-10 | 异常规则链路 | PR-07 | 新增 8 / 修改 5 / 合计 13 | `feature/pr10-exception-rules` | ✅ 已完成（本 PR） |
-| PR-11 | 补偿重试链路 | PR-08,PR-10 | 新增 3 / 修改 5 / 合计 8 | `feature/pr11-compensation` | ⏳ 未开始 |
+| PR-11 | 补偿重试链路 | PR-08,PR-10 | 新增 3 / 修改 5 / 合计 8 | `feature/pr11-compensation` | ✅ 已完成（本 PR） |
 | PR-12 | 联调收口与验收归档 | PR-03~PR-11 | 新增 0~2 / 修改 6~10 / 合计 8~12 | `feature/pr12-stabilization` | ⏳ 未开始 |
 | PR-13 | 里程碑M1全量审查-基础建模阶段 | PR-01~PR-03 | 新增 0 / 修改 2~3 / 合计 2~3 | `feature/pr13-m1-full-review` | ✅ 已完成（M1 里程碑检验通过） |
 | PR-14 | 里程碑M2全量审查-主链路打通阶段 | PR-04~PR-07 | 新增 0 / 修改 3~5 / 合计 3~5 | `feature/pr14-m2-full-review` | ✅ 已完成（本 PR，M2 里程碑验收通过） |
 | PR-15 | 里程碑M3全量审查-回传与审计阶段 | PR-08~PR-09 | 新增 0 / 修改 2~4 / 合计 2~4 | `feature/pr15-m3-full-review` | ✅ 已完成（本 PR，M3 里程碑验收通过） |
-| PR-16 | 里程碑M4全量审查-异常与补偿阶段 | PR-10~PR-11 | 新增 0 / 修改 2~4 / 合计 2~4 | `feature/pr16-m4-full-review` | ⏳ 未开始 |
+| PR-16 | 里程碑M4全量审查-异常与补偿阶段 | PR-10~PR-11 | 新增 0 / 修改 2~4 / 合计 2~4 | `feature/pr16-m4-full-review` | 🟡 已到里程碑检验时刻（待执行） |
 | PR-17 | 里程碑M5全量审查-联调收口阶段 | PR-12 | 新增 0 / 修改 1~2 / 合计 1~2 | `feature/pr17-m5-full-review` | ⏳ 未开始 |
 
 > 说明：预计改动为排期预算，允许 ±2 文件浮动；超出需在 PR 描述说明原因。
 >
-> 进度盘点口径：已先通读当前仓库代码并核对现状，当前已完成 PR-01、PR-02、PR-03、PR-04、PR-05、PR-06、PR-07、PR-08、PR-09、PR-10、PR-13、PR-14、PR-15（13/17）；M1/M2/M3 里程碑检验均已完成并通过，M3 依赖 `PR-08~PR-09` 全部完成，M3 里程碑验收通过（138/138 单元测试通过，0 Warning 0 Error）。
+> 进度盘点口径：已先通读当前仓库代码并核对现状，当前已完成 PR-01、PR-02、PR-03、PR-04、PR-05、PR-06、PR-07、PR-08、PR-09、PR-10、PR-11、PR-13、PR-14、PR-15（14/17）；M1/M2/M3 里程碑检验均已完成并通过，PR-11 完成后 PR-16（M4）进入可执行检验时刻；当前构建与测试验证通过（0 Warning 0 Error）。
 
 ### 2.1 待确认项（未确认前不默认实现）
 1. PR-02 文档基线是否需要拆分到独立目录（如 `docs/baseline/`）并定义固定文件命名规范。
@@ -87,10 +87,10 @@
 3. PR-05 业务任务持久化是否采用新表，或复用现有聚合并建立映射关系，需在进入迁移前确认。
 4. PR-08 业务回传目标 Oracle 表与幂等字段组合尚未明确，需要在实现前冻结契约。
 
-### 2.2 执行前代码通读与里程碑时机判断（2026-04-13）
-1. 已通读并核对主干实现文件：`BusinessTaskEntity`、`BusinessTaskMaterializer`、三类 Host Controller、`Program.cs`、`ServiceCollectionExtensions.cs`、`README.md`、`逐文件代码检查台账.md`。
-2. 已通过文件存在性与代码内容核对确认：PR-01/PR-02/PR-03/PR-04 交付物均已落地；PR-05~PR-12 对应核心实现（任务匹配、格口解析、落格回传闭环、业务回传、补偿服务）尚未落地。
-3. 里程碑时机判断：M1 依赖 `PR-01~PR-03` 已完成且已通过；M2 依赖 `PR-04~PR-07`，本 PR 已完成 PR-05/06/07，M2 里程碑验收通过（112/112 单元测试，0 Warning 0 Error）。
+### 2.2 执行前代码通读与里程碑时机判断（2026-04-16）
+1. 已通读并核对主干实现文件：`BusinessTaskEntity`、`WmsFeedbackService`、`BusinessTaskRepository`、`Program.cs`、`ServiceCollectionExtensions.cs`、`README.md`、`逐文件代码检查台账.md`。
+2. 已通过文件存在性与代码内容核对确认：PR-01~PR-10、PR-13~PR-15 交付物均已落地；本次已补全 PR-11（补偿服务接口与实现、补偿后台任务、配置项与测试）。
+3. 里程碑时机判断：M1/M2/M3 已完成且通过；PR-10 与 PR-11 依赖均已满足，已到达 M4（PR-16）里程碑检验时刻。
 
 ---
 
@@ -543,6 +543,14 @@
 ---
 
 ## PR-11：补偿重试链路
+
+### 执行状态
+- ✅ 已完成（本 PR）
+- 已完成：新增 `IFeedbackCompensationService` 与 `FeedbackCompensationService`，支持按任务编码与按批次重试失败回传。
+- 已完成：新增 `FeedbackCompensationJobOptions` 与 `FeedbackCompensationBackgroundWorker`，支持可开关、轮询间隔与批次上限配置。
+- 已完成：`Program.cs` 与 `ServiceCollectionExtensions.cs` 已接入补偿服务与后台任务注册，`appsettings.json` 新增补偿配置节。
+- 已完成：新增 `FeedbackCompensationServiceTests` 覆盖补偿成功、异常失败、按任务跳过与按任务重试场景。
+- 验证结果：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 通过（0 Warning 0 Error）。
 
 ### 建议标题
 `feat(application): 新增业务回传补偿服务`

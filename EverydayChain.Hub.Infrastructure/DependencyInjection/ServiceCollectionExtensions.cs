@@ -52,6 +52,7 @@ public static class ServiceCollectionExtensions {
         services.Configure<RetentionJobOptions>(configuration.GetSection(RetentionJobOptions.SectionName));
         services.Configure<OracleOptions>(configuration.GetSection(OracleOptions.SectionName));
         services.Configure<WmsFeedbackOptions>(configuration.GetSection(WmsFeedbackOptions.SectionName));
+        services.Configure<FeedbackCompensationJobOptions>(configuration.GetSection(FeedbackCompensationJobOptions.SectionName));
         services.Configure<ExceptionRuleOptions>(configuration.GetSection(ExceptionRuleOptions.SectionName));
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
@@ -112,6 +113,7 @@ public static class ServiceCollectionExtensions {
                 sp.GetRequiredService<IWmsOracleFeedbackGateway>(),
                 sp.GetRequiredService<IOptions<WmsFeedbackOptions>>().Value,
                 sp.GetRequiredService<ILogger<WmsFeedbackService>>()));
+        services.AddSingleton<IFeedbackCompensationService, FeedbackCompensationService>();
         // PR-10：注册异常规则服务（波次清理、多标签决策、回流规则）。
         services.AddSingleton<IWaveCleanupService>(sp =>
             new WaveCleanupService(
