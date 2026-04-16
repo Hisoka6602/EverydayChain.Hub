@@ -18,6 +18,8 @@
 - 新增 `.github/workflows/auto-create-pr.yml`：仅在非默认分支推送时触发，自动检查并创建到默认分支的 PR（若同源 PR 已存在则跳过），避免人工漏建 PR。
 - 实施同步日志持久化替换：新增 `SyncChangeLogEntity`、`SyncDeletionLogEntity`、`SyncChangeLogRepository`、`SyncDeletionLogRepository` 与迁移 `20260416171508_AddSyncChangeDeletionLogShardTables.cs`，`ISyncChangeLogRepository`/`ISyncDeletionLogRepository` 已切换为 SQL Server 分片持久化实现（`sync_change_logs_{yyyyMM}`、`sync_deletion_logs_{yyyyMM}`）。
 - 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，152/152 单元测试通过）。
+- 已完成本轮“执行前通读代码 + 进度盘点 + 里程碑时机复核”：关键实现与联动文档复核后，累计完成度仍为 15/17，当前仍处于 PR-12 联调收口窗口，尚未进入 PR-17（M5）检验时刻。
+- 已完成自动建 PR 机制复核：`.github/workflows/auto-create-pr.yml` 仍保持“非默认分支 push 自动建单、同源 PR 已存在则跳过”的行为，满足本 PR 自动创建要求。
 ## 后续可完善点
 - 根据产线峰值写入量细化各日志表差异化保留月数，并结合容量监控进行滚动调优。
 - 完成 PR-12（联调收口与验收归档）剩余收口项（详见 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 的 PR-12 章节），包括以下内容：

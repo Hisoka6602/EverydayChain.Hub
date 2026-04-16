@@ -93,7 +93,8 @@
 3. 里程碑时机判断：M1~M4 已完成并通过，当前处于 PR-12 联调收口实施窗口，尚未进入 M5（PR-17）检验时刻。
 4. 本 PR 自动建单要求已落地并完成行为核对：`.github/workflows/auto-create-pr.yml` 在非默认分支 push 后自动检查并创建到默认分支的 PR（已存在则跳过），默认分支不创建 PR。
 5. 实施进度量化：当前完成率 15/17（88.24%）；本计划里程碑从 M1 起算，当前状态为 M1✅、M2✅、M3✅、M4✅、M5⏳（依赖 PR-12）。
-6. 本轮复核结论：已按“先通读代码→核对已执行数量→补全实施计划→判断里程碑检验时机→核验自动建 PR”口径完成核对，并执行 `dotnet build EverydayChain.Hub.sln`、`dotnet test EverydayChain.Hub.sln -c Release` 验证通过，结论保持不变。
+6. 本轮复核结论：已按“先通读代码→核对已执行数量→补全实施计划→判断里程碑检验时机→核验自动建 PR”口径完成核对，并执行 `dotnet build EverydayChain.Hub.sln`、`dotnet test EverydayChain.Hub.sln --no-build` 验证通过，结论保持不变。
+7. 新一轮执行前复核（2026-04-16，本地时间）已完成：再次核对 `Program.cs`、`ServiceCollectionExtensions.cs`、`WmsFeedbackService.cs`、`FeedbackCompensationService.cs`、`BusinessTaskRepository.cs`、`README.md`、`逐文件代码检查台账.md` 与自动建 PR 工作流后，确认进度仍为 15/17，里程碑时机仍为“PR-12 执行中、M5 未到达检验窗口”。
 
 ---
 
@@ -600,6 +601,7 @@
 - 已完成本轮回归验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 通过（0 Warning 0 Error，152/152 单元测试通过）。
 - 已完成文档口径同步启动：`README.md`、`逐文件代码检查台账.md` 与本计划文档已对齐为“PR-12 执行中，PR-17 待 PR-12 完成后进入”。
 - 已完成同步链路代码推进：`ISyncChangeLogRepository`、`ISyncDeletionLogRepository` 已切换至 SQL Server 分片持久化实现并纳入自动迁移与分表预建。
+- 已完成本轮执行前复核补录：再次确认累计完成 15/17，当前尚未进入 M5（PR-17）检验时刻，自动建 PR 工作流行为保持有效。
 
 #### 待完成收口项（Checklist）
 - [ ] 端到端联调证据归档完成（扫描上传→请求格口→落格回传→业务回传→补偿重试失败路径）
