@@ -32,11 +32,6 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         syncJobOptions.Value.CheckpointFilePath,
         "sync-checkpoints.json");
 
-    /// <summary>批次文件绝对路径（由配置项 BatchFilePath 决定；为空时使用应用基目录下 data/sync-batches.json）。</summary>
-    private readonly string _batchFilePath = RuntimeStoragePathResolver.ResolveAbsolutePath(
-        syncJobOptions.Value.BatchFilePath,
-        "data/sync-batches.json");
-
     /// <summary>运行期配置。</summary>
     private readonly SyncJobOptions _options = syncJobOptions.Value;
 
@@ -101,17 +96,13 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         var startupMinFreeSpaceMb = NormalizeStartupMinFreeSpaceMb();
         EnsureDirectoryWritable(_checkpointFilePath, "检查点目录");
         EnsureFileReadableAndWritable(_checkpointFilePath, "检查点文件");
-        EnsureDirectoryWritable(_batchFilePath, "批次目录");
-        EnsureFileReadableAndWritable(_batchFilePath, "批次文件");
         if (startupMinFreeSpaceMb > 0)
         {
             EnsureDiskFreeSpace(_checkpointFilePath, startupMinFreeSpaceMb, "启动自检-检查点路径");
-            EnsureDiskFreeSpace(_batchFilePath, startupMinFreeSpaceMb, "启动自检-批次路径");
         }
         logger.LogInformation(
-            "运行期存储启动自检通过。CheckpointPath={CheckpointPath}, BatchPath={BatchPath}, MinFreeSpaceMb={MinFreeSpaceMb}",
+            "运行期存储启动自检通过。CheckpointPath={CheckpointPath}, MinFreeSpaceMb={MinFreeSpaceMb}",
             _checkpointFilePath,
-            _batchFilePath,
             startupMinFreeSpaceMb);
         return Task.CompletedTask;
     }

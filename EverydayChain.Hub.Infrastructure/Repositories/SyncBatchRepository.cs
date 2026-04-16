@@ -1,33 +1,27 @@
-using System.Text.Json;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
+using EverydayChain.Hub.Domain.Aggregates.SyncBatchAggregate;
 using EverydayChain.Hub.Domain.Enums;
-using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Domain.Sync;
+using EverydayChain.Hub.Infrastructure.Persistence;
+using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Infrastructure.Services;
-using EverydayChain.Hub.SharedKernel.Utilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 同步批次仓储文件持久化实现。
+/// 同步批次仓储 SQL Server 持久化实现（按月分片）。
 /// </summary>
 public class SyncBatchRepository(
-    IOptions<SyncJobOptions> syncJobOptions,
-    IRuntimeStorageGuard runtimeStorageGuard,
+    IDbContextFactory<HubDbContext> dbContextFactory,
+    IShardSuffixResolver shardSuffixResolver,
+    IShardTableProvisioner shardTableProvisioner,
+    IShardTableResolver shardTableResolver,
     ILogger<SyncBatchRepository> logger) : ISyncBatchRepository
 {
-    /// <summary>批次文件访问锁。</summary>
-    private static readonly SemaphoreSlim FileLock = new(1, 1);
-
-    /// <summary>批次 JSON 序列化配置。</summary>
-    private static readonly JsonSerializerOptions BatchSerializerOptions = new() { WriteIndented = true };
-
-    /// <summary>批次文件路径（由配置项 BatchFilePath 决定；为空时使用应用基目录下 data/sync-batches.json）。</summary>
-    private readonly string _batchFilePath = RuntimeStoragePathResolver.ResolveAbsolutePath(
-        syncJobOptions.Value.BatchFilePath,
-        "data/sync-batches.json");
+    /// <summary>同步批次逻辑表名。</summary>
+    private const string SyncBatchLogicalTable = "sync_batches";
 
     /// <inheritdoc/>
     public async Task CreateBatchAsync(SyncBatch batch, CancellationToken ct)
@@ -35,28 +29,22 @@ public class SyncBatchRepository(
         ct.ThrowIfCancellationRequested();
         try
         {
-            await FileLock.WaitAsync(ct);
-            try
+            ValidateBatchForCreate(batch);
+            if (await TryGetBatchFromExistingShardsAsync(batch.BatchId, ct) is not null)
             {
-                ValidateBatchForCreate(batch);
-                var batches = await LoadAllWithoutLockAsync(ct);
-                if (batches.ContainsKey(batch.BatchId))
-                {
-                    throw new InvalidOperationException($"批次已存在：{batch.BatchId}");
-                }
+                throw new InvalidOperationException($"批次已存在：{batch.BatchId}");
+            }
 
-                batch.Status = SyncBatchStatus.Pending;
-                batches[batch.BatchId] = CloneBatch(batch);
-                await PersistWithoutLockAsync(batches, "创建同步批次", ct);
-            }
-            finally
-            {
-                FileLock.Release();
-            }
+            var suffix = ResolveBatchSuffix(batch.WindowEndLocal);
+            await shardTableProvisioner.EnsureShardTableAsync(suffix, ct);
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+            dbContext.SyncBatches.Add(MapToEntity(batch, SyncBatchStatus.Pending));
+            await dbContext.SaveChangesAsync(ct);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "创建同步批次失败。Path={BatchFilePath}, BatchId={BatchId}, TableCode={TableCode}", _batchFilePath, batch.BatchId, batch.TableCode);
+            logger.LogError(ex, "创建同步批次失败。BatchId={BatchId}, TableCode={TableCode}", batch.BatchId, batch.TableCode);
             throw;
         }
     }
@@ -67,24 +55,18 @@ public class SyncBatchRepository(
         ct.ThrowIfCancellationRequested();
         try
         {
-            await FileLock.WaitAsync(ct);
-            try
-            {
-                var batches = await LoadAllWithoutLockAsync(ct);
-                var batch = GetRequiredBatch(batches, batchId);
-                batch.Status = SyncBatchStatus.InProgress;
-                batch.StartedTimeLocal = startedTimeLocal;
-                batches[batchId] = batch;
-                await PersistWithoutLockAsync(batches, "更新批次执行状态", ct);
-            }
-            finally
-            {
-                FileLock.Release();
-            }
+            var loaded = await GetRequiredBatchFromShardsAsync(batchId, ct);
+            loaded.Entity.Status = SyncBatchStatus.InProgress;
+            loaded.Entity.StartedTimeLocal = startedTimeLocal;
+            loaded.Entity.ErrorMessage = null;
+            using var scope = TableSuffixScope.Use(loaded.Suffix);
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+            dbContext.SyncBatches.Update(loaded.Entity);
+            await dbContext.SaveChangesAsync(ct);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "标记批次执行中失败。Path={BatchFilePath}, BatchId={BatchId}", _batchFilePath, batchId);
+            logger.LogError(ex, "标记批次执行中失败。BatchId={BatchId}", batchId);
             throw;
         }
     }
@@ -95,30 +77,23 @@ public class SyncBatchRepository(
         ct.ThrowIfCancellationRequested();
         try
         {
-            await FileLock.WaitAsync(ct);
-            try
-            {
-                var batches = await LoadAllWithoutLockAsync(ct);
-                var batch = GetRequiredBatch(batches, result.BatchId);
-                batch.Status = SyncBatchStatus.Completed;
-                batch.CompletedTimeLocal = completedTimeLocal;
-                batch.ReadCount = result.ReadCount;
-                batch.InsertCount = result.InsertCount;
-                batch.UpdateCount = result.UpdateCount;
-                batch.DeleteCount = result.DeleteCount;
-                batch.SkipCount = result.SkipCount;
-                batch.ErrorMessage = null;
-                batches[result.BatchId] = batch;
-                await PersistWithoutLockAsync(batches, "完成同步批次", ct);
-            }
-            finally
-            {
-                FileLock.Release();
-            }
+            var loaded = await GetRequiredBatchFromShardsAsync(result.BatchId, ct);
+            loaded.Entity.Status = SyncBatchStatus.Completed;
+            loaded.Entity.CompletedTimeLocal = completedTimeLocal;
+            loaded.Entity.ReadCount = result.ReadCount;
+            loaded.Entity.InsertCount = result.InsertCount;
+            loaded.Entity.UpdateCount = result.UpdateCount;
+            loaded.Entity.DeleteCount = result.DeleteCount;
+            loaded.Entity.SkipCount = result.SkipCount;
+            loaded.Entity.ErrorMessage = null;
+            using var scope = TableSuffixScope.Use(loaded.Suffix);
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+            dbContext.SyncBatches.Update(loaded.Entity);
+            await dbContext.SaveChangesAsync(ct);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "标记批次完成失败。Path={BatchFilePath}, BatchId={BatchId}", _batchFilePath, result.BatchId);
+            logger.LogError(ex, "标记批次完成失败。BatchId={BatchId}", result.BatchId);
             throw;
         }
     }
@@ -129,25 +104,18 @@ public class SyncBatchRepository(
         ct.ThrowIfCancellationRequested();
         try
         {
-            await FileLock.WaitAsync(ct);
-            try
-            {
-                var batches = await LoadAllWithoutLockAsync(ct);
-                var batch = GetRequiredBatch(batches, batchId);
-                batch.Status = SyncBatchStatus.Failed;
-                batch.CompletedTimeLocal = failedTimeLocal;
-                batch.ErrorMessage = errorMessage;
-                batches[batchId] = batch;
-                await PersistWithoutLockAsync(batches, "标记同步批次失败", ct);
-            }
-            finally
-            {
-                FileLock.Release();
-            }
+            var loaded = await GetRequiredBatchFromShardsAsync(batchId, ct);
+            loaded.Entity.Status = SyncBatchStatus.Failed;
+            loaded.Entity.CompletedTimeLocal = failedTimeLocal;
+            loaded.Entity.ErrorMessage = errorMessage;
+            using var scope = TableSuffixScope.Use(loaded.Suffix);
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+            dbContext.SyncBatches.Update(loaded.Entity);
+            await dbContext.SaveChangesAsync(ct);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "标记批次失败失败。Path={BatchFilePath}, BatchId={BatchId}", _batchFilePath, batchId);
+            logger.LogError(ex, "标记批次失败失败。BatchId={BatchId}", batchId);
             throw;
         }
     }
@@ -158,25 +126,37 @@ public class SyncBatchRepository(
         ct.ThrowIfCancellationRequested();
         try
         {
-            await FileLock.WaitAsync(ct);
-            try
+            var maxCompletedTime = DateTime.MinValue;
+            var latestBatchId = default(string);
+            var suffixes = await ListExistingShardSuffixesAsync(ct);
+            foreach (var suffix in suffixes)
             {
-                var batches = await LoadAllWithoutLockAsync(ct);
-                var latestFailedBatch = batches.Values
-                    .Where(batch => string.Equals(batch.TableCode, tableCode, StringComparison.OrdinalIgnoreCase))
-                    .Where(static batch => batch.Status == SyncBatchStatus.Failed)
-                    .OrderByDescending(static batch => batch.CompletedTimeLocal ?? DateTime.MinValue)
-                    .FirstOrDefault();
-                return latestFailedBatch?.BatchId;
+                using var scope = TableSuffixScope.Use(suffix);
+                await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+                var candidate = await dbContext.SyncBatches
+                    .AsNoTracking()
+                    .Where(batch => batch.Status == SyncBatchStatus.Failed)
+                    .Where(batch => batch.TableCode == tableCode)
+                    .OrderByDescending(batch => batch.CompletedTimeLocal)
+                    .FirstOrDefaultAsync(ct);
+                if (candidate is null)
+                {
+                    continue;
+                }
+
+                var completedTime = candidate.CompletedTimeLocal ?? DateTime.MinValue;
+                if (completedTime > maxCompletedTime)
+                {
+                    maxCompletedTime = completedTime;
+                    latestBatchId = candidate.BatchId;
+                }
             }
-            finally
-            {
-                FileLock.Release();
-            }
+
+            return latestBatchId;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "查询最近失败批次失败。Path={BatchFilePath}, TableCode={TableCode}", _batchFilePath, tableCode);
+            logger.LogError(ex, "查询最近失败批次失败。TableCode={TableCode}", tableCode);
             throw;
         }
     }
@@ -204,109 +184,78 @@ public class SyncBatchRepository(
     /// <param name="batches">批次集合。</param>
     /// <param name="batchId">批次编号。</param>
     /// <returns>批次对象。</returns>
-    private static SyncBatch GetRequiredBatch(Dictionary<string, SyncBatch> batches, string batchId)
+    private async Task<LoadedBatchEntity> GetRequiredBatchFromShardsAsync(string batchId, CancellationToken ct)
     {
-        if (batches.TryGetValue(batchId, out var batch))
+        var loaded = await TryGetBatchFromExistingShardsAsync(batchId, ct);
+        if (loaded is not null)
         {
-            return CloneBatch(batch);
+            return loaded;
         }
 
         throw new InvalidOperationException($"未找到批次：{batchId}");
     }
 
     /// <summary>
-    /// 在已持锁状态下持久化批次集合。
+    /// 尝试从现有分片中加载批次。
     /// </summary>
-    /// <param name="batches">批次集合。</param>
-    /// <param name="scene">场景名称。</param>
+    /// <param name="batchId">批次编号。</param>
     /// <param name="ct">取消令牌。</param>
-    private async Task PersistWithoutLockAsync(Dictionary<string, SyncBatch> batches, string scene, CancellationToken ct)
+    /// <returns>加载结果。</returns>
+    private async Task<LoadedBatchEntity?> TryGetBatchFromExistingShardsAsync(string batchId, CancellationToken ct)
     {
-        await runtimeStorageGuard.EnsureWriteSpaceAsync(_batchFilePath, scene, ct);
-        var directory = Path.GetDirectoryName(_batchFilePath);
-        if (!string.IsNullOrWhiteSpace(directory))
+        var suffixes = await ListExistingShardSuffixesAsync(ct);
+        foreach (var suffix in suffixes)
         {
-            Directory.CreateDirectory(directory);
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+            var entity = await dbContext.SyncBatches
+                .AsNoTracking()
+                .FirstOrDefaultAsync(batch => batch.BatchId == batchId, ct);
+            if (entity is not null)
+            {
+                return new LoadedBatchEntity(suffix, entity);
+            }
         }
 
-        var json = JsonSerializer.Serialize(batches, BatchSerializerOptions);
-        var tempFilePath = $"{_batchFilePath}.tmp";
-        var backupFilePath = $"{_batchFilePath}.bak";
-        await WriteAtomicAsync(tempFilePath, backupFilePath, json, ct);
+        return null;
     }
 
     /// <summary>
-    /// 将 JSON 内容原子写入目标文件（写临时文件后替换）。
+    /// 列出已存在同步批次分片后缀。
     /// </summary>
-    /// <param name="tempFilePath">临时文件路径。</param>
-    /// <param name="backupFilePath">备份文件路径。</param>
-    /// <param name="json">JSON 内容。</param>
     /// <param name="ct">取消令牌。</param>
-    private async Task WriteAtomicAsync(string tempFilePath, string backupFilePath, string json, CancellationToken ct)
+    /// <returns>后缀列表（倒序）。</returns>
+    private async Task<IReadOnlyList<string>> ListExistingShardSuffixesAsync(CancellationToken ct)
     {
-        try
-        {
-            await File.WriteAllTextAsync(tempFilePath, json, ct);
-            if (File.Exists(_batchFilePath))
-            {
-                File.Replace(tempFilePath, _batchFilePath, backupFilePath, ignoreMetadataErrors: false);
-                if (File.Exists(backupFilePath))
-                {
-                    File.Delete(backupFilePath);
-                }
-            }
-            else
-            {
-                File.Move(tempFilePath, _batchFilePath);
-            }
-        }
-        catch
-        {
-            try
-            {
-                if (File.Exists(tempFilePath))
-                {
-                    File.Delete(tempFilePath);
-                }
-            }
-            catch (Exception cleanupEx)
-            {
-                logger.LogError(cleanupEx, "清理批次临时文件失败。TempPath={TempFilePath}", tempFilePath);
-            }
-            throw;
-        }
+        var tables = await shardTableResolver.ListPhysicalTablesAsync(SyncBatchLogicalTable, ct);
+        return tables
+            .Select(table => table[SyncBatchLogicalTable.Length..])
+            .Where(static suffix => !string.IsNullOrWhiteSpace(suffix))
+            .Distinct(StringComparer.Ordinal)
+            .OrderByDescending(static suffix => suffix, StringComparer.Ordinal)
+            .ToList();
     }
 
     /// <summary>
-    /// 在已持锁状态下读取全部批次。
+    /// 解析批次分表后缀。
     /// </summary>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>批次字典。</returns>
-    private async Task<Dictionary<string, SyncBatch>> LoadAllWithoutLockAsync(CancellationToken ct)
+    /// <param name="timeLocal">本地时间。</param>
+    /// <returns>分表后缀。</returns>
+    private string ResolveBatchSuffix(DateTime timeLocal)
     {
-        if (!File.Exists(_batchFilePath))
-        {
-            return new Dictionary<string, SyncBatch>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        var json = await File.ReadAllTextAsync(_batchFilePath, ct);
-        if (string.IsNullOrWhiteSpace(json))
-        {
-            return new Dictionary<string, SyncBatch>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        var data = JsonSerializer.Deserialize<Dictionary<string, SyncBatch>>(json) ?? new Dictionary<string, SyncBatch>(StringComparer.OrdinalIgnoreCase);
-        return new Dictionary<string, SyncBatch>(data, StringComparer.OrdinalIgnoreCase);
+        var offset = TimeZoneInfo.Local.GetUtcOffset(timeLocal);
+        return shardSuffixResolver.Resolve(new DateTimeOffset(timeLocal, offset));
     }
 
     /// <summary>
-    /// 克隆批次对象。
+    /// 将领域批次模型映射为持久化实体。
     /// </summary>
-    /// <param name="batch">源批次。</param>
-    /// <returns>克隆结果。</returns>
-    private static SyncBatch CloneBatch(SyncBatch batch)
+    /// <param name="batch">领域批次对象。</param>
+    /// <param name="status">目标状态。</param>
+    /// <returns>持久化实体。</returns>
+    private static SyncBatchEntity MapToEntity(SyncBatch batch, SyncBatchStatus status)
     {
-        return new SyncBatch
+        return new SyncBatchEntity
         {
             BatchId = batch.BatchId,
             ParentBatchId = batch.ParentBatchId,
@@ -318,10 +267,17 @@ public class SyncBatchRepository(
             UpdateCount = batch.UpdateCount,
             DeleteCount = batch.DeleteCount,
             SkipCount = batch.SkipCount,
-            Status = batch.Status,
+            Status = status,
             StartedTimeLocal = batch.StartedTimeLocal,
             CompletedTimeLocal = batch.CompletedTimeLocal,
             ErrorMessage = batch.ErrorMessage,
         };
     }
+
+    /// <summary>
+    /// 分片批次加载结果。
+    /// </summary>
+    /// <param name="Suffix">分片后缀。</param>
+    /// <param name="Entity">批次实体。</param>
+    private readonly record struct LoadedBatchEntity(string Suffix, SyncBatchEntity Entity);
 }

@@ -1,8 +1,10 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 移除 `InMemorySyncBatchRepository` 注册，新增 `SyncBatchRepository` 文件持久化实现（`ISyncBatchRepository` 由纯内存改为落盘存储），服务重启后可恢复批次状态并支持最近失败批次查询。
-- `SyncJob` 配置新增 `BatchFilePath`，默认示例 `data/sync-batches.json`，并纳入运行期存储自检（目录可写、文件可读写、磁盘可用空间）。
+- 将 `SyncBatchRepository` 从文件持久化升级为 SQL Server 持久化分片实现：批次数据写入 `sync_batches_{yyyyMM}`，支持 `Pending/InProgress/Completed/Failed` 状态流转与跨分片查询最近失败批次。
+- 新增 `SyncBatchEntity`、`SyncBatchEntityTypeConfiguration` 与迁移 `20260416010041_AddSyncBatchShardTable.cs`，将同步批次纳入自动迁移与自动分表预建链路。
+- 分表纳管集合新增 `sync_batches`，启动阶段通过 `AutoMigrationService + ShardTableProvisioner` 自动迁移与自动分表。
+- 移除批次文件落盘残留配置与自检：删除 `SyncJob.BatchFilePath` 与运行期批次文件探针逻辑。
 - 实施 PR-11（补偿重试链路）：新增 `IFeedbackCompensationService` 与 `FeedbackCompensationService`（支持按任务编码重试、按批次重试）；新增 `FeedbackCompensationResult` 结果模型；新增 `FeedbackCompensationJobOptions` 配置实体；新增 `FeedbackCompensationBackgroundWorker` 后台任务并接入 `Program.cs` 与 `ServiceCollectionExtensions.cs`；`appsettings.json` 增加 `FeedbackCompensationJob` 配置节。
 - 新增补偿单元测试 `FeedbackCompensationServiceTests`，覆盖批次成功、批次失败、按任务跳过、按任务单条重试四个场景。
 - 已通读代码并更新实施计划进度：当前已完成 14/17（PR-11 已完成），已到达 M4（PR-16）里程碑检验时刻。
@@ -75,6 +77,7 @@
 │   ├── Aggregates/DropLogAggregate/DropLogEntity.cs
 │   ├── Aggregates/WmsPickToWcsAggregate/WmsPickToWcsEntity.cs
 │   ├── Aggregates/WmsSplitPickToLightCartonAggregate/WmsSplitPickToLightCartonEntity.cs
+│   ├── Aggregates/SyncBatchAggregate/SyncBatchEntity.cs
 │   ├── Options/AutoTuneOptions.cs
 │   ├── Options/DangerZoneOptions.cs
 │   ├── Options/OracleOptions.cs
@@ -212,6 +215,7 @@
 │   ├── Persistence/EntityConfigurations/BusinessTaskEntityTypeConfiguration.cs
 │   ├── Persistence/EntityConfigurations/ScanLogEntityTypeConfiguration.cs
 │   ├── Persistence/EntityConfigurations/DropLogEntityTypeConfiguration.cs
+│   ├── Persistence/EntityConfigurations/SyncBatchEntityTypeConfiguration.cs
 │   ├── Persistence/Sharding/TableSuffixScope.cs
 │   ├── Persistence/Sharding/IShardSuffixResolver.cs
 │   ├── Persistence/Sharding/MonthShardSuffixResolver.cs
@@ -222,6 +226,7 @@
 │   ├── Migrations/20260413144042_AddBusinessTaskTable.Designer.cs
 │   ├── Migrations/20260413160852_AddScanDropLogTables.cs
 │   ├── Migrations/20260413160852_AddScanDropLogTables.Designer.cs
+│   ├── Migrations/20260416010041_AddSyncBatchShardTable.cs
 │   ├── Migrations/HubDbContextModelSnapshot.cs
 │   └── Services
 │       ├── IDangerZoneExecutor.cs
@@ -426,13 +431,15 @@
 - `ShardTableResolver.cs`：分表解析仓储实现，按逻辑表枚举物理分表并解析分表月份后缀。
 - `ShardRetentionRepository.cs`：分表保留期仓储实现，在危险动作隔离器保护下执行分表删除并输出审计日志，且可基于系统元数据生成可回放回滚 DDL。
 - `SyncCheckpointRepository.cs`：检查点文件持久化实现，读写日志均以 Information 级落盘；写入改为临时文件 + File.Replace/Move 原子替换，防止崩溃产生半写 JSON。
-- `SyncBatchRepository.cs`：同步批次仓储文件持久化实现，支持 `Pending/InProgress/Completed/Failed` 状态流转与最近失败批次查询，进程重启后可恢复批次状态。
+- `SyncBatchRepository.cs`：同步批次仓储 SQL Server 持久化分片实现，写入 `sync_batches_{yyyyMM}`，支持跨分片查询最近失败批次。
+- `SyncBatchEntity.cs` + `SyncBatchEntityTypeConfiguration.cs`：同步批次实体与映射配置，定义批次状态流转字段、唯一约束与查询索引。
 - `InMemorySyncChangeLogRepository.cs`：同步变更日志仓储内存实现，支持批量写入审计记录。
 - `InMemorySyncDeletionLogRepository.cs`：同步删除日志仓储内存实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖，并在启动阶段从启用同步表配置提取逻辑表名集合，完成安全校验与空配置异常拦截。
 - `20260408020833_RebuildInitialHubSchema.cs`：初始化迁移，定义 `sorting_task_trace`、`IDX_PICKTOLIGHT_CARTON1`、`IDX_PICKTOWCS2` 三张聚合表结构及索引。
 - `20260413144042_AddBusinessTaskTable.cs`：新增 `business_tasks` 固定表迁移，包含任务编码、条码、格口、扫描落格时间、状态、回传状态等字段及唯一索引。
 - `20260413160852_AddScanDropLogTables.cs`：新增 `scan_logs` 与 `drop_logs` 表迁移，包含审计字段与查询索引。
+- `20260416010041_AddSyncBatchShardTable.cs`：新增 `sync_batches` 基础表迁移，用于同步批次自动迁移基线与分片模板。
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
 - `nlog.config`：NLog 日志配置，输出至控制台与两个滚动日志文件：通用日志（`hub-${shortdate}.log`，按日切割，单文件上限 10 MB，保留 30 天）；同步专属日志（`sync-${shortdate}.log`，仅收录同步链路相关组件日志，便于独立分析同步性能问题）。
 - `Program.cs`（Host）：Host 启动入口，现已支持 API + Worker 共存，启用 Controllers、Swagger（中文注释）并保留自动迁移与同步后台任务注册。

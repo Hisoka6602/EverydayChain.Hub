@@ -34,10 +34,10 @@ public class ServiceCollectionExtensionsTests
     }
 
     /// <summary>
-    /// 无启用同步表时仍应包含分拣任务追踪逻辑表。
+    /// 无启用同步表时仍应包含固定纳管逻辑表。
     /// </summary>
     [Fact]
-    public void BuildManagedLogicalTables_WithEmptyEnabledTables_ShouldContainSortingTaskTrace()
+    public void BuildManagedLogicalTables_WithEmptyEnabledTables_ShouldContainFixedManagedTables()
     {
         var options = new SyncJobOptions
         {
@@ -53,8 +53,9 @@ public class ServiceCollectionExtensionsTests
         };
 
         var tables = ServiceCollectionExtensions.BuildManagedLogicalTables(options);
-        Assert.Single(tables);
+        Assert.Equal(2, tables.Count);
         Assert.Contains("sorting_task_trace", tables);
+        Assert.Contains("sync_batches", tables);
     }
 
     /// <summary>
@@ -90,8 +91,9 @@ public class ServiceCollectionExtensionsTests
 
         var tables = ServiceCollectionExtensions.BuildManagedLogicalTables(options);
 
-        Assert.Equal(2, tables.Count);
+        Assert.Equal(3, tables.Count);
         Assert.Contains("sorting_task_trace", tables);
+        Assert.Contains("sync_batches", tables);
         Assert.Contains("Table_A", tables);
     }
 

@@ -16,7 +16,7 @@
 | 1.4 | 本地暂存：`SyncStagingRepository` 支持分页写入与清理 | ✅ 已完成 | `Infrastructure/Repositories/SyncStagingRepository.cs` |
 | 1.5 | 幂等合并：`SqlServerSyncUpsertRepository.MergeCoreAsync` 按唯一键 Insert/Update/Skip | ✅ 已完成 | `Infrastructure/Repositories/SqlServerSyncUpsertRepository.cs` |
 | 1.6 | 检查点持久化：`SyncCheckpointRepository` 文件读写 + 断点续跑 | ✅ 已完成 | `Infrastructure/Repositories/SyncCheckpointRepository.cs` |
-| 1.7 | 批次日志：`SyncBatchRepository`（文件持久化，重启可恢复） | ✅ 已完成 | `Infrastructure/Repositories/SyncBatchRepository.cs` |
+| 1.7 | 批次日志：`SyncBatchRepository`（SQL Server 持久化 + 自动分表 + 自动迁移） | ✅ 已完成 | `Infrastructure/Repositories/SyncBatchRepository.cs` |
 | 1.8 | 变更日志：`InMemorySyncChangeLogRepository`（内存有界缓冲，上限 200,000 条） | ✅ 已完成 | `Infrastructure/Repositories/InMemorySyncChangeLogRepository.cs` |
 | 1.9 | 应用层编排：`SyncOrchestrator`、`SyncWindowCalculator`、`SyncExecutionService` | ✅ 已完成 | `Application/Services/` |
 | 1.10 | Host 后台任务：`SyncBackgroundWorker` | ✅ 已完成 | `Host/Workers/SyncBackgroundWorker.cs` |

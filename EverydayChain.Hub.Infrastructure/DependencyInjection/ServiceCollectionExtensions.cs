@@ -37,6 +37,8 @@ namespace EverydayChain.Hub.Infrastructure.DependencyInjection;
 public static class ServiceCollectionExtensions {
     /// <summary>分拣任务追踪逻辑表名。</summary>
     private const string SortingTaskTraceLogicalTable = "sorting_task_trace";
+    /// <summary>同步批次逻辑表名。</summary>
+    private const string SyncBatchLogicalTable = "sync_batches";
 
     /// <summary>
     /// 注册基础设施层全部服务，包括 EF Core 工厂、分表服务、调谐器、危险操作执行器与自动迁移应用服务（不含 HostedService 注册，该注册由 Host 层 Program.cs 负责）。
@@ -143,6 +145,7 @@ public static class ServiceCollectionExtensions {
     public static HashSet<string> BuildManagedLogicalTables(SyncJobOptions syncJobOptions) {
         var managedTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         LogicalTableNameNormalizer.AddValidated(managedTables, SortingTaskTraceLogicalTable, "Sharding.SortingTaskTrace");
+        LogicalTableNameNormalizer.AddValidated(managedTables, SyncBatchLogicalTable, "Sharding.SyncBatch");
         foreach (var table in (syncJobOptions.Tables ?? []).Where(x => x.Enabled)) {
             if (string.IsNullOrWhiteSpace(table.TargetLogicalTable)) {
                 throw new InvalidOperationException($"分表配置无效：启用表 {table.TableCode} 的 TargetLogicalTable 不能为空白。");

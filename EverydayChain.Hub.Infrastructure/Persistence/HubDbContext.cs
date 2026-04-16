@@ -1,6 +1,7 @@
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Aggregates.DropLogAggregate;
 using EverydayChain.Hub.Domain.Aggregates.ScanLogAggregate;
+using EverydayChain.Hub.Domain.Aggregates.SyncBatchAggregate;
 using EverydayChain.Hub.Domain.Aggregates.SortingTaskTraceAggregate;
 using EverydayChain.Hub.Domain.Aggregates.WmsPickToWcsAggregate;
 using EverydayChain.Hub.Domain.Aggregates.WmsSplitPickToLightCartonAggregate;
@@ -30,6 +31,8 @@ public class HubDbContext : DbContext
     private const string ScanLogLogicalTable = "scan_logs";
     /// <summary>落格日志固定表名（非分片，不含后缀）。</summary>
     private const string DropLogLogicalTable = "drop_logs";
+    /// <summary>同步批次逻辑表名（分片表，按月后缀路由）。</summary>
+    private const string SyncBatchLogicalTable = "sync_batches";
 
     /// <summary>分表配置快照，用于动态拼接表名与 Schema。</summary>
     private readonly ShardingOptions _shardingOptions;
@@ -71,6 +74,11 @@ public class HubDbContext : DbContext
     /// </summary>
     public DbSet<DropLogEntity> DropLogs => Set<DropLogEntity>();
 
+    /// <summary>
+    /// 同步批次实体集，映射到按月分片表 <c>sync_batches_{yyyyMM}</c>。
+    /// </summary>
+    public DbSet<SyncBatchEntity> SyncBatches => Set<SyncBatchEntity>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -78,6 +86,7 @@ public class HubDbContext : DbContext
         var sortingTaskTraceTableName = $"{SortingTaskTraceLogicalTable}{suffix}";
         var wmsSplitPickToLightCartonTableName = $"{WmsSplitPickToLightCartonLogicalTable}{suffix}";
         var wmsPickToWcsTableName = $"{WmsPickToWcsLogicalTable}{suffix}";
+        var syncBatchTableName = $"{SyncBatchLogicalTable}{suffix}";
 
         modelBuilder.ApplyConfiguration(new SortingTaskTraceEntityTypeConfiguration(sortingTaskTraceTableName, _shardingOptions.Schema));
         ConfigureWmsSplitPickToLightCartonEntity(modelBuilder, wmsSplitPickToLightCartonTableName);
@@ -87,6 +96,7 @@ public class HubDbContext : DbContext
         // 扫描日志与落格日志使用固定表名，不随分片后缀变化。
         modelBuilder.ApplyConfiguration(new ScanLogEntityTypeConfiguration(ScanLogLogicalTable, _shardingOptions.Schema));
         modelBuilder.ApplyConfiguration(new DropLogEntityTypeConfiguration(DropLogLogicalTable, _shardingOptions.Schema));
+        modelBuilder.ApplyConfiguration(new SyncBatchEntityTypeConfiguration(syncBatchTableName, _shardingOptions.Schema));
     }
 
     /// <summary>
