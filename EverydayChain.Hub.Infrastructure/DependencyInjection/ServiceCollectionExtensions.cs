@@ -37,6 +37,14 @@ namespace EverydayChain.Hub.Infrastructure.DependencyInjection;
 public static class ServiceCollectionExtensions {
     /// <summary>分拣任务追踪逻辑表名。</summary>
     private const string SortingTaskTraceLogicalTable = "sorting_task_trace";
+    /// <summary>同步批次逻辑表名。</summary>
+    private const string SyncBatchLogicalTable = "sync_batches";
+    /// <summary>业务任务逻辑表名。</summary>
+    private const string BusinessTaskLogicalTable = "business_tasks";
+    /// <summary>扫描日志逻辑表名。</summary>
+    private const string ScanLogLogicalTable = "scan_logs";
+    /// <summary>落格日志逻辑表名。</summary>
+    private const string DropLogLogicalTable = "drop_logs";
 
     /// <summary>
     /// 注册基础设施层全部服务，包括 EF Core 工厂、分表服务、调谐器、危险操作执行器与自动迁移应用服务（不含 HostedService 注册，该注册由 Host 层 Program.cs 负责）。
@@ -52,10 +60,12 @@ public static class ServiceCollectionExtensions {
         services.Configure<RetentionJobOptions>(configuration.GetSection(RetentionJobOptions.SectionName));
         services.Configure<OracleOptions>(configuration.GetSection(OracleOptions.SectionName));
         services.Configure<WmsFeedbackOptions>(configuration.GetSection(WmsFeedbackOptions.SectionName));
+        services.Configure<FeedbackCompensationJobOptions>(configuration.GetSection(FeedbackCompensationJobOptions.SectionName));
         services.Configure<ExceptionRuleOptions>(configuration.GetSection(ExceptionRuleOptions.SectionName));
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
         var syncOptions = configuration.GetSection(SyncJobOptions.SectionName).Get<SyncJobOptions>() ?? new SyncJobOptions();
+        var retentionJobOptions = configuration.GetSection(RetentionJobOptions.SectionName).Get<RetentionJobOptions>() ?? new RetentionJobOptions();
         var managedLogicalTables = BuildManagedLogicalTables(syncOptions).ToArray();
 
         services.AddDbContextFactory<HubDbContext>(options => {
@@ -69,6 +79,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IRuntimeStorageGuard, RuntimeStorageGuard>();
         services.AddSingleton<ISqlExecutionTuner, SqlExecutionTuner>();
         services.AddSingleton<IReadOnlyList<string>>(managedLogicalTables);
+        services.AddSingleton<IReadOnlyList<RetentionLogTableOptions>>(retentionJobOptions.LogTables);
         services.AddSingleton<IShardTableProvisioner, ShardTableProvisioner>();
         services.AddScoped<IAutoMigrationService, AutoMigrationService>();
         services.AddSingleton<ISortingTaskTraceWriter, SortingTaskTraceWriter>();
@@ -79,7 +90,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<ISyncStagingRepository, SyncStagingRepository>();
         services.AddSingleton<ISyncUpsertRepository, SqlServerSyncUpsertRepository>();
         services.AddSingleton<ISyncCheckpointRepository, SyncCheckpointRepository>();
-        services.AddSingleton<ISyncBatchRepository, InMemorySyncBatchRepository>();
+        services.AddSingleton<ISyncBatchRepository, SyncBatchRepository>();
         services.AddSingleton<ISyncChangeLogRepository, InMemorySyncChangeLogRepository>();
         services.AddSingleton<ISyncDeletionRepository, SyncDeletionRepository>();
         services.AddSingleton<ISyncDeletionLogRepository, InMemorySyncDeletionLogRepository>();
@@ -112,6 +123,7 @@ public static class ServiceCollectionExtensions {
                 sp.GetRequiredService<IWmsOracleFeedbackGateway>(),
                 sp.GetRequiredService<IOptions<WmsFeedbackOptions>>().Value,
                 sp.GetRequiredService<ILogger<WmsFeedbackService>>()));
+        services.AddSingleton<IFeedbackCompensationService, FeedbackCompensationService>();
         // PR-10：注册异常规则服务（波次清理、多标签决策、回流规则）。
         services.AddSingleton<IWaveCleanupService>(sp =>
             new WaveCleanupService(
@@ -141,6 +153,10 @@ public static class ServiceCollectionExtensions {
     public static HashSet<string> BuildManagedLogicalTables(SyncJobOptions syncJobOptions) {
         var managedTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         LogicalTableNameNormalizer.AddValidated(managedTables, SortingTaskTraceLogicalTable, "Sharding.SortingTaskTrace");
+        LogicalTableNameNormalizer.AddValidated(managedTables, SyncBatchLogicalTable, "Sharding.SyncBatch");
+        LogicalTableNameNormalizer.AddValidated(managedTables, BusinessTaskLogicalTable, "Sharding.BusinessTask");
+        LogicalTableNameNormalizer.AddValidated(managedTables, ScanLogLogicalTable, "Sharding.ScanLog");
+        LogicalTableNameNormalizer.AddValidated(managedTables, DropLogLogicalTable, "Sharding.DropLog");
         foreach (var table in (syncJobOptions.Tables ?? []).Where(x => x.Enabled)) {
             if (string.IsNullOrWhiteSpace(table.TargetLogicalTable)) {
                 throw new InvalidOperationException($"分表配置无效：启用表 {table.TableCode} 的 TargetLogicalTable 不能为空白。");

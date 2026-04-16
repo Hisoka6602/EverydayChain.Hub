@@ -51,6 +51,7 @@ builder.Services.AddSwaggerGen(options => {
 builder.Services.AddHostedService<AutoMigrationHostedService>();
 builder.Services.AddHostedService<SyncBackgroundWorker>();
 builder.Services.AddHostedService<RetentionBackgroundWorker>();
+builder.Services.AddHostedService<FeedbackCompensationBackgroundWorker>();
 #if !DEBUG
 var isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
 var isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);

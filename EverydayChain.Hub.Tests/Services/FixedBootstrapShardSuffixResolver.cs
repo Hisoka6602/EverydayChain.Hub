@@ -15,6 +15,12 @@ public sealed class FixedBootstrapShardSuffixResolver(IReadOnlyList<string> boot
     }
 
     /// <inheritdoc/>
+    public string ResolveLocal(DateTime localTime)
+    {
+        return "_202604";
+    }
+
+    /// <inheritdoc/>
     public IReadOnlyList<string> ResolveBootstrapSuffixes(DateTimeOffset now, int monthsAhead)
     {
         return bootstrapSuffixes;

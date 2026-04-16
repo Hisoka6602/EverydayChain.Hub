@@ -1,15 +1,24 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 修正条码与格口规则：条码解析改为固定规则“拆零=`02` 开头取第 3 位数字格口号、整件=`Z` 开头取第 2 位数字格口号”，并新增 `BarcodeParseResult.TargetChuteCode` 输出；请求格口服务改为基于条码解析目标格口（仍保留任务命中与已扫描状态校验）；同步更新 `条码规则基线.md` 与 `对外API接口基线.md`。
-- 实施 PR-10（异常规则链路）：新增 `ExceptionRuleOptions`/`WaveCleanupRuleOptions`/`MultiLabelRuleOptions`/`RecirculationRuleOptions` 配置实体（`Domain/Options/`，每类独立文件）；新增 `MultiLabelDecisionResult` 领域模型（`Domain/MultiLabel/`）；新增 `RecirculationDecisionResult` 领域模型（`Domain/Recirculation/`）；新增 `IWaveCleanupService` 接口（`Application/WaveCleanup/Abstractions/`）与 `WaveCleanupResult`（独立文件）及 `WaveCleanupService` 实现（支持批量更新 + TargetStatusOnCleanup 配置应用）；新增 `IMultiLabelDecisionService` 接口（`Application/MultiLabel/Abstractions/`）与 `MultiLabelDecisionService` 实现；新增 `IRecirculationService` 接口（`Application/Recirculation/Abstractions/`）与 `RecirculationService` 实现；`BusinessTaskEntity` 新增 `WaveCode`、`IsRecirculated`、`ScanRetryCount` 字段；`TaskExecutionService` 在扫描状态校验失败时递增 `ScanRetryCount`（为回流规则提供判定依据）；`IBusinessTaskRepository` 新增 `FindByWaveCodeAsync`、`FindActiveByBarcodeAsync`、`BulkMarkExceptionByWaveCodeAsync` 方法；新增 EF 迁移 `20260413185000_AddExceptionRuleFields`；`ServiceCollectionExtensions` 注册三个新服务；`appsettings.json` 增加 `ExceptionRule` 配置节（含全局开关与 dry-run 支持）；新增 `ExceptionRuleTests` 测试 16 例。
-- 实施 PR-15（M3 里程碑全量审查：回传与审计阶段）：PR-08 与 PR-09 均已完成，构建与测试全绿（0 Warning 0 Error，138/138 测试通过），M3 里程碑审查结论归档到逐文件代码检查台账。
-- 新增测试合计 16 例，总计 138/138 测试通过。
-- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过（0 Warning 0 Error，138/138）。
+- 新增日志表自动删除配置能力：`RetentionJob.LogTables` 支持对 `sorting_task_trace`、`scan_logs`、`drop_logs`、`sync_batches` 分别配置 `Enabled/KeepMonths/DryRun/AllowDrop`。
+- `RetentionExecutionService` 扩展为“同步表保留期 + 日志表保留期”双入口执行，统一走现有危险动作隔离与回滚脚本生成链路。
+- `appsettings.json` 已补齐日志表清理示例配置，支持逐表启停和保留期参数化。
+- 将 `SyncBatchRepository` 从文件持久化升级为 SQL Server 持久化分片实现：批次数据写入 `sync_batches_{yyyyMM}`，支持 `Pending/InProgress/Completed/Failed` 状态流转与跨分片查询最近失败批次。
+- 新增 `SyncBatchEntity`、`SyncBatchEntityTypeConfiguration` 与迁移 `20260416010041_AddSyncBatchShardTable.cs`，将同步批次纳入自动迁移与自动分表预建链路。
+- 分表纳管集合新增 `sync_batches`，启动阶段通过 `AutoMigrationService + ShardTableProvisioner` 自动迁移与自动分表。
+- `business_tasks`、`scan_logs`、`drop_logs` 从固定表改为按月分表（`{logical}_{yyyyMM}`）并纳入自动分表预建；对应仓储改为分片写入与跨分片查询。
+- 移除批次文件落盘残留配置与自检：删除 `SyncJob.BatchFilePath` 与运行期批次文件探针逻辑。
+- 实施 PR-11（补偿重试链路）：新增 `IFeedbackCompensationService` 与 `FeedbackCompensationService`（支持按任务编码重试、按批次重试）；新增 `FeedbackCompensationResult` 结果模型；新增 `FeedbackCompensationJobOptions` 配置实体；新增 `FeedbackCompensationBackgroundWorker` 后台任务并接入 `Program.cs` 与 `ServiceCollectionExtensions.cs`；`appsettings.json` 增加 `FeedbackCompensationJob` 配置节。
+- 新增补偿单元测试 `FeedbackCompensationServiceTests`，覆盖批次成功、批次失败、按任务跳过、按任务单条重试四个场景。
+- 已通读代码并更新实施计划进度：当前已完成 14/17（PR-11 已完成），已到达 M4（PR-16）里程碑检验时刻。
+- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过（0 Warning 0 Error）。
 ## 后续可完善点
-- 继续推进 PR-11（补偿重试链路）、PR-12（联调收口）。
-- 推进 PR-16（M4 里程碑审查，依赖 PR-10 + PR-11 完成后）。
-- 开启异常规则：生产环境确认规则参数后，将 `ExceptionRule.Enabled` 置 `true`，建议先用 `DryRun=true` 观察审计日志再正式启用。
+- 根据产线峰值写入量细化各日志表差异化保留月数，并结合容量监控进行滚动调优。
+- 评估并推进 `InMemorySyncChangeLogRepository`、`InMemorySyncDeletionLogRepository` 的持久化替换，彻底移除同步链路内存仓储。
+- 推进 PR-12（联调收口与验收归档）。
+- 执行 PR-16（M4 里程碑全量审查，PR-10 + PR-11 依赖已满足）。
+- 开启补偿后台任务：生产环境确认重试节流参数后，将 `FeedbackCompensationJob.Enabled` 置 `true`。
 
 ## 解决方案文件树与职责
 ```text
@@ -73,17 +82,20 @@
 │   ├── Aggregates/DropLogAggregate/DropLogEntity.cs
 │   ├── Aggregates/WmsPickToWcsAggregate/WmsPickToWcsEntity.cs
 │   ├── Aggregates/WmsSplitPickToLightCartonAggregate/WmsSplitPickToLightCartonEntity.cs
+│   ├── Aggregates/SyncBatchAggregate/SyncBatchEntity.cs
 │   ├── Options/AutoTuneOptions.cs
 │   ├── Options/DangerZoneOptions.cs
 │   ├── Options/OracleOptions.cs
 │   ├── Options/SwaggerOptions.cs
 │   ├── Options/RetentionJobOptions.cs
+│   ├── Options/RetentionLogTableOptions.cs
 │   ├── Options/ShardingOptions.cs
 │   ├── Options/SyncDeleteOptions.cs
 │   ├── Options/SyncJobOptions.cs
 │   ├── Options/SyncRetentionOptions.cs
 │   ├── Options/SyncTableOptions.cs
 │   ├── Options/WmsFeedbackOptions.cs
+│   ├── Options/FeedbackCompensationJobOptions.cs
 │   ├── Options/ExceptionRuleOptions.cs
 │   ├── Options/WaveCleanupRuleOptions.cs
 │   ├── Options/MultiLabelRuleOptions.cs
@@ -114,6 +126,7 @@
 │   ├── Models/ScanMatchResult.cs
 │   ├── Models/TaskExecutionResult.cs
 │   ├── Models/WmsFeedbackApplicationResult.cs
+│   ├── Models/FeedbackCompensationResult.cs
 │   ├── Abstractions/Persistence/ISyncTaskConfigRepository.cs
 │   ├── Abstractions/Persistence/IOracleSourceReader.cs
 │   ├── Abstractions/Persistence/ISyncStagingRepository.cs
@@ -145,6 +158,7 @@
 │   ├── Abstractions/Services/IChuteQueryService.cs
 │   ├── Abstractions/Services/IDropFeedbackService.cs
 │   ├── Abstractions/Services/IWmsFeedbackService.cs
+│   ├── Abstractions/Services/IFeedbackCompensationService.cs
 │   ├── Abstractions/Integrations/IWmsOracleFeedbackGateway.cs
 │   ├── WaveCleanup/Abstractions/IWaveCleanupService.cs
 │   ├── WaveCleanup/Abstractions/WaveCleanupResult.cs
@@ -165,6 +179,7 @@
 │   ├── Services/ChuteQueryService.cs
 │   ├── Services/DropFeedbackService.cs
 │   ├── Feedback/Services/WmsFeedbackService.cs
+│   ├── Feedback/Services/FeedbackCompensationService.cs
 │   ├── Services/DeletionExecutionService.cs
 │   └── Services/RetentionExecutionService.cs
 ├── EverydayChain.Hub.SharedKernel
@@ -194,7 +209,7 @@
 │   ├── Repositories/ShardTableResolver.cs
 │   ├── Repositories/ShardRetentionRepository.cs
 │   ├── Repositories/SyncCheckpointRepository.cs
-│   ├── Repositories/InMemorySyncBatchRepository.cs
+│   ├── Repositories/SyncBatchRepository.cs
 │   ├── Repositories/InMemorySyncChangeLogRepository.cs
 │   ├── Repositories/InMemorySyncDeletionLogRepository.cs
 │   ├── Repositories/BusinessTaskRepository.cs
@@ -206,6 +221,7 @@
 │   ├── Persistence/EntityConfigurations/BusinessTaskEntityTypeConfiguration.cs
 │   ├── Persistence/EntityConfigurations/ScanLogEntityTypeConfiguration.cs
 │   ├── Persistence/EntityConfigurations/DropLogEntityTypeConfiguration.cs
+│   ├── Persistence/EntityConfigurations/SyncBatchEntityTypeConfiguration.cs
 │   ├── Persistence/Sharding/TableSuffixScope.cs
 │   ├── Persistence/Sharding/IShardSuffixResolver.cs
 │   ├── Persistence/Sharding/MonthShardSuffixResolver.cs
@@ -216,6 +232,7 @@
 │   ├── Migrations/20260413144042_AddBusinessTaskTable.Designer.cs
 │   ├── Migrations/20260413160852_AddScanDropLogTables.cs
 │   ├── Migrations/20260413160852_AddScanDropLogTables.Designer.cs
+│   ├── Migrations/20260416010041_AddSyncBatchShardTable.cs
 │   ├── Migrations/HubDbContextModelSnapshot.cs
 │   └── Services
 │       ├── IDangerZoneExecutor.cs
@@ -267,6 +284,7 @@
 │       ├── ChuteQueryServiceTests.cs
 │       ├── DropFeedbackServiceTests.cs
 │       ├── WmsFeedbackServiceTests.cs
+│       ├── FeedbackCompensationServiceTests.cs
 │       ├── ScanDropLogTests.cs
 │       ├── InMemoryScanLogRepository.cs
 │       ├── InMemoryDropLogRepository.cs
@@ -292,6 +310,7 @@
     ├── Workers/SyncBackgroundWorker.cs
     ├── Workers/RetentionBackgroundWorker.cs
     ├── Workers/AutoMigrationHostedService.cs
+    ├── Workers/FeedbackCompensationBackgroundWorker.cs
     ├── Properties/launchSettings.json
     ├── nlog.config
     ├── appsettings.json
@@ -333,6 +352,7 @@
 - `BusinessTaskFeedbackStatus.cs`：业务回传状态枚举，覆盖 NotRequired、Pending、Completed、Failed，标识任务回传 WMS 的进度。
 - `RemoteStatusConsumeProfile.cs`（`EverydayChain.Hub.Domain/Sync/Models`）：StatusDriven 消费配置模型，统一承载状态列、待处理值、完成值、回写开关与批次大小。
 - `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`SyncTable`、`SyncDelete`、`SyncRetention`、`RetentionJob`、`Oracle` 等），供 Infrastructure 绑定读取。
+- `Domain/Options/RetentionLogTableOptions.cs`：日志表保留期配置实体，定义单日志表 `Enabled`、`LogicalTableName`、`KeepMonths`、`DryRun`、`AllowDrop` 参数。
 - `SwaggerOptions.cs`：Swagger 文档配置实体，承载标题、版本、描述与各环境开关（开发/测试/生产）。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
 - `BusinessTaskEntity.cs`（`Domain/Aggregates/BusinessTaskAggregate`）：统一业务任务聚合根实体，承载任务编码、来源表、业务键、条码、目标格口、实际格口、设备编码、链路追踪、失败原因、扫描时间、落格时间、任务状态、回传状态与本地时间字段。
@@ -345,22 +365,25 @@
 - `Application/Abstractions/Services/ITaskExecutionService.cs`：任务执行服务抽象，负责推进业务任务扫描状态并持久化。
 - `Application/ScanMatch/Services/ScanMatchService.cs`：扫描匹配服务实现，按条码在业务任务仓储中定位任务。
 - `Application/TaskExecution/Services/TaskExecutionService.cs`：任务执行服务实现，按条码匹配任务、校验状态并推进到已扫描并持久化。
-- `Infrastructure/Repositories/BusinessTaskRepository.cs`：业务任务仓储 EF Core 实现，操作 `business_tasks` 固定非分片表。
-- `Infrastructure/Persistence/EntityConfigurations/BusinessTaskEntityTypeConfiguration.cs`：业务任务 EF Fluent API 配置，定义固定表名、字段约束与索引。
+- `Infrastructure/Repositories/BusinessTaskRepository.cs`：业务任务仓储 EF Core 实现，按月分片写入与查询 `business_tasks_{yyyyMM}`，并兼容历史无后缀表读取。
+- `Infrastructure/Persistence/EntityConfigurations/BusinessTaskEntityTypeConfiguration.cs`：业务任务 EF Fluent API 配置，定义分片表结构、字段约束与索引。
 - `Application/Abstractions/Services/IBarcodeParser.cs` + `Application/Services/BarcodeParser.cs`：条码解析服务抽象与实现，按固定规则“拆零 `02` 开头取第 3 位数字、整件 `Z` 开头取第 2 位数字”分类并提取 `TargetChuteCode`，统一输出失败语义（InvalidBarcode、UnsupportedBarcodeType、ParseError）。
 - `Application/Abstractions/Services/IScanIngressService.cs` + `Application/Services/ScanIngressService.cs`：扫描上传应用服务，协调条码解析、任务匹配与状态推进链路，输出标准化受理结果。
 - `Application/Abstractions/Services/IChuteQueryService.cs` + `Application/Services/ChuteQueryService.cs`：请求格口应用服务抽象与实现，按任务编码或条码查询业务任务，在任务已扫描前提下按条码规则解析并返回目标格口，覆盖状态校验与不支持条码异常分支。
 - `Application/Abstractions/Services/IDropFeedbackService.cs` + `Application/Services/DropFeedbackService.cs`：落格回传应用服务抽象与实现，支持双定位（TaskCode/Barcode）、参数冲突校验与状态机推进（成功→Dropped+FeedbackPending，失败→Exception），落格成功/失败均写落格日志。
 - `Application/Abstractions/Services/IWmsFeedbackService.cs` + `Application/Feedback/Services/WmsFeedbackService.cs`：业务回传应用服务抽象与实现，查询 `FeedbackStatus=Pending` 任务、批量调用 Oracle 写入器、按结果回填 Completed/Failed。
+- `Application/Abstractions/Services/IFeedbackCompensationService.cs` + `Application/Feedback/Services/FeedbackCompensationService.cs`：业务回传补偿服务抽象与实现，支持按任务编码重试与按批次重试 `FeedbackStatus=Failed` 任务，并回填本地回传状态。
 - `Application/Abstractions/Integrations/IWmsOracleFeedbackGateway.cs` + `Infrastructure/Integrations/OracleWmsFeedbackGateway.cs`：Oracle WMS 业务回传网关抽象与实现；实现使用数组绑定批量更新，安全标识符校验防止 SQL 注入；`Enabled=false` 时仅记录日志不实际写入 Oracle。
 - `Domain/Options/WmsFeedbackOptions.cs`：业务回传配置实体，定义 Schema、Table、BusinessKeyColumn、FeedbackStatusColumn、FeedbackCompletedValue、FeedbackTimeColumn、ActualChuteColumn、CommandTimeoutSeconds 与 Enabled 开关（默认 false）。
+- `Domain/Options/FeedbackCompensationJobOptions.cs`：业务回传补偿后台任务配置实体，定义补偿开关、轮询间隔与每轮批次上限。
 - `Application/Models/WmsFeedbackApplicationResult.cs`：业务回传执行结果模型，汇总 PendingCount、SuccessCount、FailedCount 与 IsSuccess。
-- `Application/Abstractions/Persistence/IScanLogRepository.cs` + `Infrastructure/Repositories/ScanLogRepository.cs`：扫描日志仓储抽象与 EF Core 实现，写入 `scan_logs` 固定非分片表。
-- `Application/Abstractions/Persistence/IDropLogRepository.cs` + `Infrastructure/Repositories/DropLogRepository.cs`：落格日志仓储抽象与 EF Core 实现，写入 `drop_logs` 固定非分片表。
+- `Application/Models/FeedbackCompensationResult.cs`：业务回传补偿执行结果模型，汇总目标数量、重试数量、成功/失败/跳过数量与失败原因。
+- `Application/Abstractions/Persistence/IScanLogRepository.cs` + `Infrastructure/Repositories/ScanLogRepository.cs`：扫描日志仓储抽象与 EF Core 实现，按月写入 `scan_logs_{yyyyMM}`。
+- `Application/Abstractions/Persistence/IDropLogRepository.cs` + `Infrastructure/Repositories/DropLogRepository.cs`：落格日志仓储抽象与 EF Core 实现，按月写入 `drop_logs_{yyyyMM}`。
 - `Domain/Aggregates/ScanLogAggregate/ScanLogEntity.cs`：扫描日志聚合实体，记录条码、匹配结果、失败原因、设备编码、链路追踪、扫描时间等审计字段。
 - `Domain/Aggregates/DropLogAggregate/DropLogEntity.cs`：落格日志聚合实体，记录任务编码、条码、实际格口、成功标志、失败原因、落格时间等审计字段。
-- `Infrastructure/Persistence/EntityConfigurations/ScanLogEntityTypeConfiguration.cs`：扫描日志 EF Fluent API 配置，映射 `scan_logs` 表，定义字段约束与查询索引。
-- `Infrastructure/Persistence/EntityConfigurations/DropLogEntityTypeConfiguration.cs`：落格日志 EF Fluent API 配置，映射 `drop_logs` 表，定义字段约束与查询索引。
+- `Infrastructure/Persistence/EntityConfigurations/ScanLogEntityTypeConfiguration.cs`：扫描日志 EF Fluent API 配置，定义分片表结构、字段约束与查询索引。
+- `Infrastructure/Persistence/EntityConfigurations/DropLogEntityTypeConfiguration.cs`：落格日志 EF Fluent API 配置，定义分片表结构、字段约束与查询索引。
 - `20260413160852_AddScanDropLogTables.cs`：新增 `scan_logs` 与 `drop_logs` 表的 EF 迁移，包含所有字段与索引定义。
 - `EverydayChain.Hub.Tests/Services/WmsFeedbackServiceTests.cs`：业务回传服务单元测试，覆盖无待回传任务空结果、写入成功置 Completed、写入器异常置 Failed、batchSize 限制、Enabled=false 直接短路、writtenRows 不一致整批失败六个场景；含 `CapturingWmsOracleFeedbackGateway` 捕获替身。
 - `Domain/Options/ExceptionRuleOptions.cs`：异常规则根配置实体，包含全局开关与 dry-run 标志，持有三个子配置实例。
@@ -415,13 +438,15 @@
 - `ShardTableResolver.cs`：分表解析仓储实现，按逻辑表枚举物理分表并解析分表月份后缀。
 - `ShardRetentionRepository.cs`：分表保留期仓储实现，在危险动作隔离器保护下执行分表删除并输出审计日志，且可基于系统元数据生成可回放回滚 DDL。
 - `SyncCheckpointRepository.cs`：检查点文件持久化实现，读写日志均以 Information 级落盘；写入改为临时文件 + File.Replace/Move 原子替换，防止崩溃产生半写 JSON。
-- `InMemorySyncBatchRepository.cs`：同步批次仓储内存实现，支持 `Pending/InProgress/Completed/Failed` 状态流转与最近失败批次查询。
+- `SyncBatchRepository.cs`：同步批次仓储 SQL Server 持久化分片实现，写入 `sync_batches_{yyyyMM}`，支持跨分片查询最近失败批次。
+- `SyncBatchEntity.cs` + `SyncBatchEntityTypeConfiguration.cs`：同步批次实体与映射配置，定义批次状态流转字段、唯一约束与查询索引。
 - `InMemorySyncChangeLogRepository.cs`：同步变更日志仓储内存实现，支持批量写入审计记录。
 - `InMemorySyncDeletionLogRepository.cs`：同步删除日志仓储内存实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖，并在启动阶段从启用同步表配置提取逻辑表名集合，完成安全校验与空配置异常拦截。
 - `20260408020833_RebuildInitialHubSchema.cs`：初始化迁移，定义 `sorting_task_trace`、`IDX_PICKTOLIGHT_CARTON1`、`IDX_PICKTOWCS2` 三张聚合表结构及索引。
-- `20260413144042_AddBusinessTaskTable.cs`：新增 `business_tasks` 固定表迁移，包含任务编码、条码、格口、扫描落格时间、状态、回传状态等字段及唯一索引。
-- `20260413160852_AddScanDropLogTables.cs`：新增 `scan_logs` 与 `drop_logs` 表迁移，包含审计字段与查询索引。
+- `20260413144042_AddBusinessTaskTable.cs`：新增 `business_tasks` 迁移基线，作为分片模板来源，包含任务编码、条码、格口、扫描落格时间、状态、回传状态等字段及唯一索引。
+- `20260413160852_AddScanDropLogTables.cs`：新增 `scan_logs` 与 `drop_logs` 迁移基线，作为分片模板来源，包含审计字段与查询索引。
+- `20260416010041_AddSyncBatchShardTable.cs`：新增 `sync_batches` 基础表迁移，用于同步批次自动迁移基线与分片模板。
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
 - `nlog.config`：NLog 日志配置，输出至控制台与两个滚动日志文件：通用日志（`hub-${shortdate}.log`，按日切割，单文件上限 10 MB，保留 30 天）；同步专属日志（`sync-${shortdate}.log`，仅收录同步链路相关组件日志，便于独立分析同步性能问题）。
 - `Program.cs`（Host）：Host 启动入口，现已支持 API + Worker 共存，启用 Controllers、Swagger（中文注释）并保留自动迁移与同步后台任务注册。
@@ -429,6 +454,7 @@
 - `Host/Contracts/Requests/*.cs` + `Host/Contracts/Responses/*.cs`：三类 API 的输入输出契约与统一响应包装，配合 Swagger 提供中文参数说明。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
+- `FeedbackCompensationBackgroundWorker.cs`：业务回传补偿后台任务，按 `FeedbackCompensationJob.PollingIntervalSeconds` 周期重试失败回传任务，支持批次上限控制并输出补偿统计日志。
 - `EverydayChain.Hub.Tests/Host/Controllers/*Tests.cs`：PR-03 新增 Controller 基础行为测试，覆盖空参校验与标准成功响应路径。
 - `EverydayChain.Hub.Tests/Services/DangerZoneExecutorTests.cs`：危险操作隔离器取消语义测试，覆盖调用方取消与非调用方取消的日志等级分支。
 - `EverydayChain.Hub.Tests/Services/TestLogger.cs`：通用测试日志记录器，集中承载日志采集替身，避免在测试文件内重复声明嵌套日志类型。

@@ -9,6 +9,13 @@ public class MonthShardSuffixResolver : IShardSuffixResolver
     public string Resolve(DateTimeOffset timestamp) => $"_{timestamp:yyyyMM}";
 
     /// <inheritdoc/>
+    public string ResolveLocal(DateTime localTime)
+    {
+        var normalizedLocalTime = localTime == DateTime.MinValue ? DateTime.Now : localTime;
+        return Resolve(new DateTimeOffset(normalizedLocalTime));
+    }
+
+    /// <inheritdoc/>
     public IReadOnlyList<string> ResolveBootstrapSuffixes(DateTimeOffset localNow, int monthsAhead)
     {
         var result = new List<string> { Resolve(localNow) };
