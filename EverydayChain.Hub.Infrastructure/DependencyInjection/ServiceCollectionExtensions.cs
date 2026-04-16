@@ -80,7 +80,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<ISyncStagingRepository, SyncStagingRepository>();
         services.AddSingleton<ISyncUpsertRepository, SqlServerSyncUpsertRepository>();
         services.AddSingleton<ISyncCheckpointRepository, SyncCheckpointRepository>();
-        services.AddSingleton<ISyncBatchRepository, InMemorySyncBatchRepository>();
+        services.AddSingleton<ISyncBatchRepository, SyncBatchRepository>();
         services.AddSingleton<ISyncChangeLogRepository, InMemorySyncChangeLogRepository>();
         services.AddSingleton<ISyncDeletionRepository, SyncDeletionRepository>();
         services.AddSingleton<ISyncDeletionLogRepository, InMemorySyncDeletionLogRepository>();

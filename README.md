@@ -1,11 +1,14 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 移除 `InMemorySyncBatchRepository` 注册，新增 `SyncBatchRepository` 文件持久化实现（`ISyncBatchRepository` 由纯内存改为落盘存储），服务重启后可恢复批次状态并支持最近失败批次查询。
+- `SyncJob` 配置新增 `BatchFilePath`，默认示例 `data/sync-batches.json`，并纳入运行期存储自检（目录可写、文件可读写、磁盘可用空间）。
 - 实施 PR-11（补偿重试链路）：新增 `IFeedbackCompensationService` 与 `FeedbackCompensationService`（支持按任务编码重试、按批次重试）；新增 `FeedbackCompensationResult` 结果模型；新增 `FeedbackCompensationJobOptions` 配置实体；新增 `FeedbackCompensationBackgroundWorker` 后台任务并接入 `Program.cs` 与 `ServiceCollectionExtensions.cs`；`appsettings.json` 增加 `FeedbackCompensationJob` 配置节。
 - 新增补偿单元测试 `FeedbackCompensationServiceTests`，覆盖批次成功、批次失败、按任务跳过、按任务单条重试四个场景。
 - 已通读代码并更新实施计划进度：当前已完成 14/17（PR-11 已完成），已到达 M4（PR-16）里程碑检验时刻。
 - 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过（0 Warning 0 Error）。
 ## 后续可完善点
+- 评估并推进 `InMemorySyncChangeLogRepository`、`InMemorySyncDeletionLogRepository` 的持久化替换，彻底移除同步链路内存仓储。
 - 推进 PR-12（联调收口与验收归档）。
 - 执行 PR-16（M4 里程碑全量审查，PR-10 + PR-11 依赖已满足）。
 - 开启补偿后台任务：生产环境确认重试节流参数后，将 `FeedbackCompensationJob.Enabled` 置 `true`。
@@ -197,7 +200,7 @@
 │   ├── Repositories/ShardTableResolver.cs
 │   ├── Repositories/ShardRetentionRepository.cs
 │   ├── Repositories/SyncCheckpointRepository.cs
-│   ├── Repositories/InMemorySyncBatchRepository.cs
+│   ├── Repositories/SyncBatchRepository.cs
 │   ├── Repositories/InMemorySyncChangeLogRepository.cs
 │   ├── Repositories/InMemorySyncDeletionLogRepository.cs
 │   ├── Repositories/BusinessTaskRepository.cs
@@ -423,7 +426,7 @@
 - `ShardTableResolver.cs`：分表解析仓储实现，按逻辑表枚举物理分表并解析分表月份后缀。
 - `ShardRetentionRepository.cs`：分表保留期仓储实现，在危险动作隔离器保护下执行分表删除并输出审计日志，且可基于系统元数据生成可回放回滚 DDL。
 - `SyncCheckpointRepository.cs`：检查点文件持久化实现，读写日志均以 Information 级落盘；写入改为临时文件 + File.Replace/Move 原子替换，防止崩溃产生半写 JSON。
-- `InMemorySyncBatchRepository.cs`：同步批次仓储内存实现，支持 `Pending/InProgress/Completed/Failed` 状态流转与最近失败批次查询。
+- `SyncBatchRepository.cs`：同步批次仓储文件持久化实现，支持 `Pending/InProgress/Completed/Failed` 状态流转与最近失败批次查询，进程重启后可恢复批次状态。
 - `InMemorySyncChangeLogRepository.cs`：同步变更日志仓储内存实现，支持批量写入审计记录。
 - `InMemorySyncDeletionLogRepository.cs`：同步删除日志仓储内存实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖，并在启动阶段从启用同步表配置提取逻辑表名集合，完成安全校验与空配置异常拦截。

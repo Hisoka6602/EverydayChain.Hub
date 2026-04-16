@@ -16,7 +16,7 @@
 | 1.4 | 本地暂存：`SyncStagingRepository` 支持分页写入与清理 | ✅ 已完成 | `Infrastructure/Repositories/SyncStagingRepository.cs` |
 | 1.5 | 幂等合并：`SqlServerSyncUpsertRepository.MergeCoreAsync` 按唯一键 Insert/Update/Skip | ✅ 已完成 | `Infrastructure/Repositories/SqlServerSyncUpsertRepository.cs` |
 | 1.6 | 检查点持久化：`SyncCheckpointRepository` 文件读写 + 断点续跑 | ✅ 已完成 | `Infrastructure/Repositories/SyncCheckpointRepository.cs` |
-| 1.7 | 批次日志：`InMemorySyncBatchRepository`（内存有界缓冲，上限 5,000 条） | ✅ 已完成 | `Infrastructure/Repositories/InMemorySyncBatchRepository.cs` |
+| 1.7 | 批次日志：`SyncBatchRepository`（文件持久化，重启可恢复） | ✅ 已完成 | `Infrastructure/Repositories/SyncBatchRepository.cs` |
 | 1.8 | 变更日志：`InMemorySyncChangeLogRepository`（内存有界缓冲，上限 200,000 条） | ✅ 已完成 | `Infrastructure/Repositories/InMemorySyncChangeLogRepository.cs` |
 | 1.9 | 应用层编排：`SyncOrchestrator`、`SyncWindowCalculator`、`SyncExecutionService` | ✅ 已完成 | `Application/Services/` |
 | 1.10 | Host 后台任务：`SyncBackgroundWorker` | ✅ 已完成 | `Host/Workers/SyncBackgroundWorker.cs` |
@@ -86,6 +86,6 @@
 | 条目 | 描述 | 优先级 |
 |---|---|:---:|
 | 6.1 | 增量落盘/分片持久化：优化目标快照从整表重写改为增量写入，降低大表 I/O | P1 |
-| 6.2 | 内存仓储持久化：`InMemorySync*Repository` 当前为纯内存，进程重启后日志丢失；如需持久化需另行设计 | P2 |
+| 6.2 | 内存仓储持久化：`InMemorySyncChangeLogRepository`、`InMemorySyncDeletionLogRepository` 当前为纯内存，进程重启后日志丢失；如需持久化需另行设计 | P2 |
 | 6.3 | Polly 熔断策略可观测：当前熔断状态不对外暴露指标，后续可接入健康检查端点 | P2 |
 | 6.4 | 扫描/落格字段强制回写规则落地：整件与拆零表在扫描阶段落实 `LENGTH/WIDTH/HIGH/CUBE/GROSSWEIGHT` 本地+远端写入，`SCANCOUNT` 按条码 `+1`，`CLOSETIME` 更新最新扫描时间；落格阶段落实 `STATUS` 本地+远端写入 | P1 |
