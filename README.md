@@ -12,6 +12,7 @@
 - 实施 PR-11（补偿重试链路）：新增 `IFeedbackCompensationService` 与 `FeedbackCompensationService`（支持按任务编码重试、按批次重试）；新增 `FeedbackCompensationResult` 结果模型；新增 `FeedbackCompensationJobOptions` 配置实体；新增 `FeedbackCompensationBackgroundWorker` 后台任务并接入 `Program.cs` 与 `ServiceCollectionExtensions.cs`；`appsettings.json` 增加 `FeedbackCompensationJob` 配置节。
 - 新增补偿单元测试 `FeedbackCompensationServiceTests`，覆盖批次成功、批次失败、按任务跳过、按任务单条重试四个场景。
 - 已通读代码并完成本轮执行前复核：按“通读代码→盘点进度→补全计划→里程碑时机判断”闭环再次确认当前已完成 14/17（PR-11 已完成），当前处于 M4（PR-16）里程碑检验阶段。
+- 已完成本次问题单二次复核（2026-04-16 本地时间 23:08）：结论保持一致，当前累计完成 14/17，PR-16（M4）检验时机有效，自动建单工作流状态正常。
 - 新增 `.github/workflows/auto-create-pr.yml`：仅在非默认分支推送时触发，自动检查并创建到默认分支的 PR（若同源 PR 已存在则跳过），避免人工漏建 PR。
 - 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 均通过（0 Warning 0 Error）。
 ## 后续可完善点
