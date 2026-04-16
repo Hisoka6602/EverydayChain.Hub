@@ -58,6 +58,10 @@ public class SyncBatchRepository(
             var loaded = await GetRequiredBatchFromShardsAsync(batchId, ct);
             loaded.Entity.Status = SyncBatchStatus.InProgress;
             loaded.Entity.StartedTimeLocal = startedTimeLocal;
+            if (!string.IsNullOrWhiteSpace(loaded.Entity.ErrorMessage))
+            {
+                logger.LogInformation("批次重试进入执行中，清理历史错误信息。BatchId={BatchId}", batchId);
+            }
             loaded.Entity.ErrorMessage = null;
             using var scope = TableSuffixScope.Use(loaded.Suffix);
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
@@ -181,15 +185,15 @@ public class SyncBatchRepository(
     /// <summary>
     /// 获取必须存在的批次。
     /// </summary>
-    /// <param name="batches">批次集合。</param>
     /// <param name="batchId">批次编号。</param>
-    /// <returns>批次对象。</returns>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>分片批次加载结果。</returns>
     private async Task<LoadedBatchEntity> GetRequiredBatchFromShardsAsync(string batchId, CancellationToken ct)
     {
         var loaded = await TryGetBatchFromExistingShardsAsync(batchId, ct);
         if (loaded is not null)
         {
-            return loaded;
+            return loaded.Value;
         }
 
         throw new InvalidOperationException($"未找到批次：{batchId}");
@@ -243,8 +247,7 @@ public class SyncBatchRepository(
     /// <returns>分表后缀。</returns>
     private string ResolveBatchSuffix(DateTime timeLocal)
     {
-        var offset = TimeZoneInfo.Local.GetUtcOffset(timeLocal);
-        return shardSuffixResolver.Resolve(new DateTimeOffset(timeLocal, offset));
+        return shardSuffixResolver.Resolve(new DateTimeOffset(timeLocal));
     }
 
     /// <summary>
