@@ -87,17 +87,13 @@
 3. PR-05 业务任务持久化是否采用新表，或复用现有聚合并建立映射关系，需在进入迁移前确认。
 4. PR-08 业务回传目标 Oracle 表与幂等字段组合尚未明确，需要在实现前冻结契约。
 
-### 2.2 执行前代码通读与里程碑时机判断（2026-04-16）
-1. 已通读并核对主干实现文件：`BusinessTaskEntity`、`WmsFeedbackService`、`BusinessTaskRepository`、`Program.cs`、`ServiceCollectionExtensions.cs`、`README.md`、`逐文件代码检查台账.md`。
-2. 已通过文件存在性与代码内容核对确认：PR-01~PR-10、PR-13~PR-15 交付物均已落地；含本次补全的 PR-11（补偿服务接口与实现、补偿后台任务、配置项与测试）在内，当前累计完成 14/17，PR-16 执行中，待执行 PR-12、PR-17。
-3. 里程碑时机判断：M1/M2/M3 已完成且通过；PR-10 与 PR-11 依赖均已满足，已进入 M4（PR-16）执行与检验阶段。
-4. 本 PR 自动建单要求已落地并完成行为核对：`.github/workflows/auto-create-pr.yml` 在非默认分支 push 后自动检查并创建到默认分支的 PR（已存在则跳过），默认分支不触发建单。
-5. 实施进度量化：当前完成率 14/17（82.35%）；本计划里程碑从 M1 起算，当前状态为 M1✅、M2✅、M3✅、M4🚧（执行中）、M5⏳（依赖 PR-12）。
-6. 本轮复核结果（2026-04-16）：已按“先通读代码→盘点已执行项→补全实施计划→复核里程碑时机”顺序完成核对，并执行 `dotnet build EverydayChain.Hub.sln`、`dotnet test EverydayChain.Hub.sln` 验证通过；结论保持不变，当前累计完成 14/17，仍处于 PR-16（M4）检验窗口，自动建单能力继续由 `.github/workflows/auto-create-pr.yml` 提供并保持生效。
-7. 本次问题单复核（2026-04-16 22:56~23:08，本地时间）：按“通读代码→核对已执行数量→补全计划→判断里程碑检验时机→核验自动建 PR”口径完成两次交叉复核，结论保持一致：已完成 14/17，当前处于 M4（PR-16）检验窗口，自动建单工作流保持可用。
-8. 本次问题单三次复核（2026-04-16 23:18~23:26，本地时间）：再次通读实施计划、README、自动建单工作流与 PR-11/PR-16 相关实现，复核结论保持一致：当前累计完成 14/17，里程碑处于 M4（PR-16）检验窗口；自动建单继续由 `.github/workflows/auto-create-pr.yml` 承载并保持可用。
-9. 本次问题单收口复核（2026-04-16，本地时间）：已完成 PR-10~PR-11 异常与补偿链路全量复核（规则优先级、补偿幂等、重试上限、审计可追溯）并复跑 `dotnet build EverydayChain.Hub.sln`、`dotnet test EverydayChain.Hub.sln --no-build`（0 Warning 0 Error，152/152 通过）；阻塞问题清单结论为“无新增阻塞项”，PR-16（M4）由执行中更新为已完成，当前累计 15/17，可进入 PR-12 开发实施阶段。
-10. 本次实施前复核（2026-04-16，本地时间）：已按“先通读代码→核对已执行数量→补全实施计划→判断里程碑检验时机→核验自动建 PR”口径完成复核，关键实现与文件核对结论保持一致，当前累计完成 15/17（PR-01~PR-11、PR-13~PR-16），待执行 PR-12、PR-17。里程碑时机判断为：M1~M4 均已完成并通过，当前处于 PR-12 联调收口实施窗口，尚未进入 M5（PR-17）检验时刻。自动建单继续由 `.github/workflows/auto-create-pr.yml` 承载（非默认分支 push 自动检查并创建 PR，已存在则跳过）；本轮复核已执行 `dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build`，结果为 0 Warning 0 Error、152/152 通过。
+### 2.2 执行前代码通读与里程碑时机判断（2026-04-16，本地时间）
+1. 已通读并核对主干实现与联动文档：`BusinessTaskEntity`、`WmsFeedbackService`、`FeedbackCompensationService`、`BusinessTaskRepository`、`Program.cs`、`ServiceCollectionExtensions.cs`、`README.md`、`逐文件代码检查台账.md`、`Oracle到SQLServer同步实施计划.md`。
+2. 已通过文件存在性与代码内容核对确认：PR-01~PR-11、PR-13~PR-16 交付物均已落地，当前累计完成 15/17，待执行 PR-12、PR-17。
+3. 里程碑时机判断：M1~M4 已完成并通过，当前处于 PR-12 联调收口实施窗口，尚未进入 M5（PR-17）检验时刻。
+4. 本 PR 自动建单要求已落地并完成行为核对：`.github/workflows/auto-create-pr.yml` 在非默认分支 push 后自动检查并创建到默认分支的 PR（已存在则跳过），默认分支不创建 PR。
+5. 实施进度量化：当前完成率 15/17（88.24%）；本计划里程碑从 M1 起算，当前状态为 M1✅、M2✅、M3✅、M4✅、M5⏳（依赖 PR-12）。
+6. 本轮复核结论：已按“先通读代码→核对已执行数量→补全实施计划→判断里程碑检验时机→核验自动建 PR”口径完成核对，并执行 `dotnet build EverydayChain.Hub.sln`、`dotnet test EverydayChain.Hub.sln -c Release` 验证通过，结论保持不变。
 
 ---
 
