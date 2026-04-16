@@ -602,12 +602,14 @@
 - 已完成文档口径同步启动：`README.md`、`逐文件代码检查台账.md` 与本计划文档已对齐为“PR-12 执行中，PR-17 待 PR-12 完成后进入”。
 - 已完成同步链路代码推进：`ISyncChangeLogRepository`、`ISyncDeletionLogRepository` 已切换至 SQL Server 分片持久化实现并纳入自动迁移与分表预建。
 - 已完成本轮执行前复核补录：再次确认累计完成 15/17，当前尚未进入 M5（PR-17）检验时刻，自动建 PR 工作流行为保持有效。
+- 已完成联调证据实归档落地：已创建 `docs/联调证据/PR12-20260416-R1/`，三类证据文件（执行记录、关键日志索引、结果汇总）已入库，待补齐端到端链路实测结果。
 
 #### 待完成收口项（Checklist）
 - [ ] 端到端联调证据归档完成（扫描上传→请求格口→落格回传→业务回传→补偿重试失败路径）
   - 交付物：联调执行记录、关键日志与结果汇总。
   - 依赖：PR-03 至 PR-11 主功能交付完成且构建与测试回归通过。
   - 目标：进入 PR-17 前完成。
+  - 当前状态：证据目录与三类证据文件已落地，端到端链路实测证据待补齐。
 - [ ] “已实现/未实现/后续计划”收口归档完成
   - 交付物：`README.md` 与 `逐文件代码检查台账.md` 收口结论同步。
   - 依赖：端到端联调证据归档。
@@ -616,7 +618,7 @@
 
 #### 待确认项（进入最终收口前）
 - [x] 联调执行批次确认：归档批次编号采用 `PR12-20260416-R1`（R 表示收口回归批次），执行窗口采用“本地时间”记录，环境标识采用 `local-debug`（对应本轮 `dotnet build` + `dotnet test --no-build` 回归批次）。
-- [x] 关键日志范围确认：归档 NLog 文件范围统一为 `${basedir}/logs/hub-{shortdate}.log` 与 `${basedir}/logs/sync-{shortdate}.log`，时间段采用批次窗口 `[StartLocalTime, EndLocalTime]`（由实际执行窗口确定，以下为占位符示例：`[2026-04-16 18:00:00, 2026-04-16 18:30:00]`），关键检索词口径采用 `SyncBackgroundWorker`、`WmsFeedbackService`、`FeedbackCompensationBackgroundWorker`、`Error`。
+- [x] 关键日志范围确认：归档 NLog 文件范围统一为 `${basedir}/logs/hub-{shortdate}.log` 与 `${basedir}/logs/sync-{shortdate}.log`，时间段采用批次窗口 `[StartLocalTime, EndLocalTime]`（由实际执行窗口确定，以下为格式占位符示例：`[2026-04-16 18:00:00, 2026-04-16 18:30:00]`；R1 实际窗口见 `docs/联调证据/PR12-20260416-R1/`），关键检索词口径采用 `SyncBackgroundWorker`、`WmsFeedbackService`、`FeedbackCompensationBackgroundWorker`、`Error`。
 - [x] 结果汇总口径确认：统计口径统一为“成功=主链路完成且无异常；失败=主链路抛错或业务失败；补偿重试=反馈状态由 Failed 进入重试流程”，验收阈值采用“构建通过 + 测试通过 + 证据链完整”。
 
 #### 阶段性归档（已实现/未实现/后续计划）
@@ -639,6 +641,14 @@
   - `03-结果汇总.md`（按“成功/失败/补偿重试”口径汇总并给出验收结论）。
 - 日志归档来源：`${basedir}/logs/hub-{shortdate}.log`、`${basedir}/logs/sync-{shortdate}.log`。
 - 收口门禁：上述三类文件齐备且口径一致后，方可将“端到端联调证据归档完成”标记为已完成。
+
+#### 端到端联调证据归档落地进展（R1）
+- 已落地目录：`docs/联调证据/PR12-20260416-R1/`
+- 已落地文件：
+  - `01-联调执行记录.md`
+  - `02-关键日志索引.md`
+  - `03-结果汇总.md`
+- 当前缺口：链路“扫描上传→请求格口→落格回传→业务回传→补偿重试失败路径”的实测结果与日志命中证据待补录。
 
 ### 建议标题
 `chore(release): 全链路联调收口与验收归档`
