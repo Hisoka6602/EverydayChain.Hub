@@ -18,12 +18,13 @@
 - 新增 `.github/workflows/auto-create-pr.yml`：仅在非默认分支推送时触发，自动检查并创建到默认分支的 PR（若同源 PR 已存在则跳过），避免人工漏建 PR。
 - 实施同步日志持久化替换：新增 `SyncChangeLogEntity`、`SyncDeletionLogEntity`、`SyncChangeLogRepository`、`SyncDeletionLogRepository` 与迁移 `20260416171508_AddSyncChangeDeletionLogShardTables.cs`，`ISyncChangeLogRepository`/`ISyncDeletionLogRepository` 已切换为 SQL Server 分片持久化实现（`sync_change_logs_{yyyyMM}`、`sync_deletion_logs_{yyyyMM}`）。
 - 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，152/152 单元测试通过）。
+- 已落地 PR-12 联调证据实归档目录 `docs/联调证据/PR12-20260416-R1/`，完成三类证据文件补录：关键链路自动化用例证据已回填（28/28 通过），待补充端到端实机联调日志命中与统计后定稿。
 ## 后续可完善点
 - 根据产线峰值写入量细化各日志表差异化保留月数，并结合容量监控进行滚动调优。
 - 完成 PR-12（联调收口与验收归档）剩余收口项（详见 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 的 PR-12 章节），包括以下内容：
   - 端到端联调证据归档（联调执行记录、关键日志、结果汇总）。
   - 已实现/未实现/后续计划收口归档（`README.md` 与 `逐文件代码检查台账.md` 收口结论同步，依赖端到端联调证据归档后定稿）。
-  - 待确认项闭环（联调执行批次、关键日志范围、结果汇总统计口径），完成后再输出最终收口定稿。
+- PR-12 后续仅需补齐端到端实机联调日志命中证据并完成收口定稿。
 - 推进 PR-17（M5 里程碑全量审查，待 PR-12 完成后进入）。
 - 开启补偿后台任务：生产环境确认重试节流参数后，将 `FeedbackCompensationJob.Enabled` 置 `true`。
 
@@ -53,6 +54,12 @@
 ├── 对外API接口基线.md
 ├── 拆零业务字段语义基线.md
 ├── 整件业务字段语义基线.md
+├── docs
+│   └── 联调证据
+│       └── PR12-20260416-R1
+│           ├── 01-联调执行记录.md
+│           ├── 02-关键日志索引.md
+│           └── 03-结果汇总.md
 ├── scripts
 │   ├── health-check.sh
 │   ├── disaster-recovery.sh
@@ -341,6 +348,9 @@
 - `scripts/health-check.sh`：一键体检脚本，检查磁盘空间、目录权限、关键文件可读写、配置文件格式、日志健康状态、进程存活与压缩归档文件状态，可集成到监控或定时任务。
 - `scripts/disaster-recovery.sh`：灾难恢复脚本，支持检查点重置（checkpoint-reset）、快照从归档恢复（snapshot-restore）、快照备份（snapshot-backup）、归档清理（archive-cleanup）与完全重置（full-reset）；全部操作支持 --dry-run 预览模式。
 - `scripts/stability-drill.sh`：稳定性演练脚本，串联体检与灾备动作（checkpoint-reset、snapshot-backup、snapshot-restore、archive-cleanup），支持 dry-run 与真实执行并自动生成演练记录。
+- `docs/联调证据/PR12-20260416-R1/01-联调执行记录.md`：PR-12 联调收口 R1 批次执行记录，归档本地时间窗口、回归命令与端到端链路执行状态。
+- `docs/联调证据/PR12-20260416-R1/02-关键日志索引.md`：PR-12 联调收口 R1 批次关键日志索引，固化日志范围、检索词口径与命中补录表。
+- `docs/联调证据/PR12-20260416-R1/03-结果汇总.md`：PR-12 联调收口 R1 批次结果汇总，记录阶段统计口径、回归结果与待完成收口项。
 - `监控告警规则基线清单.md`：监控告警规则基线文档，定义日志关键字告警、指标阈值告警与演练留档验收口径，用于补齐稳定性清单剩余交付项。
 - `年度维护清单.md`：月度/季度/年度例行巡检项标准化清单，包含磁盘治理、日志审查、数据一致性、配置审核、灾难恢复演练、容量规划、安全审计等条目及快速异常处理参考表。
 - `值班处置手册.md`：日常值班与告警应急处置手册，覆盖 9 类告警的处置步骤（卡死检测、磁盘不足、内存水位、整轮超时、熔断、检查点损坏、快照损坏、归档失败、进程停止），定义 P0~P3 优先级与升级规则，含处置记录与演练记录模板。
