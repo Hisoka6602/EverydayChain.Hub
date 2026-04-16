@@ -1,33 +1,34 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using EverydayChain.Hub.Domain.Options;
 using Microsoft.Extensions.Configuration;
 using EverydayChain.Hub.Application.Services;
-using Microsoft.Extensions.DependencyInjection;
 using EverydayChain.Hub.SharedKernel.Utilities;
+using Microsoft.Extensions.DependencyInjection;
 using EverydayChain.Hub.Infrastructure.Services;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using EverydayChain.Hub.Infrastructure.Integrations;
 using EverydayChain.Hub.Infrastructure.Repositories;
+using EverydayChain.Hub.Infrastructure.Sync.Readers;
+using EverydayChain.Hub.Infrastructure.Sync.Writers;
+using EverydayChain.Hub.Infrastructure.Sync.Services;
+using EverydayChain.Hub.Application.Abstractions.Sync;
+using EverydayChain.Hub.Application.Feedback.Services;
+using EverydayChain.Hub.Application.ScanMatch.Services;
+using EverydayChain.Hub.Application.MultiLabel.Services;
+using EverydayChain.Hub.Application.WaveCleanup.Services;
+using EverydayChain.Hub.Application.Abstractions.Services;
+using EverydayChain.Hub.Application.Recirculation.Services;
+using EverydayChain.Hub.Application.TaskExecution.Services;
+using EverydayChain.Hub.Application.MultiLabel.Abstractions;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
-using EverydayChain.Hub.Application.Abstractions.Services;
-using EverydayChain.Hub.Application.Abstractions.Sync;
-using EverydayChain.Hub.Application.ScanMatch.Services;
-using EverydayChain.Hub.Application.TaskExecution.Services;
-using EverydayChain.Hub.Infrastructure.Sync.Readers;
-using EverydayChain.Hub.Infrastructure.Sync.Services;
-using EverydayChain.Hub.Infrastructure.Sync.Writers;
-using EverydayChain.Hub.Application.Abstractions.Integrations;
-using EverydayChain.Hub.Application.Feedback.Services;
-using EverydayChain.Hub.Infrastructure.Integrations;
 using EverydayChain.Hub.Application.WaveCleanup.Abstractions;
-using EverydayChain.Hub.Application.WaveCleanup.Services;
-using EverydayChain.Hub.Application.MultiLabel.Abstractions;
-using EverydayChain.Hub.Application.MultiLabel.Services;
+using EverydayChain.Hub.Application.Abstractions.Integrations;
 using EverydayChain.Hub.Application.Recirculation.Abstractions;
-using EverydayChain.Hub.Application.Recirculation.Services;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Infrastructure.DependencyInjection;
 
@@ -35,14 +36,19 @@ namespace EverydayChain.Hub.Infrastructure.DependencyInjection;
 /// 基础设施层依赖注入扩展，统一向 DI 容器注册所有基础设施服务。
 /// </summary>
 public static class ServiceCollectionExtensions {
+
     /// <summary>分拣任务追踪逻辑表名。</summary>
     private const string SortingTaskTraceLogicalTable = "sorting_task_trace";
+
     /// <summary>同步批次逻辑表名。</summary>
     private const string SyncBatchLogicalTable = "sync_batches";
+
     /// <summary>业务任务逻辑表名。</summary>
     private const string BusinessTaskLogicalTable = "business_tasks";
+
     /// <summary>扫描日志逻辑表名。</summary>
     private const string ScanLogLogicalTable = "scan_logs";
+
     /// <summary>落格日志逻辑表名。</summary>
     private const string DropLogLogicalTable = "drop_logs";
 
@@ -72,6 +78,8 @@ public static class ServiceCollectionExtensions {
             options.UseSqlServer(shardingOptions.ConnectionString, sqlServerOptions => {
                 sqlServerOptions.EnableRetryOnFailure();
             });
+            // 运行时自动迁移阶段仅需执行已生成迁移，忽略“模型较快照有待提交变更”的告警，避免阻断启动链路。
+            options.ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
             options.ReplaceService<IModelCacheKeyFactory, ShardModelCacheKeyFactory>();
         });
         services.AddSingleton<IShardSuffixResolver, MonthShardSuffixResolver>();

@@ -2,11 +2,11 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using EverydayChain.Hub.Domain.Options;
+using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
-using Microsoft.EntityFrameworkCore.Storage;
 
 namespace EverydayChain.Hub.Infrastructure.Services;
 
@@ -21,6 +21,7 @@ public class AutoMigrationService(
     IOptions<DangerZoneOptions> dangerZoneOptions,
     IDangerZoneExecutor dangerZoneExecutor,
     ILogger<AutoMigrationService> logger) : IAutoMigrationService {
+
     /// <summary>迁移基线固定 Schema。</summary>
     private const string ExpectedMigrationSchema = "dbo";
 
@@ -37,6 +38,8 @@ public class AutoMigrationService(
 
         // 步骤1：通过隔离器执行 EF Core 基础 Migration。
         await dangerZoneExecutor.ExecuteAsync("auto-migrate-base", async token => {
+            // 明确在“无后缀基础表”上下文执行迁移，避免外层异步上下文遗留后缀影响模型对比。
+            using var _ = TableSuffixScope.Use(string.Empty);
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(token);
             await EnsureDatabaseCreatedAsync(dbContext, token);
             await LogPendingMigrationsAsync(dbContext, token);
@@ -57,8 +60,7 @@ public class AutoMigrationService(
     /// <param name="localNow">当前本地时间。</param>
     /// <param name="monthsAhead">未来预建月数。</param>
     /// <returns>后缀列表。</returns>
-    internal static IReadOnlyList<string> BuildBootstrapSuffixes(IShardSuffixResolver suffixResolver, DateTimeOffset localNow, int monthsAhead)
-    {
+    internal static IReadOnlyList<string> BuildBootstrapSuffixes(IShardSuffixResolver suffixResolver, DateTimeOffset localNow, int monthsAhead) {
         // 约定：空字符串代表“无后缀基础表”，当前策略明确只预建后缀分表，因此此处过滤空后缀。
         return suffixResolver.ResolveBootstrapSuffixes(localNow, monthsAhead)
             .Where(suffix => !string.IsNullOrWhiteSpace(suffix))
