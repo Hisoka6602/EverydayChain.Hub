@@ -91,12 +91,14 @@ public class ServiceCollectionExtensionsTests
         };
 
         var tables = ServiceCollectionExtensions.BuildManagedLogicalTables(options);
-        Assert.Equal(5, tables.Count);
+        Assert.Equal(7, tables.Count);
         Assert.Contains("sorting_task_trace", tables);
         Assert.Contains("sync_batches", tables);
         Assert.Contains("business_tasks", tables);
         Assert.Contains("scan_logs", tables);
         Assert.Contains("drop_logs", tables);
+        Assert.Contains("sync_change_logs", tables);
+        Assert.Contains("sync_deletion_logs", tables);
     }
 
     /// <summary>
@@ -132,12 +134,14 @@ public class ServiceCollectionExtensionsTests
 
         var tables = ServiceCollectionExtensions.BuildManagedLogicalTables(options);
 
-        Assert.Equal(6, tables.Count);
+        Assert.Equal(8, tables.Count);
         Assert.Contains("sorting_task_trace", tables);
         Assert.Contains("sync_batches", tables);
         Assert.Contains("business_tasks", tables);
         Assert.Contains("scan_logs", tables);
         Assert.Contains("drop_logs", tables);
+        Assert.Contains("sync_change_logs", tables);
+        Assert.Contains("sync_deletion_logs", tables);
         Assert.Contains("Table_A", tables);
     }
 

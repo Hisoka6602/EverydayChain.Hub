@@ -51,6 +51,10 @@ public static class ServiceCollectionExtensions {
 
     /// <summary>落格日志逻辑表名。</summary>
     private const string DropLogLogicalTable = "drop_logs";
+    /// <summary>同步变更日志逻辑表名。</summary>
+    private const string SyncChangeLogLogicalTable = "sync_change_logs";
+    /// <summary>同步删除日志逻辑表名。</summary>
+    private const string SyncDeletionLogLogicalTable = "sync_deletion_logs";
 
     /// <summary>
     /// 注册基础设施层全部服务，包括 EF Core 工厂、分表服务、调谐器、危险操作执行器与自动迁移应用服务（不含 HostedService 注册，该注册由 Host 层 Program.cs 负责）。
@@ -99,9 +103,9 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<ISyncUpsertRepository, SqlServerSyncUpsertRepository>();
         services.AddSingleton<ISyncCheckpointRepository, SyncCheckpointRepository>();
         services.AddSingleton<ISyncBatchRepository, SyncBatchRepository>();
-        services.AddSingleton<ISyncChangeLogRepository, InMemorySyncChangeLogRepository>();
+        services.AddSingleton<ISyncChangeLogRepository, SyncChangeLogRepository>();
         services.AddSingleton<ISyncDeletionRepository, SyncDeletionRepository>();
-        services.AddSingleton<ISyncDeletionLogRepository, InMemorySyncDeletionLogRepository>();
+        services.AddSingleton<ISyncDeletionLogRepository, SyncDeletionLogRepository>();
         services.AddSingleton<IOracleStatusDrivenSourceReader, OracleStatusDrivenSourceReader>();
         services.AddSingleton<ISqlServerAppendOnlyWriter, SqlServerAppendOnlyWriter>();
         services.AddSingleton<IOracleRemoteStatusWriter, OracleRemoteStatusWriter>();
@@ -165,6 +169,8 @@ public static class ServiceCollectionExtensions {
         LogicalTableNameNormalizer.AddValidated(managedTables, BusinessTaskLogicalTable, "Sharding.BusinessTask");
         LogicalTableNameNormalizer.AddValidated(managedTables, ScanLogLogicalTable, "Sharding.ScanLog");
         LogicalTableNameNormalizer.AddValidated(managedTables, DropLogLogicalTable, "Sharding.DropLog");
+        LogicalTableNameNormalizer.AddValidated(managedTables, SyncChangeLogLogicalTable, "Sharding.SyncChangeLog");
+        LogicalTableNameNormalizer.AddValidated(managedTables, SyncDeletionLogLogicalTable, "Sharding.SyncDeletionLog");
         foreach (var table in (syncJobOptions.Tables ?? []).Where(x => x.Enabled)) {
             if (string.IsNullOrWhiteSpace(table.TargetLogicalTable)) {
                 throw new InvalidOperationException($"分表配置无效：启用表 {table.TableCode} 的 TargetLogicalTable 不能为空白。");

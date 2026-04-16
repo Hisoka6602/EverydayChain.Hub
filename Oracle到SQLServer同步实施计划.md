@@ -86,6 +86,6 @@
 | 条目 | 描述 | 优先级 |
 |---|---|:---:|
 | 6.1 | 增量落盘/分片持久化：优化目标快照从整表重写改为增量写入，降低大表 I/O | P1 |
-| 6.2 | 内存仓储持久化：`InMemorySyncChangeLogRepository`、`InMemorySyncDeletionLogRepository` 当前为纯内存，进程重启后日志丢失；如需持久化需另行设计 | P2 |
+| 6.2 | 内存仓储持久化：`ISyncChangeLogRepository`、`ISyncDeletionLogRepository` 已切换为 SQL Server 分片持久化实现（`sync_change_logs_{yyyyMM}`、`sync_deletion_logs_{yyyyMM}`），默认链路已不再依赖内存仓储 | ✅ 已完成 |
 | 6.3 | Polly 熔断策略可观测：当前熔断状态不对外暴露指标，后续可接入健康检查端点 | P2 |
 | 6.4 | 扫描/落格字段强制回写规则落地：整件与拆零表在扫描阶段落实 `LENGTH/WIDTH/HIGH/CUBE/GROSSWEIGHT` 本地+远端写入，`SCANCOUNT` 按条码 `+1`，`CLOSETIME` 更新最新扫描时间；落格阶段落实 `STATUS` 本地+远端写入 | P1 |
