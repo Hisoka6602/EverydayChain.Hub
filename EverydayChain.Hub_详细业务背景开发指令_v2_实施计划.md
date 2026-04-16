@@ -93,6 +93,7 @@
 3. 里程碑时机判断：M1/M2/M3 已完成且通过；PR-10 与 PR-11 依赖均已满足，已进入 M4（PR-16）执行与检验阶段。
 4. 本 PR 自动建单要求已落地并完成行为核对：`.github/workflows/auto-create-pr.yml` 在非默认分支 push 后自动检查并创建到默认分支的 PR（已存在则跳过），默认分支不触发建单。
 5. 实施进度量化：当前完成率 14/17（82.35%）；本计划里程碑从 M1 起算，当前状态为 M1✅、M2✅、M3✅、M4🚧（执行中）、M5⏳（依赖 PR-12）。
+6. 本轮复核结果（2026-04-16）：已再次通读实施计划与核心实现，并执行 `dotnet build EverydayChain.Hub.sln`、`dotnet test EverydayChain.Hub.sln` 验证通过；里程碑时机判断保持不变，仍处于 M4 检验窗口。
 
 ---
 
@@ -782,6 +783,7 @@
 - 已完成执行前通读、进度盘点与补全：当前累计完成 14/17（PR-01~PR-11、PR-13~PR-15），PR-16 执行中，待执行 PR-12、PR-17。
 - 已完成里程碑时机复核：按总览表定义，M4 依赖 PR-10~PR-11；当前依赖均已满足，且 M1~M3 审查结论已归档，已进入 M4 全量审查窗口。
 - 已复核自动建单能力：本次通过代码审阅方式检查 `.github/workflows/auto-create-pr.yml`，确认触发条件为 `on.push.branches-ignore: main` 且作业门禁为 `if: github.ref_name != github.event.repository.default_branch`；`actions/github-script` 先 `pulls.list` 查询同源 PR，未命中再 `pulls.create` 创建到默认分支，若返回“A pull request already exists”则按已存在分支路径退出。
+- 已完成本轮构建测试复核：`dotnet build EverydayChain.Hub.sln`、`dotnet test EverydayChain.Hub.sln` 通过（0 Warning 0 Error）。
 
 ### 建议标题
 `chore(review): 里程碑M4全量审查与问题闭环`
