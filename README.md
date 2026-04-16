@@ -16,10 +16,10 @@
 - 已启动 PR-12（联调收口与验收归档）：当前阶段从“可进入”更新为“执行中”，本轮已完成收口前回归验证（`dotnet build EverydayChain.Hub.sln`、`dotnet test EverydayChain.Hub.sln --no-build` 通过，0 Warning 0 Error，152/152 单元测试通过）。
 - 已输出 PR-12“已实现/未实现/后续计划”阶段性归档草案：已实现项、未实现项与后续计划已形成初稿，待端到端联调证据归档后定稿。
 - 新增 `.github/workflows/auto-create-pr.yml`：仅在非默认分支推送时触发，自动检查并创建到默认分支的 PR（若同源 PR 已存在则跳过），避免人工漏建 PR。
+- 实施同步日志持久化替换：新增 `SyncChangeLogEntity`、`SyncDeletionLogEntity`、`SyncChangeLogRepository`、`SyncDeletionLogRepository` 与迁移 `20260416171508_AddSyncChangeDeletionLogShardTables.cs`，`ISyncChangeLogRepository`/`ISyncDeletionLogRepository` 已切换为 SQL Server 分片持久化实现（`sync_change_logs_{yyyyMM}`、`sync_deletion_logs_{yyyyMM}`）。
 - 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，152/152 单元测试通过）。
 ## 后续可完善点
 - 根据产线峰值写入量细化各日志表差异化保留月数，并结合容量监控进行滚动调优。
-- 评估并推进 `InMemorySyncChangeLogRepository`、`InMemorySyncDeletionLogRepository` 的持久化替换，彻底移除同步链路内存仓储。
 - 完成 PR-12（联调收口与验收归档）剩余收口项（详见 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 的 PR-12 章节），包括以下内容：
   - 端到端联调证据归档（联调执行记录、关键日志、结果汇总）。
   - 已实现/未实现/后续计划收口归档（`README.md` 与 `逐文件代码检查台账.md` 收口结论同步，依赖端到端联调证据归档后定稿）。
@@ -91,6 +91,8 @@
 │   ├── Aggregates/WmsPickToWcsAggregate/WmsPickToWcsEntity.cs
 │   ├── Aggregates/WmsSplitPickToLightCartonAggregate/WmsSplitPickToLightCartonEntity.cs
 │   ├── Aggregates/SyncBatchAggregate/SyncBatchEntity.cs
+│   ├── Aggregates/SyncChangeLogAggregate/SyncChangeLogEntity.cs
+│   ├── Aggregates/SyncDeletionLogAggregate/SyncDeletionLogEntity.cs
 │   ├── Options/AutoTuneOptions.cs
 │   ├── Options/DangerZoneOptions.cs
 │   ├── Options/OracleOptions.cs
@@ -218,6 +220,8 @@
 │   ├── Repositories/ShardRetentionRepository.cs
 │   ├── Repositories/SyncCheckpointRepository.cs
 │   ├── Repositories/SyncBatchRepository.cs
+│   ├── Repositories/SyncChangeLogRepository.cs
+│   ├── Repositories/SyncDeletionLogRepository.cs
 │   ├── Repositories/InMemorySyncChangeLogRepository.cs
 │   ├── Repositories/InMemorySyncDeletionLogRepository.cs
 │   ├── Repositories/BusinessTaskRepository.cs
@@ -230,6 +234,8 @@
 │   ├── Persistence/EntityConfigurations/ScanLogEntityTypeConfiguration.cs
 │   ├── Persistence/EntityConfigurations/DropLogEntityTypeConfiguration.cs
 │   ├── Persistence/EntityConfigurations/SyncBatchEntityTypeConfiguration.cs
+│   ├── Persistence/EntityConfigurations/SyncChangeLogEntityTypeConfiguration.cs
+│   ├── Persistence/EntityConfigurations/SyncDeletionLogEntityTypeConfiguration.cs
 │   ├── Persistence/Sharding/TableSuffixScope.cs
 │   ├── Persistence/Sharding/IShardSuffixResolver.cs
 │   ├── Persistence/Sharding/MonthShardSuffixResolver.cs
@@ -241,6 +247,7 @@
 │   ├── Migrations/20260413160852_AddScanDropLogTables.cs
 │   ├── Migrations/20260413160852_AddScanDropLogTables.Designer.cs
 │   ├── Migrations/20260416010041_AddSyncBatchShardTable.cs
+│   ├── Migrations/20260416171508_AddSyncChangeDeletionLogShardTables.cs
 │   ├── Migrations/HubDbContextModelSnapshot.cs
 │   └── Services
 │       ├── IDangerZoneExecutor.cs
@@ -391,8 +398,12 @@
 - `Application/Abstractions/Persistence/IDropLogRepository.cs` + `Infrastructure/Repositories/DropLogRepository.cs`：落格日志仓储抽象与 EF Core 实现，按月写入 `drop_logs_{yyyyMM}`。
 - `Domain/Aggregates/ScanLogAggregate/ScanLogEntity.cs`：扫描日志聚合实体，记录条码、匹配结果、失败原因、设备编码、链路追踪、扫描时间等审计字段。
 - `Domain/Aggregates/DropLogAggregate/DropLogEntity.cs`：落格日志聚合实体，记录任务编码、条码、实际格口、成功标志、失败原因、落格时间等审计字段。
+- `Domain/Aggregates/SyncChangeLogAggregate/SyncChangeLogEntity.cs`：同步变更日志聚合实体，记录批次、表编码、操作类型、业务键、变更快照与本地时间。
+- `Domain/Aggregates/SyncDeletionLogAggregate/SyncDeletionLogEntity.cs`：同步删除日志聚合实体，记录批次、删除策略、执行标识、删除时间与源端证据。
 - `Infrastructure/Persistence/EntityConfigurations/ScanLogEntityTypeConfiguration.cs`：扫描日志 EF Fluent API 配置，定义分片表结构、字段约束与查询索引。
 - `Infrastructure/Persistence/EntityConfigurations/DropLogEntityTypeConfiguration.cs`：落格日志 EF Fluent API 配置，定义分片表结构、字段约束与查询索引。
+- `Infrastructure/Persistence/EntityConfigurations/SyncChangeLogEntityTypeConfiguration.cs`：同步变更日志 EF Fluent API 配置，定义分片表结构、字段约束与查询索引。
+- `Infrastructure/Persistence/EntityConfigurations/SyncDeletionLogEntityTypeConfiguration.cs`：同步删除日志 EF Fluent API 配置，定义分片表结构、字段约束与查询索引。
 - `20260413160852_AddScanDropLogTables.cs`：新增 `scan_logs` 与 `drop_logs` 表的 EF 迁移，包含所有字段与索引定义。
 - `EverydayChain.Hub.Tests/Services/WmsFeedbackServiceTests.cs`：业务回传服务单元测试，覆盖无待回传任务空结果、写入成功置 Completed、写入器异常置 Failed、batchSize 限制、Enabled=false 直接短路、writtenRows 不一致整批失败六个场景；含 `CapturingWmsOracleFeedbackGateway` 捕获替身。
 - `Domain/Options/ExceptionRuleOptions.cs`：异常规则根配置实体，包含全局开关与 dry-run 标志，持有三个子配置实例。
@@ -449,13 +460,16 @@
 - `SyncCheckpointRepository.cs`：检查点文件持久化实现，读写日志均以 Information 级落盘；写入改为临时文件 + File.Replace/Move 原子替换，防止崩溃产生半写 JSON。
 - `SyncBatchRepository.cs`：同步批次仓储 SQL Server 持久化分片实现，写入 `sync_batches_{yyyyMM}`，支持跨分片查询最近失败批次。
 - `SyncBatchEntity.cs` + `SyncBatchEntityTypeConfiguration.cs`：同步批次实体与映射配置，定义批次状态流转字段、唯一约束与查询索引。
-- `InMemorySyncChangeLogRepository.cs`：同步变更日志仓储内存实现，支持批量写入审计记录。
-- `InMemorySyncDeletionLogRepository.cs`：同步删除日志仓储内存实现，支持批量写入删除审计记录（含 DryRun 执行标记）。
+- `SyncChangeLogRepository.cs`：同步变更日志仓储 SQL Server 持久化分片实现，按 `ChangedTimeLocal` 写入 `sync_change_logs_{yyyyMM}`。
+- `SyncDeletionLogRepository.cs`：同步删除日志仓储 SQL Server 持久化分片实现，按 `DeletedTimeLocal`（为空时按入库时间）写入 `sync_deletion_logs_{yyyyMM}`。
+- `InMemorySyncChangeLogRepository.cs`：同步变更日志仓储内存实现（当前仅保留历史实现文件，不再作为默认 DI 注册）。
+- `InMemorySyncDeletionLogRepository.cs`：同步删除日志仓储内存实现（当前仅保留历史实现文件，不再作为默认 DI 注册）。
 - `ServiceCollectionExtensions.cs`：统一注册基础设施依赖，并在启动阶段从启用同步表配置提取逻辑表名集合，完成安全校验与空配置异常拦截。
 - `20260408020833_RebuildInitialHubSchema.cs`：初始化迁移，定义 `sorting_task_trace`、`IDX_PICKTOLIGHT_CARTON1`、`IDX_PICKTOWCS2` 三张聚合表结构及索引。
 - `20260413144042_AddBusinessTaskTable.cs`：新增 `business_tasks` 迁移基线，作为分片模板来源，包含任务编码、条码、格口、扫描落格时间、状态、回传状态等字段及唯一索引。
 - `20260413160852_AddScanDropLogTables.cs`：新增 `scan_logs` 与 `drop_logs` 迁移基线，作为分片模板来源，包含审计字段与查询索引。
 - `20260416010041_AddSyncBatchShardTable.cs`：新增 `sync_batches` 基础表迁移，用于同步批次自动迁移基线与分片模板。
+- `20260416171508_AddSyncChangeDeletionLogShardTables.cs`：新增 `sync_change_logs` 与 `sync_deletion_logs` 基础表迁移，用于同步变更/删除日志自动迁移基线与分片模板。
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
 - `nlog.config`：NLog 日志配置，输出至控制台与两个滚动日志文件：通用日志（`hub-${shortdate}.log`，按日切割，单文件上限 10 MB，保留 30 天）；同步专属日志（`sync-${shortdate}.log`，仅收录同步链路相关组件日志，便于独立分析同步性能问题）。
 - `Program.cs`（Host）：Host 启动入口，现已支持 API + Worker 共存，启用 Controllers、Swagger（中文注释）并保留自动迁移与同步后台任务注册。

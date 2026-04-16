@@ -603,6 +603,7 @@
 - 已完成前置条件复核：PR-03~PR-11 主功能交付已齐备，PR-13~PR-16 里程碑审查结论可复用，当前累计完成 15/17。
 - 已完成本轮回归验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 通过（0 Warning 0 Error，152/152 单元测试通过）。
 - 已完成文档口径同步启动：`README.md`、`逐文件代码检查台账.md` 与本计划文档已对齐为“PR-12 执行中，PR-17 待 PR-12 完成后进入”。
+- 已完成同步链路代码推进：`ISyncChangeLogRepository`、`ISyncDeletionLogRepository` 已切换至 SQL Server 分片持久化实现并纳入自动迁移与分表预建。
 
 #### 待完成收口项（Checklist）
 - [ ] 端到端联调证据归档完成（扫描上传→请求格口→落格回传→业务回传→补偿重试失败路径）
