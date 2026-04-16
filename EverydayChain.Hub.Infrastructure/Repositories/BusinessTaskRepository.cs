@@ -183,9 +183,28 @@ public class BusinessTaskRepository(
     {
         var result = new List<BusinessTaskEntity>(maxCount);
         var suffixes = await ListShardSuffixesWithLegacyFallbackAsync(ct);
-        foreach (var suffix in suffixes
-                     .OrderBy(static value => string.IsNullOrEmpty(value) ? "!" : value, StringComparer.Ordinal))
+        if (suffixes.Contains(string.Empty, StringComparer.Ordinal))
         {
+            var remainingCount = maxCount - result.Count;
+            if (remainingCount > 0)
+            {
+                using var legacyScope = TableSuffixScope.Use(string.Empty);
+                await using var legacyDb = await contextFactory.CreateDbContextAsync(ct);
+                var legacyRows = await queryBuilder(legacyDb.BusinessTasks.AsNoTracking())
+                    .Take(remainingCount)
+                    .ToListAsync(ct);
+                result.AddRange(legacyRows);
+            }
+        }
+
+        for (var i = suffixes.Count - 1; i >= 0; i--)
+        {
+            var suffix = suffixes[i];
+            if (string.IsNullOrEmpty(suffix))
+            {
+                continue;
+            }
+
             var remainingCount = maxCount - result.Count;
             if (remainingCount <= 0)
             {
