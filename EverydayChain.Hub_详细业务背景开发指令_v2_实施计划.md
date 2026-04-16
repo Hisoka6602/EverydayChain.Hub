@@ -89,9 +89,9 @@
 
 ### 2.2 执行前代码通读与里程碑时机判断（2026-04-16）
 1. 已通读并核对主干实现文件：`BusinessTaskEntity`、`WmsFeedbackService`、`BusinessTaskRepository`、`Program.cs`、`ServiceCollectionExtensions.cs`、`README.md`、`逐文件代码检查台账.md`。
-2. 已通过文件存在性与代码内容核对确认：PR-01~PR-10、PR-13~PR-15 交付物均已落地；本次已补全 PR-11（补偿服务接口与实现、补偿后台任务、配置项与测试）。
+2. 已通过文件存在性与代码内容核对确认：PR-01~PR-10、PR-13~PR-15 交付物均已落地；含本次补全的 PR-11（补偿服务接口与实现、补偿后台任务、配置项与测试）在内，当前累计完成 14/17，待执行 PR-12、PR-16、PR-17。
 3. 里程碑时机判断：M1/M2/M3 已完成且通过；PR-10 与 PR-11 依赖均已满足，已到达 M4（PR-16）里程碑检验时刻。
-4. 本 PR 自动建单要求已落地：新增 `.github/workflows/auto-create-pr.yml`，在非默认分支 push 后自动检查并创建到默认分支的 PR（已存在则跳过）。
+4. 本 PR 自动建单要求已落地并完成行为核对：`.github/workflows/auto-create-pr.yml` 在非默认分支 push 后自动检查并创建到默认分支的 PR（已存在则跳过），默认分支不触发建单。
 
 ---
 
