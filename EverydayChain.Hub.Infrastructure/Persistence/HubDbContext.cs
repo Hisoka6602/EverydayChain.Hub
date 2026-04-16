@@ -25,11 +25,11 @@ public class HubDbContext : DbContext
     private const string WmsSplitPickToLightCartonLogicalTable = "IDX_PICKTOLIGHT_CARTON1";
     /// <summary>WMS 下发至 WCS 分拣任务默认逻辑表名（沿用遗留系统表命名）。</summary>
     private const string WmsPickToWcsLogicalTable = "IDX_PICKTOWCS2";
-    /// <summary>业务任务固定表名（非分片，不含后缀）。</summary>
+    /// <summary>业务任务逻辑表名（分片表，按月后缀路由）。</summary>
     private const string BusinessTaskLogicalTable = "business_tasks";
-    /// <summary>扫描日志固定表名（非分片，不含后缀）。</summary>
+    /// <summary>扫描日志逻辑表名（分片表，按月后缀路由）。</summary>
     private const string ScanLogLogicalTable = "scan_logs";
-    /// <summary>落格日志固定表名（非分片，不含后缀）。</summary>
+    /// <summary>落格日志逻辑表名（分片表，按月后缀路由）。</summary>
     private const string DropLogLogicalTable = "drop_logs";
     /// <summary>同步批次逻辑表名（分片表，按月后缀路由）。</summary>
     private const string SyncBatchLogicalTable = "sync_batches";
@@ -60,17 +60,17 @@ public class HubDbContext : DbContext
     /// </summary>
     public DbSet<WmsPickToWcsEntity> WmsPickToWcsTasks => Set<WmsPickToWcsEntity>();
     /// <summary>
-    /// 业务任务实体集，映射到固定表 <c>business_tasks</c>（非分片）。
+    /// 业务任务实体集，映射到按月分片表 <c>business_tasks_{yyyyMM}</c>。
     /// </summary>
     public DbSet<BusinessTaskEntity> BusinessTasks => Set<BusinessTaskEntity>();
 
     /// <summary>
-    /// 扫描日志实体集，映射到固定表 <c>scan_logs</c>（非分片）。
+    /// 扫描日志实体集，映射到按月分片表 <c>scan_logs_{yyyyMM}</c>。
     /// </summary>
     public DbSet<ScanLogEntity> ScanLogs => Set<ScanLogEntity>();
 
     /// <summary>
-    /// 落格日志实体集，映射到固定表 <c>drop_logs</c>（非分片）。
+    /// 落格日志实体集，映射到按月分片表 <c>drop_logs_{yyyyMM}</c>。
     /// </summary>
     public DbSet<DropLogEntity> DropLogs => Set<DropLogEntity>();
 
@@ -86,16 +86,17 @@ public class HubDbContext : DbContext
         var sortingTaskTraceTableName = $"{SortingTaskTraceLogicalTable}{suffix}";
         var wmsSplitPickToLightCartonTableName = $"{WmsSplitPickToLightCartonLogicalTable}{suffix}";
         var wmsPickToWcsTableName = $"{WmsPickToWcsLogicalTable}{suffix}";
+        var businessTaskTableName = $"{BusinessTaskLogicalTable}{suffix}";
+        var scanLogTableName = $"{ScanLogLogicalTable}{suffix}";
+        var dropLogTableName = $"{DropLogLogicalTable}{suffix}";
         var syncBatchTableName = $"{SyncBatchLogicalTable}{suffix}";
 
         modelBuilder.ApplyConfiguration(new SortingTaskTraceEntityTypeConfiguration(sortingTaskTraceTableName, _shardingOptions.Schema));
         ConfigureWmsSplitPickToLightCartonEntity(modelBuilder, wmsSplitPickToLightCartonTableName);
         ConfigureWmsPickToWcsEntity(modelBuilder, wmsPickToWcsTableName);
-        // 业务任务使用固定表名，不随分片后缀变化。
-        modelBuilder.ApplyConfiguration(new BusinessTaskEntityTypeConfiguration(BusinessTaskLogicalTable, _shardingOptions.Schema));
-        // 扫描日志与落格日志使用固定表名，不随分片后缀变化。
-        modelBuilder.ApplyConfiguration(new ScanLogEntityTypeConfiguration(ScanLogLogicalTable, _shardingOptions.Schema));
-        modelBuilder.ApplyConfiguration(new DropLogEntityTypeConfiguration(DropLogLogicalTable, _shardingOptions.Schema));
+        modelBuilder.ApplyConfiguration(new BusinessTaskEntityTypeConfiguration(businessTaskTableName, _shardingOptions.Schema));
+        modelBuilder.ApplyConfiguration(new ScanLogEntityTypeConfiguration(scanLogTableName, _shardingOptions.Schema));
+        modelBuilder.ApplyConfiguration(new DropLogEntityTypeConfiguration(dropLogTableName, _shardingOptions.Schema));
         modelBuilder.ApplyConfiguration(new SyncBatchEntityTypeConfiguration(syncBatchTableName, _shardingOptions.Schema));
     }
 

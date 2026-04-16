@@ -2,35 +2,38 @@ using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Aggregates.DropLogAggregate;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
+using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 落格日志仓储 EF Core 实现，写入 SQL Server 中的 <c>drop_logs</c> 固定表（非分片）。
+/// 落格日志仓储 EF Core 实现，按月写入 <c>drop_logs_{yyyyMM}</c> 分表。
 /// </summary>
-public class DropLogRepository : IDropLogRepository
+public class DropLogRepository(
+    IDbContextFactory<HubDbContext> contextFactory,
+    IShardSuffixResolver shardSuffixResolver,
+    IShardTableProvisioner shardTableProvisioner) : IDropLogRepository
 {
-    /// <summary>
-    /// DbContext 工厂，每次操作均创建独立上下文以保证线程安全。
-    /// </summary>
-    private readonly IDbContextFactory<HubDbContext> _contextFactory;
-
-    /// <summary>
-    /// 初始化落格日志仓储。
-    /// </summary>
-    /// <param name="contextFactory">HubDbContext 工厂。</param>
-    public DropLogRepository(IDbContextFactory<HubDbContext> contextFactory)
-    {
-        _contextFactory = contextFactory;
-    }
-
     /// <inheritdoc/>
     public async Task SaveAsync(DropLogEntity entity, CancellationToken ct)
     {
-        using var scope = TableSuffixScope.Use(string.Empty);
-        await using var db = await _contextFactory.CreateDbContextAsync(ct);
+        var suffix = ResolveSuffix(entity.CreatedTimeLocal);
+        await shardTableProvisioner.EnsureShardTableAsync(suffix, ct);
+        using var scope = TableSuffixScope.Use(suffix);
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
         db.DropLogs.Add(entity);
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// 将本地时间解析为分片后缀。
+    /// </summary>
+    /// <param name="timeLocal">本地时间。</param>
+    /// <returns>分片后缀。</returns>
+    private string ResolveSuffix(DateTime timeLocal)
+    {
+        var normalizedLocalTime = timeLocal == DateTime.MinValue ? DateTime.Now : timeLocal;
+        return shardSuffixResolver.Resolve(new DateTimeOffset(normalizedLocalTime));
     }
 }
