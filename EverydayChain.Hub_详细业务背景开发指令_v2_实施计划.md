@@ -100,7 +100,7 @@
 ## PR-01：统一业务任务模型
 
 ### 执行状态
-- ✅ 已完成（本 PR）
+- ✅ 已完成（PR-14）
 - 验证结果：`dotnet build` 通过、`dotnet test` 通过。
 - 交付文件：
   - `EverydayChain.Hub.Domain/Enums/BusinessTaskStatus.cs`
@@ -151,7 +151,7 @@
 ## PR-02：语义与接口基线文档
 
 ### 执行状态
-- ✅ 已完成（本 PR）
+- ✅ 已完成（PR-15）
 - 验证结果：`dotnet build` 通过、`dotnet test` 通过。
 - 交付文件：
   - `WMS状态语义基线.md`
