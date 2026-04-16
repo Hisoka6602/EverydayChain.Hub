@@ -1,9 +1,9 @@
-name: 自动创建拉取请求
+name: 自动创建PR
 
 on:
   push:
-    branches:
-      - "**"
+    branches-ignore:
+      - main
 
 permissions:
   contents: read
@@ -14,7 +14,7 @@ jobs:
     if: github.ref_name != github.event.repository.default_branch
     runs-on: ubuntu-latest
     steps:
-      - name: 自动创建PR
+      - name: 检查并创建PR到默认分支
         uses: actions/github-script@v7
         with:
           script: |
@@ -23,12 +23,13 @@ jobs:
             const head = context.ref.replace("refs/heads/", "");
             const base = context.payload.repository.default_branch;
             const actor = context.actor;
+            const headOwner = context.payload.repository.owner.login;
 
             const { data: existing } = await github.rest.pulls.list({
               owner,
               repo,
               state: "open",
-              head: `${owner}:${head}`,
+              head: `${headOwner}:${head}`,
               base,
               per_page: 1
             });
@@ -38,14 +39,19 @@ jobs:
               return;
             }
 
-            const title = `chore: 自动创建 PR - ${head}`;
+            const title = `自动PR: ${head} -> ${base}`;
             const body = [
               "## 自动创建说明",
               `- 来源分支：\`${head}\``,
               `- 目标分支：\`${base}\``,
               `- 触发人：@${actor}`,
               "",
-              "该 PR 由工作流自动创建，用于满足“本 PR 需要自动创建 PR”的交付要求。"
+              "该 PR 由工作流自动创建，用于满足“本 PR 需要自动创建 PR”的交付要求。",
+              "",
+              "## 待补充内容",
+              "- [ ] 详细变更说明",
+              "- [ ] 验收清单（含构建/测试结果）",
+              "- [ ] 实施计划进度更新"
             ].join("\n");
 
             const { data: created } = await github.rest.pulls.create({
