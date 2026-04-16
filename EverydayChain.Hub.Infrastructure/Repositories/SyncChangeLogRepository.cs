@@ -60,9 +60,9 @@ public class SyncChangeLogRepository(
     private List<StagedChangeLogEntity> BuildStagedEntities(IReadOnlyList<SyncChangeLog> changes)
     {
         var stagedEntities = new List<StagedChangeLogEntity>(changes.Count);
+        var createdTimeLocal = DateTime.Now;
         foreach (var change in changes)
         {
-            var createdTimeLocal = DateTime.Now;
             var suffix = shardSuffixResolver.ResolveLocal(change.ChangedTimeLocal);
             stagedEntities.Add(new StagedChangeLogEntity(
                 suffix,

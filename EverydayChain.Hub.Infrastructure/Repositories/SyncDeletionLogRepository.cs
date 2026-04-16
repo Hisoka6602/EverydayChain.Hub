@@ -60,9 +60,9 @@ public class SyncDeletionLogRepository(
     private List<StagedDeletionLogEntity> BuildStagedEntities(IReadOnlyList<SyncDeletionLog> logs)
     {
         var stagedEntities = new List<StagedDeletionLogEntity>(logs.Count);
+        var createdTimeLocal = DateTime.Now;
         foreach (var log in logs)
         {
-            var createdTimeLocal = DateTime.Now;
             var routingTimeLocal = log.DeletedTimeLocal ?? createdTimeLocal;
             var suffix = shardSuffixResolver.ResolveLocal(routingTimeLocal);
             stagedEntities.Add(new StagedDeletionLogEntity(

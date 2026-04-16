@@ -36,7 +36,7 @@ public class SyncDeletionLogEntityTypeConfiguration : IEntityTypeConfiguration<S
         builder.Property(x => x.ParentBatchId).HasMaxLength(64);
         builder.Property(x => x.TableCode).IsRequired().HasMaxLength(64);
         builder.Property(x => x.BusinessKey).IsRequired().HasMaxLength(256);
-        builder.Property(x => x.SourceEvidence).HasMaxLength(1024);
+        builder.Property(x => x.SourceEvidence).IsRequired().HasMaxLength(1024);
         builder.HasIndex(x => x.BatchId);
         builder.HasIndex(x => new { x.TableCode, x.DeletedTimeLocal });
     }
