@@ -2,7 +2,6 @@ using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Domain.Options;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using System.Text.RegularExpressions;
 
 namespace EverydayChain.Hub.Application.Services;
@@ -14,14 +13,14 @@ public class RetentionExecutionService(
     ISyncTaskConfigRepository taskConfigRepository,
     IShardTableResolver shardTableResolver,
     IShardRetentionRepository shardRetentionRepository,
-    IOptions<RetentionJobOptions> retentionJobOptions,
+    IReadOnlyList<RetentionLogTableOptions> logRetentionTables,
     ILogger<RetentionExecutionService> logger) : IRetentionExecutionService
 {
     /// <summary>SQL 标识符安全校验正则（仅允许字母、数字、下划线）。</summary>
     private static readonly Regex SqlIdentifierRegex = new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
 
-    /// <summary>保留期任务配置快照。</summary>
-    private readonly RetentionJobOptions _retentionJobOptions = retentionJobOptions.Value;
+    /// <summary>日志表保留期配置快照。</summary>
+    private readonly IReadOnlyList<RetentionLogTableOptions> _logRetentionTables = logRetentionTables;
 
     /// <inheritdoc/>
     public async Task<string> ExecuteRetentionCleanupAsync(CancellationToken ct)
@@ -121,7 +120,7 @@ public class RetentionExecutionService(
                 table.RetentionAllowDrop));
         }
 
-        foreach (var logTable in _retentionJobOptions.LogTables)
+        foreach (var logTable in _logRetentionTables)
         {
             if (!logTable.Enabled)
             {

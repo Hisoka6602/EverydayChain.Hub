@@ -65,6 +65,7 @@ public static class ServiceCollectionExtensions {
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
         var syncOptions = configuration.GetSection(SyncJobOptions.SectionName).Get<SyncJobOptions>() ?? new SyncJobOptions();
+        var retentionJobOptions = configuration.GetSection(RetentionJobOptions.SectionName).Get<RetentionJobOptions>() ?? new RetentionJobOptions();
         var managedLogicalTables = BuildManagedLogicalTables(syncOptions).ToArray();
 
         services.AddDbContextFactory<HubDbContext>(options => {
@@ -78,6 +79,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IRuntimeStorageGuard, RuntimeStorageGuard>();
         services.AddSingleton<ISqlExecutionTuner, SqlExecutionTuner>();
         services.AddSingleton<IReadOnlyList<string>>(managedLogicalTables);
+        services.AddSingleton<IReadOnlyList<RetentionLogTableOptions>>(retentionJobOptions.LogTables);
         services.AddSingleton<IShardTableProvisioner, ShardTableProvisioner>();
         services.AddScoped<IAutoMigrationService, AutoMigrationService>();
         services.AddSingleton<ISortingTaskTraceWriter, SortingTaskTraceWriter>();
