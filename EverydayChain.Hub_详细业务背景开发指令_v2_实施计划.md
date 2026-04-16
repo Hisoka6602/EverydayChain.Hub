@@ -679,6 +679,12 @@
 
 ## PR-14：里程碑M2全量审查-主链路打通阶段
 
+### 执行状态
+- ✅ 已完成（本 PR）
+- 已完成：对扫描输入、扫描匹配、任务执行、格口请求、落格回传主链路执行全量审查，并将结论归档到 `逐文件代码检查台账.md`。
+- 已完成：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 验证通过（0 Warning 0 Error）。
+- 已完成：M2 里程碑检验结论为“主链路职责边界与调用链路满足当前阶段验收要求，可进入 PR-08/PR-09 与后续里程碑阶段”。
+
 ### 建议标题
 `chore(review): 里程碑M2全量审查与问题闭环`
 
@@ -719,6 +725,12 @@
 ---
 
 ## PR-15：里程碑M3全量审查-回传与审计阶段
+
+### 执行状态
+- ✅ 已完成（本 PR）
+- 已完成：对业务回传与扫描/落格日志链路执行全量审查，并完成审计字段一致性核对与结论归档。
+- 已完成：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln` 验证通过（0 Warning 0 Error）。
+- 已完成：M3 里程碑检验结论为“回传与审计链路可追溯、无阻塞级缺陷，可进入 PR-10/PR-11 与 M4 里程碑检验阶段”。
 
 ### 建议标题
 `chore(review): 里程碑M3全量审查与问题闭环`
