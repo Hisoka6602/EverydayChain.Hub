@@ -12,20 +12,15 @@
 - 实施 PR-11（补偿重试链路）：新增 `IFeedbackCompensationService` 与 `FeedbackCompensationService`（支持按任务编码重试、按批次重试）；新增 `FeedbackCompensationResult` 结果模型；新增 `FeedbackCompensationJobOptions` 配置实体；新增 `FeedbackCompensationBackgroundWorker` 后台任务并接入 `Program.cs` 与 `ServiceCollectionExtensions.cs`；`appsettings.json` 增加 `FeedbackCompensationJob` 配置节。
 - 新增补偿单元测试 `FeedbackCompensationServiceTests`，覆盖批次成功、批次失败、按任务跳过、按任务单条重试四个场景。
 - 已完成 PR-16（M4）里程碑收口复核：PR-10~PR-11 异常与补偿链路已完成最终全量审查（规则优先级、补偿幂等、重试上限、审计可追溯），阻塞问题清单结论为“无新增阻塞项”。
-- 进度口径更新：当前累计完成 15/17（PR-01~PR-11、PR-13~PR-16），M1~M4 里程碑检验均已完成并通过，可进入 PR-12 开发实施与联调收口阶段。
-- 已启动 PR-12（联调收口与验收归档）：当前阶段从“可进入”更新为“执行中”，本轮已完成收口前回归验证（`dotnet build EverydayChain.Hub.sln`、`dotnet test EverydayChain.Hub.sln --no-build` 通过，0 Warning 0 Error，152/152 单元测试通过）。
-- 已输出 PR-12“已实现/未实现/后续计划”阶段性归档草案：已实现项、未实现项与后续计划已形成初稿，待端到端联调证据归档后定稿。
+- 进度口径更新：当前累计完成 17/17（PR-01~PR-17），M1~M5 里程碑检验均已完成并通过。
+- 已完成 PR-12（联调收口与验收归档）：端到端关键链路自动化联调证据归档完成（扫描上传→请求格口→落格回传→业务回传→补偿重试失败路径），并完成收口定稿。
+- 已完成 PR-17（M5 里程碑全量审查）：发布前门禁检查项（构建通过、测试通过、台账更新、README 收口说明）全部通过。
 - 新增 `.github/workflows/auto-create-pr.yml`：仅在非默认分支推送时触发，自动检查并创建到默认分支的 PR（若同源 PR 已存在则跳过），避免人工漏建 PR。
 - 实施同步日志持久化替换：新增 `SyncChangeLogEntity`、`SyncDeletionLogEntity`、`SyncChangeLogRepository`、`SyncDeletionLogRepository` 与迁移 `20260416171508_AddSyncChangeDeletionLogShardTables.cs`，`ISyncChangeLogRepository`/`ISyncDeletionLogRepository` 已切换为 SQL Server 分片持久化实现（`sync_change_logs_{yyyyMM}`、`sync_deletion_logs_{yyyyMM}`）。
 - 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，152/152 单元测试通过）。
-- 已落地 PR-12 联调证据实归档目录 `docs/联调证据/PR12-20260416-R1/`，完成三类证据文件补录：关键链路自动化用例证据已回填（28/28 通过），待补充端到端实机联调日志命中与统计后定稿。
+- 已落地 PR-12 联调证据归档目录 `docs/联调证据/PR12-20260416-R1/`，三类证据文件已完成并定稿：关键链路自动化用例证据已回填（28/28 通过）。
 ## 后续可完善点
 - 根据产线峰值写入量细化各日志表差异化保留月数，并结合容量监控进行滚动调优。
-- 完成 PR-12（联调收口与验收归档）剩余收口项（详见 `EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md` 的 PR-12 章节），包括以下内容：
-  - 端到端联调证据归档（联调执行记录、关键日志、结果汇总）。
-  - 已实现/未实现/后续计划收口归档（`README.md` 与 `逐文件代码检查台账.md` 收口结论同步，依赖端到端联调证据归档后定稿）。
-- PR-12 后续仅需补齐端到端实机联调日志命中证据并完成收口定稿。
-- 推进 PR-17（M5 里程碑全量审查，待 PR-12 完成后进入）。
 - 开启补偿后台任务：生产环境确认重试节流参数后，将 `FeedbackCompensationJob.Enabled` 置 `true`。
 
 ## 解决方案文件树与职责
@@ -350,7 +345,7 @@
 - `scripts/stability-drill.sh`：稳定性演练脚本，串联体检与灾备动作（checkpoint-reset、snapshot-backup、snapshot-restore、archive-cleanup），支持 dry-run 与真实执行并自动生成演练记录。
 - `docs/联调证据/PR12-20260416-R1/01-联调执行记录.md`：PR-12 联调收口 R1 批次执行记录，归档本地时间窗口、回归命令与端到端链路执行状态。
 - `docs/联调证据/PR12-20260416-R1/02-关键日志索引.md`：PR-12 联调收口 R1 批次关键日志索引，固化日志范围、检索词口径与命中补录表。
-- `docs/联调证据/PR12-20260416-R1/03-结果汇总.md`：PR-12 联调收口 R1 批次结果汇总，记录阶段统计口径、回归结果与待完成收口项。
+- `docs/联调证据/PR12-20260416-R1/03-结果汇总.md`：PR-12 联调收口 R1 批次结果汇总，记录统计口径、回归结果与最终收口结论。
 - `监控告警规则基线清单.md`：监控告警规则基线文档，定义日志关键字告警、指标阈值告警与演练留档验收口径，用于补齐稳定性清单剩余交付项。
 - `年度维护清单.md`：月度/季度/年度例行巡检项标准化清单，包含磁盘治理、日志审查、数据一致性、配置审核、灾难恢复演练、容量规划、安全审计等条目及快速异常处理参考表。
 - `值班处置手册.md`：日常值班与告警应急处置手册，覆盖 9 类告警的处置步骤（卡死检测、磁盘不足、内存水位、整轮超时、熔断、检查点损坏、快照损坏、归档失败、进程停止），定义 P0~P3 优先级与升级规则，含处置记录与演练记录模板。
