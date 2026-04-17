@@ -232,6 +232,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     {
         IReadOnlyList<BusinessTaskEntity> result = BuildFilterQuery(filter)
             .OrderByDescending(task => task.CreatedTimeLocal)
+            .ThenByDescending(task => task.Id)
             .Skip(skip)
             .Take(take)
             .ToList();

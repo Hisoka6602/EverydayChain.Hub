@@ -157,7 +157,10 @@ public class BusinessTaskRepository(
             var shardRows = await db.BusinessTasks
                 .AsNoTracking()
                 .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal)
-                .GroupBy(x => string.IsNullOrEmpty(x.WaveCode) ? EmptyWaveCode : x.WaveCode!)
+                .GroupBy(x =>
+                    x.WaveCode == null || x.WaveCode.Trim() == string.Empty
+                        ? EmptyWaveCode
+                        : x.WaveCode.Trim())
                 .Select(group => new BusinessTaskWaveAggregateRow
                 {
                     WaveCode = group.Key,
@@ -200,7 +203,10 @@ public class BusinessTaskRepository(
             var shardCodes = await db.BusinessTasks
                 .AsNoTracking()
                 .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal)
-                .Select(x => string.IsNullOrEmpty(x.WaveCode) ? EmptyWaveCode : x.WaveCode!)
+                .Select(x =>
+                    x.WaveCode == null || x.WaveCode.Trim() == string.Empty
+                        ? EmptyWaveCode
+                        : x.WaveCode.Trim())
                 .Distinct()
                 .ToListAsync(ct);
             foreach (var code in shardCodes)
@@ -229,6 +235,8 @@ public class BusinessTaskRepository(
 
         var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct);
         var merged = new Dictionary<string, BusinessTaskDockAggregateRow>(StringComparer.OrdinalIgnoreCase);
+        var normalizedWaveCode = NormalizeOptionalText(waveCode);
+        var normalizedDockCode = NormalizeOptionalText(dockCode);
         foreach (var suffix in suffixes)
         {
             using var scope = TableSuffixScope.Use(suffix);
@@ -236,24 +244,31 @@ public class BusinessTaskRepository(
             var query = db.BusinessTasks
                 .AsNoTracking()
                 .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal);
-            if (!string.IsNullOrWhiteSpace(waveCode))
-            {
-                query = query.Where(x => (string.IsNullOrEmpty(x.WaveCode) ? EmptyWaveCode : x.WaveCode!) == waveCode);
-            }
-
-            if (!string.IsNullOrWhiteSpace(dockCode))
+            if (!string.IsNullOrWhiteSpace(normalizedWaveCode))
             {
                 query = query.Where(x =>
-                    (string.IsNullOrEmpty(x.ActualChuteCode)
-                        ? (string.IsNullOrEmpty(x.TargetChuteCode) ? EmptyDockCode : x.TargetChuteCode!)
-                        : x.ActualChuteCode!) == dockCode);
+                    (x.WaveCode == null || x.WaveCode.Trim() == string.Empty
+                        ? EmptyWaveCode
+                        : x.WaveCode.Trim()) == normalizedWaveCode);
+            }
+
+            if (!string.IsNullOrWhiteSpace(normalizedDockCode))
+            {
+                query = query.Where(x =>
+                    (x.ActualChuteCode == null || x.ActualChuteCode.Trim() == string.Empty
+                        ? (x.TargetChuteCode == null || x.TargetChuteCode.Trim() == string.Empty
+                            ? EmptyDockCode
+                            : x.TargetChuteCode.Trim())
+                        : x.ActualChuteCode.Trim()) == normalizedDockCode);
             }
 
             var shardRows = await query
                 .GroupBy(x =>
-                    string.IsNullOrEmpty(x.ActualChuteCode)
-                        ? (string.IsNullOrEmpty(x.TargetChuteCode) ? EmptyDockCode : x.TargetChuteCode!)
-                        : x.ActualChuteCode!)
+                    x.ActualChuteCode == null || x.ActualChuteCode.Trim() == string.Empty
+                        ? (x.TargetChuteCode == null || x.TargetChuteCode.Trim() == string.Empty
+                            ? EmptyDockCode
+                            : x.TargetChuteCode.Trim())
+                        : x.ActualChuteCode.Trim())
                 .Select(group => new BusinessTaskDockAggregateRow
                 {
                     DockCode = group.Key,
@@ -325,13 +340,17 @@ public class BusinessTaskRepository(
             using var scope = TableSuffixScope.Use(suffix);
             await using var db = await contextFactory.CreateDbContextAsync(ct);
             var query = BuildQueryBySearchFilter(db.BusinessTasks.AsNoTracking(), filter)
-                .OrderByDescending(task => task.CreatedTimeLocal);
+                .OrderByDescending(task => task.CreatedTimeLocal)
+                .ThenByDescending(task => task.Id);
 
-            var shardCount = await query.CountAsync(ct);
-            if (shardCount <= remainingSkip)
+            if (remainingSkip > 0)
             {
-                remainingSkip -= shardCount;
-                continue;
+                var shardCount = await query.CountAsync(ct);
+                if (shardCount <= remainingSkip)
+                {
+                    remainingSkip -= shardCount;
+                    continue;
+                }
             }
 
             var shardRows = await query
@@ -428,28 +447,40 @@ public class BusinessTaskRepository(
         IQueryable<BusinessTaskEntity> query,
         BusinessTaskSearchFilter filter)
     {
+        var normalizedWaveCode = NormalizeOptionalText(filter.WaveCode);
+        var normalizedBarcode = NormalizeOptionalText(filter.Barcode);
+        var normalizedDockCode = NormalizeOptionalText(filter.DockCode);
+        var normalizedChuteCode = NormalizeOptionalText(filter.ChuteCode);
+
         query = query.Where(task => task.CreatedTimeLocal >= filter.StartTimeLocal && task.CreatedTimeLocal < filter.EndTimeLocal);
-        if (!string.IsNullOrWhiteSpace(filter.WaveCode))
-        {
-            query = query.Where(task => (string.IsNullOrEmpty(task.WaveCode) ? EmptyWaveCode : task.WaveCode!) == filter.WaveCode);
-        }
-
-        if (!string.IsNullOrWhiteSpace(filter.Barcode))
-        {
-            query = query.Where(task => task.Barcode == filter.Barcode);
-        }
-
-        if (!string.IsNullOrWhiteSpace(filter.DockCode))
+        if (!string.IsNullOrWhiteSpace(normalizedWaveCode))
         {
             query = query.Where(task =>
-                (string.IsNullOrEmpty(task.ActualChuteCode)
-                    ? (string.IsNullOrEmpty(task.TargetChuteCode) ? EmptyDockCode : task.TargetChuteCode!)
-                    : task.ActualChuteCode!) == filter.DockCode);
+                (task.WaveCode == null || task.WaveCode.Trim() == string.Empty
+                    ? EmptyWaveCode
+                    : task.WaveCode.Trim()) == normalizedWaveCode);
         }
 
-        if (!string.IsNullOrWhiteSpace(filter.ChuteCode))
+        if (!string.IsNullOrWhiteSpace(normalizedBarcode))
         {
-            query = query.Where(task => task.TargetChuteCode == filter.ChuteCode || task.ActualChuteCode == filter.ChuteCode);
+            query = query.Where(task => task.Barcode != null && task.Barcode.Trim() == normalizedBarcode);
+        }
+
+        if (!string.IsNullOrWhiteSpace(normalizedDockCode))
+        {
+            query = query.Where(task =>
+                (task.ActualChuteCode == null || task.ActualChuteCode.Trim() == string.Empty
+                    ? (task.TargetChuteCode == null || task.TargetChuteCode.Trim() == string.Empty
+                        ? EmptyDockCode
+                        : task.TargetChuteCode.Trim())
+                    : task.ActualChuteCode.Trim()) == normalizedDockCode);
+        }
+
+        if (!string.IsNullOrWhiteSpace(normalizedChuteCode))
+        {
+            query = query.Where(task =>
+                (task.TargetChuteCode != null && task.TargetChuteCode.Trim() == normalizedChuteCode)
+                || (task.ActualChuteCode != null && task.ActualChuteCode.Trim() == normalizedChuteCode));
         }
 
         if (filter.OnlyException)
@@ -463,6 +494,16 @@ public class BusinessTaskRepository(
         }
 
         return query;
+    }
+
+    /// <summary>
+    /// 归一化可选文本，空白文本转为 null，其余文本执行 Trim。
+    /// </summary>
+    /// <param name="value">原始文本。</param>
+    /// <returns>归一化后的文本。</returns>
+    private static string? NormalizeOptionalText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
     /// <summary>
