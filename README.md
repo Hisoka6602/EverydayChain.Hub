@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 完成 `EverydayChain.Hub_分阶段执行PR与验收门禁_严格版.md` 首轮“先盘点后补全”落地：新增 PR-08~PR-10 联调证据包与旧实现删除清单，并补录 PR-01/PR-02、PR-04/PR-05 分表回归与迁移校验清单。
 - 开始实施 `EverydayChain.Hub_分阶段执行PR与验收门禁_严格版.md`：先完成现状盘点，再补齐 PR-08（码头看板 API）、PR-09（报表查询与 CSV 导出 API）、PR-10（业务任务/异常件/回流查询 API）。
 - 新增查询能力：`DockDashboardController`、`SortingReportController`、`BusinessTaskQueryController` 及对应应用层服务，支持默认当天查询、波次筛选、码头维度统计、CSV 导出、多条件分页查询与“仅 7 号码头显示异常数”规则。
 - 新增测试补齐：新增 PR-08~PR-10 控制器测试、服务测试与替身实现，覆盖时间校验、分页校验、统计口径与导出结果。
@@ -29,7 +30,7 @@
 - 实施 PR-07（总看板 API）：新增 `GlobalDashboardController`、`GlobalDashboardQueryService` 与 `IGlobalDashboardQueryService`，支持时间区间查询、波次维度聚合、整件/拆零分口径统计、识别率、回流数、异常数、总体积与总重量。
 - 扩展业务任务仓储查询契约：`IBusinessTaskRepository` 新增 `FindByCreatedTimeRangeAsync`，并在 `BusinessTaskRepository` 与 `InMemoryBusinessTaskRepository` 落地实现。
 - 新增总看板契约与测试：`GlobalDashboardQueryRequest/Response`、`WaveDashboardSummaryResponse`、`GlobalDashboardControllerTests`、`GlobalDashboardQueryServiceTests`、`StubGlobalDashboardQueryService`。
-- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，173/173 单元测试通过）。
+- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，180/180 单元测试通过）。
 ## 后续可完善点
 - 根据产线峰值写入量细化各日志表差异化保留月数，并结合容量监控进行滚动调优。
 - 开启补偿后台任务：生产环境确认重试节流参数后，将 `FeedbackCompensationJob.Enabled` 置 `true`。
@@ -63,10 +64,16 @@
 ├── 整件业务字段语义基线.md
 ├── docs
 │   └── 联调证据
+│       ├── PR08-PR10-20260417-R1
+│       │   ├── 01-码头规则抽样记录.md
+│       │   ├── 02-报表导出核对记录.md
+│       │   ├── 03-业务筛选回归记录.md
+│       │   └── 04-旧实现删除清单.md
 │       └── PR12-20260416-R1
 │           ├── 01-联调执行记录.md
 │           ├── 02-关键日志索引.md
-│           └── 03-结果汇总.md
+│           ├── 03-结果汇总.md
+│           └── 04-分表回归与迁移校验清单.md
 ├── scripts
 │   ├── health-check.sh
 │   ├── disaster-recovery.sh
@@ -417,6 +424,11 @@
 - `docs/联调证据/PR12-20260416-R1/01-联调执行记录.md`：PR-12 联调收口 R1 批次执行记录，归档本地时间窗口、回归命令与端到端链路执行状态。
 - `docs/联调证据/PR12-20260416-R1/02-关键日志索引.md`：PR-12 联调收口 R1 批次关键日志索引，固化日志范围、检索词口径与命中补录表。
 - `docs/联调证据/PR12-20260416-R1/03-结果汇总.md`：PR-12 联调收口 R1 批次结果汇总，记录统计口径、回归结果与最终收口结论。
+- `docs/联调证据/PR12-20260416-R1/04-分表回归与迁移校验清单.md`：补录 PR-01/PR-02 与 PR-04/PR-05 的分表回归、迁移执行与上线前 SQL 校验项，明确已完成项与待环境执行项。
+- `docs/联调证据/PR08-PR10-20260417-R1/01-码头规则抽样记录.md`：PR-08 码头看板规则抽样记录，归档“仅 7 号码头显示异常数”等门禁项自动化验证结果。
+- `docs/联调证据/PR08-PR10-20260417-R1/02-报表导出核对记录.md`：PR-09 报表查询与 CSV 导出核对记录，固化查询/导出口径一致性与格式验证结果。
+- `docs/联调证据/PR08-PR10-20260417-R1/03-业务筛选回归记录.md`：PR-10 业务任务、异常件、回流查询筛选回归记录，归档分页与筛选条件自动化回归结果。
+- `docs/联调证据/PR08-PR10-20260417-R1/04-旧实现删除清单.md`：PR-08~PR-10 覆盖关系与旧实现删除盘点，明确无重复旧实现待删除的结论与后续门禁要求。
 - `监控告警规则基线清单.md`：监控告警规则基线文档，定义日志关键字告警、指标阈值告警与演练留档验收口径，用于补齐稳定性清单剩余交付项。
 - `年度维护清单.md`：月度/季度/年度例行巡检项标准化清单，包含磁盘治理、日志审查、数据一致性、配置审核、灾难恢复演练、容量规划、安全审计等条目及快速异常处理参考表。
 - `值班处置手册.md`：日常值班与告警应急处置手册，覆盖 9 类告警的处置步骤（卡死检测、磁盘不足、内存水位、整轮超时、熔断、检查点损坏、快照损坏、归档失败、进程停止），定义 P0~P3 优先级与升级规则，含处置记录与演练记录模板。
