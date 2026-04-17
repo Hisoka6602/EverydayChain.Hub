@@ -107,9 +107,13 @@ public sealed class DropFeedbackService : IDropFeedbackService {
             task.FeedbackStatus = BusinessTaskFeedbackStatus.Pending;
             task.ActualChuteCode = string.IsNullOrWhiteSpace(request.ActualChuteCode) ? task.ActualChuteCode : request.ActualChuteCode.Trim();
             task.DroppedAtLocal = request.DropTimeLocal;
+            // 落格成功后任务进入待回传阶段，需清理旧回传成功标记并等待新的 WMS 回写结果。
+            task.IsFeedbackReported = false;
+            task.FeedbackTimeLocal = null;
         } else {
             task.Status = BusinessTaskStatus.Exception;
             task.FailureReason = (request.FailureReason ?? string.Empty).Trim();
+            task.IsException = true;
         }
 
         task.UpdatedTimeLocal = DateTime.Now;

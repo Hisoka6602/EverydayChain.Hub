@@ -23,6 +23,9 @@ public class BusinessTaskMaterializerTests
             SourceTableCode = "WMS_PICK",
             BusinessKey = "ORDER-1|LINE-2",
             Barcode = " BC-001 ",
+            SourceType = BusinessTaskSourceType.Split,
+            WaveCode = "WAVE-001",
+            WaveRemark = "首波次",
             MaterializedTimeLocal = fixedTime,
         };
 
@@ -35,6 +38,9 @@ public class BusinessTaskMaterializerTests
         Assert.Equal("WMS_PICK", entity.SourceTableCode);
         Assert.Equal("ORDER-1|LINE-2", entity.BusinessKey);
         Assert.Equal("BC-001", entity.Barcode);
+        Assert.Equal(BusinessTaskSourceType.Split, entity.SourceType);
+        Assert.Equal("WAVE-001", entity.WaveCode);
+        Assert.Equal("首波次", entity.WaveRemark);
     }
 
     /// <summary>

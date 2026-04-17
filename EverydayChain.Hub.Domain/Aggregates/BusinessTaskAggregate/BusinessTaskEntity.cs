@@ -28,6 +28,11 @@ public class BusinessTaskEntity : IEntity<long>
     public string SourceTableCode { get; set; } = string.Empty;
 
     /// <summary>
+    /// 来源类型，区分拆零与整件链路。
+    /// </summary>
+    public BusinessTaskSourceType SourceType { get; set; } = BusinessTaskSourceType.Unknown;
+
+    /// <summary>
     /// 业务键文本（由唯一键拼接得到），最大 256 字符。
     /// </summary>
     [MaxLength(256)]
@@ -85,6 +90,36 @@ public class BusinessTaskEntity : IEntity<long>
     public DateTime? ScannedAtLocal { get; set; }
 
     /// <summary>
+    /// 包裹长度，单位毫米；可为空。
+    /// </summary>
+    public decimal? LengthMm { get; set; }
+
+    /// <summary>
+    /// 包裹宽度，单位毫米；可为空。
+    /// </summary>
+    public decimal? WidthMm { get; set; }
+
+    /// <summary>
+    /// 包裹高度，单位毫米；可为空。
+    /// </summary>
+    public decimal? HeightMm { get; set; }
+
+    /// <summary>
+    /// 包裹体积，单位立方毫米；可为空。
+    /// </summary>
+    public decimal? VolumeMm3 { get; set; }
+
+    /// <summary>
+    /// 包裹重量，单位克；可为空。
+    /// </summary>
+    public decimal? WeightGram { get; set; }
+
+    /// <summary>
+    /// 扫描次数；每次扫描成功后递增。
+    /// </summary>
+    public int ScanCount { get; set; }
+
+    /// <summary>
     /// 落格时间（本地时间）；尚未落格时为空。
     /// </summary>
     public DateTime? DroppedAtLocal { get; set; }
@@ -106,12 +141,33 @@ public class BusinessTaskEntity : IEntity<long>
     public string? WaveCode { get; set; }
 
     /// <summary>
+    /// 波次备注，来自上游波次说明信息，最大 128 字符；无备注时为空。
+    /// </summary>
+    [MaxLength(128)]
+    public string? WaveRemark { get; set; }
+
+    /// <summary>
     /// 是否已被标记为回流；由回流规则服务在扫描重试超限时置为 true。
     /// </summary>
     public bool IsRecirculated { get; set; }
 
     /// <summary>
+    /// 是否处于异常状态；用于显式标识异常任务。
+    /// </summary>
+    public bool IsException { get; set; }
+
+    /// <summary>
     /// 扫描重试次数；每次扫描上传失败时由任务执行服务递增，用于触发回流判定。
     /// </summary>
     public int ScanRetryCount { get; set; }
+
+    /// <summary>
+    /// 回传标记；回传成功后置为 true。
+    /// </summary>
+    public bool IsFeedbackReported { get; set; }
+
+    /// <summary>
+    /// 回传时间（本地时间）；回传成功后写入。
+    /// </summary>
+    public DateTime? FeedbackTimeLocal { get; set; }
 }

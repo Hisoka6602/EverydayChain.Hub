@@ -124,8 +124,8 @@
 
 | PR | 当前状态 | 盘点结论 |
 |---|---|---|
-| PR-01 业务模型收口 | ⚠️ 部分完成 | 已有 `BusinessTaskEntity` 与迁移，但“来源类型、尺寸体积重量、扫描次数、回传时间”等统一字段尚未在本地主模型完整收口。 |
-| PR-02 扫描字段闭环 | ⚠️ 部分完成 | 扫描接口与多条码策略已落地，扫描日志保留；但扫描尺寸/重量等字段未完成统一任务主模型更新闭环。 |
+| PR-01 业务模型收口 | ✅ 本轮补全完成 | 本轮已新增 `BusinessTaskSourceType`、`WaveRemark`、尺寸体积重量、`ScanCount`、`IsFeedbackReported`、`FeedbackTimeLocal`、`IsException` 等统一字段，并补齐 EF 配置与迁移 `20260417043253_AddBusinessTaskClosureFields`。 |
+| PR-02 扫描字段闭环 | ✅ 本轮补全完成 | 扫描接口与多条码策略保持兼容，`TaskExecutionService` 已在扫描成功链路写入扫描时间、尺寸体积重量并递增 `ScanCount`，扫描日志链路保持不变。 |
 | PR-03 扫描兼容测试与日志补强 | ✅ 已完成 | 扫描控制器与扫描链路测试已覆盖，日志落地链路存在并稳定。 |
 | PR-04 回写模型与配置收口 | ⚠️ 部分完成 | 已有 `WmsFeedbackService` 与配置模型；当前仍以通用回写字段配置为主，真实业务字段映射待继续收口。 |
 | PR-05 回写执行与补偿收口 | ⚠️ 部分完成 | 已具备回写执行与失败补偿后台任务；真实业务字段全量回写与专项测试仍需补齐。 |
@@ -149,12 +149,26 @@
 4. 新增测试：
    - `Tests/Host/Controllers/WaveCleanupControllerTests.cs`
    - `Tests/Host/Controllers/StubWaveCleanupService.cs`
+5. 补齐统一业务任务字段（PR-01/PR-02）：
+   - `Domain/Enums/BusinessTaskSourceType.cs`
+   - `Domain/Aggregates/BusinessTaskAggregate/BusinessTaskEntity.cs`
+   - `Infrastructure/Persistence/EntityConfigurations/BusinessTaskEntityTypeConfiguration.cs`
+   - `Infrastructure/Migrations/20260417043253_AddBusinessTaskClosureFields.cs`
+6. 扫描与回写链路字段闭环补齐：
+   - `Application/TaskExecution/Services/TaskExecutionService.cs`
+   - `Application/Feedback/Services/WmsFeedbackService.cs`
+   - `Application/Feedback/Services/FeedbackCompensationService.cs`
+   - `Application/Services/DropFeedbackService.cs`
+   - `Application/Recirculation/Services/RecirculationService.cs`
+7. 测试补齐：
+   - `Tests/Services/TaskExecutionServiceTests.cs`
+   - `Tests/Services/BusinessTaskMaterializerTests.cs`
 
 ## 3.3 下一步优先补全建议（按顺序）
 
-1. 优先补齐 PR-01/PR-02 未完成字段闭环（统一业务任务模型 + 扫描字段写入闭环）。
-2. 然后补齐 PR-04/PR-05 的真实业务字段回写映射与执行测试。
-3. 最后推进 PR-07~PR-10 的查询类 API 与收口删除。
+1. 优先补齐 PR-04/PR-05 的真实业务字段回写映射与执行测试。
+2. 然后推进 PR-07~PR-10 的查询类 API 与收口删除。
+3. 补充 PR-01/PR-02 的分表回归与迁移执行验收记录（含上线前 SQL 校验清单）。
 
 ---
 

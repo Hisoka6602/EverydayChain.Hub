@@ -105,6 +105,7 @@ public sealed class RecirculationService : IRecirculationService
         // 步骤 4：更新任务回流状态。
         task.IsRecirculated = true;
         task.Status = BusinessTaskStatus.Exception;
+        task.IsException = true;
         task.FailureReason = reason;
         task.UpdatedTimeLocal = DateTime.Now;
         await _businessTaskRepository.UpdateAsync(task, ct);

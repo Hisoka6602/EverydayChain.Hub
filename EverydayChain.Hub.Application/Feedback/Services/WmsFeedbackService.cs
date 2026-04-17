@@ -121,6 +121,8 @@ public sealed class WmsFeedbackService : IWmsFeedbackService
             foreach (var task in pendingTasks)
             {
                 task.FeedbackStatus = BusinessTaskFeedbackStatus.Completed;
+                task.IsFeedbackReported = true;
+                task.FeedbackTimeLocal = now;
                 task.UpdatedTimeLocal = now;
                 await UpdateSilentlyAsync(task, ct);
             }

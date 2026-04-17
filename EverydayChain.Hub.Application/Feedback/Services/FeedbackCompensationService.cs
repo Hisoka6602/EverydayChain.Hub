@@ -160,6 +160,8 @@ public sealed class FeedbackCompensationService : IFeedbackCompensationService
             foreach (var task in tasks)
             {
                 task.FeedbackStatus = BusinessTaskFeedbackStatus.Completed;
+                task.IsFeedbackReported = true;
+                task.FeedbackTimeLocal = now;
                 task.UpdatedTimeLocal = now;
                 await UpdateSilentlyAsync(task, ct);
             }

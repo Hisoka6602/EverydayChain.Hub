@@ -98,6 +98,7 @@ public class BusinessTaskRepository(
                     && x.Status != BusinessTaskStatus.Exception)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(x => x.Status, targetStatus)
+                    .SetProperty(x => x.IsException, targetStatus == BusinessTaskStatus.Exception)
                     .SetProperty(x => x.FailureReason, failureReasonPrefix)
                     .SetProperty(x => x.UpdatedTimeLocal, updatedTimeLocal),
                     ct);

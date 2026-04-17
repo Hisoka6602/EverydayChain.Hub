@@ -128,7 +128,12 @@ public sealed class TaskExecutionServiceTests
         {
             Barcode = "BC-003",
             DeviceCode = "DVC-02",
-            ScanTimeLocal = new DateTime(2026, 4, 13, 10, 0, 0, DateTimeKind.Local)
+            ScanTimeLocal = new DateTime(2026, 4, 13, 10, 0, 0, DateTimeKind.Local),
+            LengthMm = 120,
+            WidthMm = 220,
+            HeightMm = 320,
+            VolumeMm3 = 8448000,
+            WeightGram = 520
         };
 
         await service.MarkScannedAsync(request, CancellationToken.None);
@@ -138,5 +143,11 @@ public sealed class TaskExecutionServiceTests
         Assert.Equal(BusinessTaskStatus.Scanned, updatedTask!.Status);
         Assert.Equal("DVC-02", updatedTask.DeviceCode);
         Assert.Equal(new DateTime(2026, 4, 13, 10, 0, 0, DateTimeKind.Local), updatedTask.ScannedAtLocal);
+        Assert.Equal(120, updatedTask.LengthMm);
+        Assert.Equal(220, updatedTask.WidthMm);
+        Assert.Equal(320, updatedTask.HeightMm);
+        Assert.Equal(8448000, updatedTask.VolumeMm3);
+        Assert.Equal(520, updatedTask.WeightGram);
+        Assert.Equal(1, updatedTask.ScanCount);
     }
 }
