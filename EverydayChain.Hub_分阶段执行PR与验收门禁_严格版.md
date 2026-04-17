@@ -127,8 +127,8 @@
 | PR-01 业务模型收口 | ✅ 本轮补全完成 | 本轮已新增 `BusinessTaskSourceType`、`WaveRemark`、尺寸体积重量、`ScanCount`、`IsFeedbackReported`、`FeedbackTimeLocal`、`IsException` 等统一字段，并补齐 EF 配置与迁移 `20260417043253_AddBusinessTaskClosureFields`。 |
 | PR-02 扫描字段闭环 | ✅ 本轮补全完成 | 扫描接口与多条码策略保持兼容，`TaskExecutionService` 已在扫描成功链路写入扫描时间、尺寸体积重量并递增 `ScanCount`，扫描日志链路保持不变。 |
 | PR-03 扫描兼容测试与日志补强 | ✅ 已完成 | 扫描控制器与扫描链路测试已覆盖，日志落地链路存在并稳定。 |
-| PR-04 回写模型与配置收口 | ⚠️ 部分完成 | 已有 `WmsFeedbackService` 与配置模型；当前仍以通用回写字段配置为主，真实业务字段映射待继续收口。 |
-| PR-05 回写执行与补偿收口 | ⚠️ 部分完成 | 已具备回写执行与失败补偿后台任务；真实业务字段全量回写与专项测试仍需补齐。 |
+| PR-04 回写模型与配置收口 | ✅ 本轮补全完成 | `WmsFeedbackOptions` 已补齐拆零/整件分流目标配置（Schema/Table/BusinessKey）与真实业务字段映射配置（扫描时间、尺寸体积重量、扫描次数、业务状态）。 |
+| PR-05 回写执行与补偿收口 | ✅ 本轮补全完成 | `OracleWmsFeedbackGateway` 已按来源类型分流回写并覆盖真实业务字段；失败仍走既有补偿链路，`WmsFeedbackService`/`FeedbackCompensationService` 维持成功/失败状态闭环。 |
 | PR-06 波次清理 API 化 | ✅ 本轮补全完成 | 本轮新增 `WaveCleanupController`、`WaveCleanupRequest/Response`、`dry-run` 与正式执行端点，并补齐控制器测试。 |
 | PR-07 总看板 API | ❌ 未开始 | 代码中尚未提供总看板查询 API。 |
 | PR-08 码头看板 API | ❌ 未开始 | 代码中尚未提供码头看板查询 API。 |
@@ -161,13 +161,17 @@
    - `Application/Services/DropFeedbackService.cs`
    - `Application/Recirculation/Services/RecirculationService.cs`
 7. 测试补齐：
-   - `Tests/Services/TaskExecutionServiceTests.cs`
-   - `Tests/Services/BusinessTaskMaterializerTests.cs`
+    - `Tests/Services/TaskExecutionServiceTests.cs`
+    - `Tests/Services/BusinessTaskMaterializerTests.cs`
+8. 回写链路补齐（PR-04/PR-05）：
+   - `Domain/Options/WmsFeedbackOptions.cs`
+   - `Infrastructure/Integrations/OracleWmsFeedbackGateway.cs`
+   - `Host/appsettings.json`
 
 ## 3.3 下一步优先补全建议（按顺序）
 
-1. 优先补齐 PR-04/PR-05 的真实业务字段回写映射与执行测试。
-2. 然后推进 PR-07~PR-10 的查询类 API 与收口删除。
+1. 推进 PR-07~PR-10 的查询类 API 与收口删除。
+2. 补充 PR-04/PR-05 的联调验收记录（拆零/整件目标表字段抽样核对、失败补偿重试演练）。
 3. 补充 PR-01/PR-02 的分表回归与迁移执行验收记录（含上线前 SQL 校验清单）。
 
 ---

@@ -71,6 +71,8 @@ public sealed class WmsFeedbackServiceTests
 
         var updated = await repo.FindByTaskCodeAsync("TASK-001", CancellationToken.None);
         Assert.Equal(BusinessTaskFeedbackStatus.Completed, updated!.FeedbackStatus);
+        Assert.True(updated.IsFeedbackReported);
+        Assert.NotNull(updated.FeedbackTimeLocal);
     }
 
     /// <summary>
@@ -103,6 +105,8 @@ public sealed class WmsFeedbackServiceTests
 
         var updated = await repo.FindByTaskCodeAsync("TASK-002", CancellationToken.None);
         Assert.Equal(BusinessTaskFeedbackStatus.Failed, updated!.FeedbackStatus);
+        Assert.False(updated.IsFeedbackReported);
+        Assert.Null(updated.FeedbackTimeLocal);
     }
 
     /// <summary>
@@ -198,6 +202,8 @@ public sealed class WmsFeedbackServiceTests
 
         var updated = await repo.FindByTaskCodeAsync("TASK-M01", CancellationToken.None);
         Assert.Equal(BusinessTaskFeedbackStatus.Failed, updated!.FeedbackStatus);
+        Assert.False(updated.IsFeedbackReported);
+        Assert.Null(updated.FeedbackTimeLocal);
     }
 }
 

@@ -40,6 +40,8 @@ public sealed class FeedbackCompensationServiceTests
         Assert.Equal(0, result.FailedCount);
         var updated = await repository.FindByTaskCodeAsync("TASK-COMP-001", CancellationToken.None);
         Assert.Equal(BusinessTaskFeedbackStatus.Completed, updated!.FeedbackStatus);
+        Assert.True(updated.IsFeedbackReported);
+        Assert.NotNull(updated.FeedbackTimeLocal);
     }
 
     /// <summary>
@@ -59,6 +61,8 @@ public sealed class FeedbackCompensationServiceTests
         Assert.False(result.IsSuccess);
         var updated = await repository.FindByTaskCodeAsync("TASK-COMP-002", CancellationToken.None);
         Assert.Equal(BusinessTaskFeedbackStatus.Failed, updated!.FeedbackStatus);
+        Assert.False(updated.IsFeedbackReported);
+        Assert.Null(updated.FeedbackTimeLocal);
     }
 
     /// <summary>
