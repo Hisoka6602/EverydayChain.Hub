@@ -71,6 +71,7 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         var groupedTasks = GroupTasksByWriteTarget(tasks);
         var feedbackTime = DateTime.Now;
         var totalAffectedRows = 0;
+        var targetSummary = BuildTargetSummary(groupedTasks.Keys);
 
         try
         {
@@ -83,14 +84,27 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
                     await connection.OpenAsync(token);
                     foreach (var entry in groupedTasks)
                     {
-                        affectedRows += await ExecuteWriteBatchAsync(
-                            connection,
-                            entry.Key.Schema,
-                            entry.Key.Table,
-                            entry.Key.BusinessKeyColumn,
-                            entry.Value,
-                            feedbackTime,
-                            token);
+                        try
+                        {
+                            affectedRows += await ExecuteWriteBatchAsync(
+                                connection,
+                                entry.Key.Schema,
+                                entry.Key.Table,
+                                entry.Key.BusinessKeyColumn,
+                                entry.Value,
+                                feedbackTime,
+                                token);
+                        }
+                        catch (Exception ex) when (!token.IsCancellationRequested)
+                        {
+                            _logger.LogError(
+                                ex,
+                                "WMS 回传网关：目标表写入失败。Schema={Schema}, Table={Table}, TaskCount={TaskCount}",
+                                entry.Key.Schema,
+                                entry.Key.Table,
+                                entry.Value.Count);
+                            throw;
+                        }
                     }
 
                     return affectedRows;
@@ -115,8 +129,9 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         {
             _logger.LogError(
                 ex,
-                "WMS 回传网关：Oracle 批量写入异常。Schema={Schema}, Table={Table}, TaskCount={TaskCount}",
-                _options.Schema, _options.Table, tasks.Count);
+                "WMS 回传网关：Oracle 批量写入异常。Targets={Targets}, TaskCount={TaskCount}",
+                targetSummary,
+                tasks.Count);
             throw;
         }
     }
@@ -397,9 +412,14 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
     /// <param name="fieldName">字段名（用于错误消息）。</param>
     private static void EnsureSafeIdentifier(string identifier, string fieldName)
     {
-        if (string.IsNullOrWhiteSpace(identifier) || !identifier.All(ch => char.IsLetterOrDigit(ch) || ch == '_'))
+        if (string.IsNullOrWhiteSpace(identifier))
         {
-            throw new InvalidOperationException($"{fieldName} 包含非法字符，仅允许字母、数字、下划线。");
+            throw new InvalidOperationException($"{fieldName} 不能为空或空白。");
+        }
+
+        if (!identifier.All(IsAsciiLetterDigitOrUnderscore))
+        {
+            throw new InvalidOperationException($"{fieldName} 包含非法字符，仅允许 ASCII 字母、数字、下划线。");
         }
     }
 
@@ -414,6 +434,32 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         {
             EnsureSafeIdentifier(identifier, fieldName);
         }
+    }
+
+    /// <summary>
+    /// 判断字符是否属于 ASCII 字母、数字或下划线。
+    /// </summary>
+    /// <param name="ch">待判断字符。</param>
+    /// <returns>满足规则返回 true，否则返回 false。</returns>
+    private static bool IsAsciiLetterDigitOrUnderscore(char ch)
+    {
+        return (ch >= 'A' && ch <= 'Z')
+            || (ch >= 'a' && ch <= 'z')
+            || (ch >= '0' && ch <= '9')
+            || ch == '_';
+    }
+
+    /// <summary>
+    /// 构建目标写入表摘要文本。
+    /// </summary>
+    /// <param name="targets">目标写入键集合。</param>
+    /// <returns>目标摘要文本。</returns>
+    private static string BuildTargetSummary(IEnumerable<(string Schema, string Table, string BusinessKeyColumn)> targets)
+    {
+        var entries = targets
+            .Select(target => $"{target.Schema}.{target.Table}({target.BusinessKeyColumn})")
+            .ToArray();
+        return entries.Length == 0 ? "<none>" : string.Join(", ", entries);
     }
 
     /// <summary>
