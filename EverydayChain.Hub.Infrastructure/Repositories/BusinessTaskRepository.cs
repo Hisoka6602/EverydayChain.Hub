@@ -360,7 +360,7 @@ public class BusinessTaskRepository(
             currentMonth = currentMonth.AddMonths(1);
         }
 
-        // 容量预留：命中月份分片数量 + 1 个历史固定表空后缀。
+        // 容量预留：命中月份分片数量 + 1 个历史固定表空后缀（用于兼容未分片的历史遗留数据）。
         var estimatedSuffixCount = targetSuffixes.Count + 1;
         var matchedSuffixes = new List<string>(estimatedSuffixCount);
         foreach (var suffix in availableSuffixes)

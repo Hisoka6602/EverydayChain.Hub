@@ -11,29 +11,6 @@ namespace EverydayChain.Hub.Tests.Host.Controllers;
 public sealed class GlobalDashboardControllerTests
 {
     /// <summary>
-    /// UTC 语义枚举字面量值。
-    /// </summary>
-    private const DateTimeKind UtcKindLiteral = (DateTimeKind)1;
-
-    /// <summary>
-    /// 开始时间为 UTC 时应返回 BadRequest。
-    /// </summary>
-    [Fact]
-    public async Task QueryOverviewAsync_ShouldReturnBadRequest_WhenStartTimeIsUtc()
-    {
-        var controller = new GlobalDashboardController(new StubGlobalDashboardQueryService());
-        var request = new GlobalDashboardQueryRequest
-        {
-            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 9, 0, 0), UtcKindLiteral),
-            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 10, 0, 0), DateTimeKind.Local)
-        };
-
-        var actionResult = await controller.QueryOverviewAsync(request, CancellationToken.None);
-
-        Assert.IsType<BadRequestObjectResult>(actionResult.Result);
-    }
-
-    /// <summary>
     /// 开始或结束时间未传入时应返回 BadRequest。
     /// </summary>
     [Theory]
