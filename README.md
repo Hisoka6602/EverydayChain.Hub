@@ -11,7 +11,7 @@
 - 补齐查询索引：`BusinessTaskEntity`、`ScanLogEntity`、`DropLogEntity`、`SyncBatchEntity` 新增高频单列与组合索引，覆盖分页、看板聚合、扫描匹配、回写补偿场景。
 - 完成进一步性能精修：热路径查询去除 `Trim()` 函数包裹以提升索引命中；扫描链路增加字符串一次归一化；补偿失败链路移除冗余“失败到失败”重复更新。
 - 新增文档：`性能精修说明.md`、`前端对接文档.md`；更新 `WMS回写联调基线.md`，补齐最终配置、联调步骤、阻塞项与生产启用门禁。
-- 实施 PR-11 收口：WMS 回写配置收口为“生产默认关闭、联调配置齐全”，新增 `WMS回写联调基线.md`，明确拆零/整件目标表、业务键列、字段映射、联调入口与生产启用阻塞项。
+- 实施 PR-11 收口（历史阶段）：当时 WMS 回写配置口径为“生产默认关闭、联调配置齐全”，并新增 `WMS回写联调基线.md` 明确拆零/整件目标表、业务键列、字段映射、联调入口与生产启用阻塞项；当前口径以本节前述 `WmsFeedback.Enabled=true` 为准。
 - 实施 PR-11 查询性能收口：`GlobalDashboardQueryService`、`DockDashboardQueryService`、`SortingReportQueryService`、`BusinessTaskReadService` 已改为仓储侧聚合/过滤/分页主路径，避免“全量查回内存聚合/分页”。
 - 扩展业务任务仓储查询能力：新增波次聚合、码头聚合、波次选项查询与业务任务条件统计/分页下推；同步补齐 `BusinessTaskWaveAggregateRow`、`BusinessTaskDockAggregateRow`、`BusinessTaskSearchFilter`。
 - 补齐 WMS 回写验证：新增拆零与整件回写成功测试，结合既有批量、失败补偿、行数不一致整批失败测试，形成 PR-11 回写联调验收入口。
