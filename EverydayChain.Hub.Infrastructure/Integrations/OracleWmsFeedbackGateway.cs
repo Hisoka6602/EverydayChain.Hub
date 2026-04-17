@@ -18,6 +18,8 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
 {
     /// <summary>默认命令超时秒数。</summary>
     private const int DefaultCommandTimeoutSeconds = 60;
+    /// <summary>无目标表时的占位文本。</summary>
+    private const string EmptyTargetsPlaceholder = "(无目标表)";
 
     /// <summary>业务回传配置快照。</summary>
     private readonly WmsFeedbackOptions _options;
@@ -71,7 +73,6 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         var groupedTasks = GroupTasksByWriteTarget(tasks);
         var feedbackTime = DateTime.Now;
         var totalAffectedRows = 0;
-        var targetSummary = BuildTargetSummary(groupedTasks.Keys);
 
         try
         {
@@ -127,6 +128,7 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         }
         catch (Exception ex)
         {
+            var targetSummary = BuildTargetSummary(groupedTasks.Keys);
             _logger.LogError(
                 ex,
                 "WMS 回传网关：Oracle 批量写入异常。Targets={Targets}, TaskCount={TaskCount}",
@@ -456,10 +458,8 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
     /// <returns>目标摘要文本。</returns>
     private static string BuildTargetSummary(IEnumerable<(string Schema, string Table, string BusinessKeyColumn)> targets)
     {
-        var entries = targets
-            .Select(target => $"{target.Schema}.{target.Table}({target.BusinessKeyColumn})")
-            .ToArray();
-        return entries.Length == 0 ? "<none>" : string.Join(", ", entries);
+        var entries = targets.Select(target => $"{target.Schema}.{target.Table}({target.BusinessKeyColumn})");
+        return entries.Any() ? string.Join(", ", entries) : EmptyTargetsPlaceholder;
     }
 
     /// <summary>
