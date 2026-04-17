@@ -22,7 +22,7 @@ public sealed class SwaggerOptions {
     /// <summary>
     /// 文档描述（可填写范围：长度 0~512 的文本）。
     /// </summary>
-    public string Description { get; set; } = "提供扫描上传、请求格口、落格回传、波次清理、总看板查询、码头看板查询、分拣报表查询与导出、业务任务/异常件/回流记录查询等对外 API 能力。";
+    public string Description { get; set; } = "提供扫描上传、请求格口、落格回传、波次清理、总看板查询、码头看板查询、分拣报表查询与导出，以及业务任务/异常件/回流记录查询等对外 API 能力。";
 
     /// <summary>
     /// Swagger 页面入口路径（可填写范围：以 / 开头的路径；默认值：/swagger）。

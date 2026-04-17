@@ -1,12 +1,17 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 按业务需求切换 WMS 回写开关：`WmsFeedback.Enabled` 调整为 `true`，上线口径更新为“回写开启”。
+- 完成最后一轮上线收口：新增 `Swagger注释全量盘点清单.md` 与 `上线前最终检查清单.md`，形成可直接执行的上线门禁与逐文件注释盘点留痕。
+- 完成前端文档一致性收口：`前端对接文档.md` 已补充“一致性校验结果”，并修正请求格口、落格回传、波次清理示例消息语义。
+- 完成 WMS 回写上线策略收口：`README.md`、`WMS回写联调基线.md`、`上线前最终检查清单.md` 三处统一为“当前版本可上线，且 WMS 回写开启（`WmsFeedback.Enabled=true`）”。
+- 收口 Swagger 描述文案：`appsettings.json` 与 `SwaggerOptions.cs` 文案统一为当前真实能力描述（不再使用“骨架能力”语义）。
 - 实施 PR-12 精准修复：新增 `WebEndpointOptions` 与 `Swagger.Path` 配置，`Program.cs` 改为从 `appsettings.json` 读取 Web 监听地址与 Swagger 路径，移除硬编码入口路径。
 - 完成 EF Core 迁移历史重建：删除旧迁移链并重建单一基线迁移 `20260417185400_RebuildHubBaseline`，保留自动迁移与自动分表能力。
 - 补齐查询索引：`BusinessTaskEntity`、`ScanLogEntity`、`DropLogEntity`、`SyncBatchEntity` 新增高频单列与组合索引，覆盖分页、看板聚合、扫描匹配、回写补偿场景。
 - 完成进一步性能精修：热路径查询去除 `Trim()` 函数包裹以提升索引命中；扫描链路增加字符串一次归一化；补偿失败链路移除冗余“失败到失败”重复更新。
 - 新增文档：`性能精修说明.md`、`前端对接文档.md`；更新 `WMS回写联调基线.md`，补齐最终配置、联调步骤、阻塞项与生产启用门禁。
-- 实施 PR-11 收口：WMS 回写配置收口为“生产默认关闭、联调配置齐全”，新增 `WMS回写联调基线.md`，明确拆零/整件目标表、业务键列、字段映射、联调入口与生产启用阻塞项。
+- 实施 PR-11 收口（历史阶段）：当时 WMS 回写配置口径为“生产默认关闭、联调配置齐全”，并新增 `WMS回写联调基线.md` 明确拆零/整件目标表、业务键列、字段映射、联调入口与生产启用阻塞项；当前口径以本节前述 `WmsFeedback.Enabled=true` 为准。
 - 实施 PR-11 查询性能收口：`GlobalDashboardQueryService`、`DockDashboardQueryService`、`SortingReportQueryService`、`BusinessTaskReadService` 已改为仓储侧聚合/过滤/分页主路径，避免“全量查回内存聚合/分页”。
 - 扩展业务任务仓储查询能力：新增波次聚合、码头聚合、波次选项查询与业务任务条件统计/分页下推；同步补齐 `BusinessTaskWaveAggregateRow`、`BusinessTaskDockAggregateRow`、`BusinessTaskSearchFilter`。
 - 补齐 WMS 回写验证：新增拆零与整件回写成功测试，结合既有批量、失败补偿、行数不一致整批失败测试，形成 PR-11 回写联调验收入口。
@@ -71,6 +76,8 @@
 ├── EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md
 ├── WMS状态语义基线.md
 ├── WMS回写联调基线.md
+├── Swagger注释全量盘点清单.md
+├── 上线前最终检查清单.md
 ├── 性能精修说明.md
 ├── 前端对接文档.md
 ├── 条码规则基线.md
@@ -431,7 +438,9 @@
 - `scripts/stability-drill.sh`：稳定性演练脚本，串联体检与灾备动作（checkpoint-reset、snapshot-backup、snapshot-restore、archive-cleanup），支持 dry-run 与真实执行并自动生成演练记录。
 - `性能精修说明.md`：记录热路径进一步性能精修项、已完成项、当前性能边界与后续极限优化方向。
 - `前端对接文档.md`：面向调用方的接口对接说明，覆盖公开 API 路由、请求/响应字段与成功失败示例。
-- `WMS回写联调基线.md`：固化 WMS 回写联调配置、验证路径、阻塞项与生产启用门禁。
+- `WMS回写联调基线.md`：固化 WMS 回写联调配置、验证路径、阻塞项与生产启用门禁，并明确本次上线结论为“可上线且回写开启”。
+- `Swagger注释全量盘点清单.md`：记录 Host 层 Controller/Request/Response 逐文件 Swagger/XML 注释盘点结果与修复结论。
+- `上线前最终检查清单.md`：面向开发/运维/测试/业务的最终上线门禁清单，明确 WMS 关闭上线与启用上线两种判定路径。
 - `EverydayChain.Hub.Domain/Options/WebEndpointOptions.cs`：定义 Web 监听地址配置实体，统一承载 `WebEndpoint.Url` 绑定语义。
 - `EverydayChain.Hub.Domain/Options/SwaggerOptions.cs`：Swagger 文档配置实体，新增 `Path` 用于配置化 Swagger 页面入口。
 - `EverydayChain.Hub.Infrastructure/Migrations/20260417185400_RebuildHubBaseline.cs`：EF Core 新基线迁移，覆盖当前全量模型与索引定义。
