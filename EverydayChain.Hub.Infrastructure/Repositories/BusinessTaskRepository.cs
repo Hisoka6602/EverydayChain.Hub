@@ -158,9 +158,9 @@ public class BusinessTaskRepository(
                 .AsNoTracking()
                 .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal)
                 .GroupBy(x =>
-                    x.WaveCode == null || x.WaveCode == string.Empty
+                    x.WaveCode == null || x.WaveCode.Trim() == string.Empty
                         ? EmptyWaveCode
-                        : x.WaveCode)
+                        : x.WaveCode.Trim())
                 .Select(group => new BusinessTaskWaveAggregateRow
                 {
                     WaveCode = group.Key,
@@ -204,9 +204,9 @@ public class BusinessTaskRepository(
                 .AsNoTracking()
                 .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal)
                 .Select(x =>
-                    x.WaveCode == null || x.WaveCode == string.Empty
+                    x.WaveCode == null || x.WaveCode.Trim() == string.Empty
                         ? EmptyWaveCode
-                        : x.WaveCode)
+                        : x.WaveCode.Trim())
                 .Distinct()
                 .ToListAsync(ct);
             foreach (var code in shardCodes)
@@ -248,11 +248,14 @@ public class BusinessTaskRepository(
             {
                 if (string.Equals(normalizedWaveCode, EmptyWaveCode, StringComparison.Ordinal))
                 {
-                    query = query.Where(x => x.WaveCode == null || x.WaveCode == string.Empty);
+                    query = query.Where(x => x.WaveCode == null || x.WaveCode.Trim() == string.Empty);
                 }
                 else
                 {
-                    query = query.Where(x => x.WaveCode == normalizedWaveCode);
+                    query = query.Where(x =>
+                        (x.WaveCode == null || x.WaveCode.Trim() == string.Empty
+                            ? EmptyWaveCode
+                            : x.WaveCode.Trim()) == normalizedWaveCode);
                 }
             }
 
@@ -468,17 +471,20 @@ public class BusinessTaskRepository(
         {
             if (string.Equals(normalizedWaveCode, EmptyWaveCode, StringComparison.Ordinal))
             {
-                query = query.Where(task => task.WaveCode == null || task.WaveCode == string.Empty);
+                query = query.Where(task => task.WaveCode == null || task.WaveCode.Trim() == string.Empty);
             }
             else
             {
-                query = query.Where(task => task.WaveCode == normalizedWaveCode);
+                query = query.Where(task =>
+                    (task.WaveCode == null || task.WaveCode.Trim() == string.Empty
+                        ? EmptyWaveCode
+                        : task.WaveCode.Trim()) == normalizedWaveCode);
             }
         }
 
         if (!string.IsNullOrWhiteSpace(normalizedBarcode))
         {
-            query = query.Where(task => task.Barcode == normalizedBarcode);
+            query = query.Where(task => task.Barcode != null && task.Barcode.Trim() == normalizedBarcode);
         }
 
         if (!string.IsNullOrWhiteSpace(normalizedDockCode))

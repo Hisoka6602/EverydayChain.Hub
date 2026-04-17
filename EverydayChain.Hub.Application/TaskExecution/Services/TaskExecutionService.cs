@@ -103,11 +103,11 @@ public sealed class TaskExecutionService : ITaskExecutionService
             await WriteScanLogSilentlyAsync(
                 businessTaskId: task.Id,
                 taskCode: task.TaskCode,
-                barcode: request.Barcode,
-                deviceCode: request.DeviceCode,
+                barcode: normalizedBarcode,
+                deviceCode: normalizedDeviceCode,
                 isMatched: false,
                 failureReason: reason,
-                traceId: request.TraceId,
+                traceId: normalizedTraceId,
                 scanTimeLocal: request.ScanTimeLocal,
                 ct: ct);
 

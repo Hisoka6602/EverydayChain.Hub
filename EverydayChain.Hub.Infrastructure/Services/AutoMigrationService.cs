@@ -2,11 +2,12 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
-using EverydayChain.Hub.Domain.Options;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore.Storage;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
+using System.Data;
 
 namespace EverydayChain.Hub.Infrastructure.Services;
 
@@ -24,6 +25,10 @@ public class AutoMigrationService(
 
     /// <summary>迁移基线固定 Schema。</summary>
     private const string ExpectedMigrationSchema = "dbo";
+    /// <summary>重建迁移基线 Id。</summary>
+    private const string BaselineMigrationId = "20260417185400_RebuildHubBaseline";
+    /// <summary>EF 迁移历史写入版本号。</summary>
+    private const string BaselineProductVersion = "9.0.14";
 
     /// <summary>分表配置快照。</summary>
     private readonly ShardingOptions _options = shardingOptions.Value;
@@ -42,6 +47,7 @@ public class AutoMigrationService(
             using var _ = TableSuffixScope.Use(string.Empty);
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(token);
             await EnsureDatabaseCreatedAsync(dbContext, token);
+            await TryMarkBaselineMigrationForExistingDatabaseAsync(dbContext, token);
             await LogPendingMigrationsAsync(dbContext, token);
             await dbContext.Database.MigrateAsync(token);
             logger.LogInformation("自动迁移: 基础迁移已执行完成。");
@@ -66,6 +72,33 @@ public class AutoMigrationService(
             .Where(suffix => !string.IsNullOrWhiteSpace(suffix))
             .Distinct(StringComparer.Ordinal)
             .ToList();
+    }
+
+    /// <summary>
+    /// 判断是否需要对存量库执行“基线迁移已应用”标记。
+    /// </summary>
+    /// <param name="allMigrations">当前程序集全部迁移。</param>
+    /// <param name="appliedMigrations">数据库已应用迁移。</param>
+    /// <param name="existingCoreTableCount">已存在核心业务表数量。</param>
+    /// <returns>需要标记返回 true，否则返回 false。</returns>
+    internal static bool ShouldMarkBaselineMigration(
+        IReadOnlyList<string> allMigrations,
+        IReadOnlyCollection<string> appliedMigrations,
+        int existingCoreTableCount) {
+        if (allMigrations.Count != 1) {
+            return false;
+        }
+
+        var onlyMigration = allMigrations[0];
+        if (!string.Equals(onlyMigration, BaselineMigrationId, StringComparison.Ordinal)) {
+            return false;
+        }
+
+        if (appliedMigrations.Contains(onlyMigration)) {
+            return false;
+        }
+
+        return existingCoreTableCount > 0;
     }
 
     /// <summary>
@@ -137,6 +170,89 @@ public class AutoMigrationService(
             "自动迁移已成功创建数据库。DataSource={DataSource}, InitialCatalog={InitialCatalog}",
             dataSource,
             initialCatalog);
+    }
+
+    /// <summary>
+    /// 针对迁移历史重建场景，在检测到存量业务表且仅存在基线迁移时自动写入迁移历史标记。
+    /// </summary>
+    /// <param name="dbContext">数据库上下文。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    private async Task TryMarkBaselineMigrationForExistingDatabaseAsync(HubDbContext dbContext, CancellationToken cancellationToken) {
+        var allMigrations = dbContext.Database.GetMigrations().ToList();
+        var appliedMigrations = dbContext.Database.GetAppliedMigrations().ToList();
+        var existingCoreTableCount = await CountExistingCoreTablesAsync(dbContext, cancellationToken);
+        if (!ShouldMarkBaselineMigration(allMigrations, appliedMigrations, existingCoreTableCount)) {
+            return;
+        }
+
+        logger.LogWarning(
+            "自动迁移检测到迁移基线重建场景：核心表已存在但基线迁移未标记，开始自动补写迁移历史。CoreTableCount={CoreTableCount}, BaselineMigration={BaselineMigration}",
+            existingCoreTableCount,
+            BaselineMigrationId);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            IF OBJECT_ID(N'[dbo].[__EFMigrationsHistory]', N'U') IS NULL
+            BEGIN
+                CREATE TABLE [dbo].[__EFMigrationsHistory]
+                (
+                    [MigrationId] nvarchar(150) NOT NULL,
+                    [ProductVersion] nvarchar(32) NOT NULL,
+                    CONSTRAINT [PK___EFMigrationsHistory] PRIMARY KEY ([MigrationId])
+                );
+            END;
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            $"""
+            IF NOT EXISTS (SELECT 1 FROM [dbo].[__EFMigrationsHistory] WHERE [MigrationId] = N'{BaselineMigrationId}')
+            BEGIN
+                INSERT INTO [dbo].[__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+                VALUES (N'{BaselineMigrationId}', N'{BaselineProductVersion}');
+            END;
+            """,
+            cancellationToken);
+
+        logger.LogInformation("自动迁移已补写基线迁移历史。BaselineMigration={BaselineMigration}", BaselineMigrationId);
+    }
+
+    /// <summary>
+    /// 统计当前数据库中已存在的核心业务表数量。
+    /// </summary>
+    /// <param name="dbContext">数据库上下文。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>核心表数量。</returns>
+    private static async Task<int> CountExistingCoreTablesAsync(HubDbContext dbContext, CancellationToken cancellationToken) {
+        var connection = dbContext.Database.GetDbConnection();
+        var shouldClose = connection.State == ConnectionState.Closed;
+        if (shouldClose) {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try {
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                SELECT COUNT(1)
+                FROM sys.tables AS t
+                INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
+                WHERE s.name = @schema
+                  AND t.name IN (N'business_tasks', N'IDX_PICKTOLIGHT_CARTON1', N'IDX_PICKTOWCS2');
+                """;
+            var schemaParameter = command.CreateParameter();
+            schemaParameter.ParameterName = "@schema";
+            schemaParameter.Value = ExpectedMigrationSchema;
+            command.Parameters.Add(schemaParameter);
+
+            var scalar = await command.ExecuteScalarAsync(cancellationToken);
+            return scalar is null || scalar == DBNull.Value ? 0 : Convert.ToInt32(scalar);
+        }
+        finally {
+            if (shouldClose) {
+                await connection.CloseAsync();
+            }
+        }
     }
 
     /// <summary>
