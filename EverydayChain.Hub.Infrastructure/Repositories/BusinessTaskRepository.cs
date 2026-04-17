@@ -122,6 +122,19 @@ public class BusinessTaskRepository(
                 && x.Status != BusinessTaskStatus.Exception), ct);
     }
 
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BusinessTaskEntity>> FindByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
+    {
+        if (endTimeLocal <= startTimeLocal)
+        {
+            return Array.Empty<BusinessTaskEntity>();
+        }
+
+        var shardSuffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct);
+        return await QueryAcrossSpecifiedShardsAsync(query => query
+            .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal), shardSuffixes, ct);
+    }
+
     /// <summary>
     /// 在全部分片中查询首条记录。
     /// </summary>
@@ -156,13 +169,37 @@ public class BusinessTaskRepository(
         Func<IQueryable<BusinessTaskEntity>, IQueryable<BusinessTaskEntity>> queryBuilder,
         CancellationToken ct)
     {
+        var suffixes = await ListShardSuffixesWithLegacyFallbackAsync(ct);
+        return await QueryAcrossSpecifiedShardsAsync(queryBuilder, suffixes, ct);
+    }
+
+    /// <summary>
+    /// 在指定分片集合中查询数据并按创建时间升序返回。
+    /// </summary>
+    /// <param name="queryBuilder">查询构造函数。</param>
+    /// <param name="shardSuffixes">需要查询的分片后缀集合。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>聚合结果。</returns>
+    private async Task<IReadOnlyList<BusinessTaskEntity>> QueryAcrossSpecifiedShardsAsync(
+        Func<IQueryable<BusinessTaskEntity>, IQueryable<BusinessTaskEntity>> queryBuilder,
+        IReadOnlyList<string> shardSuffixes,
+        CancellationToken ct)
+    {
+        if (shardSuffixes.Count == 0)
+        {
+            return Array.Empty<BusinessTaskEntity>();
+        }
+
         var result = new List<BusinessTaskEntity>();
-        foreach (var suffix in await ListShardSuffixesWithLegacyFallbackAsync(ct))
+        foreach (var suffix in shardSuffixes)
         {
             using var scope = TableSuffixScope.Use(suffix);
             await using var db = await contextFactory.CreateDbContextAsync(ct);
             var shardRows = await queryBuilder(db.BusinessTasks.AsNoTracking()).ToListAsync(ct);
-            result.AddRange(shardRows);
+            if (shardRows.Count > 0)
+            {
+                result.AddRange(shardRows);
+            }
         }
 
         return result
@@ -292,6 +329,49 @@ public class BusinessTaskRepository(
         // 兼容历史固定表 business_tasks（无后缀），迁移窗口内保留读取能力。
         suffixes.Add(string.Empty);
         return suffixes;
+    }
+
+    /// <summary>
+    /// 根据创建时间范围计算需要命中的月份分片，并保留历史固定表兜底读取能力。
+    /// </summary>
+    /// <param name="startTimeLocal">开始时间（本地时间，含边界）。</param>
+    /// <param name="endTimeLocal">结束时间（本地时间，不含边界）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>命中的分片后缀集合。</returns>
+    private async Task<IReadOnlyList<string>> ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        CancellationToken ct)
+    {
+        var availableSuffixes = await ListShardSuffixesWithLegacyFallbackAsync(ct);
+        if (availableSuffixes.Count == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var targetSuffixes = new HashSet<string>(StringComparer.Ordinal);
+        var currentMonth = new DateTime(startTimeLocal.Year, startTimeLocal.Month, 1, 0, 0, 0);
+        var endInclusiveTime = endTimeLocal.AddTicks(-1);
+        var endBoundaryMonth = new DateTime(endInclusiveTime.Year, endInclusiveTime.Month, 1, 0, 0, 0);
+
+        while (currentMonth <= endBoundaryMonth)
+        {
+            targetSuffixes.Add(shardSuffixResolver.ResolveLocal(currentMonth));
+            currentMonth = currentMonth.AddMonths(1);
+        }
+
+        // 容量预留：命中月份分片数量 + 1 个历史固定表空后缀（用于兼容未分片的历史遗留数据）。
+        var estimatedSuffixCount = targetSuffixes.Count + 1;
+        var matchedSuffixes = new List<string>(estimatedSuffixCount);
+        foreach (var suffix in availableSuffixes)
+        {
+            if (string.IsNullOrEmpty(suffix) || targetSuffixes.Contains(suffix))
+            {
+                matchedSuffixes.Add(suffix);
+            }
+        }
+
+        return matchedSuffixes;
     }
 
     /// <summary>

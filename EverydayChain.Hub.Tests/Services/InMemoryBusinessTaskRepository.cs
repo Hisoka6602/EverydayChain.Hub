@@ -123,4 +123,14 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
             .ToList();
         return Task.FromResult(result);
     }
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<BusinessTaskEntity>> FindByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
+    {
+        IReadOnlyList<BusinessTaskEntity> result = _tasks
+            .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal)
+            .OrderBy(x => x.CreatedTimeLocal)
+            .ToList();
+        return Task.FromResult(result);
+    }
 }

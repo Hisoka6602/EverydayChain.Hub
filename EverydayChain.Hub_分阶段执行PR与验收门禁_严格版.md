@@ -118,7 +118,7 @@
 
 ---
 
-## 3.1 当前实现盘点（2026-04-17，本地代码基线）
+## 3.1 当前实现盘点（2026-04-17，PR-07 补全后基线）
 
 > 盘点范围：`Domain`/`Application`/`Infrastructure`/`Host` 与 `EverydayChain.Hub.Tests` 当前主干代码。
 
@@ -130,7 +130,7 @@
 | PR-04 回写模型与配置收口 | ✅ 本轮补全完成 | `WmsFeedbackOptions` 已补齐拆零/整件分流目标配置（Schema/Table/BusinessKey）与真实业务字段映射配置（扫描时间、尺寸体积重量、扫描次数、业务状态）。 |
 | PR-05 回写执行与补偿收口 | ✅ 本轮补全完成 | `OracleWmsFeedbackGateway` 已按来源类型分流回写并覆盖真实业务字段；失败仍走既有补偿链路，`WmsFeedbackService`/`FeedbackCompensationService` 维持成功/失败状态闭环。 |
 | PR-06 波次清理 API 化 | ✅ 本轮补全完成 | 本轮新增 `WaveCleanupController`、`WaveCleanupRequest/Response`、`dry-run` 与正式执行端点，并补齐控制器测试。 |
-| PR-07 总看板 API | ❌ 未开始 | 代码中尚未提供总看板查询 API。 |
+| PR-07 总看板 API | ✅ 本轮补全完成 | 本轮新增 `GlobalDashboardController` 与 `GlobalDashboardQueryService`，支持时间区间查询、波次维度聚合、整件/拆零统计、识别率、回流数、异常数、总体积与总重量。 |
 | PR-08 码头看板 API | ❌ 未开始 | 代码中尚未提供码头看板查询 API。 |
 | PR-09 报表查询与导出 API | ❌ 未开始 | 代码中尚未提供报表查询与导出 API。 |
 | PR-10 业务查询与收口删除 | ❌ 未开始 | 代码中尚未提供业务任务/异常件/回流查询 API 与对应收口删除。 |
@@ -167,10 +167,26 @@
    - `Domain/Options/WmsFeedbackOptions.cs`
    - `Infrastructure/Integrations/OracleWmsFeedbackGateway.cs`
    - `Host/appsettings.json`
+9. 总看板 API 补齐（PR-07）：
+   - `Host/Controllers/GlobalDashboardController.cs`
+   - `Host/Contracts/Requests/GlobalDashboardQueryRequest.cs`
+   - `Host/Contracts/Responses/GlobalDashboardResponse.cs`
+   - `Host/Contracts/Responses/WaveDashboardSummaryResponse.cs`
+   - `Application/Abstractions/Queries/IGlobalDashboardQueryService.cs`
+   - `Application/Queries/GlobalDashboardQueryService.cs`
+   - `Application/Models/GlobalDashboardQueryRequest.cs`
+   - `Application/Models/GlobalDashboardQueryResult.cs`
+   - `Application/Models/WaveDashboardSummary.cs`
+   - `Application/Abstractions/Persistence/IBusinessTaskRepository.cs`
+   - `Infrastructure/Repositories/BusinessTaskRepository.cs`
+10. 总看板测试补齐：
+   - `Tests/Host/Controllers/GlobalDashboardControllerTests.cs`
+   - `Tests/Host/Controllers/StubGlobalDashboardQueryService.cs`
+   - `Tests/Services/GlobalDashboardQueryServiceTests.cs`
 
 ## 3.3 下一步优先补全建议（按顺序）
 
-1. 推进 PR-07~PR-10 的查询类 API 与收口删除。
+1. 推进 PR-08~PR-10 的查询类 API 与收口删除。
 2. 补充 PR-04/PR-05 的联调验收记录（拆零/整件目标表字段抽样核对、失败补偿重试演练）。
 3. 补充 PR-01/PR-02 的分表回归与迁移执行验收记录（含上线前 SQL 校验清单）。
 

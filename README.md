@@ -23,10 +23,14 @@
 - 新增波次清理 Host 契约：`WaveCleanupRequest`、`WaveCleanupResponse`，统一波次清理接口输入输出语义并补齐中文注释。
 - 扩展波次清理应用服务接口：`IWaveCleanupService` 新增 `DryRunByWaveCodeAsync` 与 `ExecuteByWaveCodeAsync`，支持端点级别区分 dry-run/正式执行。
 - 新增 `WaveCleanupControllerTests` 与 `StubWaveCleanupService`，覆盖空波次号校验、dry-run 执行与正式执行的控制器行为。
-- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，156/156 单元测试通过）。
+- 实施 PR-07（总看板 API）：新增 `GlobalDashboardController`、`GlobalDashboardQueryService` 与 `IGlobalDashboardQueryService`，支持时间区间查询、波次维度聚合、整件/拆零分口径统计、识别率、回流数、异常数、总体积与总重量。
+- 扩展业务任务仓储查询契约：`IBusinessTaskRepository` 新增 `FindByCreatedTimeRangeAsync`，并在 `BusinessTaskRepository` 与 `InMemoryBusinessTaskRepository` 落地实现。
+- 新增总看板契约与测试：`GlobalDashboardQueryRequest/Response`、`WaveDashboardSummaryResponse`、`GlobalDashboardControllerTests`、`GlobalDashboardQueryServiceTests`、`StubGlobalDashboardQueryService`。
+- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，161/161 单元测试通过）。
 ## 后续可完善点
 - 根据产线峰值写入量细化各日志表差异化保留月数，并结合容量监控进行滚动调优。
 - 开启补偿后台任务：生产环境确认重试节流参数后，将 `FeedbackCompensationJob.Enabled` 置 `true`。
+- 与业务方确认“识别率/分拣进度/未分拣”的最终口径，随后同步固化到 `对外API接口基线.md` 与看板测试用例。
 
 ## 解决方案文件树与职责
 ```text
@@ -145,6 +149,9 @@
 │   ├── Models/TaskExecutionResult.cs
 │   ├── Models/WmsFeedbackApplicationResult.cs
 │   ├── Models/FeedbackCompensationResult.cs
+│   ├── Models/GlobalDashboardQueryRequest.cs
+│   ├── Models/GlobalDashboardQueryResult.cs
+│   ├── Models/WaveDashboardSummary.cs
 │   ├── Abstractions/Persistence/ISyncTaskConfigRepository.cs
 │   ├── Abstractions/Persistence/IOracleSourceReader.cs
 │   ├── Abstractions/Persistence/ISyncStagingRepository.cs
@@ -177,6 +184,7 @@
 │   ├── Abstractions/Services/IDropFeedbackService.cs
 │   ├── Abstractions/Services/IWmsFeedbackService.cs
 │   ├── Abstractions/Services/IFeedbackCompensationService.cs
+│   ├── Abstractions/Queries/IGlobalDashboardQueryService.cs
 │   ├── Abstractions/Integrations/IWmsOracleFeedbackGateway.cs
 │   ├── WaveCleanup/Abstractions/IWaveCleanupService.cs
 │   ├── WaveCleanup/Abstractions/WaveCleanupResult.cs
@@ -196,6 +204,7 @@
 │   ├── Services/ScanIngressService.cs
 │   ├── Services/ChuteQueryService.cs
 │   ├── Services/DropFeedbackService.cs
+│   ├── Queries/GlobalDashboardQueryService.cs
 │   ├── Feedback/Services/WmsFeedbackService.cs
 │   ├── Feedback/Services/FeedbackCompensationService.cs
 │   ├── Services/DeletionExecutionService.cs
@@ -288,10 +297,12 @@
 │   ├── Host/Controllers/ChuteControllerTests.cs
 │   ├── Host/Controllers/DropFeedbackControllerTests.cs
 │   ├── Host/Controllers/WaveCleanupControllerTests.cs
+│   ├── Host/Controllers/GlobalDashboardControllerTests.cs
 │   ├── Host/Controllers/StubScanIngressService.cs
 │   ├── Host/Controllers/StubChuteQueryService.cs
 │   ├── Host/Controllers/StubDropFeedbackService.cs
 │   ├── Host/Controllers/StubWaveCleanupService.cs
+│   ├── Host/Controllers/StubGlobalDashboardQueryService.cs
 │   └── Services
 │       ├── AutoMigrationServiceTests.cs
 │       ├── DangerZoneExecutorTests.cs
@@ -307,6 +318,7 @@
 │       ├── ScanMatchServiceTests.cs
 │       ├── TaskExecutionServiceTests.cs
 │       ├── ChuteQueryServiceTests.cs
+│       ├── GlobalDashboardQueryServiceTests.cs
 │       ├── DropFeedbackServiceTests.cs
 │       ├── WmsFeedbackServiceTests.cs
 │       ├── FeedbackCompensationServiceTests.cs
@@ -326,15 +338,19 @@
     ├── Controllers/ChuteController.cs
     ├── Controllers/DropFeedbackController.cs
     ├── Controllers/WaveCleanupController.cs
+    ├── Controllers/GlobalDashboardController.cs
     ├── Contracts/Requests/ScanUploadRequest.cs
     ├── Contracts/Requests/ChuteResolveRequest.cs
     ├── Contracts/Requests/DropFeedbackRequest.cs
     ├── Contracts/Requests/WaveCleanupRequest.cs
+    ├── Contracts/Requests/GlobalDashboardQueryRequest.cs
     ├── Contracts/Responses/ApiResponse.cs
     ├── Contracts/Responses/ScanUploadResponse.cs
     ├── Contracts/Responses/ChuteResolveResponse.cs
     ├── Contracts/Responses/DropFeedbackResponse.cs
     ├── Contracts/Responses/WaveCleanupResponse.cs
+    ├── Contracts/Responses/GlobalDashboardResponse.cs
+    ├── Contracts/Responses/WaveDashboardSummaryResponse.cs
     ├── Workers/SyncBackgroundWorker.cs
     ├── Workers/RetentionBackgroundWorker.cs
     ├── Workers/AutoMigrationHostedService.cs
@@ -392,7 +408,7 @@
 - `BusinessTaskMaterializeRequest.cs`：业务任务物化输入模型，统一约束任务编码、来源表编码、业务键、条码、来源类型、波次信息与物化时间字段。
 - `ScanUploadApplicationRequest.cs` / `ScanUploadApplicationResult.cs` / `BarcodeParseResult.cs` / `ChuteResolveApplicationRequest.cs` / `ChuteResolveApplicationResult.cs` / `DropFeedbackApplicationRequest.cs` / `DropFeedbackApplicationResult.cs` / `ScanMatchResult.cs` / `TaskExecutionResult.cs`：扫描、格口、落格链路的应用层输入输出模型；`DropFeedbackApplicationRequest` 新增 `IsSuccess`、`FailureReason`；`ScanMatchResult` 与 `TaskExecutionResult` 为 PR-05 新增的中间结果模型。
 - `Application/Abstractions/Services/IBusinessTaskMaterializer.cs` + `Application/Services/BusinessTaskMaterializer.cs`：业务任务物化服务抽象与实现，仅执行字段映射、文本规范化和默认状态赋值，不承载扫描/格口/落格业务规则。
-- `Application/Abstractions/Persistence/IBusinessTaskRepository.cs`：业务任务仓储抽象，定义按条码、任务编码、主键查询及新增、更新操作契约。
+- `Application/Abstractions/Persistence/IBusinessTaskRepository.cs`：业务任务仓储抽象，定义按条码、任务编码、主键、时间区间查询及新增、更新操作契约。
 - `Application/Abstractions/Services/IScanMatchService.cs`：扫描匹配服务抽象，按条码定位关联业务任务并返回匹配结果。
 - `Application/Abstractions/Services/ITaskExecutionService.cs`：任务执行服务抽象，负责推进业务任务扫描状态并持久化。
 - `Application/ScanMatch/Services/ScanMatchService.cs`：扫描匹配服务实现，按条码在业务任务仓储中定位任务。
@@ -403,6 +419,8 @@
 - `Application/Abstractions/Services/IScanIngressService.cs` + `Application/Services/ScanIngressService.cs`：扫描上传应用服务，协调条码解析、任务匹配与状态推进链路，输出标准化受理结果。
 - `Application/Abstractions/Services/IChuteQueryService.cs` + `Application/Services/ChuteQueryService.cs`：请求格口应用服务抽象与实现，按任务编码或条码查询业务任务，在任务已扫描前提下按条码规则解析并返回目标格口，覆盖状态校验与不支持条码异常分支。
 - `Application/Abstractions/Services/IDropFeedbackService.cs` + `Application/Services/DropFeedbackService.cs`：落格回传应用服务抽象与实现，支持双定位（TaskCode/Barcode）、参数冲突校验与状态机推进（成功→Dropped+FeedbackPending，失败→Exception），落格成功/失败均写落格日志。
+- `Application/Abstractions/Queries/IGlobalDashboardQueryService.cs` + `Application/Queries/GlobalDashboardQueryService.cs`：总看板查询服务抽象与实现，按时间区间汇总总量、整件/拆零分口径、识别率、回流数、异常数、体积重量与波次聚合数据。
+- `Application/Models/GlobalDashboardQueryRequest.cs` + `Application/Models/GlobalDashboardQueryResult.cs` + `Application/Models/WaveDashboardSummary.cs`：总看板应用层查询入参、统计结果与波次维度摘要模型。
 - `Application/Abstractions/Services/IWmsFeedbackService.cs` + `Application/Feedback/Services/WmsFeedbackService.cs`：业务回传应用服务抽象与实现，查询 `FeedbackStatus=Pending` 任务、批量调用 Oracle 写入器、按结果回填 Completed/Failed。
 - `Application/Abstractions/Services/IFeedbackCompensationService.cs` + `Application/Feedback/Services/FeedbackCompensationService.cs`：业务回传补偿服务抽象与实现，支持按任务编码重试与按批次重试 `FeedbackStatus=Failed` 任务，并回填本地回传状态。
 - `Application/Abstractions/Integrations/IWmsOracleFeedbackGateway.cs` + `Infrastructure/Integrations/OracleWmsFeedbackGateway.cs`：Oracle WMS 业务回传网关抽象与实现；实现使用数组绑定批量更新，安全标识符校验防止 SQL 注入；`Enabled=false` 时仅记录日志不实际写入 Oracle。
@@ -439,6 +457,9 @@
 - `20260417043253_AddBusinessTaskClosureFields.cs`：新增 `SourceType`、尺寸体积重量、`ScanCount`、`IsException`、`IsFeedbackReported`、`FeedbackTimeLocal`、`WaveRemark` 字段及配套索引的 EF 迁移。
 - `EverydayChain.Hub.Tests/Services/ExceptionRuleTests.cs`：异常规则服务单元测试，覆盖波次清理、多标签决策与回流规则的主要路径共 16 个场景。
 - `EverydayChain.Hub.Tests/Services/ScanDropLogTests.cs`：扫描/落格日志落库测试，覆盖扫描成功写日志、扫描失败写日志、落格成功写日志+FeedbackPending、落格失败写日志四个场景。
+- `Host/Controllers/GlobalDashboardController.cs` + `Host/Contracts/Requests/GlobalDashboardQueryRequest.cs` + `Host/Contracts/Responses/GlobalDashboardResponse.cs` + `Host/Contracts/Responses/WaveDashboardSummaryResponse.cs`：总看板查询 API 与契约，提供时间区间查询并返回波次维度聚合数据。
+- `EverydayChain.Hub.Tests/Host/Controllers/GlobalDashboardControllerTests.cs` + `EverydayChain.Hub.Tests/Host/Controllers/StubGlobalDashboardQueryService.cs`：总看板控制器测试与查询服务替身，覆盖时间语义校验、区间校验与成功返回路径。
+- `EverydayChain.Hub.Tests/Services/GlobalDashboardQueryServiceTests.cs`：总看板应用服务测试，覆盖空数据与多维统计聚合口径。
 - `EverydayChain.Hub.Tests/Services/InMemoryScanLogRepository.cs`：扫描日志仓储内存替身。
 - `EverydayChain.Hub.Tests/Services/InMemoryDropLogRepository.cs`：落格日志仓储内存替身。
 - `Application/Abstractions/Sync/IOracleRemoteStatusWriter.cs` / `IOracleStatusDrivenSourceReader.cs` / `ISqlServerAppendOnlyWriter.cs`：定义 StatusDriven 模式中 Oracle 远端状态回写、Oracle 状态驱动源读取与 SQL Server 仅追加写入的外部协作能力抽象，遵循 Application 层外部协作抽象放置规则。
