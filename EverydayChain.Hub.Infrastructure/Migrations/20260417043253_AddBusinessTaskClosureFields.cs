@@ -111,6 +111,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 DECLARE @tableName sysname;
                 DECLARE @tableIdentifier nvarchar(260);
                 DECLARE @qualifiedTable nvarchar(260);
+                DECLARE @isExceptionIndexName sysname;
+                DECLARE @sourceTypeIndexName sysname;
                 DECLARE @sql nvarchar(max);
 
                 DECLARE table_cursor CURSOR LOCAL FAST_FORWARD FOR
@@ -118,7 +120,7 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 FROM sys.tables AS t
                 INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
                 WHERE s.name = @schema
-                  AND t.name LIKE N'business_tasks[_]%';
+                  AND t.name LIKE N'business\_tasks\_%' ESCAPE N'\';
 
                 OPEN table_cursor;
                 FETCH NEXT FROM table_cursor INTO @tableName;
@@ -126,6 +128,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 BEGIN
                     SET @tableIdentifier = @schema + N'.' + @tableName;
                     SET @qualifiedTable = QUOTENAME(@schema) + N'.' + QUOTENAME(@tableName);
+                    SET @isExceptionIndexName = N'IX_' + @tableName + N'_IsException';
+                    SET @sourceTypeIndexName = N'IX_' + @tableName + N'_SourceType';
 
                     IF COL_LENGTH(@tableIdentifier, N'FeedbackTimeLocal') IS NULL
                     BEGIN
@@ -197,9 +201,9 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                         SELECT 1
                         FROM sys.indexes
                         WHERE object_id = OBJECT_ID(@tableIdentifier)
-                          AND name = N'IX_business_tasks_IsException')
+                          AND name = @isExceptionIndexName)
                     BEGIN
-                        SET @sql = N'CREATE INDEX [IX_business_tasks_IsException] ON ' + @qualifiedTable + N' ([IsException]);';
+                        SET @sql = N'CREATE INDEX ' + QUOTENAME(@isExceptionIndexName) + N' ON ' + @qualifiedTable + N' ([IsException]);';
                         EXEC (@sql);
                     END;
 
@@ -207,9 +211,9 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                         SELECT 1
                         FROM sys.indexes
                         WHERE object_id = OBJECT_ID(@tableIdentifier)
-                          AND name = N'IX_business_tasks_SourceType')
+                          AND name = @sourceTypeIndexName)
                     BEGIN
-                        SET @sql = N'CREATE INDEX [IX_business_tasks_SourceType] ON ' + @qualifiedTable + N' ([SourceType]);';
+                        SET @sql = N'CREATE INDEX ' + QUOTENAME(@sourceTypeIndexName) + N' ON ' + @qualifiedTable + N' ([SourceType]);';
                         EXEC (@sql);
                     END;
 
@@ -295,6 +299,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 DECLARE @tableName sysname;
                 DECLARE @tableIdentifier nvarchar(260);
                 DECLARE @qualifiedTable nvarchar(260);
+                DECLARE @isExceptionIndexName sysname;
+                DECLARE @sourceTypeIndexName sysname;
                 DECLARE @constraintName sysname;
                 DECLARE @sql nvarchar(max);
 
@@ -303,7 +309,7 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 FROM sys.tables AS t
                 INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
                 WHERE s.name = @schema
-                  AND t.name LIKE N'business_tasks[_]%';
+                  AND t.name LIKE N'business\_tasks\_%' ESCAPE N'\';
 
                 OPEN table_cursor;
                 FETCH NEXT FROM table_cursor INTO @tableName;
@@ -311,22 +317,24 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 BEGIN
                     SET @tableIdentifier = @schema + N'.' + @tableName;
                     SET @qualifiedTable = QUOTENAME(@schema) + N'.' + QUOTENAME(@tableName);
+                    SET @isExceptionIndexName = N'IX_' + @tableName + N'_IsException';
+                    SET @sourceTypeIndexName = N'IX_' + @tableName + N'_SourceType';
 
                     IF EXISTS (
                         SELECT 1 FROM sys.indexes
                         WHERE object_id = OBJECT_ID(@tableIdentifier)
-                          AND name = N'IX_business_tasks_IsException')
+                          AND name = @isExceptionIndexName)
                     BEGIN
-                        SET @sql = N'DROP INDEX [IX_business_tasks_IsException] ON ' + @qualifiedTable + N';';
+                        SET @sql = N'DROP INDEX ' + QUOTENAME(@isExceptionIndexName) + N' ON ' + @qualifiedTable + N';';
                         EXEC (@sql);
                     END;
 
                     IF EXISTS (
                         SELECT 1 FROM sys.indexes
                         WHERE object_id = OBJECT_ID(@tableIdentifier)
-                          AND name = N'IX_business_tasks_SourceType')
+                          AND name = @sourceTypeIndexName)
                     BEGIN
-                        SET @sql = N'DROP INDEX [IX_business_tasks_SourceType] ON ' + @qualifiedTable + N';';
+                        SET @sql = N'DROP INDEX ' + QUOTENAME(@sourceTypeIndexName) + N' ON ' + @qualifiedTable + N';';
                         EXEC (@sql);
                     END;
 
