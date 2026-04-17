@@ -123,7 +123,7 @@ public sealed class TaskExecutionService : ITaskExecutionService
         task.DeviceCode = string.IsNullOrWhiteSpace(request.DeviceCode) ? task.DeviceCode : request.DeviceCode.Trim();
         task.TraceId = string.IsNullOrWhiteSpace(request.TraceId) ? task.TraceId : request.TraceId.Trim();
         task.Barcode = string.IsNullOrWhiteSpace(task.Barcode) ? request.Barcode.Trim() : task.Barcode;
-        task.IsException = false;
+        // 扫描维度字段采用“请求优先、缺省保留旧值”策略，避免空值覆盖历史有效测量数据。
         task.LengthMm = request.LengthMm ?? task.LengthMm;
         task.WidthMm = request.WidthMm ?? task.WidthMm;
         task.HeightMm = request.HeightMm ?? task.HeightMm;
