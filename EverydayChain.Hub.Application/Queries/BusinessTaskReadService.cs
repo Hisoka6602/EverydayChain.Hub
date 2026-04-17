@@ -19,7 +19,7 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
     /// <summary>
     /// 业务任务统计规则。
     /// </summary>
-    private readonly BusinessTaskMetrics _metrics = new();
+    private readonly BusinessTaskQueryPolicy _queryPolicy = new();
 
     /// <summary>
     /// 初始化业务任务查询服务。
@@ -78,9 +78,9 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
         var normalizedChuteCode = NormalizeOptionalValue(request.ChuteCode);
 
         var filteredTasks = tasks
-            .Where(task => MatchOptionalValue(_metrics.NormalizeWaveCode(task.WaveCode), normalizedWaveCode))
+            .Where(task => MatchOptionalValue(_queryPolicy.NormalizeWaveCode(task.WaveCode), normalizedWaveCode))
             .Where(task => MatchOptionalValue(task.Barcode, normalizedBarcode))
-            .Where(task => MatchOptionalValue(_metrics.ResolveDockCode(task), normalizedDockCode))
+            .Where(task => MatchOptionalValue(_queryPolicy.ResolveDockCode(task), normalizedDockCode))
             .Where(task => MatchOptionalValue(task.TargetChuteCode, normalizedChuteCode) || MatchOptionalValue(task.ActualChuteCode, normalizedChuteCode))
             .Where(extraPredicate)
             .OrderByDescending(task => task.CreatedTimeLocal)
@@ -147,7 +147,7 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
             Status = task.Status,
             TargetChuteCode = task.TargetChuteCode,
             ActualChuteCode = task.ActualChuteCode,
-            DockCode = _metrics.ResolveDockCode(task),
+            DockCode = _queryPolicy.ResolveDockCode(task),
             IsRecirculated = task.IsRecirculated,
             IsException = task.IsException || task.Status == BusinessTaskStatus.Exception,
             CreatedTimeLocal = task.CreatedTimeLocal

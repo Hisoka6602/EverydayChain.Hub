@@ -4,9 +4,10 @@ using EverydayChain.Hub.Domain.Enums;
 namespace EverydayChain.Hub.Application.Queries;
 
 /// <summary>
-/// 业务任务统计规则。
+/// 业务任务查询策略集合。
+/// 该类集中封装查询服务复用的口径判定能力，统一码头归属、波次归一化、7 号码头识别与百分比计算规则。
 /// </summary>
-internal sealed class BusinessTaskMetrics
+internal sealed class BusinessTaskQueryPolicy
 {
     /// <summary>
     /// 无波次占位文本。

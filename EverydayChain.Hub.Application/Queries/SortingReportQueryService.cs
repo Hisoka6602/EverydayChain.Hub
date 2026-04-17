@@ -19,7 +19,7 @@ public sealed class SortingReportQueryService : ISortingReportQueryService
     /// <summary>
     /// 业务任务统计规则。
     /// </summary>
-    private readonly BusinessTaskMetrics _metrics = new();
+    private readonly BusinessTaskQueryPolicy _queryPolicy = new();
 
     /// <summary>
     /// 初始化分拣报表查询服务。
@@ -48,20 +48,20 @@ public sealed class SortingReportQueryService : ISortingReportQueryService
         var tasks = await _businessTaskRepository.FindByCreatedTimeRangeAsync(request.StartTimeLocal, request.EndTimeLocal, cancellationToken);
         var filteredTasks = string.IsNullOrWhiteSpace(selectedDockCode)
             ? tasks
-            : tasks.Where(task => string.Equals(_metrics.ResolveDockCode(task), selectedDockCode, StringComparison.OrdinalIgnoreCase)).ToList();
+            : tasks.Where(task => string.Equals(_queryPolicy.ResolveDockCode(task), selectedDockCode, StringComparison.OrdinalIgnoreCase)).ToList();
 
         // 步骤 3：按码头聚合统计。
         var counters = new Dictionary<string, ReportCounter>(StringComparer.OrdinalIgnoreCase);
         foreach (var task in filteredTasks)
         {
-            var dockCode = _metrics.ResolveDockCode(task);
+            var dockCode = _queryPolicy.ResolveDockCode(task);
             if (!counters.TryGetValue(dockCode, out var counter))
             {
                 counter = new ReportCounter();
                 counters.Add(dockCode, counter);
             }
 
-            var isSorted = _metrics.IsSortedTask(task);
+            var isSorted = _queryPolicy.IsSortedTask(task);
             if (task.SourceType == BusinessTaskSourceType.Split)
             {
                 counter.SplitTotalCount++;
@@ -84,7 +84,7 @@ public sealed class SortingReportQueryService : ISortingReportQueryService
                 counter.RecirculatedCount++;
             }
 
-            if (_metrics.IsDockSeven(dockCode) && (task.IsException || task.Status == BusinessTaskStatus.Exception))
+            if (_queryPolicy.IsDockSeven(dockCode) && (task.IsException || task.Status == BusinessTaskStatus.Exception))
             {
                 counter.ExceptionCount++;
             }

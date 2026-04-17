@@ -38,8 +38,9 @@ public sealed class DockDashboardController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<DockDashboardResponse>), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ApiResponse<DockDashboardResponse>>> QueryOverviewAsync([FromBody] DockDashboardQueryRequest request, CancellationToken cancellationToken)
     {
-        var start = request.StartTimeLocal ?? DateTime.Now.Date;
-        var end = request.EndTimeLocal ?? DateTime.Now.Date.AddDays(1);
+        var todayLocal = DateTime.SpecifyKind(DateTime.Today, DateTimeKind.Local);
+        var start = request.StartTimeLocal ?? todayLocal;
+        var end = request.EndTimeLocal ?? todayLocal.AddDays(1);
 
         if (!LocalDateTimeNormalizer.TryNormalize(start, "开始时间必须为本地时间，禁止传入 UTC 时间。", out var normalizedStart, out var startValidationMessage))
         {

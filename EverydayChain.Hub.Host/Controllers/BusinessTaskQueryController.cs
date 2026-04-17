@@ -128,16 +128,6 @@ public sealed class BusinessTaskQueryController : ControllerBase
     }
 
     /// <summary>
-    /// 构建校验失败响应。
-    /// </summary>
-    /// <param name="message">失败消息。</param>
-    /// <returns>BadRequest 结果。</returns>
-    private ActionResult<ApiResponse<BusinessTaskQueryResponse>>? BuildValidationError(string message)
-    {
-        return BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail(message));
-    }
-
-    /// <summary>
     /// 校验查询请求。
     /// </summary>
     /// <param name="request">查询请求。</param>
@@ -157,43 +147,43 @@ public sealed class BusinessTaskQueryController : ControllerBase
 
         if (request.StartTimeLocal == DateTime.MinValue)
         {
-            validationResult = BuildValidationError("开始时间不能为空。");
+            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("开始时间不能为空。"));
             return false;
         }
 
         if (request.EndTimeLocal == DateTime.MinValue)
         {
-            validationResult = BuildValidationError("结束时间不能为空。");
+            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("结束时间不能为空。"));
             return false;
         }
 
         if (!LocalDateTimeNormalizer.TryNormalize(request.StartTimeLocal, "开始时间必须为本地时间，禁止传入 UTC 时间。", out normalizedStart, out var startValidationMessage))
         {
-            validationResult = BuildValidationError(startValidationMessage);
+            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail(startValidationMessage));
             return false;
         }
 
         if (!LocalDateTimeNormalizer.TryNormalize(request.EndTimeLocal, "结束时间必须为本地时间，禁止传入 UTC 时间。", out normalizedEnd, out var endValidationMessage))
         {
-            validationResult = BuildValidationError(endValidationMessage);
+            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail(endValidationMessage));
             return false;
         }
 
         if (normalizedEnd <= normalizedStart)
         {
-            validationResult = BuildValidationError("结束时间必须大于开始时间。");
+            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("结束时间必须大于开始时间。"));
             return false;
         }
 
         if (request.PageNumber < 1 || request.PageNumber > 100000)
         {
-            validationResult = BuildValidationError("页码范围必须在 1 到 100000 之间。");
+            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("页码范围必须在 1 到 100000 之间。"));
             return false;
         }
 
         if (request.PageSize < 1 || request.PageSize > 1000)
         {
-            validationResult = BuildValidationError("页大小范围必须在 1 到 1000 之间。");
+            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("页大小范围必须在 1 到 1000 之间。"));
             return false;
         }
 

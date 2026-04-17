@@ -96,7 +96,8 @@ public sealed class SortingReportController : ControllerBase
             DockCode = request.DockCode
         }, cancellationToken);
 
-        var fileName = $"sorting-report-{DateTime.Now:yyyyMMddHHmmss}.csv";
+        var localNow = DateTimeOffset.Now.LocalDateTime;
+        var fileName = $"sorting-report-{localNow:yyyyMMddHHmmss}.csv";
         return File(Encoding.UTF8.GetBytes(csvContent), "text/csv", fileName);
     }
 

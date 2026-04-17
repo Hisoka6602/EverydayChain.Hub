@@ -223,6 +223,7 @@
 │   ├── Queries/DockDashboardQueryService.cs
 │   ├── Queries/SortingReportQueryService.cs
 │   ├── Queries/BusinessTaskReadService.cs
+│   ├── Queries/BusinessTaskQueryPolicy.cs
 │   ├── Feedback/Services/WmsFeedbackService.cs
 │   ├── Feedback/Services/FeedbackCompensationService.cs
 │   ├── Services/DeletionExecutionService.cs
@@ -463,7 +464,7 @@
 - `Application/Abstractions/Queries/IDockDashboardQueryService.cs` + `Application/Queries/DockDashboardQueryService.cs`：码头看板查询服务抽象与实现，支持默认当天查询、波次筛选、拆零/整件未分拣统计、分拣进度、已分拣总数与“仅 7 号码头显示异常数”规则。
 - `Application/Abstractions/Queries/ISortingReportQueryService.cs` + `Application/Queries/SortingReportQueryService.cs`：报表查询与导出服务抽象与实现，支持按时间范围与码头维度输出统计，并提供 CSV 文本导出能力。
 - `Application/Abstractions/Queries/IBusinessTaskReadService.cs` + `Application/Queries/BusinessTaskReadService.cs`：业务任务查询服务抽象与实现，提供业务任务、异常件、回流记录三类分页查询，支持时间、波次、条码、码头与格口筛选。
-- `Application/Queries/BusinessTaskMetrics.cs`：业务任务统计规则封装，统一已分拣判定、码头解析、波次归一化、7 号码头识别与百分比计算。
+- `Application/Queries/BusinessTaskQueryPolicy.cs`：业务任务查询策略封装，统一已分拣判定、码头解析、波次归一化、7 号码头识别与百分比计算。
 - `Application/Models/DockDashboardQueryRequest.cs` + `Application/Models/DockDashboardQueryResult.cs` + `Application/Models/DockDashboardSummary.cs`：码头看板应用层查询入参、聚合结果与码头维度摘要模型。
 - `Application/Models/SortingReportQueryRequest.cs` + `Application/Models/SortingReportQueryResult.cs` + `Application/Models/SortingReportRow.cs`：报表查询与导出模型，统一报表查询返回与导出口径。
 - `Application/Models/BusinessTaskQueryRequest.cs` + `Application/Models/BusinessTaskQueryResult.cs` + `Application/Models/BusinessTaskQueryItem.cs`：业务任务查询分页模型与结果项模型。

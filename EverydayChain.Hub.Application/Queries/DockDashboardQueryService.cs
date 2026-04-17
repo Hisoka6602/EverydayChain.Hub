@@ -18,7 +18,7 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
     /// <summary>
     /// 业务任务统计规则。
     /// </summary>
-    private readonly BusinessTaskMetrics _metrics = new();
+    private readonly BusinessTaskQueryPolicy _queryPolicy = new();
 
     /// <summary>
     /// 初始化码头看板查询服务。
@@ -45,7 +45,7 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
         // 步骤 2：拉取时间区间内任务并构建波次选项。
         var tasks = await _businessTaskRepository.FindByCreatedTimeRangeAsync(request.StartTimeLocal, request.EndTimeLocal, cancellationToken);
         var waveOptions = tasks
-            .Select(task => _metrics.NormalizeWaveCode(task.WaveCode))
+            .Select(task => _queryPolicy.NormalizeWaveCode(task.WaveCode))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(code => code, StringComparer.Ordinal)
             .ToList();
@@ -54,12 +54,12 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
         var selectedWaveCode = string.IsNullOrWhiteSpace(request.WaveCode) ? null : request.WaveCode.Trim();
         var filteredTasks = string.IsNullOrWhiteSpace(selectedWaveCode)
             ? tasks
-            : tasks.Where(task => string.Equals(_metrics.NormalizeWaveCode(task.WaveCode), selectedWaveCode, StringComparison.OrdinalIgnoreCase)).ToList();
+            : tasks.Where(task => string.Equals(_queryPolicy.NormalizeWaveCode(task.WaveCode), selectedWaveCode, StringComparison.OrdinalIgnoreCase)).ToList();
 
         var counters = new Dictionary<string, DockCounter>(StringComparer.OrdinalIgnoreCase);
         foreach (var task in filteredTasks)
         {
-            var dockCode = _metrics.ResolveDockCode(task);
+            var dockCode = _queryPolicy.ResolveDockCode(task);
             if (!counters.TryGetValue(dockCode, out var counter))
             {
                 counter = new DockCounter();
@@ -67,7 +67,7 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
             }
 
             counter.TotalCount++;
-            var isSorted = _metrics.IsSortedTask(task);
+            var isSorted = _queryPolicy.IsSortedTask(task);
             if (isSorted)
             {
                 counter.SortedCount++;
@@ -86,7 +86,7 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
                 counter.RecirculatedCount++;
             }
 
-            if (_metrics.IsDockSeven(dockCode) && (task.IsException || task.Status == BusinessTaskStatus.Exception))
+            if (_queryPolicy.IsDockSeven(dockCode) && (task.IsException || task.Status == BusinessTaskStatus.Exception))
             {
                 counter.ExceptionCount++;
             }
@@ -101,7 +101,7 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
                 RecirculatedCount = pair.Value.RecirculatedCount,
                 ExceptionCount = pair.Value.ExceptionCount,
                 SortedCount = pair.Value.SortedCount,
-                SortedProgressPercent = _metrics.CalculatePercent(pair.Value.SortedCount, pair.Value.TotalCount)
+                SortedProgressPercent = _queryPolicy.CalculatePercent(pair.Value.SortedCount, pair.Value.TotalCount)
             })
             .OrderBy(summary => summary.DockCode, StringComparer.Ordinal)
             .ToList();
