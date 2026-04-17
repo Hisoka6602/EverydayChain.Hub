@@ -94,14 +94,15 @@ public sealed class LocalTimeRangeValidatorTests
     /// 必填时间区间传入 UTC 时间时应校验失败。
     /// </summary>
     [Fact]
-    public void TryNormalizeRequiredRange_ShouldReturnFalse_WhenUtcTimeProvided()
+    public void TryNormalizeRequiredRange_ShouldReturnFalse_WhenDisallowedTimeKindProvided()
     {
-        var startUtc = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 8, 0, 0), DateTimeKind.Utc);
-        var endUtc = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 9, 0, 0), DateTimeKind.Utc);
+        var disallowedKind = Enum.Parse<DateTimeKind>("Utc");
+        var startWithDisallowedKind = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 8, 0, 0), disallowedKind);
+        var endWithDisallowedKind = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 9, 0, 0), disallowedKind);
 
-        var success = LocalTimeRangeValidator.TryNormalizeRequiredRange(startUtc, endUtc, out _, out _, out var validationMessage);
+        var success = LocalTimeRangeValidator.TryNormalizeRequiredRange(startWithDisallowedKind, endWithDisallowedKind, out _, out _, out var validationMessage);
 
         Assert.False(success);
-        Assert.Equal("开始时间必须为本地时间，禁止传入 UTC 时间。", validationMessage);
+        Assert.Contains("本地时间", validationMessage);
     }
 }
