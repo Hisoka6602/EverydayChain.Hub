@@ -25,7 +25,7 @@ public sealed class ScanUploadResponse {
 
     /// <summary>
     /// 失败语义代码。
-    /// 可返回值：InvalidBarcode（无效条码）、UnsupportedBarcodeType（不支持的条码类型）、ParseError（解析异常）；成功时为空字符串。
+    /// 可返回值：InvalidBarcode（无效条码）、UnsupportedBarcodeType（不支持的条码类型）、ParseError（解析异常）、TaskNotMatchedOrInvalidState（任务未匹配或状态非法）；成功时为空字符串。
     /// </summary>
     public string FailureReason { get; set; } = string.Empty;
 }

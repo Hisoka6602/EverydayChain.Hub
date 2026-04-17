@@ -33,8 +33,8 @@ public sealed class DropFeedbackRequest {
 
     /// <summary>
     /// 落格时间（本地时间）。
-    /// 可填写范围：本地时间语义；禁止 UTC 与带时区偏移的时间值。
-    /// 空值语义：该字段为值类型，未传时会触发时间合法性校验失败。
+    /// 可填写范围：本地时间语义；禁止 UTC 与时区偏移格式（如 +08:00）。
+    /// 空值语义：该字段为值类型，未传时通常绑定为 <see cref="DateTime.MinValue"/>，当前规范化逻辑会替换为服务器本地当前时间。
     /// </summary>
     public DateTime DropTimeLocal { get; set; }
 

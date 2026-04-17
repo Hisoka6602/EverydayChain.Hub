@@ -83,7 +83,7 @@ public sealed class SortingReportController : ControllerBase
     /// <summary>
     /// 导出 CSV 报表。
     /// 请求条件：时间范围校验规则与报表查询一致。
-    /// 返回语义：成功返回 UTF-8 BOM 编码的 CSV 文件流，失败返回 400 统一响应。
+    /// 返回语义：成功返回 UTF-8 BOM 编码的 CSV 文件流；参数校验失败返回 400；系统异常返回结果遵循项目实际异常处理策略。
     /// </summary>
     /// <param name="request">查询请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
