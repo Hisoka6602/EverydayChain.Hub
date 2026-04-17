@@ -1,6 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 开始实施 `EverydayChain.Hub_分阶段执行PR与验收门禁_严格版.md`：先完成现状盘点，再补齐 PR-08（码头看板 API）、PR-09（报表查询与 CSV 导出 API）、PR-10（业务任务/异常件/回流查询 API）。
+- 新增查询能力：`DockDashboardController`、`SortingReportController`、`BusinessTaskQueryController` 及对应应用层服务，支持默认当天查询、波次筛选、码头维度统计、CSV 导出、多条件分页查询与“仅 7 号码头显示异常数”规则。
+- 新增测试补齐：新增 PR-08~PR-10 控制器测试、服务测试与替身实现，覆盖时间校验、分页校验、统计口径与导出结果。
 - 启动“分阶段执行 PR 与验收门禁（严格版）”补全：完成 PR-01/PR-02 的第一轮代码补齐，统一业务任务模型新增来源类型、尺寸体积重量、扫描次数、回传标记与回传时间等字段。
 - 扫描闭环补齐：`TaskExecutionService` 在扫描成功链路写入长宽高/体积/重量并递增 `ScanCount`，继续保持现有扫描上传接口路由与协议不变。
 - 回传与异常状态补齐：`WmsFeedbackService`、`FeedbackCompensationService`、`DropFeedbackService`、`RecirculationService` 已同步维护 `IsFeedbackReported`、`FeedbackTimeLocal`、`IsException` 等字段语义。
@@ -26,7 +29,7 @@
 - 实施 PR-07（总看板 API）：新增 `GlobalDashboardController`、`GlobalDashboardQueryService` 与 `IGlobalDashboardQueryService`，支持时间区间查询、波次维度聚合、整件/拆零分口径统计、识别率、回流数、异常数、总体积与总重量。
 - 扩展业务任务仓储查询契约：`IBusinessTaskRepository` 新增 `FindByCreatedTimeRangeAsync`，并在 `BusinessTaskRepository` 与 `InMemoryBusinessTaskRepository` 落地实现。
 - 新增总看板契约与测试：`GlobalDashboardQueryRequest/Response`、`WaveDashboardSummaryResponse`、`GlobalDashboardControllerTests`、`GlobalDashboardQueryServiceTests`、`StubGlobalDashboardQueryService`。
-- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，161/161 单元测试通过）。
+- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，173/173 单元测试通过）。
 ## 后续可完善点
 - 根据产线峰值写入量细化各日志表差异化保留月数，并结合容量监控进行滚动调优。
 - 开启补偿后台任务：生产环境确认重试节流参数后，将 `FeedbackCompensationJob.Enabled` 置 `true`。
@@ -152,6 +155,15 @@
 │   ├── Models/GlobalDashboardQueryRequest.cs
 │   ├── Models/GlobalDashboardQueryResult.cs
 │   ├── Models/WaveDashboardSummary.cs
+│   ├── Models/DockDashboardQueryRequest.cs
+│   ├── Models/DockDashboardQueryResult.cs
+│   ├── Models/DockDashboardSummary.cs
+│   ├── Models/SortingReportQueryRequest.cs
+│   ├── Models/SortingReportQueryResult.cs
+│   ├── Models/SortingReportRow.cs
+│   ├── Models/BusinessTaskQueryRequest.cs
+│   ├── Models/BusinessTaskQueryResult.cs
+│   ├── Models/BusinessTaskQueryItem.cs
 │   ├── Abstractions/Persistence/ISyncTaskConfigRepository.cs
 │   ├── Abstractions/Persistence/IOracleSourceReader.cs
 │   ├── Abstractions/Persistence/ISyncStagingRepository.cs
@@ -185,6 +197,9 @@
 │   ├── Abstractions/Services/IWmsFeedbackService.cs
 │   ├── Abstractions/Services/IFeedbackCompensationService.cs
 │   ├── Abstractions/Queries/IGlobalDashboardQueryService.cs
+│   ├── Abstractions/Queries/IDockDashboardQueryService.cs
+│   ├── Abstractions/Queries/ISortingReportQueryService.cs
+│   ├── Abstractions/Queries/IBusinessTaskReadService.cs
 │   ├── Abstractions/Integrations/IWmsOracleFeedbackGateway.cs
 │   ├── WaveCleanup/Abstractions/IWaveCleanupService.cs
 │   ├── WaveCleanup/Abstractions/WaveCleanupResult.cs
@@ -205,6 +220,9 @@
 │   ├── Services/ChuteQueryService.cs
 │   ├── Services/DropFeedbackService.cs
 │   ├── Queries/GlobalDashboardQueryService.cs
+│   ├── Queries/DockDashboardQueryService.cs
+│   ├── Queries/SortingReportQueryService.cs
+│   ├── Queries/BusinessTaskReadService.cs
 │   ├── Feedback/Services/WmsFeedbackService.cs
 │   ├── Feedback/Services/FeedbackCompensationService.cs
 │   ├── Services/DeletionExecutionService.cs
@@ -298,11 +316,17 @@
 │   ├── Host/Controllers/DropFeedbackControllerTests.cs
 │   ├── Host/Controllers/WaveCleanupControllerTests.cs
 │   ├── Host/Controllers/GlobalDashboardControllerTests.cs
+│   ├── Host/Controllers/DockDashboardControllerTests.cs
+│   ├── Host/Controllers/SortingReportControllerTests.cs
+│   ├── Host/Controllers/BusinessTaskQueryControllerTests.cs
 │   ├── Host/Controllers/StubScanIngressService.cs
 │   ├── Host/Controllers/StubChuteQueryService.cs
 │   ├── Host/Controllers/StubDropFeedbackService.cs
 │   ├── Host/Controllers/StubWaveCleanupService.cs
 │   ├── Host/Controllers/StubGlobalDashboardQueryService.cs
+│   ├── Host/Controllers/StubDockDashboardQueryService.cs
+│   ├── Host/Controllers/StubSortingReportQueryService.cs
+│   ├── Host/Controllers/StubBusinessTaskReadService.cs
 │   └── Services
 │       ├── AutoMigrationServiceTests.cs
 │       ├── DangerZoneExecutorTests.cs
@@ -319,6 +343,9 @@
 │       ├── TaskExecutionServiceTests.cs
 │       ├── ChuteQueryServiceTests.cs
 │       ├── GlobalDashboardQueryServiceTests.cs
+│       ├── DockDashboardQueryServiceTests.cs
+│       ├── SortingReportQueryServiceTests.cs
+│       ├── BusinessTaskReadServiceTests.cs
 │       ├── DropFeedbackServiceTests.cs
 │       ├── WmsFeedbackServiceTests.cs
 │       ├── FeedbackCompensationServiceTests.cs
@@ -339,11 +366,17 @@
     ├── Controllers/DropFeedbackController.cs
     ├── Controllers/WaveCleanupController.cs
     ├── Controllers/GlobalDashboardController.cs
+    ├── Controllers/DockDashboardController.cs
+    ├── Controllers/SortingReportController.cs
+    ├── Controllers/BusinessTaskQueryController.cs
     ├── Contracts/Requests/ScanUploadRequest.cs
     ├── Contracts/Requests/ChuteResolveRequest.cs
     ├── Contracts/Requests/DropFeedbackRequest.cs
     ├── Contracts/Requests/WaveCleanupRequest.cs
     ├── Contracts/Requests/GlobalDashboardQueryRequest.cs
+    ├── Contracts/Requests/DockDashboardQueryRequest.cs
+    ├── Contracts/Requests/SortingReportQueryRequest.cs
+    ├── Contracts/Requests/BusinessTaskQueryRequest.cs
     ├── Contracts/Responses/ApiResponse.cs
     ├── Contracts/Responses/ScanUploadResponse.cs
     ├── Contracts/Responses/ChuteResolveResponse.cs
@@ -351,6 +384,12 @@
     ├── Contracts/Responses/WaveCleanupResponse.cs
     ├── Contracts/Responses/GlobalDashboardResponse.cs
     ├── Contracts/Responses/WaveDashboardSummaryResponse.cs
+    ├── Contracts/Responses/DockDashboardResponse.cs
+    ├── Contracts/Responses/DockDashboardSummaryResponse.cs
+    ├── Contracts/Responses/SortingReportResponse.cs
+    ├── Contracts/Responses/SortingReportRowResponse.cs
+    ├── Contracts/Responses/BusinessTaskQueryResponse.cs
+    ├── Contracts/Responses/BusinessTaskItemResponse.cs
     ├── Workers/SyncBackgroundWorker.cs
     ├── Workers/RetentionBackgroundWorker.cs
     ├── Workers/AutoMigrationHostedService.cs
@@ -421,6 +460,13 @@
 - `Application/Abstractions/Services/IDropFeedbackService.cs` + `Application/Services/DropFeedbackService.cs`：落格回传应用服务抽象与实现，支持双定位（TaskCode/Barcode）、参数冲突校验与状态机推进（成功→Dropped+FeedbackPending，失败→Exception），落格成功/失败均写落格日志。
 - `Application/Abstractions/Queries/IGlobalDashboardQueryService.cs` + `Application/Queries/GlobalDashboardQueryService.cs`：总看板查询服务抽象与实现，按时间区间汇总总量、整件/拆零分口径、识别率、回流数、异常数、体积重量与波次聚合数据。
 - `Application/Models/GlobalDashboardQueryRequest.cs` + `Application/Models/GlobalDashboardQueryResult.cs` + `Application/Models/WaveDashboardSummary.cs`：总看板应用层查询入参、统计结果与波次维度摘要模型。
+- `Application/Abstractions/Queries/IDockDashboardQueryService.cs` + `Application/Queries/DockDashboardQueryService.cs`：码头看板查询服务抽象与实现，支持默认当天查询、波次筛选、拆零/整件未分拣统计、分拣进度、已分拣总数与“仅 7 号码头显示异常数”规则。
+- `Application/Abstractions/Queries/ISortingReportQueryService.cs` + `Application/Queries/SortingReportQueryService.cs`：报表查询与导出服务抽象与实现，支持按时间范围与码头维度输出统计，并提供 CSV 文本导出能力。
+- `Application/Abstractions/Queries/IBusinessTaskReadService.cs` + `Application/Queries/BusinessTaskReadService.cs`：业务任务查询服务抽象与实现，提供业务任务、异常件、回流记录三类分页查询，支持时间、波次、条码、码头与格口筛选。
+- `Application/Queries/BusinessTaskMetrics.cs`：业务任务统计规则封装，统一已分拣判定、码头解析、波次归一化、7 号码头识别与百分比计算。
+- `Application/Models/DockDashboardQueryRequest.cs` + `Application/Models/DockDashboardQueryResult.cs` + `Application/Models/DockDashboardSummary.cs`：码头看板应用层查询入参、聚合结果与码头维度摘要模型。
+- `Application/Models/SortingReportQueryRequest.cs` + `Application/Models/SortingReportQueryResult.cs` + `Application/Models/SortingReportRow.cs`：报表查询与导出模型，统一报表查询返回与导出口径。
+- `Application/Models/BusinessTaskQueryRequest.cs` + `Application/Models/BusinessTaskQueryResult.cs` + `Application/Models/BusinessTaskQueryItem.cs`：业务任务查询分页模型与结果项模型。
 - `Application/Abstractions/Services/IWmsFeedbackService.cs` + `Application/Feedback/Services/WmsFeedbackService.cs`：业务回传应用服务抽象与实现，查询 `FeedbackStatus=Pending` 任务、批量调用 Oracle 写入器、按结果回填 Completed/Failed。
 - `Application/Abstractions/Services/IFeedbackCompensationService.cs` + `Application/Feedback/Services/FeedbackCompensationService.cs`：业务回传补偿服务抽象与实现，支持按任务编码重试与按批次重试 `FeedbackStatus=Failed` 任务，并回填本地回传状态。
 - `Application/Abstractions/Integrations/IWmsOracleFeedbackGateway.cs` + `Infrastructure/Integrations/OracleWmsFeedbackGateway.cs`：Oracle WMS 业务回传网关抽象与实现；实现使用数组绑定批量更新，安全标识符校验防止 SQL 注入；`Enabled=false` 时仅记录日志不实际写入 Oracle。
@@ -458,8 +504,17 @@
 - `EverydayChain.Hub.Tests/Services/ExceptionRuleTests.cs`：异常规则服务单元测试，覆盖波次清理、多标签决策与回流规则的主要路径共 16 个场景。
 - `EverydayChain.Hub.Tests/Services/ScanDropLogTests.cs`：扫描/落格日志落库测试，覆盖扫描成功写日志、扫描失败写日志、落格成功写日志+FeedbackPending、落格失败写日志四个场景。
 - `Host/Controllers/GlobalDashboardController.cs` + `Host/Contracts/Requests/GlobalDashboardQueryRequest.cs` + `Host/Contracts/Responses/GlobalDashboardResponse.cs` + `Host/Contracts/Responses/WaveDashboardSummaryResponse.cs`：总看板查询 API 与契约，提供时间区间查询并返回波次维度聚合数据。
+- `Host/Controllers/DockDashboardController.cs` + `Host/Contracts/Requests/DockDashboardQueryRequest.cs` + `Host/Contracts/Responses/DockDashboardResponse.cs` + `Host/Contracts/Responses/DockDashboardSummaryResponse.cs`：码头看板查询 API 与契约，提供默认当天、波次筛选与码头统计能力。
+- `Host/Controllers/SortingReportController.cs` + `Host/Contracts/Requests/SortingReportQueryRequest.cs` + `Host/Contracts/Responses/SortingReportResponse.cs` + `Host/Contracts/Responses/SortingReportRowResponse.cs`：报表查询与 CSV 导出 API 与契约，统一报表查询和导出字段口径。
+- `Host/Controllers/BusinessTaskQueryController.cs` + `Host/Contracts/Requests/BusinessTaskQueryRequest.cs` + `Host/Contracts/Responses/BusinessTaskQueryResponse.cs` + `Host/Contracts/Responses/BusinessTaskItemResponse.cs`：业务任务、异常件与回流记录查询 API 与契约，支持多条件筛选和分页。
 - `EverydayChain.Hub.Tests/Host/Controllers/GlobalDashboardControllerTests.cs` + `EverydayChain.Hub.Tests/Host/Controllers/StubGlobalDashboardQueryService.cs`：总看板控制器测试与查询服务替身，覆盖时间语义校验、区间校验与成功返回路径。
 - `EverydayChain.Hub.Tests/Services/GlobalDashboardQueryServiceTests.cs`：总看板应用服务测试，覆盖空数据与多维统计聚合口径。
+- `EverydayChain.Hub.Tests/Host/Controllers/DockDashboardControllerTests.cs` + `StubDockDashboardQueryService.cs`：码头看板控制器测试与服务替身，覆盖时间区间校验和成功返回路径。
+- `EverydayChain.Hub.Tests/Host/Controllers/SortingReportControllerTests.cs` + `StubSortingReportQueryService.cs`：报表控制器测试与服务替身，覆盖查询成功路径与 CSV 导出路径。
+- `EverydayChain.Hub.Tests/Host/Controllers/BusinessTaskQueryControllerTests.cs` + `StubBusinessTaskReadService.cs`：业务查询控制器测试与服务替身，覆盖分页参数校验与成功返回路径。
+- `EverydayChain.Hub.Tests/Services/DockDashboardQueryServiceTests.cs`：码头看板应用服务测试，覆盖码头聚合统计与 7 号码头异常规则。
+- `EverydayChain.Hub.Tests/Services/SortingReportQueryServiceTests.cs`：报表应用服务测试，覆盖码头聚合口径与 CSV 导出内容。
+- `EverydayChain.Hub.Tests/Services/BusinessTaskReadServiceTests.cs`：业务任务查询服务测试，覆盖多条件筛选、异常件筛选与回流筛选。
 - `EverydayChain.Hub.Tests/Services/InMemoryScanLogRepository.cs`：扫描日志仓储内存替身。
 - `EverydayChain.Hub.Tests/Services/InMemoryDropLogRepository.cs`：落格日志仓储内存替身。
 - `Application/Abstractions/Sync/IOracleRemoteStatusWriter.cs` / `IOracleStatusDrivenSourceReader.cs` / `ISqlServerAppendOnlyWriter.cs`：定义 StatusDriven 模式中 Oracle 远端状态回写、Oracle 状态驱动源读取与 SQL Server 仅追加写入的外部协作能力抽象，遵循 Application 层外部协作抽象放置规则。
@@ -509,8 +564,8 @@
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
 - `nlog.config`：NLog 日志配置，输出至控制台与两个滚动日志文件：通用日志（`hub-${shortdate}.log`，按日切割，单文件上限 10 MB，保留 30 天）；同步专属日志（`sync-${shortdate}.log`，仅收录同步链路相关组件日志，便于独立分析同步性能问题）。
 - `Program.cs`（Host）：Host 启动入口，现已支持 API + Worker 共存，启用 Controllers、Swagger（中文注释）并保留自动迁移与同步后台任务注册。
-- `Host/Controllers/ScanController.cs` / `ChuteController.cs` / `DropFeedbackController.cs` / `WaveCleanupController.cs`：对外 API 控制器，仅做入参校验、调用应用服务与统一响应封装；`WaveCleanupController` 提供波次清理 dry-run 与正式执行端点。
-- `Host/Contracts/Requests/*.cs` + `Host/Contracts/Responses/*.cs`：API 输入输出契约与统一响应包装，配合 Swagger 提供中文参数说明；其中 `WaveCleanupRequest`/`WaveCleanupResponse` 用于波次清理接口。
+- `Host/Controllers/ScanController.cs` / `ChuteController.cs` / `DropFeedbackController.cs` / `WaveCleanupController.cs` / `GlobalDashboardController.cs` / `DockDashboardController.cs` / `SortingReportController.cs` / `BusinessTaskQueryController.cs`：对外 API 控制器，仅做入参校验、调用应用服务与统一响应封装；覆盖在线链路、看板查询、报表导出与业务查询能力。
+- `Host/Contracts/Requests/*.cs` + `Host/Contracts/Responses/*.cs`：API 输入输出契约与统一响应包装，配合 Swagger 提供中文参数说明；其中 `WaveCleanup*`、`GlobalDashboard*`、`DockDashboard*`、`SortingReport*`、`BusinessTaskQuery*` 分别服务对应业务端点。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
 - `FeedbackCompensationBackgroundWorker.cs`：业务回传补偿后台任务，按 `FeedbackCompensationJob.PollingIntervalSeconds` 周期重试失败回传任务，支持批次上限控制并输出补偿统计日志。
