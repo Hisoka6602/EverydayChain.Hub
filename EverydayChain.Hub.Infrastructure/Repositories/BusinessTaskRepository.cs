@@ -350,9 +350,9 @@ public class BusinessTaskRepository(
         }
 
         var targetSuffixes = new HashSet<string>(StringComparer.Ordinal);
-        var currentMonth = new DateTime(startTimeLocal.Year, startTimeLocal.Month, 1, 0, 0, 0, DateTimeKind.Local);
+        var currentMonth = new DateTime(startTimeLocal.Year, startTimeLocal.Month, 1, 0, 0, 0);
         var endInclusiveTime = endTimeLocal.AddTicks(-1);
-        var endBoundaryMonth = new DateTime(endInclusiveTime.Year, endInclusiveTime.Month, 1, 0, 0, 0, DateTimeKind.Local);
+        var endBoundaryMonth = new DateTime(endInclusiveTime.Year, endInclusiveTime.Month, 1, 0, 0, 0);
 
         while (currentMonth <= endBoundaryMonth)
         {
@@ -360,7 +360,9 @@ public class BusinessTaskRepository(
             currentMonth = currentMonth.AddMonths(1);
         }
 
-        var matchedSuffixes = new List<string>(targetSuffixes.Count + 1);
+        // 容量预留：命中月份分片数量 + 1 个历史固定表空后缀。
+        var estimatedSuffixCount = targetSuffixes.Count + 1;
+        var matchedSuffixes = new List<string>(estimatedSuffixCount);
         foreach (var suffix in availableSuffixes)
         {
             if (string.IsNullOrEmpty(suffix) || targetSuffixes.Contains(suffix))
