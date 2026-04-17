@@ -12,7 +12,8 @@ var builder = WebApplication.CreateBuilder(args);
 var logger = NLog.LogManager.GetCurrentClassLogger();
 var webEndpointSection = builder.Configuration.GetSection(WebEndpointOptions.SectionName);
 var webEndpointOptions = webEndpointSection.Get<WebEndpointOptions>() ?? new WebEndpointOptions();
-if (!webEndpointSection.Exists()) {
+if (!webEndpointSection.Exists())
+{
     logger.Warn("WebEndpoint 配置节缺失，已使用默认配置。");
 }
 
@@ -22,7 +23,8 @@ if (!string.IsNullOrWhiteSpace(webEndpointOptions.Url)) {
 
 var swaggerSection = builder.Configuration.GetSection(SwaggerOptions.SectionName);
 var swaggerOptions = swaggerSection.Get<SwaggerOptions>() ?? new SwaggerOptions();
-if (!swaggerSection.Exists()) {
+if (!swaggerSection.Exists())
+{
     logger.Warn("Swagger 配置节缺失，已使用默认配置。");
 }
 builder.Logging.ClearProviders();

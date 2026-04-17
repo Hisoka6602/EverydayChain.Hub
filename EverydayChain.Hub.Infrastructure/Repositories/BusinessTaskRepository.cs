@@ -252,10 +252,7 @@ public class BusinessTaskRepository(
                 }
                 else
                 {
-                    query = query.Where(x =>
-                        (x.WaveCode == null || x.WaveCode.Trim() == string.Empty
-                            ? EmptyWaveCode
-                            : x.WaveCode.Trim()) == normalizedWaveCode);
+                    query = query.Where(x => x.WaveCode != null && x.WaveCode.Trim() == normalizedWaveCode);
                 }
             }
 
@@ -475,10 +472,7 @@ public class BusinessTaskRepository(
             }
             else
             {
-                query = query.Where(task =>
-                    (task.WaveCode == null || task.WaveCode.Trim() == string.Empty
-                        ? EmptyWaveCode
-                        : task.WaveCode.Trim()) == normalizedWaveCode);
+                query = query.Where(task => task.WaveCode != null && task.WaveCode.Trim() == normalizedWaveCode);
             }
         }
 

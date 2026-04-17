@@ -84,17 +84,21 @@ public class AutoMigrationService(
     internal static bool ShouldMarkBaselineMigration(
         IReadOnlyList<string> allMigrations,
         IReadOnlyCollection<string> appliedMigrations,
-        int existingCoreTableCount) {
-        if (allMigrations.Count != 1) {
+        int existingCoreTableCount)
+    {
+        if (allMigrations.Count != 1)
+        {
             return false;
         }
 
         var onlyMigration = allMigrations[0];
-        if (!string.Equals(onlyMigration, BaselineMigrationId, StringComparison.Ordinal)) {
+        if (!string.Equals(onlyMigration, BaselineMigrationId, StringComparison.Ordinal))
+        {
             return false;
         }
 
-        if (appliedMigrations.Contains(onlyMigration)) {
+        if (appliedMigrations.Contains(onlyMigration))
+        {
             return false;
         }
 
@@ -177,11 +181,13 @@ public class AutoMigrationService(
     /// </summary>
     /// <param name="dbContext">数据库上下文。</param>
     /// <param name="cancellationToken">取消令牌。</param>
-    private async Task TryMarkBaselineMigrationForExistingDatabaseAsync(HubDbContext dbContext, CancellationToken cancellationToken) {
+    private async Task TryMarkBaselineMigrationForExistingDatabaseAsync(HubDbContext dbContext, CancellationToken cancellationToken)
+    {
         var allMigrations = dbContext.Database.GetMigrations().ToList();
         var appliedMigrations = dbContext.Database.GetAppliedMigrations().ToList();
         var existingCoreTableCount = await CountExistingCoreTablesAsync(dbContext, cancellationToken);
-        if (!ShouldMarkBaselineMigration(allMigrations, appliedMigrations, existingCoreTableCount)) {
+        if (!ShouldMarkBaselineMigration(allMigrations, appliedMigrations, existingCoreTableCount))
+        {
             return;
         }
 
@@ -204,12 +210,12 @@ public class AutoMigrationService(
             """,
             cancellationToken);
 
-        await dbContext.Database.ExecuteSqlRawAsync(
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
             $"""
-            IF NOT EXISTS (SELECT 1 FROM [dbo].[__EFMigrationsHistory] WHERE [MigrationId] = N'{BaselineMigrationId}')
+            IF NOT EXISTS (SELECT 1 FROM [dbo].[__EFMigrationsHistory] WHERE [MigrationId] = {BaselineMigrationId})
             BEGIN
                 INSERT INTO [dbo].[__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-                VALUES (N'{BaselineMigrationId}', N'{BaselineProductVersion}');
+                VALUES ({BaselineMigrationId}, {BaselineProductVersion});
             END;
             """,
             cancellationToken);
@@ -223,14 +229,17 @@ public class AutoMigrationService(
     /// <param name="dbContext">数据库上下文。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>核心表数量。</returns>
-    private static async Task<int> CountExistingCoreTablesAsync(HubDbContext dbContext, CancellationToken cancellationToken) {
+    private static async Task<int> CountExistingCoreTablesAsync(HubDbContext dbContext, CancellationToken cancellationToken)
+    {
         var connection = dbContext.Database.GetDbConnection();
         var shouldClose = connection.State == ConnectionState.Closed;
-        if (shouldClose) {
+        if (shouldClose)
+        {
             await connection.OpenAsync(cancellationToken);
         }
 
-        try {
+        try
+        {
             await using var command = connection.CreateCommand();
             command.CommandText =
                 """
@@ -248,8 +257,10 @@ public class AutoMigrationService(
             var scalar = await command.ExecuteScalarAsync(cancellationToken);
             return scalar is null || scalar == DBNull.Value ? 0 : Convert.ToInt32(scalar);
         }
-        finally {
-            if (shouldClose) {
+        finally
+        {
+            if (shouldClose)
+            {
                 await connection.CloseAsync();
             }
         }
