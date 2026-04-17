@@ -88,14 +88,26 @@ public sealed class WaveCleanupService : IWaveCleanupService
         if (!_options.Enabled || !_options.WaveCleanup.Enabled)
         {
             _logger.LogDebug("波次清理：规则开关关闭，跳过执行。WaveCode={WaveCode}", safeWaveCode);
-            return new WaveCleanupResult { Message = "规则开关关闭，已跳过。" };
+            return new WaveCleanupResult
+            {
+                IsDryRun = dryRun,
+                IdentifiedCount = 0,
+                CleanedCount = 0,
+                Message = "规则开关关闭，已跳过。"
+            };
         }
 
         // 步骤 1：校验波次编码。
         if (string.IsNullOrWhiteSpace(waveCode))
         {
             _logger.LogWarning("波次清理：波次编码为空，跳过执行。");
-            return new WaveCleanupResult { Message = "波次编码为空，已跳过。" };
+            return new WaveCleanupResult
+            {
+                IsDryRun = dryRun,
+                IdentifiedCount = 0,
+                CleanedCount = 0,
+                Message = "波次编码为空，已跳过。"
+            };
         }
 
         var trimmedWaveCode = waveCode.Trim();
@@ -175,7 +187,7 @@ public sealed class WaveCleanupService : IWaveCleanupService
     }
 
     /// <summary>
-    /// 对日志中的波次号进行安全规范化，移除换行符以避免日志注入。
+    /// 对日志中的波次号进行安全规范化，移除控制字符以避免日志注入。
     /// </summary>
     /// <param name="waveCode">原始波次号。</param>
     /// <returns>可安全记录到日志的波次号。</returns>
