@@ -39,22 +39,9 @@ public sealed class DockDashboardController : ControllerBase
     public async Task<ActionResult<ApiResponse<DockDashboardResponse>>> QueryOverviewAsync([FromBody] DockDashboardQueryRequest request, CancellationToken cancellationToken)
     {
         var todayLocal = DateTime.SpecifyKind(DateTime.Today, DateTimeKind.Local);
-        var start = request.StartTimeLocal ?? todayLocal;
-        var end = request.EndTimeLocal ?? todayLocal.AddDays(1);
-
-        if (!LocalDateTimeNormalizer.TryNormalize(start, "开始时间必须为本地时间，禁止传入 UTC 时间。", out var normalizedStart, out var startValidationMessage))
+        if (!LocalTimeRangeValidator.TryNormalizeOptionalRange(request.StartTimeLocal, request.EndTimeLocal, todayLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
         {
-            return BadRequest(ApiResponse<DockDashboardResponse>.Fail(startValidationMessage));
-        }
-
-        if (!LocalDateTimeNormalizer.TryNormalize(end, "结束时间必须为本地时间，禁止传入 UTC 时间。", out var normalizedEnd, out var endValidationMessage))
-        {
-            return BadRequest(ApiResponse<DockDashboardResponse>.Fail(endValidationMessage));
-        }
-
-        if (normalizedEnd <= normalizedStart)
-        {
-            return BadRequest(ApiResponse<DockDashboardResponse>.Fail("结束时间必须大于开始时间。"));
+            return BadRequest(ApiResponse<DockDashboardResponse>.Fail(validationMessage));
         }
 
         var result = await _dockDashboardQueryService.QueryAsync(new EverydayChain.Hub.Application.Models.DockDashboardQueryRequest

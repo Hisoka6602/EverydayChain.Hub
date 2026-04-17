@@ -2,6 +2,7 @@ using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using Microsoft.AspNetCore.Mvc;
+using System.Text;
 
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
@@ -46,6 +47,13 @@ public sealed class SortingReportControllerTests
         };
 
         var result = await controller.ExportCsvAsync(request, CancellationToken.None);
-        Assert.IsType<FileContentResult>(result);
+        var fileResult = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("text/csv; charset=utf-8", fileResult.ContentType);
+        Assert.True(fileResult.FileContents.Length >= 3);
+        Assert.Equal(0xEF, fileResult.FileContents[0]);
+        Assert.Equal(0xBB, fileResult.FileContents[1]);
+        Assert.Equal(0xBF, fileResult.FileContents[2]);
+        var csvText = Encoding.UTF8.GetString(fileResult.FileContents);
+        Assert.Contains("码头号,拆零总数", csvText);
     }
 }

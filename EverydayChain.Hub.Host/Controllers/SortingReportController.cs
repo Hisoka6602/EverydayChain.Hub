@@ -15,6 +15,11 @@ namespace EverydayChain.Hub.Host.Controllers;
 public sealed class SortingReportController : ControllerBase
 {
     /// <summary>
+    /// 带 BOM 的 UTF-8 编码实例。
+    /// </summary>
+    private static readonly UTF8Encoding Utf8EncodingWithBom = new(true);
+
+    /// <summary>
     /// 分拣报表查询服务。
     /// </summary>
     private readonly ISortingReportQueryService _sortingReportQueryService;
@@ -39,9 +44,9 @@ public sealed class SortingReportController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<SortingReportResponse>), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ApiResponse<SortingReportResponse>>> QueryAsync([FromBody] SortingReportQueryRequest request, CancellationToken cancellationToken)
     {
-        if (!TryValidateTimeRange(request.StartTimeLocal, request.EndTimeLocal, out var normalizedStart, out var normalizedEnd, out var validationResult))
+        if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(request.StartTimeLocal, request.EndTimeLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
         {
-            return validationResult!;
+            return BadRequest(ApiResponse<SortingReportResponse>.Fail(validationMessage));
         }
 
         var result = await _sortingReportQueryService.QueryAsync(new EverydayChain.Hub.Application.Models.SortingReportQueryRequest
@@ -84,9 +89,9 @@ public sealed class SortingReportController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult> ExportCsvAsync([FromBody] SortingReportQueryRequest request, CancellationToken cancellationToken)
     {
-        if (!TryValidateTimeRange(request.StartTimeLocal, request.EndTimeLocal, out var normalizedStart, out var normalizedEnd, out var validationResult))
+        if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(request.StartTimeLocal, request.EndTimeLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
         {
-            return validationResult!;
+            return BadRequest(ApiResponse<object>.Fail(validationMessage));
         }
 
         var csvContent = await _sortingReportQueryService.ExportCsvAsync(new EverydayChain.Hub.Application.Models.SortingReportQueryRequest
@@ -98,59 +103,22 @@ public sealed class SortingReportController : ControllerBase
 
         var localNow = DateTimeOffset.Now.LocalDateTime;
         var fileName = $"sorting-report-{localNow:yyyyMMddHHmmss}.csv";
-        return File(Encoding.UTF8.GetBytes(csvContent), "text/csv", fileName);
+        var csvBytes = BuildUtf8BomCsvBytes(csvContent);
+        return File(csvBytes, "text/csv; charset=utf-8", fileName);
     }
 
     /// <summary>
-    /// 校验并规范化时间区间。
+    /// 构建带 UTF-8 BOM 的 CSV 字节数组。
     /// </summary>
-    /// <param name="startTimeLocal">开始时间。</param>
-    /// <param name="endTimeLocal">结束时间。</param>
-    /// <param name="normalizedStart">规范化开始时间。</param>
-    /// <param name="normalizedEnd">规范化结束时间。</param>
-    /// <param name="validationResult">校验失败结果。</param>
-    /// <returns>是否通过校验。</returns>
-    private bool TryValidateTimeRange(
-        DateTime startTimeLocal,
-        DateTime endTimeLocal,
-        out DateTime normalizedStart,
-        out DateTime normalizedEnd,
-        out BadRequestObjectResult? validationResult)
+    /// <param name="csvContent">CSV 文本内容。</param>
+    /// <returns>带 UTF-8 BOM 的字节数组。</returns>
+    private static byte[] BuildUtf8BomCsvBytes(string csvContent)
     {
-        normalizedStart = default;
-        normalizedEnd = default;
-        validationResult = null;
-
-        if (startTimeLocal == DateTime.MinValue)
-        {
-            validationResult = BadRequest(ApiResponse<object>.Fail("开始时间不能为空。"));
-            return false;
-        }
-
-        if (endTimeLocal == DateTime.MinValue)
-        {
-            validationResult = BadRequest(ApiResponse<object>.Fail("结束时间不能为空。"));
-            return false;
-        }
-
-        if (!LocalDateTimeNormalizer.TryNormalize(startTimeLocal, "开始时间必须为本地时间，禁止传入 UTC 时间。", out normalizedStart, out var startValidationMessage))
-        {
-            validationResult = BadRequest(ApiResponse<object>.Fail(startValidationMessage));
-            return false;
-        }
-
-        if (!LocalDateTimeNormalizer.TryNormalize(endTimeLocal, "结束时间必须为本地时间，禁止传入 UTC 时间。", out normalizedEnd, out var endValidationMessage))
-        {
-            validationResult = BadRequest(ApiResponse<object>.Fail(endValidationMessage));
-            return false;
-        }
-
-        if (normalizedEnd <= normalizedStart)
-        {
-            validationResult = BadRequest(ApiResponse<object>.Fail("结束时间必须大于开始时间。"));
-            return false;
-        }
-
-        return true;
+        var preamble = Utf8EncodingWithBom.GetPreamble();
+        var contentBytes = Utf8EncodingWithBom.GetBytes(csvContent);
+        var bytes = new byte[preamble.Length + contentBytes.Length];
+        Buffer.BlockCopy(preamble, 0, bytes, 0, preamble.Length);
+        Buffer.BlockCopy(contentBytes, 0, bytes, preamble.Length, contentBytes.Length);
+        return bytes;
     }
 }

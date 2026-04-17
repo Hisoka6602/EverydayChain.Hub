@@ -50,4 +50,26 @@ public sealed class DockDashboardControllerTests
         var result = await controller.QueryOverviewAsync(request, CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
+
+    /// <summary>
+    /// 仅传开始时间时应自动补齐结束时间为开始时间加一天。
+    /// </summary>
+    [Fact]
+    public async Task QueryOverviewAsync_ShouldDefaultEndTimeToStartPlusOneDay_WhenOnlyStartTimeProvided()
+    {
+        var stubService = new StubDockDashboardQueryService();
+        var controller = new DockDashboardController(stubService);
+        var startTime = DateTime.SpecifyKind(new DateTime(2026, 4, 19, 8, 0, 0), DateTimeKind.Local);
+        var request = new DockDashboardQueryRequest
+        {
+            StartTimeLocal = startTime
+        };
+
+        var result = await controller.QueryOverviewAsync(request, CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        _ = Assert.IsType<ApiResponse<DockDashboardResponse>>(okResult.Value);
+        Assert.NotNull(stubService.LastRequest);
+        Assert.Equal(startTime, stubService.LastRequest!.StartTimeLocal);
+        Assert.Equal(startTime.AddDays(1), stubService.LastRequest.EndTimeLocal);
+    }
 }

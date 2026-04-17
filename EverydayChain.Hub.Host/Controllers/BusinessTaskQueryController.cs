@@ -145,33 +145,9 @@ public sealed class BusinessTaskQueryController : ControllerBase
         normalizedEnd = default;
         validationResult = null;
 
-        if (request.StartTimeLocal == DateTime.MinValue)
+        if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(request.StartTimeLocal, request.EndTimeLocal, out normalizedStart, out normalizedEnd, out var validationMessage))
         {
-            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("开始时间不能为空。"));
-            return false;
-        }
-
-        if (request.EndTimeLocal == DateTime.MinValue)
-        {
-            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("结束时间不能为空。"));
-            return false;
-        }
-
-        if (!LocalDateTimeNormalizer.TryNormalize(request.StartTimeLocal, "开始时间必须为本地时间，禁止传入 UTC 时间。", out normalizedStart, out var startValidationMessage))
-        {
-            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail(startValidationMessage));
-            return false;
-        }
-
-        if (!LocalDateTimeNormalizer.TryNormalize(request.EndTimeLocal, "结束时间必须为本地时间，禁止传入 UTC 时间。", out normalizedEnd, out var endValidationMessage))
-        {
-            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail(endValidationMessage));
-            return false;
-        }
-
-        if (normalizedEnd <= normalizedStart)
-        {
-            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("结束时间必须大于开始时间。"));
+            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail(validationMessage));
             return false;
         }
 
