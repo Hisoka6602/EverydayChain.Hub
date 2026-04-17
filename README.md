@@ -1,6 +1,11 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 实施 PR-12 精准修复：新增 `WebEndpointOptions` 与 `Swagger.Path` 配置，`Program.cs` 改为从 `appsettings.json` 读取 Web 监听地址与 Swagger 路径，移除硬编码入口路径。
+- 完成 EF Core 迁移历史重建：删除旧迁移链并重建单一基线迁移 `20260417185400_RebuildHubBaseline`，保留自动迁移与自动分表能力。
+- 补齐查询索引：`BusinessTaskEntity`、`ScanLogEntity`、`DropLogEntity`、`SyncBatchEntity` 新增高频单列与组合索引，覆盖分页、看板聚合、扫描匹配、回写补偿场景。
+- 完成进一步性能精修：热路径查询去除 `Trim()` 函数包裹以提升索引命中；扫描链路增加字符串一次归一化；补偿失败链路移除冗余“失败到失败”重复更新。
+- 新增文档：`性能精修说明.md`、`前端对接文档.md`；更新 `WMS回写联调基线.md`，补齐最终配置、联调步骤、阻塞项与生产启用门禁。
 - 实施 PR-11 收口：WMS 回写配置收口为“生产默认关闭、联调配置齐全”，新增 `WMS回写联调基线.md`，明确拆零/整件目标表、业务键列、字段映射、联调入口与生产启用阻塞项。
 - 实施 PR-11 查询性能收口：`GlobalDashboardQueryService`、`DockDashboardQueryService`、`SortingReportQueryService`、`BusinessTaskReadService` 已改为仓储侧聚合/过滤/分页主路径，避免“全量查回内存聚合/分页”。
 - 扩展业务任务仓储查询能力：新增波次聚合、码头聚合、波次选项查询与业务任务条件统计/分页下推；同步补齐 `BusinessTaskWaveAggregateRow`、`BusinessTaskDockAggregateRow`、`BusinessTaskSearchFilter`。
@@ -37,6 +42,8 @@
 - 新增总看板契约与测试：`GlobalDashboardQueryRequest/Response`、`WaveDashboardSummaryResponse`、`GlobalDashboardControllerTests`、`GlobalDashboardQueryServiceTests`、`StubGlobalDashboardQueryService`。
 - 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，180/180 单元测试通过）。
 ## 后续可完善点
+- 在联调环境完成回写门禁清单签收后，形成生产启用审批单并执行灰度验证。
+- 基于 `前端对接文档.md` 与 Swagger 导出结果建立自动一致性校验，防止后续接口漂移。
 - 根据产线峰值写入量细化各日志表差异化保留月数，并结合容量监控进行滚动调优。
 - 开启补偿后台任务：生产环境确认重试节流参数后，将 `FeedbackCompensationJob.Enabled` 置 `true`。
 - 与业务方确认“识别率/分拣进度/未分拣”的最终口径，随后同步固化到 `对外API接口基线.md` 与看板测试用例。
@@ -64,6 +71,8 @@
 ├── EverydayChain.Hub_详细业务背景开发指令_v2_实施计划.md
 ├── WMS状态语义基线.md
 ├── WMS回写联调基线.md
+├── 性能精修说明.md
+├── 前端对接文档.md
 ├── 条码规则基线.md
 ├── 对外API接口基线.md
 ├── 拆零业务字段语义基线.md
@@ -138,6 +147,7 @@
 │   ├── Options/WaveCleanupRuleOptions.cs
 │   ├── Options/MultiLabelRuleOptions.cs
 │   ├── Options/RecirculationRuleOptions.cs
+│   ├── Options/WebEndpointOptions.cs
 │   ├── MultiLabel/MultiLabelDecisionResult.cs
 │   └── Recirculation/RecirculationDecisionResult.cs
 ├── EverydayChain.Hub.Application
@@ -288,16 +298,8 @@
 │   ├── Persistence/Sharding/IShardSuffixResolver.cs
 │   ├── Persistence/Sharding/MonthShardSuffixResolver.cs
 │   ├── Persistence/Sharding/ShardModelCacheKeyFactory.cs
-│   ├── Migrations/20260408020833_RebuildInitialHubSchema.cs
-│   ├── Migrations/20260408020833_RebuildInitialHubSchema.Designer.cs
-│   ├── Migrations/20260413144042_AddBusinessTaskTable.cs
-│   ├── Migrations/20260413144042_AddBusinessTaskTable.Designer.cs
-│   ├── Migrations/20260413160852_AddScanDropLogTables.cs
-│   ├── Migrations/20260413160852_AddScanDropLogTables.Designer.cs
-│   ├── Migrations/20260416010041_AddSyncBatchShardTable.cs
-│   ├── Migrations/20260416171508_AddSyncChangeDeletionLogShardTables.cs
-│   ├── Migrations/20260417043253_AddBusinessTaskClosureFields.cs
-│   ├── Migrations/20260417043253_AddBusinessTaskClosureFields.Designer.cs
+│   ├── Migrations/20260417185400_RebuildHubBaseline.cs
+│   ├── Migrations/20260417185400_RebuildHubBaseline.Designer.cs
 │   ├── Migrations/HubDbContextModelSnapshot.cs
 │   └── Services
 │       ├── IDangerZoneExecutor.cs
@@ -427,6 +429,12 @@
 - `scripts/health-check.sh`：一键体检脚本，检查磁盘空间、目录权限、关键文件可读写、配置文件格式、日志健康状态、进程存活与压缩归档文件状态，可集成到监控或定时任务。
 - `scripts/disaster-recovery.sh`：灾难恢复脚本，支持检查点重置（checkpoint-reset）、快照从归档恢复（snapshot-restore）、快照备份（snapshot-backup）、归档清理（archive-cleanup）与完全重置（full-reset）；全部操作支持 --dry-run 预览模式。
 - `scripts/stability-drill.sh`：稳定性演练脚本，串联体检与灾备动作（checkpoint-reset、snapshot-backup、snapshot-restore、archive-cleanup），支持 dry-run 与真实执行并自动生成演练记录。
+- `性能精修说明.md`：记录热路径进一步性能精修项、已完成项、当前性能边界与后续极限优化方向。
+- `前端对接文档.md`：面向调用方的接口对接说明，覆盖公开 API 路由、请求/响应字段与成功失败示例。
+- `WMS回写联调基线.md`：固化 WMS 回写联调配置、验证路径、阻塞项与生产启用门禁。
+- `EverydayChain.Hub.Domain/Options/WebEndpointOptions.cs`：定义 Web 监听地址配置实体，统一承载 `WebEndpoint.Url` 绑定语义。
+- `EverydayChain.Hub.Domain/Options/SwaggerOptions.cs`：Swagger 文档配置实体，新增 `Path` 用于配置化 Swagger 页面入口。
+- `EverydayChain.Hub.Infrastructure/Migrations/20260417185400_RebuildHubBaseline.cs`：EF Core 新基线迁移，覆盖当前全量模型与索引定义。
 - `docs/联调证据/PR12-20260416-R1/01-联调执行记录.md`：PR-12 联调收口 R1 批次执行记录，归档本地时间窗口、回归命令与端到端链路执行状态。
 - `docs/联调证据/PR12-20260416-R1/02-关键日志索引.md`：PR-12 联调收口 R1 批次关键日志索引，固化日志范围、检索词口径与命中补录表。
 - `docs/联调证据/PR12-20260416-R1/03-结果汇总.md`：PR-12 联调收口 R1 批次结果汇总，记录统计口径、回归结果与最终收口结论。

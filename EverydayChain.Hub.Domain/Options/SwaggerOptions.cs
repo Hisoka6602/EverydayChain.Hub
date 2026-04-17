@@ -25,6 +25,11 @@ public sealed class SwaggerOptions {
     public string Description { get; set; } = "提供扫描上传、请求格口与落格回传的 API 骨架能力。";
 
     /// <summary>
+    /// Swagger 页面入口路径（可填写范围：以 / 开头的路径；默认值：/swagger）。
+    /// </summary>
+    public string Path { get; set; } = "/swagger";
+
+    /// <summary>
     /// 开发环境是否启用 Swagger（可填写项：true、false）。
     /// </summary>
     public bool EnableInDevelopment { get; set; } = true;

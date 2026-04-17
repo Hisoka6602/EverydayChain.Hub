@@ -31,7 +31,8 @@ public sealed class ScanMatchService : IScanMatchService
     /// <returns>匹配结果。</returns>
     public async Task<ScanMatchResult> MatchByBarcodeAsync(string barcode, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(barcode))
+        var normalizedBarcode = string.IsNullOrWhiteSpace(barcode) ? null : barcode.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedBarcode))
         {
             return new ScanMatchResult
             {
@@ -40,13 +41,13 @@ public sealed class ScanMatchService : IScanMatchService
             };
         }
 
-        var task = await _businessTaskRepository.FindByBarcodeAsync(barcode.Trim(), ct);
+        var task = await _businessTaskRepository.FindByBarcodeAsync(normalizedBarcode, ct);
         if (task == null)
         {
             return new ScanMatchResult
             {
                 IsMatched = false,
-                FailureReason = $"未找到条码 [{barcode}] 对应的业务任务。"
+                FailureReason = $"未找到条码 [{normalizedBarcode}] 对应的业务任务。"
             };
         }
 

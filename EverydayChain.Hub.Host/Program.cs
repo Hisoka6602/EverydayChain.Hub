@@ -10,6 +10,16 @@ using EverydayChain.Hub.Infrastructure.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 var logger = NLog.LogManager.GetCurrentClassLogger();
+var webEndpointSection = builder.Configuration.GetSection(WebEndpointOptions.SectionName);
+var webEndpointOptions = webEndpointSection.Get<WebEndpointOptions>() ?? new WebEndpointOptions();
+if (!webEndpointSection.Exists()) {
+    logger.Warn("WebEndpoint 配置节缺失或绑定失败，已使用默认配置。");
+}
+
+if (!string.IsNullOrWhiteSpace(webEndpointOptions.Url)) {
+    builder.WebHost.UseUrls(webEndpointOptions.Url.Trim());
+}
+
 var swaggerSection = builder.Configuration.GetSection(SwaggerOptions.SectionName);
 var swaggerOptions = swaggerSection.Get<SwaggerOptions>() ?? new SwaggerOptions();
 if (!swaggerSection.Exists()) {
@@ -74,8 +84,21 @@ else {
     shouldEnableSwagger = swaggerOptions.EnableInProduction;
 }
 if (shouldEnableSwagger) {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    var swaggerRoutePrefix = NormalizeSwaggerRoutePrefix(swaggerOptions.Path);
+    var swaggerJsonRoute = string.IsNullOrEmpty(swaggerRoutePrefix)
+        ? "{documentName}/swagger.json"
+        : $"{swaggerRoutePrefix}/{{documentName}}/swagger.json";
+    var swaggerJsonEndpoint = string.IsNullOrEmpty(swaggerRoutePrefix)
+        ? "/v1/swagger.json"
+        : $"/{swaggerRoutePrefix}/v1/swagger.json";
+
+    app.UseSwagger(options => {
+        options.RouteTemplate = swaggerJsonRoute;
+    });
+    app.UseSwaggerUI(options => {
+        options.RoutePrefix = swaggerRoutePrefix;
+        options.SwaggerEndpoint(swaggerJsonEndpoint, $"{swaggerOptions.Title} {swaggerOptions.Version}");
+    });
 }
 app.MapControllers();
 try {
@@ -84,4 +107,20 @@ try {
 finally {
     // 确保应用退出时 NLog 将所有缓冲日志全部落盘后再释放资源。
     NLog.LogManager.Shutdown();
+}
+
+// 归一化 Swagger 路由前缀。
+// path: 配置路径。
+// 返回值：路由前缀；根路径返回空字符串。
+static string NormalizeSwaggerRoutePrefix(string? path) {
+    if (string.IsNullOrWhiteSpace(path)) {
+        return "swagger";
+    }
+
+    var trimmed = path.Trim();
+    if (trimmed == "/") {
+        return string.Empty;
+    }
+
+    return trimmed.Trim('/').ToLowerInvariant();
 }

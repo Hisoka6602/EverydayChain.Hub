@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EverydayChain.Hub.Infrastructure.Migrations
 {
     [DbContext(typeof(HubDbContext))]
-    [Migration("20260417043253_AddBusinessTaskClosureFields")]
-    partial class AddBusinessTaskClosureFields
+    [Migration("20260417185400_RebuildHubBaseline")]
+    partial class RebuildHubBaseline
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -138,20 +138,46 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"));
 
+                    b.HasIndex("ActualChuteCode");
+
                     b.HasIndex("Barcode");
 
                     b.HasIndex("CreatedTimeLocal");
 
+                    b.HasIndex("FeedbackStatus");
+
+                    b.HasIndex("FeedbackTimeLocal");
+
                     b.HasIndex("IsException");
+
+                    b.HasIndex("IsFeedbackReported");
+
+                    b.HasIndex("IsRecirculated");
 
                     b.HasIndex("SourceType");
 
                     b.HasIndex("Status");
 
+                    b.HasIndex("TargetChuteCode");
+
                     b.HasIndex("TaskCode")
                         .IsUnique();
 
                     b.HasIndex("WaveCode");
+
+                    b.HasIndex("Barcode", "CreatedTimeLocal");
+
+                    b.HasIndex("CreatedTimeLocal", "Id");
+
+                    b.HasIndex("FeedbackStatus", "CreatedTimeLocal");
+
+                    b.HasIndex("WaveCode", "CreatedTimeLocal");
+
+                    b.HasIndex("FeedbackStatus", "IsFeedbackReported", "FeedbackTimeLocal");
+
+                    b.HasIndex("CreatedTimeLocal", "WaveCode", "TargetChuteCode", "ActualChuteCode");
+
+                    b.HasIndex("CreatedTimeLocal", "SourceType", "Status", "IsException", "IsRecirculated");
 
                     b.ToTable("business_tasks", "dbo");
                 });
@@ -196,11 +222,19 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"));
 
+                    b.HasIndex("ActualChuteCode");
+
+                    b.HasIndex("Barcode");
+
                     b.HasIndex("BusinessTaskId");
 
                     b.HasIndex("DropTimeLocal");
 
                     b.HasIndex("TaskCode");
+
+                    b.HasIndex("Barcode", "DropTimeLocal");
+
+                    b.HasIndex("TaskCode", "DropTimeLocal");
 
                     b.ToTable("drop_logs", "dbo");
                 });
@@ -255,6 +289,12 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                     b.HasIndex("BusinessTaskId");
 
                     b.HasIndex("ScanTimeLocal");
+
+                    b.HasIndex("TaskCode");
+
+                    b.HasIndex("Barcode", "ScanTimeLocal");
+
+                    b.HasIndex("TaskCode", "ScanTimeLocal");
 
                     b.ToTable("scan_logs", "dbo");
                 });
@@ -367,6 +407,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     b.HasIndex("BatchId")
                         .IsUnique();
+
+                    b.HasIndex("Status", "CompletedTimeLocal");
 
                     b.HasIndex("TableCode", "Status", "CompletedTimeLocal");
 
