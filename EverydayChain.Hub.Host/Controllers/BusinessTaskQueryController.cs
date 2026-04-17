@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 业务任务查询接口。
+/// 业务任务查询控制器，提供业务任务、异常件与回流记录分页查询能力。
 /// </summary>
 [ApiController]
 [Route("api/v1/business-query")]
@@ -29,10 +29,12 @@ public sealed class BusinessTaskQueryController : ControllerBase
 
     /// <summary>
     /// 查询业务任务。
+    /// 请求条件：时间范围必填且合法，分页参数需在允许范围内。
+    /// 返回语义：返回业务任务口径分页结果；参数非法返回 400。
     /// </summary>
     /// <param name="request">查询请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>业务任务分页结果。</returns>
+    /// <returns>业务任务分页结果，包含总数、分页信息与任务明细列表。</returns>
     [HttpPost("tasks")]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status400BadRequest)]
@@ -43,10 +45,12 @@ public sealed class BusinessTaskQueryController : ControllerBase
 
     /// <summary>
     /// 查询异常件。
+    /// 请求条件：与业务任务查询一致。
+    /// 返回语义：仅返回异常件口径分页结果；参数非法返回 400。
     /// </summary>
     /// <param name="request">查询请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>异常件分页结果。</returns>
+    /// <returns>异常件分页结果，包含总数、分页信息与任务明细列表。</returns>
     [HttpPost("exceptions")]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status400BadRequest)]
@@ -57,10 +61,12 @@ public sealed class BusinessTaskQueryController : ControllerBase
 
     /// <summary>
     /// 查询回流记录。
+    /// 请求条件：与业务任务查询一致。
+    /// 返回语义：仅返回回流口径分页结果；参数非法返回 400。
     /// </summary>
     /// <param name="request">查询请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>回流记录分页结果。</returns>
+    /// <returns>回流记录分页结果，包含总数、分页信息与任务明细列表。</returns>
     [HttpPost("recirculations")]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status400BadRequest)]
