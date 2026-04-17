@@ -444,9 +444,8 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
             .Select(task =>
             {
                 var value = selector(task);
-                return string.IsNullOrWhiteSpace(value) ? DBNull.Value : value;
+                return string.IsNullOrWhiteSpace(value) ? (object)DBNull.Value : value;
             })
-            .Cast<object>()
             .ToArray();
     }
 
@@ -461,8 +460,7 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         Func<BusinessTaskEntity, DateTime?> selector)
     {
         return tasks
-            .Select(task => selector(task) is DateTime value ? value : DBNull.Value)
-            .Cast<object>()
+            .Select(task => selector(task) is DateTime value ? (object)value : DBNull.Value)
             .ToArray();
     }
 
@@ -477,8 +475,7 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         Func<BusinessTaskEntity, decimal?> selector)
     {
         return tasks
-            .Select(task => selector(task) is decimal value ? value : DBNull.Value)
-            .Cast<object>()
+            .Select(task => selector(task) is decimal value ? (object)value : DBNull.Value)
             .ToArray();
     }
 }
