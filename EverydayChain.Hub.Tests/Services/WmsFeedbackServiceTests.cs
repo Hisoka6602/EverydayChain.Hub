@@ -205,6 +205,64 @@ public sealed class WmsFeedbackServiceTests
         Assert.False(updated.IsFeedbackReported);
         Assert.Null(updated.FeedbackTimeLocal);
     }
+
+    /// <summary>
+    /// 拆零任务回写成功时，应更新为已回传状态。
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_ShouldCompleteSplitTask_WhenSplitTaskWritten()
+    {
+        var (service, repo, writer) = CreateService();
+        await repo.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "TASK-SPLIT-001",
+            SourceTableCode = "WMS_SPLIT",
+            SourceType = BusinessTaskSourceType.Split,
+            BusinessKey = "KS1",
+            Status = BusinessTaskStatus.Dropped,
+            FeedbackStatus = BusinessTaskFeedbackStatus.Pending,
+            CreatedTimeLocal = DateTime.Now,
+            UpdatedTimeLocal = DateTime.Now
+        }, CancellationToken.None);
+        writer.ReturnCount = 1;
+
+        var result = await service.ExecuteAsync(100, CancellationToken.None);
+
+        Assert.Equal(1, result.SuccessCount);
+        var updated = await repo.FindByTaskCodeAsync("TASK-SPLIT-001", CancellationToken.None);
+        Assert.Equal(BusinessTaskFeedbackStatus.Completed, updated!.FeedbackStatus);
+        Assert.True(updated.IsFeedbackReported);
+        Assert.Contains(writer.CapturedTasks, task => task.SourceType == BusinessTaskSourceType.Split);
+    }
+
+    /// <summary>
+    /// 整件任务回写成功时，应更新为已回传状态。
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_ShouldCompleteFullCaseTask_WhenFullCaseTaskWritten()
+    {
+        var (service, repo, writer) = CreateService();
+        await repo.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "TASK-FULL-001",
+            SourceTableCode = "WMS_FULLCASE",
+            SourceType = BusinessTaskSourceType.FullCase,
+            BusinessKey = "KF1",
+            Status = BusinessTaskStatus.Dropped,
+            FeedbackStatus = BusinessTaskFeedbackStatus.Pending,
+            CreatedTimeLocal = DateTime.Now,
+            UpdatedTimeLocal = DateTime.Now
+        }, CancellationToken.None);
+        writer.ReturnCount = 1;
+
+        var result = await service.ExecuteAsync(100, CancellationToken.None);
+
+        Assert.Equal(1, result.SuccessCount);
+        var updated = await repo.FindByTaskCodeAsync("TASK-FULL-001", CancellationToken.None);
+        Assert.Equal(BusinessTaskFeedbackStatus.Completed, updated!.FeedbackStatus);
+        Assert.True(updated.IsFeedbackReported);
+        Assert.Contains(writer.CapturedTasks, task => task.SourceType == BusinessTaskSourceType.FullCase);
+    }
 }
 
 /// <summary>

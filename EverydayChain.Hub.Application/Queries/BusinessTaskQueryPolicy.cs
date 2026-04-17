@@ -1,43 +1,17 @@
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
-using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Application.Queries;
 
 /// <summary>
 /// 业务任务查询策略集合。
-/// 该类集中封装查询服务复用的口径判定能力，统一码头归属、波次归一化、7 号码头识别与百分比计算规则。
+/// 该类集中封装查询服务复用的口径判定能力，统一码头归属、7 号码头识别与百分比计算规则。
 /// </summary>
 internal sealed class BusinessTaskQueryPolicy
 {
     /// <summary>
-    /// 无波次占位文本。
-    /// </summary>
-    private const string EmptyWaveCode = "未分波次";
-
-    /// <summary>
     /// 无码头占位文本。
     /// </summary>
     private const string EmptyDockCode = "未分配码头";
-
-    /// <summary>
-    /// 判断任务是否已分拣完成。
-    /// </summary>
-    /// <param name="task">业务任务实体。</param>
-    /// <returns>是否已分拣。</returns>
-    public bool IsSortedTask(BusinessTaskEntity task)
-    {
-        return task.Status == BusinessTaskStatus.Dropped || task.Status == BusinessTaskStatus.FeedbackPending;
-    }
-
-    /// <summary>
-    /// 归一化波次编码。
-    /// </summary>
-    /// <param name="waveCode">原始波次编码。</param>
-    /// <returns>归一化后文本。</returns>
-    public string NormalizeWaveCode(string? waveCode)
-    {
-        return string.IsNullOrWhiteSpace(waveCode) ? EmptyWaveCode : waveCode.Trim();
-    }
 
     /// <summary>
     /// 解析任务所属码头号。

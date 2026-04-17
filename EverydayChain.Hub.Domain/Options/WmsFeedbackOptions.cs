@@ -19,7 +19,7 @@ public class WmsFeedbackOptions
     public string Schema { get; set; } = string.Empty;
 
     /// <summary>
-    /// Oracle 默认目标表名（可填写范围：Oracle 有效表名，仅允许字母、数字、下划线；示例：IDX_FEEDBACK_TABLE；当未配置拆零/整件专用目标表时使用该值）。
+    /// Oracle 默认目标表名（可填写范围：Oracle 有效表名，仅允许字母、数字、下划线；示例：IDX_SPLIT_TASK；仅在来源类型未识别时回退使用该值）。
     /// </summary>
     public string Table { get; set; } = string.Empty;
 

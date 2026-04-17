@@ -1,5 +1,6 @@
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
+using EverydayChain.Hub.Application.Models;
 
 namespace EverydayChain.Hub.Application.Abstractions.Persistence;
 
@@ -103,4 +104,63 @@ public interface IBusinessTaskRepository
     /// <param name="ct">取消令牌。</param>
     /// <returns>命中的业务任务列表。</returns>
     Task<IReadOnlyList<BusinessTaskEntity>> FindByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct);
+
+    /// <summary>
+    /// 按创建时间区间聚合总看板所需的波次统计数据（左闭右开）。
+    /// 聚合在仓储侧优先完成，应用层仅做最终口径拼装。
+    /// </summary>
+    /// <param name="startTimeLocal">区间起始本地时间（包含）。</param>
+    /// <param name="endTimeLocal">区间结束本地时间（不包含）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>波次聚合行集合。</returns>
+    Task<IReadOnlyList<BusinessTaskWaveAggregateRow>> AggregateWaveDashboardAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct);
+
+    /// <summary>
+    /// 列出创建时间区间内的波次编码选项（左闭右开），用于码头看板波次筛选。
+    /// </summary>
+    /// <param name="startTimeLocal">区间起始本地时间（包含）。</param>
+    /// <param name="endTimeLocal">区间结束本地时间（不包含）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>归一化波次编码集合。</returns>
+    Task<IReadOnlyList<string>> ListWaveCodesByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct);
+
+    /// <summary>
+    /// 按创建时间区间聚合码头看板/报表所需统计数据（左闭右开），并可按波次或码头过滤。
+    /// 聚合在仓储侧优先完成，应用层仅处理 7 号码头异常规则等口径细节。
+    /// </summary>
+    /// <param name="startTimeLocal">区间起始本地时间（包含）。</param>
+    /// <param name="endTimeLocal">区间结束本地时间（不包含）。</param>
+    /// <param name="waveCode">可选波次编码。</param>
+    /// <param name="dockCode">可选码头编码。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>码头聚合行集合。</returns>
+    Task<IReadOnlyList<BusinessTaskDockAggregateRow>> AggregateDockDashboardAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        string? waveCode,
+        string? dockCode,
+        CancellationToken ct);
+
+    /// <summary>
+    /// 按查询条件统计业务任务总数。
+    /// 过滤条件在仓储侧下推执行，不在应用层做全量内存过滤。
+    /// </summary>
+    /// <param name="filter">查询过滤条件。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>命中的业务任务总数。</returns>
+    Task<int> CountByQueryConditionsAsync(BusinessTaskSearchFilter filter, CancellationToken ct);
+
+    /// <summary>
+    /// 按查询条件读取分页业务任务列表，排序与分页在仓储侧下推执行。
+    /// </summary>
+    /// <param name="filter">查询过滤条件。</param>
+    /// <param name="skip">跳过条数。</param>
+    /// <param name="take">读取条数。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>命中的分页业务任务列表。</returns>
+    Task<IReadOnlyList<BusinessTaskEntity>> QueryByQueryConditionsAsync(
+        BusinessTaskSearchFilter filter,
+        int skip,
+        int take,
+        CancellationToken ct);
 }
