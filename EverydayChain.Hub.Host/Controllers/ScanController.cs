@@ -8,7 +8,7 @@ using EverydayChain.Hub.SharedKernel.Utilities;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 扫描上传接口。
+/// 扫描上传控制器，负责接收设备扫码数据并触发任务受理流程。
 /// </summary>
 [ApiController]
 [Route("api/v1/scan")]
@@ -42,11 +42,13 @@ public sealed class ScanController : ControllerBase {
     }
 
     /// <summary>
-    /// 接收扫描上传请求。
+    /// 接收扫描上传请求并批量处理条码。
+    /// 请求条件：<see cref="ScanUploadRequest.DeviceCode"/> 必填；且 <see cref="ScanUploadRequest.Barcodes"/> 与 <see cref="ScanUploadRequest.Barcode"/> 至少提供一项。
+    /// 返回语义：全部条码受理成功返回 200；存在任意条码失败返回 400 且返回逐条处理结果。
     /// </summary>
     /// <param name="request">扫描上传请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>受理结果。</returns>
+    /// <returns>扫描受理结果集合，包含每个条码的受理状态、任务编码与失败语义码。</returns>
     [HttpPost("upload")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ScanUploadResponse>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ScanUploadResponse>>), StatusCodes.Status400BadRequest)]

@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 码头看板查询接口。
+/// 码头看板查询控制器，提供码头维度分拣进度与异常指标查询能力。
 /// </summary>
 [ApiController]
 [Route("api/v1/dock-dashboard")]
@@ -29,10 +29,12 @@ public sealed class DockDashboardController : ControllerBase
 
     /// <summary>
     /// 查询码头看板统计。
+    /// 请求条件：时间参数可选；传入时必须满足结束时间大于开始时间且为本地时间语义。
+    /// 返回语义：返回码头维度统计、波次筛选选项与实际生效时间窗口。
     /// </summary>
     /// <param name="request">查询请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>码头看板统计结果。</returns>
+    /// <returns>码头看板统计结果，包含码头汇总集合与当前波次筛选信息。</returns>
     [HttpPost("overview")]
     [ProducesResponseType(typeof(ApiResponse<DockDashboardResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<DockDashboardResponse>), StatusCodes.Status400BadRequest)]

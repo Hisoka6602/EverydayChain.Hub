@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 总看板查询接口。
+/// 总看板查询控制器，提供全局分拣统计指标查询能力。
 /// </summary>
 [ApiController]
 [Route("api/v1/dashboard")]
@@ -29,10 +29,12 @@ public sealed class GlobalDashboardController : ControllerBase
 
     /// <summary>
     /// 查询总看板统计。
+    /// 请求条件：开始时间与结束时间均为本地时间，且结束时间大于开始时间。
+    /// 返回语义：返回整件/拆零/回流/异常与波次聚合指标；参数非法返回 400。
     /// </summary>
     /// <param name="request">查询请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>总看板统计结果。</returns>
+    /// <returns>总看板统计结果，包含总体指标与波次维度汇总数据。</returns>
     [HttpPost("overview")]
     [ProducesResponseType(typeof(ApiResponse<GlobalDashboardResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<GlobalDashboardResponse>), StatusCodes.Status400BadRequest)]

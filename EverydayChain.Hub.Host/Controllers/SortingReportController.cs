@@ -8,7 +8,7 @@ using System.Text;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 分拣报表查询与导出接口。
+/// 分拣报表控制器，提供报表查询与 CSV 导出能力。
 /// </summary>
 [ApiController]
 [Route("api/v1/reports")]
@@ -35,10 +35,12 @@ public sealed class SortingReportController : ControllerBase
 
     /// <summary>
     /// 查询分拣报表。
+    /// 请求条件：开始时间与结束时间必填，且结束时间大于开始时间。
+    /// 返回语义：返回按码头聚合的分拣统计行集合；参数非法返回 400。
     /// </summary>
     /// <param name="request">查询请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>分拣报表查询结果。</returns>
+    /// <returns>分拣报表查询结果，包含生效查询窗口、码头筛选与报表明细行。</returns>
     [HttpPost("query")]
     [ProducesResponseType(typeof(ApiResponse<SortingReportResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<SortingReportResponse>), StatusCodes.Status400BadRequest)]
@@ -80,10 +82,12 @@ public sealed class SortingReportController : ControllerBase
 
     /// <summary>
     /// 导出 CSV 报表。
+    /// 请求条件：时间范围校验规则与报表查询一致。
+    /// 返回语义：成功返回 UTF-8 BOM 编码的 CSV 文件流，失败返回 400 统一响应。
     /// </summary>
     /// <param name="request">查询请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>CSV 文件。</returns>
+    /// <returns>分拣报表 CSV 文件流或参数校验失败结果。</returns>
     [HttpPost("export/csv")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]

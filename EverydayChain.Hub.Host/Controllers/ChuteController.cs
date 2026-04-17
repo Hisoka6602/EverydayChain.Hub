@@ -8,7 +8,7 @@ using EverydayChain.Hub.SharedKernel.Utilities;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 请求格口接口。
+/// 请求格口控制器，负责根据任务或条码解析目标格口。
 /// </summary>
 [ApiController]
 [Route("api/v1/chute")]
@@ -28,10 +28,12 @@ public sealed class ChuteController : ControllerBase {
 
     /// <summary>
     /// 查询目标格口。
+    /// 请求条件：条码必填，任务编码可选。
+    /// 返回语义：返回目标格口解析结果；条码为空时返回 400。
     /// </summary>
     /// <param name="request">请求格口入参。</param>
     /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>格口结果。</returns>
+    /// <returns>格口解析结果，包含是否命中、任务编码与目标格口编码。</returns>
     [HttpPost("resolve")]
     [ProducesResponseType(typeof(ApiResponse<ChuteResolveResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<ChuteResolveResponse>), StatusCodes.Status400BadRequest)]
