@@ -246,29 +246,40 @@ public class BusinessTaskRepository(
                 .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal);
             if (!string.IsNullOrWhiteSpace(normalizedWaveCode))
             {
-                query = query.Where(x =>
-                    (x.WaveCode == null || x.WaveCode.Trim() == string.Empty
-                        ? EmptyWaveCode
-                        : x.WaveCode.Trim()) == normalizedWaveCode);
+                if (string.Equals(normalizedWaveCode, EmptyWaveCode, StringComparison.Ordinal))
+                {
+                    query = query.Where(x => x.WaveCode == null || x.WaveCode.Trim() == string.Empty);
+                }
+                else
+                {
+                    query = query.Where(x => x.WaveCode != null && x.WaveCode.Trim() == normalizedWaveCode);
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(normalizedDockCode))
             {
-                query = query.Where(x =>
-                    (x.ActualChuteCode == null || x.ActualChuteCode.Trim() == string.Empty
-                        ? (x.TargetChuteCode == null || x.TargetChuteCode.Trim() == string.Empty
-                            ? EmptyDockCode
-                            : x.TargetChuteCode.Trim())
-                        : x.ActualChuteCode.Trim()) == normalizedDockCode);
+                if (string.Equals(normalizedDockCode, EmptyDockCode, StringComparison.Ordinal))
+                {
+                    query = query.Where(x =>
+                        (x.ActualChuteCode == null || x.ActualChuteCode == string.Empty)
+                        && (x.TargetChuteCode == null || x.TargetChuteCode == string.Empty));
+                }
+                else
+                {
+                    query = query.Where(x =>
+                        x.ActualChuteCode == normalizedDockCode
+                        || ((x.ActualChuteCode == null || x.ActualChuteCode == string.Empty)
+                            && x.TargetChuteCode == normalizedDockCode));
+                }
             }
 
             var shardRows = await query
                 .GroupBy(x =>
-                    x.ActualChuteCode == null || x.ActualChuteCode.Trim() == string.Empty
-                        ? (x.TargetChuteCode == null || x.TargetChuteCode.Trim() == string.Empty
+                    x.ActualChuteCode == null || x.ActualChuteCode == string.Empty
+                        ? (x.TargetChuteCode == null || x.TargetChuteCode == string.Empty
                             ? EmptyDockCode
-                            : x.TargetChuteCode.Trim())
-                        : x.ActualChuteCode.Trim())
+                            : x.TargetChuteCode)
+                        : x.ActualChuteCode)
                 .Select(group => new BusinessTaskDockAggregateRow
                 {
                     DockCode = group.Key,
@@ -455,10 +466,14 @@ public class BusinessTaskRepository(
         query = query.Where(task => task.CreatedTimeLocal >= filter.StartTimeLocal && task.CreatedTimeLocal < filter.EndTimeLocal);
         if (!string.IsNullOrWhiteSpace(normalizedWaveCode))
         {
-            query = query.Where(task =>
-                (task.WaveCode == null || task.WaveCode.Trim() == string.Empty
-                    ? EmptyWaveCode
-                    : task.WaveCode.Trim()) == normalizedWaveCode);
+            if (string.Equals(normalizedWaveCode, EmptyWaveCode, StringComparison.Ordinal))
+            {
+                query = query.Where(task => task.WaveCode == null || task.WaveCode.Trim() == string.Empty);
+            }
+            else
+            {
+                query = query.Where(task => task.WaveCode != null && task.WaveCode.Trim() == normalizedWaveCode);
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(normalizedBarcode))
@@ -468,19 +483,26 @@ public class BusinessTaskRepository(
 
         if (!string.IsNullOrWhiteSpace(normalizedDockCode))
         {
-            query = query.Where(task =>
-                (task.ActualChuteCode == null || task.ActualChuteCode.Trim() == string.Empty
-                    ? (task.TargetChuteCode == null || task.TargetChuteCode.Trim() == string.Empty
-                        ? EmptyDockCode
-                        : task.TargetChuteCode.Trim())
-                    : task.ActualChuteCode.Trim()) == normalizedDockCode);
+            if (string.Equals(normalizedDockCode, EmptyDockCode, StringComparison.Ordinal))
+            {
+                query = query.Where(task =>
+                    (task.ActualChuteCode == null || task.ActualChuteCode == string.Empty)
+                    && (task.TargetChuteCode == null || task.TargetChuteCode == string.Empty));
+            }
+            else
+            {
+                query = query.Where(task =>
+                    task.ActualChuteCode == normalizedDockCode
+                    || ((task.ActualChuteCode == null || task.ActualChuteCode == string.Empty)
+                        && task.TargetChuteCode == normalizedDockCode));
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(normalizedChuteCode))
         {
             query = query.Where(task =>
-                (task.TargetChuteCode != null && task.TargetChuteCode.Trim() == normalizedChuteCode)
-                || (task.ActualChuteCode != null && task.ActualChuteCode.Trim() == normalizedChuteCode));
+                task.TargetChuteCode == normalizedChuteCode
+                || task.ActualChuteCode == normalizedChuteCode);
         }
 
         if (filter.OnlyException)

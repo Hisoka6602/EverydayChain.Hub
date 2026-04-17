@@ -38,6 +38,10 @@ public class DropLogEntityTypeConfiguration : IEntityTypeConfiguration<DropLogEn
         builder.Property(x => x.FailureReason).HasMaxLength(256);
         builder.HasIndex(x => x.BusinessTaskId);
         builder.HasIndex(x => x.TaskCode);
+        builder.HasIndex(x => x.Barcode);
+        builder.HasIndex(x => x.ActualChuteCode);
         builder.HasIndex(x => x.DropTimeLocal);
+        builder.HasIndex(x => new { x.TaskCode, x.DropTimeLocal });
+        builder.HasIndex(x => new { x.Barcode, x.DropTimeLocal });
     }
 }

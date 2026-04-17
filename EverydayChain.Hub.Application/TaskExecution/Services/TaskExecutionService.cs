@@ -60,19 +60,23 @@ public sealed class TaskExecutionService : ITaskExecutionService
     /// <returns>任务执行结果。</returns>
     public async Task<TaskExecutionResult> MarkScannedAsync(ScanUploadApplicationRequest request, CancellationToken ct)
     {
+        var normalizedBarcode = string.IsNullOrWhiteSpace(request.Barcode) ? string.Empty : request.Barcode.Trim();
+        var normalizedDeviceCode = string.IsNullOrWhiteSpace(request.DeviceCode) ? null : request.DeviceCode.Trim();
+        var normalizedTraceId = string.IsNullOrWhiteSpace(request.TraceId) ? null : request.TraceId.Trim();
+
         // 步骤 1：按条码匹配任务。
-        var matchResult = await _scanMatchService.MatchByBarcodeAsync(request.Barcode, ct);
+        var matchResult = await _scanMatchService.MatchByBarcodeAsync(normalizedBarcode, ct);
         if (!matchResult.IsMatched || matchResult.Task == null)
         {
             // 匹配失败：写扫描失败日志后返回。
             await WriteScanLogSilentlyAsync(
                 businessTaskId: null,
                 taskCode: null,
-                barcode: request.Barcode,
-                deviceCode: request.DeviceCode,
+                barcode: normalizedBarcode,
+                deviceCode: normalizedDeviceCode,
                 isMatched: false,
                 failureReason: matchResult.FailureReason,
-                traceId: request.TraceId,
+                traceId: normalizedTraceId,
                 scanTimeLocal: request.ScanTimeLocal,
                 ct: ct);
 
@@ -99,11 +103,11 @@ public sealed class TaskExecutionService : ITaskExecutionService
             await WriteScanLogSilentlyAsync(
                 businessTaskId: task.Id,
                 taskCode: task.TaskCode,
-                barcode: request.Barcode,
-                deviceCode: request.DeviceCode,
+                barcode: normalizedBarcode,
+                deviceCode: normalizedDeviceCode,
                 isMatched: false,
                 failureReason: reason,
-                traceId: request.TraceId,
+                traceId: normalizedTraceId,
                 scanTimeLocal: request.ScanTimeLocal,
                 ct: ct);
 
@@ -120,9 +124,9 @@ public sealed class TaskExecutionService : ITaskExecutionService
         // 步骤 3：更新状态与扫描信息。
         task.Status = BusinessTaskStatus.Scanned;
         task.ScannedAtLocal = request.ScanTimeLocal;
-        task.DeviceCode = string.IsNullOrWhiteSpace(request.DeviceCode) ? task.DeviceCode : request.DeviceCode.Trim();
-        task.TraceId = string.IsNullOrWhiteSpace(request.TraceId) ? task.TraceId : request.TraceId.Trim();
-        task.Barcode = string.IsNullOrWhiteSpace(task.Barcode) ? request.Barcode.Trim() : task.Barcode;
+        task.DeviceCode = normalizedDeviceCode ?? task.DeviceCode;
+        task.TraceId = normalizedTraceId ?? task.TraceId;
+        task.Barcode = string.IsNullOrWhiteSpace(task.Barcode) ? normalizedBarcode : task.Barcode;
         // 扫描维度字段采用“请求优先、缺省保留旧值”策略，避免空值覆盖历史有效测量数据。
         task.LengthMm = request.LengthMm ?? task.LengthMm;
         task.WidthMm = request.WidthMm ?? task.WidthMm;
@@ -139,11 +143,11 @@ public sealed class TaskExecutionService : ITaskExecutionService
         await WriteScanLogSilentlyAsync(
             businessTaskId: task.Id,
             taskCode: task.TaskCode,
-            barcode: request.Barcode,
-            deviceCode: request.DeviceCode,
+            barcode: normalizedBarcode,
+            deviceCode: normalizedDeviceCode,
             isMatched: true,
             failureReason: null,
-            traceId: request.TraceId,
+            traceId: normalizedTraceId,
             scanTimeLocal: request.ScanTimeLocal,
             ct: ct);
 

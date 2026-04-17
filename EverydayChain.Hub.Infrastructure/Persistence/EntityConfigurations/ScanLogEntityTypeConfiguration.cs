@@ -39,6 +39,9 @@ public class ScanLogEntityTypeConfiguration : IEntityTypeConfiguration<ScanLogEn
         builder.Property(x => x.TraceId).HasMaxLength(64);
         builder.HasIndex(x => x.BusinessTaskId);
         builder.HasIndex(x => x.Barcode);
+        builder.HasIndex(x => x.TaskCode);
         builder.HasIndex(x => x.ScanTimeLocal);
+        builder.HasIndex(x => new { x.Barcode, x.ScanTimeLocal });
+        builder.HasIndex(x => new { x.TaskCode, x.ScanTimeLocal });
     }
 }

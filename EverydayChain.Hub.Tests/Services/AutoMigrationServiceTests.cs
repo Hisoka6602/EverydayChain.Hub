@@ -24,4 +24,37 @@ public class AutoMigrationServiceTests
         Assert.Contains("_202605", suffixes);
         Assert.DoesNotContain(string.Empty, suffixes);
     }
+
+    /// <summary>
+    /// 存量库且仅存在重建基线迁移时应触发基线标记。
+    /// </summary>
+    [Fact]
+    public void ShouldMarkBaselineMigration_ShouldReturnTrue_WhenOnlyBaselineExistsAndCoreTablesExist()
+    {
+        var shouldMark = AutoMigrationService.ShouldMarkBaselineMigration(
+            ["20260417185400_RebuildHubBaseline"],
+            [],
+            existingCoreTableCount: 2);
+
+        Assert.True(shouldMark);
+    }
+
+    /// <summary>
+    /// 新库或已标记场景不应触发基线标记。
+    /// </summary>
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, true)]
+    public void ShouldMarkBaselineMigration_ShouldReturnFalse_WhenCoreTableAbsentOrAlreadyApplied(int existingCoreTableCount, bool applied)
+    {
+        var appliedMigrations = applied
+            ? new[] { "20260417185400_RebuildHubBaseline" }
+            : Array.Empty<string>();
+        var shouldMark = AutoMigrationService.ShouldMarkBaselineMigration(
+            ["20260417185400_RebuildHubBaseline"],
+            appliedMigrations,
+            existingCoreTableCount);
+
+        Assert.False(shouldMark);
+    }
 }

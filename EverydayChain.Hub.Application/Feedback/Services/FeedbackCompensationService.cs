@@ -154,23 +154,14 @@ public sealed class FeedbackCompensationService : IFeedbackCompensationService
             _logger.LogError(ex, "业务回传补偿：Oracle 写入器执行异常，整批标记失败。TargetCount={TargetCount}", tasks.Count);
         }
 
-        var now = DateTime.Now;
         if (failedCount == 0)
         {
+            var now = DateTime.Now;
             foreach (var task in tasks)
             {
                 task.FeedbackStatus = BusinessTaskFeedbackStatus.Completed;
                 task.IsFeedbackReported = true;
                 task.FeedbackTimeLocal = now;
-                task.UpdatedTimeLocal = now;
-                await UpdateSilentlyAsync(task, ct);
-            }
-        }
-        else
-        {
-            foreach (var task in tasks)
-            {
-                task.FeedbackStatus = BusinessTaskFeedbackStatus.Failed;
                 task.UpdatedTimeLocal = now;
                 await UpdateSilentlyAsync(task, ct);
             }

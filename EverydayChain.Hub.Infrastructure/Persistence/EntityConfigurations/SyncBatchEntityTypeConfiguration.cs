@@ -38,5 +38,6 @@ public class SyncBatchEntityTypeConfiguration : IEntityTypeConfiguration<SyncBat
         builder.Property(x => x.ErrorMessage).HasMaxLength(1024);
         builder.HasIndex(x => x.BatchId).IsUnique();
         builder.HasIndex(x => new { x.TableCode, x.Status, x.CompletedTimeLocal });
+        builder.HasIndex(x => new { x.Status, x.CompletedTimeLocal });
     }
 }
