@@ -54,6 +54,7 @@ public sealed class SortingReportControllerTests
         Assert.Equal(0xBB, fileResult.FileContents[1]);
         Assert.Equal(0xBF, fileResult.FileContents[2]);
         var csvText = Encoding.UTF8.GetString(fileResult.FileContents);
-        Assert.Contains("码头号,拆零总数", csvText);
+        Assert.Contains("码头号,拆零总数,整件总数,拆零分拣数,整件分拣数,回流数,异常数", csvText);
+        Assert.Contains("7,1", csvText);
     }
 }

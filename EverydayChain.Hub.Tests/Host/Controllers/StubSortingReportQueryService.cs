@@ -26,7 +26,7 @@ internal sealed class StubSortingReportQueryService : ISortingReportQueryService
     /// <summary>
     /// 固定 CSV 文本。
     /// </summary>
-    public string CsvContent { get; set; } = "码头号,拆零总数\n7,1";
+    public string CsvContent { get; set; } = "码头号,拆零总数,整件总数,拆零分拣数,整件分拣数,回流数,异常数\n7,1,2,0,0,0,0";
 
     /// <inheritdoc/>
     public Task<SortingReportQueryResult> QueryAsync(SortingReportQueryRequest request, CancellationToken cancellationToken)
