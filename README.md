@@ -1,6 +1,10 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 启动“分阶段执行 PR 与验收门禁（严格版）”补全：完成 PR-01/PR-02 的第一轮代码补齐，统一业务任务模型新增来源类型、尺寸体积重量、扫描次数、回传标记与回传时间等字段。
+- 扫描闭环补齐：`TaskExecutionService` 在扫描成功链路写入长宽高/体积/重量并递增 `ScanCount`，继续保持现有扫描上传接口路由与协议不变。
+- 回传与异常状态补齐：`WmsFeedbackService`、`FeedbackCompensationService`、`DropFeedbackService`、`RecirculationService` 已同步维护 `IsFeedbackReported`、`FeedbackTimeLocal`、`IsException` 等字段语义。
+- 新增领域枚举 `BusinessTaskSourceType` 与迁移 `20260417043253_AddBusinessTaskClosureFields`，并更新 `HubDbContextModelSnapshot`。
 - 新增日志表自动删除配置能力：`RetentionJob.LogTables` 支持对 `sorting_task_trace`、`scan_logs`、`drop_logs`、`sync_batches` 分别配置 `Enabled/KeepMonths/DryRun/AllowDrop`。
 - `RetentionExecutionService` 扩展为“同步表保留期 + 日志表保留期”双入口执行，统一走现有危险动作隔离与回滚脚本生成链路。
 - `appsettings.json` 已补齐日志表清理示例配置，支持逐表启停和保留期参数化。
@@ -79,6 +83,7 @@
 │   ├── Enums/BusinessTaskFeedbackStatus.cs
 │   ├── Enums/BarcodeType.cs
 │   ├── Enums/BarcodeParseFailureReason.cs
+│   ├── Enums/BusinessTaskSourceType.cs
 │   ├── Sync/SyncTableDefinition.cs
 │   ├── Sync/Models/RemoteStatusConsumeProfile.cs
 │   ├── Sync/SyncWindow.cs
@@ -249,6 +254,8 @@
 │   ├── Migrations/20260413160852_AddScanDropLogTables.Designer.cs
 │   ├── Migrations/20260416010041_AddSyncBatchShardTable.cs
 │   ├── Migrations/20260416171508_AddSyncChangeDeletionLogShardTables.cs
+│   ├── Migrations/20260417043253_AddBusinessTaskClosureFields.cs
+│   ├── Migrations/20260417043253_AddBusinessTaskClosureFields.Designer.cs
 │   ├── Migrations/HubDbContextModelSnapshot.cs
 │   └── Services
 │       ├── IDangerZoneExecutor.cs
@@ -372,7 +379,7 @@
 - `BoundedConcurrentQueueHelper.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：有界并发队列淘汰辅助工具，仅执行一次 O(n) `Count` 遍历并缓存结果，供需要内存容量保护的队列实现统一复用。
 - `LocalDateTimeNormalizer.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：本地时间规范化共享工具，统一执行 UTC 拒绝、`MinValue` 回退当前本地时间与 `Unspecified` 转本地时间语义，供 Host API 复用。
 - `TaskCodeNormalizer.cs`（`EverydayChain.Hub.SharedKernel/Utilities`）：任务编码规范化共享工具，统一执行去首尾空白与全空白回退空字符串处理，供 Host API 复用。
-- `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs` / `SyncTablePriority.cs` / `BarcodeType.cs` / `BarcodeParseFailureReason.cs`：同步模式、删除策略、滞后控制、批次状态、变更操作类型、调度优先级与条码解析语义枚举，均含中文 XML 注释与 `Description`。
+- `SyncMode.cs` / `DeletionPolicy.cs` / `LagControlMode.cs` / `SyncBatchStatus.cs` / `SyncChangeOperationType.cs` / `SyncTablePriority.cs` / `BarcodeType.cs` / `BarcodeParseFailureReason.cs` / `BusinessTaskSourceType.cs`：同步模式、删除策略、滞后控制、批次状态、变更操作类型、调度优先级、条码解析语义与任务来源类型枚举，均含中文 XML 注释与 `Description`。
 - `BusinessTaskStatus.cs`：业务任务生命周期状态枚举，覆盖 Created、Scanned、Dropped、FeedbackPending、Exception，并提供中文 `Description` 说明。
 - `BusinessTaskFeedbackStatus.cs`：业务回传状态枚举，覆盖 NotRequired、Pending、Completed、Failed，标识任务回传 WMS 的进度。
 - `RemoteStatusConsumeProfile.cs`（`EverydayChain.Hub.Domain/Sync/Models`）：StatusDriven 消费配置模型，统一承载状态列、待处理值、完成值、回写开关与批次大小。
@@ -380,16 +387,16 @@
 - `Domain/Options/RetentionLogTableOptions.cs`：日志表保留期配置实体，定义单日志表 `Enabled`、`LogicalTableName`、`KeepMonths`、`DryRun`、`AllowDrop` 参数。
 - `SwaggerOptions.cs`：Swagger 文档配置实体，承载标题、版本、描述与各环境开关（开发/测试/生产）。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。
-- `BusinessTaskEntity.cs`（`Domain/Aggregates/BusinessTaskAggregate`）：统一业务任务聚合根实体，承载任务编码、来源表、业务键、条码、目标格口、实际格口、设备编码、链路追踪、失败原因、扫描时间、落格时间、任务状态、回传状态与本地时间字段。
+- `BusinessTaskEntity.cs`（`Domain/Aggregates/BusinessTaskAggregate`）：统一业务任务聚合根实体，承载任务编码、来源表、来源类型、业务键、条码、目标格口、实际格口、设备编码、链路追踪、失败原因、扫描时间、落格时间、尺寸体积重量、扫描次数、回传标记、回传时间、波次信息、异常/回流标记、任务状态、回传状态与本地时间字段。
 - `SyncExecutionContext.cs` + `SyncReadRequest.cs` + `SyncReadResult.cs` + `SyncMergeRequest.cs` + `SyncMergeResult.cs` + `SyncDeletionDetectRequest.cs` + `SyncDeletionApplyRequest.cs` + `SyncDeletionExecutionResult.cs` + `SyncDeletionCandidate.cs` + `SyncKeyReadRequest.cs` + `SyncTargetStateRow.cs`：同步执行、删除识别与轻量幂等状态存储的数据契约模型。
-- `BusinessTaskMaterializeRequest.cs`：业务任务物化输入模型，统一约束任务编码、来源表编码、业务键、条码与物化时间字段。
+- `BusinessTaskMaterializeRequest.cs`：业务任务物化输入模型，统一约束任务编码、来源表编码、业务键、条码、来源类型、波次信息与物化时间字段。
 - `ScanUploadApplicationRequest.cs` / `ScanUploadApplicationResult.cs` / `BarcodeParseResult.cs` / `ChuteResolveApplicationRequest.cs` / `ChuteResolveApplicationResult.cs` / `DropFeedbackApplicationRequest.cs` / `DropFeedbackApplicationResult.cs` / `ScanMatchResult.cs` / `TaskExecutionResult.cs`：扫描、格口、落格链路的应用层输入输出模型；`DropFeedbackApplicationRequest` 新增 `IsSuccess`、`FailureReason`；`ScanMatchResult` 与 `TaskExecutionResult` 为 PR-05 新增的中间结果模型。
 - `Application/Abstractions/Services/IBusinessTaskMaterializer.cs` + `Application/Services/BusinessTaskMaterializer.cs`：业务任务物化服务抽象与实现，仅执行字段映射、文本规范化和默认状态赋值，不承载扫描/格口/落格业务规则。
 - `Application/Abstractions/Persistence/IBusinessTaskRepository.cs`：业务任务仓储抽象，定义按条码、任务编码、主键查询及新增、更新操作契约。
 - `Application/Abstractions/Services/IScanMatchService.cs`：扫描匹配服务抽象，按条码定位关联业务任务并返回匹配结果。
 - `Application/Abstractions/Services/ITaskExecutionService.cs`：任务执行服务抽象，负责推进业务任务扫描状态并持久化。
 - `Application/ScanMatch/Services/ScanMatchService.cs`：扫描匹配服务实现，按条码在业务任务仓储中定位任务。
-- `Application/TaskExecution/Services/TaskExecutionService.cs`：任务执行服务实现，按条码匹配任务、校验状态并推进到已扫描并持久化。
+- `Application/TaskExecution/Services/TaskExecutionService.cs`：任务执行服务实现，按条码匹配任务、校验状态并推进到已扫描并持久化，同时写入扫描维度字段（时间、尺寸体积重量、扫描次数）。
 - `Infrastructure/Repositories/BusinessTaskRepository.cs`：业务任务仓储 EF Core 实现，按月分片写入与查询 `business_tasks_{yyyyMM}`，并兼容历史无后缀表读取。
 - `Infrastructure/Persistence/EntityConfigurations/BusinessTaskEntityTypeConfiguration.cs`：业务任务 EF Fluent API 配置，定义分片表结构、字段约束与索引。
 - `Application/Abstractions/Services/IBarcodeParser.cs` + `Application/Services/BarcodeParser.cs`：条码解析服务抽象与实现，按固定规则“拆零 `02` 开头取第 3 位数字、整件 `Z` 开头取第 2 位数字”分类并提取 `TargetChuteCode`，统一输出失败语义（InvalidBarcode、UnsupportedBarcodeType、ParseError）。
@@ -429,6 +436,7 @@
 - `Application/Recirculation/Abstractions/IRecirculationService.cs`：回流规则服务接口，对指定任务执行回流判定。
 - `Application/Recirculation/Services/RecirculationService.cs`：回流规则服务实现，按扫描重试次数超限判定回流，支持 dry-run 模式。
 - `20260413185000_AddExceptionRuleFields.cs`：新增 `WaveCode`、`IsRecirculated`、`ScanRetryCount` 列及 `IX_business_tasks_WaveCode` 索引的 EF 迁移。
+- `20260417043253_AddBusinessTaskClosureFields.cs`：新增 `SourceType`、尺寸体积重量、`ScanCount`、`IsException`、`IsFeedbackReported`、`FeedbackTimeLocal`、`WaveRemark` 字段及配套索引的 EF 迁移。
 - `EverydayChain.Hub.Tests/Services/ExceptionRuleTests.cs`：异常规则服务单元测试，覆盖波次清理、多标签决策与回流规则的主要路径共 16 个场景。
 - `EverydayChain.Hub.Tests/Services/ScanDropLogTests.cs`：扫描/落格日志落库测试，覆盖扫描成功写日志、扫描失败写日志、落格成功写日志+FeedbackPending、落格失败写日志四个场景。
 - `EverydayChain.Hub.Tests/Services/InMemoryScanLogRepository.cs`：扫描日志仓储内存替身。
@@ -497,7 +505,7 @@
 - `EverydayChain.Hub.Tests/Services/BarcodeParserTests.cs`：条码解析服务测试，覆盖拆零、整件、不支持条码三类解析分支。
 - `EverydayChain.Hub.Tests/Services/ScanIngressServiceTests.cs`：扫描上传应用服务测试，覆盖无效条码失败语义、无匹配任务返回未命中、有效任务受理分支；含内存仓储替身 `InMemoryBusinessTaskRepository`。
 - `EverydayChain.Hub.Tests/Services/ScanMatchServiceTests.cs`：扫描匹配服务测试，覆盖空条码拒绝、无任务未命中、有任务匹配成功分支。
-- `EverydayChain.Hub.Tests/Services/TaskExecutionServiceTests.cs`：任务执行服务测试，覆盖无任务失败、已创建任务推进、非法状态拒绝、持久化验证四个场景。
+- `EverydayChain.Hub.Tests/Services/TaskExecutionServiceTests.cs`：任务执行服务测试，覆盖无任务失败、已创建任务推进、非法状态拒绝、持久化验证与扫描维度字段写入场景。
 - `EverydayChain.Hub.Tests/Services/ChuteQueryServiceTests.cs`：请求格口服务测试，覆盖任务不存在、状态非法、无目标格口、成功解析、任务编码优先五个场景。
 - `EverydayChain.Hub.Tests/Services/DropFeedbackServiceTests.cs`：落格回传服务测试，覆盖双空参数失败、任务不存在、条码冲突、状态非法、成功落格→Dropped、失败落格→Exception 六个场景。
 - `EverydayChain.Hub.Tests/Services/SortingTaskTraceWriterTests.cs`：分表写入器兜底建表测试，覆盖首次写入先建表与同月重复写入幂等建表触发场景。

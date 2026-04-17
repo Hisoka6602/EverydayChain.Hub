@@ -1,3 +1,5 @@
+using EverydayChain.Hub.Domain.Enums;
+
 namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
@@ -24,6 +26,21 @@ public class BusinessTaskMaterializeRequest
     /// 条码文本（可填写范围：1~128 个字符，可为空）。
     /// </summary>
     public string? Barcode { get; set; }
+
+    /// <summary>
+    /// 来源类型（可填写范围：Unknown、Split、FullCase）。
+    /// </summary>
+    public BusinessTaskSourceType SourceType { get; set; } = BusinessTaskSourceType.Unknown;
+
+    /// <summary>
+    /// 波次编码（可填写范围：1~64 个字符，可为空）。
+    /// </summary>
+    public string? WaveCode { get; set; }
+
+    /// <summary>
+    /// 波次备注（可填写范围：1~128 个字符，可为空）。
+    /// </summary>
+    public string? WaveRemark { get; set; }
 
     /// <summary>
     /// 物化时间（本地时间）；为空时将使用当前本地时间。

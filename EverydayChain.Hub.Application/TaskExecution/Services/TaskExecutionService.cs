@@ -123,6 +123,13 @@ public sealed class TaskExecutionService : ITaskExecutionService
         task.DeviceCode = string.IsNullOrWhiteSpace(request.DeviceCode) ? task.DeviceCode : request.DeviceCode.Trim();
         task.TraceId = string.IsNullOrWhiteSpace(request.TraceId) ? task.TraceId : request.TraceId.Trim();
         task.Barcode = string.IsNullOrWhiteSpace(task.Barcode) ? request.Barcode.Trim() : task.Barcode;
+        task.IsException = false;
+        task.LengthMm = request.LengthMm ?? task.LengthMm;
+        task.WidthMm = request.WidthMm ?? task.WidthMm;
+        task.HeightMm = request.HeightMm ?? task.HeightMm;
+        task.VolumeMm3 = request.VolumeMm3 ?? task.VolumeMm3;
+        task.WeightGram = request.WeightGram ?? task.WeightGram;
+        task.ScanCount++;
         task.UpdatedTimeLocal = DateTime.Now;
 
         // 步骤 4：持久化。

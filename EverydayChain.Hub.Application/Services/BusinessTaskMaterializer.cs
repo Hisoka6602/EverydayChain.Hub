@@ -19,14 +19,19 @@ public class BusinessTaskMaterializer : IBusinessTaskMaterializer
         var sourceTableCode = ValidateRequiredText(request.SourceTableCode, nameof(request.SourceTableCode), 64);
         var businessKey = ValidateRequiredText(request.BusinessKey, nameof(request.BusinessKey), 256);
         var barcode = ValidateOptionalText(request.Barcode, nameof(request.Barcode), 128);
+        var waveCode = ValidateOptionalText(request.WaveCode, nameof(request.WaveCode), 64);
+        var waveRemark = ValidateOptionalText(request.WaveRemark, nameof(request.WaveRemark), 128);
         var materializedTimeLocal = request.MaterializedTimeLocal ?? DateTime.Now;
 
         return new BusinessTaskEntity
         {
             TaskCode = taskCode,
             SourceTableCode = sourceTableCode,
+            SourceType = request.SourceType,
             BusinessKey = businessKey,
             Barcode = barcode,
+            WaveCode = waveCode,
+            WaveRemark = waveRemark,
             Status = BusinessTaskStatus.Created,
             CreatedTimeLocal = materializedTimeLocal,
             UpdatedTimeLocal = materializedTimeLocal,

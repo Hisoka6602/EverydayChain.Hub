@@ -107,9 +107,13 @@ public sealed class DropFeedbackService : IDropFeedbackService {
             task.FeedbackStatus = BusinessTaskFeedbackStatus.Pending;
             task.ActualChuteCode = string.IsNullOrWhiteSpace(request.ActualChuteCode) ? task.ActualChuteCode : request.ActualChuteCode.Trim();
             task.DroppedAtLocal = request.DropTimeLocal;
+            task.IsException = false;
+            task.IsFeedbackReported = false;
+            task.FeedbackTimeLocal = null;
         } else {
             task.Status = BusinessTaskStatus.Exception;
             task.FailureReason = (request.FailureReason ?? string.Empty).Trim();
+            task.IsException = true;
         }
 
         task.UpdatedTimeLocal = DateTime.Now;
