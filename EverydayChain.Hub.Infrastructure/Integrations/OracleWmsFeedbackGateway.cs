@@ -458,8 +458,10 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
     /// <returns>目标摘要文本。</returns>
     private static string BuildTargetSummary(IEnumerable<(string Schema, string Table, string BusinessKeyColumn)> targets)
     {
-        var entries = targets.Select(target => $"{target.Schema}.{target.Table}({target.BusinessKeyColumn})");
-        return entries.Any() ? string.Join(", ", entries) : EmptyTargetsPlaceholder;
+        var entries = targets
+            .Select(target => $"{target.Schema}.{target.Table}({target.BusinessKeyColumn})")
+            .ToList();
+        return entries.Count > 0 ? string.Join(", ", entries) : EmptyTargetsPlaceholder;
     }
 
     /// <summary>
