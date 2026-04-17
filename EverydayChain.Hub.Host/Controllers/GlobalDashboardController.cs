@@ -38,6 +38,16 @@ public sealed class GlobalDashboardController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<GlobalDashboardResponse>), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ApiResponse<GlobalDashboardResponse>>> QueryOverviewAsync([FromBody] GlobalDashboardQueryRequest request, CancellationToken cancellationToken)
     {
+        if (request.StartTimeLocal == DateTime.MinValue)
+        {
+            return BadRequest(ApiResponse<GlobalDashboardResponse>.Fail("开始时间不能为空。"));
+        }
+
+        if (request.EndTimeLocal == DateTime.MinValue)
+        {
+            return BadRequest(ApiResponse<GlobalDashboardResponse>.Fail("结束时间不能为空。"));
+        }
+
         if (!LocalDateTimeNormalizer.TryNormalize(request.StartTimeLocal, "开始时间必须为本地时间，禁止传入 UTC 时间。", out var normalizedStartTime, out var startValidationMessage))
         {
             return BadRequest(ApiResponse<GlobalDashboardResponse>.Fail(startValidationMessage));

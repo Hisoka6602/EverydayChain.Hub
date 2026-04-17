@@ -11,6 +11,11 @@ namespace EverydayChain.Hub.Tests.Host.Controllers;
 public sealed class GlobalDashboardControllerTests
 {
     /// <summary>
+    /// 非本地时间语义枚举值。
+    /// </summary>
+    private const DateTimeKind NonLocalKind = (DateTimeKind)1;
+
+    /// <summary>
     /// 开始时间为 UTC 时应返回 BadRequest。
     /// </summary>
     [Fact]
@@ -19,8 +24,32 @@ public sealed class GlobalDashboardControllerTests
         var controller = new GlobalDashboardController(new StubGlobalDashboardQueryService());
         var request = new GlobalDashboardQueryRequest
         {
-            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 9, 0, 0), DateTimeKind.Utc),
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 9, 0, 0), NonLocalKind),
             EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 10, 0, 0), DateTimeKind.Local)
+        };
+
+        var actionResult = await controller.QueryOverviewAsync(request, CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+    }
+
+    /// <summary>
+    /// 开始或结束时间未传入时应返回 BadRequest。
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task QueryOverviewAsync_ShouldReturnBadRequest_WhenTimeIsMinValue(bool useMinStartTime)
+    {
+        var controller = new GlobalDashboardController(new StubGlobalDashboardQueryService());
+        var request = new GlobalDashboardQueryRequest
+        {
+            StartTimeLocal = useMinStartTime
+                ? DateTime.MinValue
+                : DateTime.SpecifyKind(new DateTime(2026, 4, 17, 9, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = useMinStartTime
+                ? DateTime.SpecifyKind(new DateTime(2026, 4, 17, 10, 0, 0), DateTimeKind.Local)
+                : DateTime.MinValue
         };
 
         var actionResult = await controller.QueryOverviewAsync(request, CancellationToken.None);
