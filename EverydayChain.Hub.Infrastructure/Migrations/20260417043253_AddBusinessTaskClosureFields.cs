@@ -104,6 +104,121 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 schema: "dbo",
                 table: "business_tasks",
                 column: "SourceType");
+
+            migrationBuilder.Sql(
+                """
+                DECLARE @schema sysname = N'dbo';
+                DECLARE @tableName sysname;
+                DECLARE @tableIdentifier nvarchar(260);
+                DECLARE @qualifiedTable nvarchar(260);
+                DECLARE @sql nvarchar(max);
+
+                DECLARE table_cursor CURSOR LOCAL FAST_FORWARD FOR
+                SELECT t.name
+                FROM sys.tables AS t
+                INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
+                WHERE s.name = @schema
+                  AND t.name LIKE N'business_tasks[_]%';
+
+                OPEN table_cursor;
+                FETCH NEXT FROM table_cursor INTO @tableName;
+                WHILE @@FETCH_STATUS = 0
+                BEGIN
+                    SET @tableIdentifier = @schema + N'.' + @tableName;
+                    SET @qualifiedTable = QUOTENAME(@schema) + N'.' + QUOTENAME(@tableName);
+
+                    IF COL_LENGTH(@tableIdentifier, N'FeedbackTimeLocal') IS NULL
+                    BEGIN
+                        SET @sql = N'ALTER TABLE ' + @qualifiedTable + N' ADD [FeedbackTimeLocal] datetime2 NULL;';
+                        EXEC (@sql);
+                    END;
+
+                    IF COL_LENGTH(@tableIdentifier, N'HeightMm') IS NULL
+                    BEGIN
+                        SET @sql = N'ALTER TABLE ' + @qualifiedTable + N' ADD [HeightMm] decimal(18,3) NULL;';
+                        EXEC (@sql);
+                    END;
+
+                    IF COL_LENGTH(@tableIdentifier, N'IsException') IS NULL
+                    BEGIN
+                        SET @sql = N'ALTER TABLE ' + @qualifiedTable + N' ADD [IsException] bit NOT NULL DEFAULT (0);';
+                        EXEC (@sql);
+                    END;
+
+                    IF COL_LENGTH(@tableIdentifier, N'IsFeedbackReported') IS NULL
+                    BEGIN
+                        SET @sql = N'ALTER TABLE ' + @qualifiedTable + N' ADD [IsFeedbackReported] bit NOT NULL DEFAULT (0);';
+                        EXEC (@sql);
+                    END;
+
+                    IF COL_LENGTH(@tableIdentifier, N'LengthMm') IS NULL
+                    BEGIN
+                        SET @sql = N'ALTER TABLE ' + @qualifiedTable + N' ADD [LengthMm] decimal(18,3) NULL;';
+                        EXEC (@sql);
+                    END;
+
+                    IF COL_LENGTH(@tableIdentifier, N'ScanCount') IS NULL
+                    BEGIN
+                        SET @sql = N'ALTER TABLE ' + @qualifiedTable + N' ADD [ScanCount] int NOT NULL DEFAULT (0);';
+                        EXEC (@sql);
+                    END;
+
+                    IF COL_LENGTH(@tableIdentifier, N'SourceType') IS NULL
+                    BEGIN
+                        SET @sql = N'ALTER TABLE ' + @qualifiedTable + N' ADD [SourceType] int NOT NULL DEFAULT (0);';
+                        EXEC (@sql);
+                    END;
+
+                    IF COL_LENGTH(@tableIdentifier, N'VolumeMm3') IS NULL
+                    BEGIN
+                        SET @sql = N'ALTER TABLE ' + @qualifiedTable + N' ADD [VolumeMm3] decimal(18,3) NULL;';
+                        EXEC (@sql);
+                    END;
+
+                    IF COL_LENGTH(@tableIdentifier, N'WaveRemark') IS NULL
+                    BEGIN
+                        SET @sql = N'ALTER TABLE ' + @qualifiedTable + N' ADD [WaveRemark] nvarchar(128) NULL;';
+                        EXEC (@sql);
+                    END;
+
+                    IF COL_LENGTH(@tableIdentifier, N'WeightGram') IS NULL
+                    BEGIN
+                        SET @sql = N'ALTER TABLE ' + @qualifiedTable + N' ADD [WeightGram] decimal(18,3) NULL;';
+                        EXEC (@sql);
+                    END;
+
+                    IF COL_LENGTH(@tableIdentifier, N'WidthMm') IS NULL
+                    BEGIN
+                        SET @sql = N'ALTER TABLE ' + @qualifiedTable + N' ADD [WidthMm] decimal(18,3) NULL;';
+                        EXEC (@sql);
+                    END;
+
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM sys.indexes
+                        WHERE object_id = OBJECT_ID(@tableIdentifier)
+                          AND name = N'IX_business_tasks_IsException')
+                    BEGIN
+                        SET @sql = N'CREATE INDEX [IX_business_tasks_IsException] ON ' + @qualifiedTable + N' ([IsException]);';
+                        EXEC (@sql);
+                    END;
+
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM sys.indexes
+                        WHERE object_id = OBJECT_ID(@tableIdentifier)
+                          AND name = N'IX_business_tasks_SourceType')
+                    BEGIN
+                        SET @sql = N'CREATE INDEX [IX_business_tasks_SourceType] ON ' + @qualifiedTable + N' ([SourceType]);';
+                        EXEC (@sql);
+                    END;
+
+                    FETCH NEXT FROM table_cursor INTO @tableName;
+                END;
+
+                CLOSE table_cursor;
+                DEALLOCATE table_cursor;
+                """);
         }
 
         /// <inheritdoc />
@@ -173,6 +288,105 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 name: "WidthMm",
                 schema: "dbo",
                 table: "business_tasks");
+
+            migrationBuilder.Sql(
+                """
+                DECLARE @schema sysname = N'dbo';
+                DECLARE @tableName sysname;
+                DECLARE @tableIdentifier nvarchar(260);
+                DECLARE @qualifiedTable nvarchar(260);
+                DECLARE @constraintName sysname;
+                DECLARE @sql nvarchar(max);
+
+                DECLARE table_cursor CURSOR LOCAL FAST_FORWARD FOR
+                SELECT t.name
+                FROM sys.tables AS t
+                INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
+                WHERE s.name = @schema
+                  AND t.name LIKE N'business_tasks[_]%';
+
+                OPEN table_cursor;
+                FETCH NEXT FROM table_cursor INTO @tableName;
+                WHILE @@FETCH_STATUS = 0
+                BEGIN
+                    SET @tableIdentifier = @schema + N'.' + @tableName;
+                    SET @qualifiedTable = QUOTENAME(@schema) + N'.' + QUOTENAME(@tableName);
+
+                    IF EXISTS (
+                        SELECT 1 FROM sys.indexes
+                        WHERE object_id = OBJECT_ID(@tableIdentifier)
+                          AND name = N'IX_business_tasks_IsException')
+                    BEGIN
+                        SET @sql = N'DROP INDEX [IX_business_tasks_IsException] ON ' + @qualifiedTable + N';';
+                        EXEC (@sql);
+                    END;
+
+                    IF EXISTS (
+                        SELECT 1 FROM sys.indexes
+                        WHERE object_id = OBJECT_ID(@tableIdentifier)
+                          AND name = N'IX_business_tasks_SourceType')
+                    BEGIN
+                        SET @sql = N'DROP INDEX [IX_business_tasks_SourceType] ON ' + @qualifiedTable + N';';
+                        EXEC (@sql);
+                    END;
+
+                    DECLARE @columns TABLE ([Name] sysname);
+                    INSERT INTO @columns ([Name])
+                    VALUES
+                        (N'IsException'),
+                        (N'IsFeedbackReported'),
+                        (N'ScanCount'),
+                        (N'SourceType'),
+                        (N'FeedbackTimeLocal'),
+                        (N'HeightMm'),
+                        (N'LengthMm'),
+                        (N'VolumeMm3'),
+                        (N'WaveRemark'),
+                        (N'WeightGram'),
+                        (N'WidthMm');
+
+                    DECLARE @columnName sysname;
+                    DECLARE column_cursor CURSOR LOCAL FAST_FORWARD FOR
+                    SELECT [Name] FROM @columns;
+
+                    OPEN column_cursor;
+                    FETCH NEXT FROM column_cursor INTO @columnName;
+                    WHILE @@FETCH_STATUS = 0
+                    BEGIN
+                        IF COL_LENGTH(@tableIdentifier, @columnName) IS NOT NULL
+                        BEGIN
+                            SELECT TOP (1) @constraintName = dc.name
+                            FROM sys.default_constraints AS dc
+                            INNER JOIN sys.columns AS c
+                                ON c.object_id = dc.parent_object_id
+                               AND c.column_id = dc.parent_column_id
+                            WHERE dc.parent_object_id = OBJECT_ID(@tableIdentifier)
+                              AND c.name = @columnName;
+
+                            IF @constraintName IS NOT NULL
+                            BEGIN
+                                SET @sql = N'ALTER TABLE ' + @qualifiedTable
+                                    + N' DROP CONSTRAINT ' + QUOTENAME(@constraintName) + N';';
+                                EXEC (@sql);
+                                SET @constraintName = NULL;
+                            END;
+
+                            SET @sql = N'ALTER TABLE ' + @qualifiedTable + N' DROP COLUMN ' + QUOTENAME(@columnName) + N';';
+                            EXEC (@sql);
+                        END;
+
+                        FETCH NEXT FROM column_cursor INTO @columnName;
+                    END;
+
+                    CLOSE column_cursor;
+                    DEALLOCATE column_cursor;
+
+                    FETCH NEXT FROM table_cursor INTO @tableName;
+                END;
+
+                CLOSE table_cursor;
+                DEALLOCATE table_cursor;
+                """);
         }
     }
 }
