@@ -15,7 +15,11 @@
 - 本轮文档收口：同步实施计划、联调证据与代码检查台账口径，完成 PR-12 与 PR-17 收口相关文档定稿。
 - 新增 `.github/workflows/auto-create-pr.yml`：仅在非默认分支推送时触发，自动检查并创建到默认分支的 PR（若同源 PR 已存在则跳过），避免人工漏建 PR。
 - 实施同步日志持久化替换：新增 `SyncChangeLogEntity`、`SyncDeletionLogEntity`、`SyncChangeLogRepository`、`SyncDeletionLogRepository` 与迁移 `20260416171508_AddSyncChangeDeletionLogShardTables.cs`，`ISyncChangeLogRepository`/`ISyncDeletionLogRepository` 已切换为 SQL Server 分片持久化实现（`sync_change_logs_{yyyyMM}`、`sync_deletion_logs_{yyyyMM}`）。
-- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，152/152 单元测试通过）。
+- 新增波次清理 API：`WaveCleanupController` 提供 `dry-run` 与正式执行端点，支持按 `WaveCode` 执行清理并返回识别数、清理数与 dry-run 标记。
+- 新增波次清理 Host 契约：`WaveCleanupRequest`、`WaveCleanupResponse`，统一波次清理接口输入输出语义并补齐中文注释。
+- 扩展波次清理应用服务接口：`IWaveCleanupService` 新增 `DryRunByWaveCodeAsync` 与 `ExecuteByWaveCodeAsync`，支持端点级别区分 dry-run/正式执行。
+- 新增 `WaveCleanupControllerTests` 与 `StubWaveCleanupService`，覆盖空波次号校验、dry-run 执行与正式执行的控制器行为。
+- 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，156/156 单元测试通过）。
 ## 后续可完善点
 - 根据产线峰值写入量细化各日志表差异化保留月数，并结合容量监控进行滚动调优。
 - 开启补偿后台任务：生产环境确认重试节流参数后，将 `FeedbackCompensationJob.Enabled` 置 `true`。
@@ -276,9 +280,11 @@
 │   ├── Host/Controllers/ScanControllerTests.cs
 │   ├── Host/Controllers/ChuteControllerTests.cs
 │   ├── Host/Controllers/DropFeedbackControllerTests.cs
+│   ├── Host/Controllers/WaveCleanupControllerTests.cs
 │   ├── Host/Controllers/StubScanIngressService.cs
 │   ├── Host/Controllers/StubChuteQueryService.cs
 │   ├── Host/Controllers/StubDropFeedbackService.cs
+│   ├── Host/Controllers/StubWaveCleanupService.cs
 │   └── Services
 │       ├── AutoMigrationServiceTests.cs
 │       ├── DangerZoneExecutorTests.cs
@@ -312,13 +318,16 @@
     ├── Controllers/ScanController.cs
     ├── Controllers/ChuteController.cs
     ├── Controllers/DropFeedbackController.cs
+    ├── Controllers/WaveCleanupController.cs
     ├── Contracts/Requests/ScanUploadRequest.cs
     ├── Contracts/Requests/ChuteResolveRequest.cs
     ├── Contracts/Requests/DropFeedbackRequest.cs
+    ├── Contracts/Requests/WaveCleanupRequest.cs
     ├── Contracts/Responses/ApiResponse.cs
     ├── Contracts/Responses/ScanUploadResponse.cs
     ├── Contracts/Responses/ChuteResolveResponse.cs
     ├── Contracts/Responses/DropFeedbackResponse.cs
+    ├── Contracts/Responses/WaveCleanupResponse.cs
     ├── Workers/SyncBackgroundWorker.cs
     ├── Workers/RetentionBackgroundWorker.cs
     ├── Workers/AutoMigrationHostedService.cs
@@ -471,8 +480,8 @@
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
 - `nlog.config`：NLog 日志配置，输出至控制台与两个滚动日志文件：通用日志（`hub-${shortdate}.log`，按日切割，单文件上限 10 MB，保留 30 天）；同步专属日志（`sync-${shortdate}.log`，仅收录同步链路相关组件日志，便于独立分析同步性能问题）。
 - `Program.cs`（Host）：Host 启动入口，现已支持 API + Worker 共存，启用 Controllers、Swagger（中文注释）并保留自动迁移与同步后台任务注册。
-- `Host/Controllers/ScanController.cs` / `ChuteController.cs` / `DropFeedbackController.cs`：三类对外 API 控制器，仅做入参校验、调用应用服务与统一响应封装。
-- `Host/Contracts/Requests/*.cs` + `Host/Contracts/Responses/*.cs`：三类 API 的输入输出契约与统一响应包装，配合 Swagger 提供中文参数说明。
+- `Host/Controllers/ScanController.cs` / `ChuteController.cs` / `DropFeedbackController.cs` / `WaveCleanupController.cs`：对外 API 控制器，仅做入参校验、调用应用服务与统一响应封装；`WaveCleanupController` 提供波次清理 dry-run 与正式执行端点。
+- `Host/Contracts/Requests/*.cs` + `Host/Contracts/Responses/*.cs`：API 输入输出契约与统一响应包装，配合 Swagger 提供中文参数说明；其中 `WaveCleanupRequest`/`WaveCleanupResponse` 用于波次清理接口。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
 - `FeedbackCompensationBackgroundWorker.cs`：业务回传补偿后台任务，按 `FeedbackCompensationJob.PollingIntervalSeconds` 周期重试失败回传任务，支持批次上限控制并输出补偿统计日志。
