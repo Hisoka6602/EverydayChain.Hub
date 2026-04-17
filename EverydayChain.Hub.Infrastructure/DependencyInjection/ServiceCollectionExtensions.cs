@@ -126,6 +126,9 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IChuteQueryService, ChuteQueryService>();
         services.AddSingleton<IDropFeedbackService, DropFeedbackService>();
         services.AddSingleton<IGlobalDashboardQueryService, GlobalDashboardQueryService>();
+        services.AddSingleton<IDockDashboardQueryService, DockDashboardQueryService>();
+        services.AddSingleton<ISortingReportQueryService, SortingReportQueryService>();
+        services.AddSingleton<IBusinessTaskReadService, BusinessTaskReadService>();
         services.AddSingleton<IDeletionExecutionService, DeletionExecutionService>();
         services.AddSingleton<IRetentionExecutionService, RetentionExecutionService>();
         services.AddSingleton<ISyncExecutionService, SyncExecutionService>();

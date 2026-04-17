@@ -1,0 +1,124 @@
+using EverydayChain.Hub.Application.Abstractions.Queries;
+using EverydayChain.Hub.Host.Contracts.Requests;
+using EverydayChain.Hub.Host.Contracts.Responses;
+using EverydayChain.Hub.SharedKernel.Utilities;
+using Microsoft.AspNetCore.Mvc;
+using System.Text;
+
+namespace EverydayChain.Hub.Host.Controllers;
+
+/// <summary>
+/// 分拣报表查询与导出接口。
+/// </summary>
+[ApiController]
+[Route("api/v1/reports")]
+public sealed class SortingReportController : ControllerBase
+{
+    /// <summary>
+    /// 带 BOM 的 UTF-8 编码实例。
+    /// </summary>
+    private static readonly UTF8Encoding Utf8EncodingWithBom = new(true);
+
+    /// <summary>
+    /// 分拣报表查询服务。
+    /// </summary>
+    private readonly ISortingReportQueryService _sortingReportQueryService;
+
+    /// <summary>
+    /// 初始化分拣报表控制器。
+    /// </summary>
+    /// <param name="sortingReportQueryService">分拣报表查询服务。</param>
+    public SortingReportController(ISortingReportQueryService sortingReportQueryService)
+    {
+        _sortingReportQueryService = sortingReportQueryService;
+    }
+
+    /// <summary>
+    /// 查询分拣报表。
+    /// </summary>
+    /// <param name="request">查询请求。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>分拣报表查询结果。</returns>
+    [HttpPost("query")]
+    [ProducesResponseType(typeof(ApiResponse<SortingReportResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<SortingReportResponse>), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ApiResponse<SortingReportResponse>>> QueryAsync([FromBody] SortingReportQueryRequest request, CancellationToken cancellationToken)
+    {
+        if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(request.StartTimeLocal, request.EndTimeLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
+        {
+            return BadRequest(ApiResponse<SortingReportResponse>.Fail(validationMessage));
+        }
+
+        var result = await _sortingReportQueryService.QueryAsync(new EverydayChain.Hub.Application.Models.SortingReportQueryRequest
+        {
+            StartTimeLocal = normalizedStart,
+            EndTimeLocal = normalizedEnd,
+            DockCode = request.DockCode
+        }, cancellationToken);
+
+        var response = new SortingReportResponse
+        {
+            StartTimeLocal = result.StartTimeLocal,
+            EndTimeLocal = result.EndTimeLocal,
+            SelectedDockCode = result.SelectedDockCode,
+            Rows = result.Rows
+                .Select(row => new SortingReportRowResponse
+                {
+                    DockCode = row.DockCode,
+                    SplitTotalCount = row.SplitTotalCount,
+                    FullCaseTotalCount = row.FullCaseTotalCount,
+                    SplitSortedCount = row.SplitSortedCount,
+                    FullCaseSortedCount = row.FullCaseSortedCount,
+                    RecirculatedCount = row.RecirculatedCount,
+                    ExceptionCount = row.ExceptionCount
+                })
+                .ToList()
+        };
+
+        return Ok(ApiResponse<SortingReportResponse>.Success(response, "分拣报表查询成功。"));
+    }
+
+    /// <summary>
+    /// 导出 CSV 报表。
+    /// </summary>
+    /// <param name="request">查询请求。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>CSV 文件。</returns>
+    [HttpPost("export/csv")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> ExportCsvAsync([FromBody] SortingReportQueryRequest request, CancellationToken cancellationToken)
+    {
+        if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(request.StartTimeLocal, request.EndTimeLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
+        {
+            return BadRequest(ApiResponse<object>.Fail(validationMessage));
+        }
+
+        var csvContent = await _sortingReportQueryService.ExportCsvAsync(new EverydayChain.Hub.Application.Models.SortingReportQueryRequest
+        {
+            StartTimeLocal = normalizedStart,
+            EndTimeLocal = normalizedEnd,
+            DockCode = request.DockCode
+        }, cancellationToken);
+
+        var localNow = DateTimeOffset.Now.LocalDateTime;
+        var fileName = $"sorting-report-{localNow:yyyyMMddHHmmss}.csv";
+        var csvBytes = BuildUtf8BomCsvBytes(csvContent);
+        return File(csvBytes, "text/csv; charset=utf-8", fileName);
+    }
+
+    /// <summary>
+    /// 构建带 UTF-8 BOM 的 CSV 字节数组。
+    /// </summary>
+    /// <param name="csvContent">CSV 文本内容。</param>
+    /// <returns>带 UTF-8 BOM 的字节数组。</returns>
+    private static byte[] BuildUtf8BomCsvBytes(string csvContent)
+    {
+        var preamble = Utf8EncodingWithBom.GetPreamble();
+        var contentBytes = Utf8EncodingWithBom.GetBytes(csvContent);
+        var bytes = new byte[preamble.Length + contentBytes.Length];
+        Buffer.BlockCopy(preamble, 0, bytes, 0, preamble.Length);
+        Buffer.BlockCopy(contentBytes, 0, bytes, preamble.Length, contentBytes.Length);
+        return bytes;
+    }
+}

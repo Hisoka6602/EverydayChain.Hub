@@ -131,9 +131,9 @@
 | PR-05 回写执行与补偿收口 | ✅ 本轮补全完成 | `OracleWmsFeedbackGateway` 已按来源类型分流回写并覆盖真实业务字段；失败仍走既有补偿链路，`WmsFeedbackService`/`FeedbackCompensationService` 维持成功/失败状态闭环。 |
 | PR-06 波次清理 API 化 | ✅ 本轮补全完成 | 本轮新增 `WaveCleanupController`、`WaveCleanupRequest/Response`、`dry-run` 与正式执行端点，并补齐控制器测试。 |
 | PR-07 总看板 API | ✅ 本轮补全完成 | 本轮新增 `GlobalDashboardController` 与 `GlobalDashboardQueryService`，支持时间区间查询、波次维度聚合、整件/拆零统计、识别率、回流数、异常数、总体积与总重量。 |
-| PR-08 码头看板 API | ❌ 未开始 | 代码中尚未提供码头看板查询 API。 |
-| PR-09 报表查询与导出 API | ❌ 未开始 | 代码中尚未提供报表查询与导出 API。 |
-| PR-10 业务查询与收口删除 | ❌ 未开始 | 代码中尚未提供业务任务/异常件/回流查询 API 与对应收口删除。 |
+| PR-08 码头看板 API | ✅ 本轮补全完成 | 已新增 `DockDashboardController` + `DockDashboardQueryService`，支持默认当天、波次筛选、拆零/整件未分拣、回流、分拣进度、已分拣总数与“仅 7 号码头显示异常数”规则。 |
+| PR-09 报表查询与导出 API | ✅ 本轮补全完成 | 已新增 `SortingReportController` 与 `SortingReportQueryService`，支持报表查询与 CSV 导出，统计口径与码头看板保持一致。 |
+| PR-10 业务查询与收口删除 | ✅ 本轮补全完成 | 已新增 `BusinessTaskQueryController` 与 `BusinessTaskReadService`，提供业务任务/异常件/回流查询 API，支持时间范围、波次号、条码、码头、格口与分页筛选。 |
 
 ## 3.2 本轮补全结果
 
@@ -180,15 +180,55 @@
    - `Application/Abstractions/Persistence/IBusinessTaskRepository.cs`
    - `Infrastructure/Repositories/BusinessTaskRepository.cs`
 10. 总看板测试补齐：
-   - `Tests/Host/Controllers/GlobalDashboardControllerTests.cs`
-   - `Tests/Host/Controllers/StubGlobalDashboardQueryService.cs`
-   - `Tests/Services/GlobalDashboardQueryServiceTests.cs`
+    - `Tests/Host/Controllers/GlobalDashboardControllerTests.cs`
+    - `Tests/Host/Controllers/StubGlobalDashboardQueryService.cs`
+    - `Tests/Services/GlobalDashboardQueryServiceTests.cs`
+11. 码头看板 API 补齐（PR-08）：
+    - `Host/Controllers/DockDashboardController.cs`
+    - `Host/Contracts/Requests/DockDashboardQueryRequest.cs`
+    - `Host/Contracts/Responses/DockDashboardResponse.cs`
+    - `Host/Contracts/Responses/DockDashboardSummaryResponse.cs`
+    - `Application/Abstractions/Queries/IDockDashboardQueryService.cs`
+    - `Application/Queries/DockDashboardQueryService.cs`
+    - `Application/Models/DockDashboardQueryRequest.cs`
+    - `Application/Models/DockDashboardQueryResult.cs`
+    - `Application/Models/DockDashboardSummary.cs`
+12. 报表查询与导出 API 补齐（PR-09）：
+    - `Host/Controllers/SortingReportController.cs`
+    - `Host/Contracts/Requests/SortingReportQueryRequest.cs`
+    - `Host/Contracts/Responses/SortingReportResponse.cs`
+    - `Host/Contracts/Responses/SortingReportRowResponse.cs`
+    - `Application/Abstractions/Queries/ISortingReportQueryService.cs`
+    - `Application/Queries/SortingReportQueryService.cs`
+    - `Application/Models/SortingReportQueryRequest.cs`
+    - `Application/Models/SortingReportQueryResult.cs`
+    - `Application/Models/SortingReportRow.cs`
+13. 业务查询 API 补齐（PR-10）：
+    - `Host/Controllers/BusinessTaskQueryController.cs`
+    - `Host/Contracts/Requests/BusinessTaskQueryRequest.cs`
+    - `Host/Contracts/Responses/BusinessTaskQueryResponse.cs`
+    - `Host/Contracts/Responses/BusinessTaskItemResponse.cs`
+    - `Application/Abstractions/Queries/IBusinessTaskReadService.cs`
+    - `Application/Queries/BusinessTaskReadService.cs`
+    - `Application/Models/BusinessTaskQueryRequest.cs`
+    - `Application/Models/BusinessTaskQueryResult.cs`
+    - `Application/Models/BusinessTaskQueryItem.cs`
+14. 测试补齐（PR-08~PR-10）：
+    - `Tests/Host/Controllers/DockDashboardControllerTests.cs`
+    - `Tests/Host/Controllers/SortingReportControllerTests.cs`
+    - `Tests/Host/Controllers/BusinessTaskQueryControllerTests.cs`
+    - `Tests/Host/Controllers/StubDockDashboardQueryService.cs`
+    - `Tests/Host/Controllers/StubSortingReportQueryService.cs`
+    - `Tests/Host/Controllers/StubBusinessTaskReadService.cs`
+    - `Tests/Services/DockDashboardQueryServiceTests.cs`
+    - `Tests/Services/SortingReportQueryServiceTests.cs`
+    - `Tests/Services/BusinessTaskReadServiceTests.cs`
 
 ## 3.3 下一步优先补全建议（按顺序）
 
-1. 推进 PR-08~PR-10 的查询类 API 与收口删除。
-2. 补充 PR-04/PR-05 的联调验收记录（拆零/整件目标表字段抽样核对、失败补偿重试演练）。
-3. 补充 PR-01/PR-02 的分表回归与迁移执行验收记录（含上线前 SQL 校验清单）。
+1. 补充 PR-08~PR-10 的联调验收记录（建议落地到 `docs/联调证据/PR08-PR10-20260417-R1/`，至少包含码头规则抽样、报表导出核对、业务筛选回归三份记录）。
+2. 输出 PR-08~PR-10 的旧实现删除清单与替代关系说明（建议新增 `docs/联调证据/PR08-PR10-20260417-R1/04-旧实现删除清单.md`，明确文件路径、替代关系与回滚说明）。
+3. 补充 PR-04/PR-05 与 PR-01/PR-02 的分表回归、迁移执行与上线前 SQL 校验清单（建议同步到 `docs/联调证据/PR12-20260416-R1/` 新增条目）。
 
 ---
 
