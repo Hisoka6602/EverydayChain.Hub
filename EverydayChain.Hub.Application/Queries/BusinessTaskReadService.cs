@@ -33,19 +33,19 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
     /// <inheritdoc/>
     public Task<BusinessTaskQueryResult> QueryTasksAsync(BusinessTaskQueryRequest request, CancellationToken cancellationToken)
     {
-        return QueryCoreAsync(request, task => true, cancellationToken);
+        return QueryCoreAsync(request, false, false, cancellationToken);
     }
 
     /// <inheritdoc/>
     public Task<BusinessTaskQueryResult> QueryExceptionsAsync(BusinessTaskQueryRequest request, CancellationToken cancellationToken)
     {
-        return QueryCoreAsync(request, task => task.IsException || task.Status == BusinessTaskStatus.Exception, cancellationToken);
+        return QueryCoreAsync(request, true, false, cancellationToken);
     }
 
     /// <inheritdoc/>
     public Task<BusinessTaskQueryResult> QueryRecirculationsAsync(BusinessTaskQueryRequest request, CancellationToken cancellationToken)
     {
-        return QueryCoreAsync(request, task => task.IsRecirculated, cancellationToken);
+        return QueryCoreAsync(request, false, true, cancellationToken);
     }
 
     /// <summary>
@@ -57,7 +57,8 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
     /// <returns>分页结果。</returns>
     private async Task<BusinessTaskQueryResult> QueryCoreAsync(
         BusinessTaskQueryRequest request,
-        Func<BusinessTaskEntity, bool> extraPredicate,
+        bool onlyException,
+        bool onlyRecirculation,
         CancellationToken cancellationToken)
     {
         // 步骤 1：校验时间区间。
@@ -70,38 +71,33 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
             };
         }
 
-        // 步骤 2：读取基础数据并执行多条件筛选。
-        var tasks = await _businessTaskRepository.FindByCreatedTimeRangeAsync(request.StartTimeLocal, request.EndTimeLocal, cancellationToken);
-        var normalizedWaveCode = NormalizeOptionalValue(request.WaveCode);
-        var normalizedBarcode = NormalizeOptionalValue(request.Barcode);
-        var normalizedDockCode = NormalizeOptionalValue(request.DockCode);
-        var normalizedChuteCode = NormalizeOptionalValue(request.ChuteCode);
-
-        var filteredTasks = tasks
-            .Where(task => MatchOptionalValue(_queryPolicy.NormalizeWaveCode(task.WaveCode), normalizedWaveCode))
-            .Where(task => MatchOptionalValue(task.Barcode, normalizedBarcode))
-            .Where(task => MatchOptionalValue(_queryPolicy.ResolveDockCode(task), normalizedDockCode))
-            .Where(task => MatchOptionalValue(task.TargetChuteCode, normalizedChuteCode) || MatchOptionalValue(task.ActualChuteCode, normalizedChuteCode))
-            .Where(extraPredicate)
-            .OrderByDescending(task => task.CreatedTimeLocal)
-            .ToList();
-
-        // 步骤 3：分页并映射输出。
+        // 步骤 2：归一化筛选条件并在仓储侧下推过滤、排序与分页。
+        var filter = new BusinessTaskSearchFilter
+        {
+            StartTimeLocal = request.StartTimeLocal,
+            EndTimeLocal = request.EndTimeLocal,
+            WaveCode = NormalizeOptionalValue(request.WaveCode),
+            Barcode = NormalizeOptionalValue(request.Barcode),
+            DockCode = NormalizeOptionalValue(request.DockCode),
+            ChuteCode = NormalizeOptionalValue(request.ChuteCode),
+            OnlyException = onlyException,
+            OnlyRecirculation = onlyRecirculation
+        };
         var pageNumber = request.PageNumber < 1 ? 1 : request.PageNumber;
         var pageSize = request.PageSize <= 0 ? 50 : request.PageSize;
         var skip = (pageNumber - 1) * pageSize;
-        var pagedTasks = filteredTasks
-            .Skip(skip)
-            .Take(pageSize)
+        var totalCount = await _businessTaskRepository.CountByQueryConditionsAsync(filter, cancellationToken);
+        var pagedTasks = await _businessTaskRepository.QueryByQueryConditionsAsync(filter, skip, pageSize, cancellationToken);
+        var items = pagedTasks
             .Select(MapItem)
             .ToList();
 
         return new BusinessTaskQueryResult
         {
-            TotalCount = filteredTasks.Count,
+            TotalCount = totalCount,
             PageNumber = pageNumber,
             PageSize = pageSize,
-            Items = pagedTasks
+            Items = items
         };
     }
 
@@ -113,22 +109,6 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
     private static string? NormalizeOptionalValue(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    }
-
-    /// <summary>
-    /// 匹配可选值。
-    /// </summary>
-    /// <param name="actual">实际值。</param>
-    /// <param name="expected">期望值。</param>
-    /// <returns>是否匹配。</returns>
-    private static bool MatchOptionalValue(string? actual, string? expected)
-    {
-        if (expected is null)
-        {
-            return true;
-        }
-
-        return string.Equals(actual?.Trim(), expected, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

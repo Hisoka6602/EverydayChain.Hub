@@ -1,4 +1,5 @@
 using EverydayChain.Hub.Application.Abstractions.Persistence;
+using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Infrastructure.Persistence;
@@ -19,6 +20,10 @@ public class BusinessTaskRepository(
 {
     /// <summary>业务任务逻辑表名。</summary>
     private const string BusinessTaskLogicalTable = "business_tasks";
+    /// <summary>无波次占位文本。</summary>
+    private const string EmptyWaveCode = "未分波次";
+    /// <summary>无码头占位文本。</summary>
+    private const string EmptyDockCode = "未分配码头";
 
     /// <inheritdoc/>
     public async Task<BusinessTaskEntity?> FindByBarcodeAsync(string barcode, CancellationToken ct)
@@ -135,6 +140,212 @@ public class BusinessTaskRepository(
             .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal), shardSuffixes, ct);
     }
 
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BusinessTaskWaveAggregateRow>> AggregateWaveDashboardAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
+    {
+        if (endTimeLocal <= startTimeLocal)
+        {
+            return Array.Empty<BusinessTaskWaveAggregateRow>();
+        }
+
+        var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct);
+        var merged = new Dictionary<string, BusinessTaskWaveAggregateRow>(StringComparer.OrdinalIgnoreCase);
+        foreach (var suffix in suffixes)
+        {
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            var shardRows = await db.BusinessTasks
+                .AsNoTracking()
+                .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal)
+                .GroupBy(x => string.IsNullOrEmpty(x.WaveCode) ? EmptyWaveCode : x.WaveCode!)
+                .Select(group => new BusinessTaskWaveAggregateRow
+                {
+                    WaveCode = group.Key,
+                    TotalCount = group.Count(),
+                    UnsortedCount = group.Count(task => task.Status != BusinessTaskStatus.Dropped && task.Status != BusinessTaskStatus.FeedbackPending),
+                    FullCaseTotalCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase),
+                    FullCaseUnsortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase && task.Status != BusinessTaskStatus.Dropped && task.Status != BusinessTaskStatus.FeedbackPending),
+                    SplitTotalCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split),
+                    SplitUnsortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split && task.Status != BusinessTaskStatus.Dropped && task.Status != BusinessTaskStatus.FeedbackPending),
+                    RecognitionCount = group.Count(task => task.ScannedAtLocal != null),
+                    RecirculatedCount = group.Count(task => task.IsRecirculated),
+                    ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception),
+                    TotalVolumeMm3 = group.Sum(task => task.VolumeMm3 ?? 0M),
+                    TotalWeightGram = group.Sum(task => task.WeightGram ?? 0M)
+                })
+                .ToListAsync(ct);
+
+            MergeWaveAggregateRows(merged, shardRows);
+        }
+
+        return merged.Values
+            .OrderBy(row => row.WaveCode, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<string>> ListWaveCodesByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
+    {
+        if (endTimeLocal <= startTimeLocal)
+        {
+            return Array.Empty<string>();
+        }
+
+        var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct);
+        var waveCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var suffix in suffixes)
+        {
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            var shardCodes = await db.BusinessTasks
+                .AsNoTracking()
+                .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal)
+                .Select(x => string.IsNullOrEmpty(x.WaveCode) ? EmptyWaveCode : x.WaveCode!)
+                .Distinct()
+                .ToListAsync(ct);
+            foreach (var code in shardCodes)
+            {
+                waveCodes.Add(code);
+            }
+        }
+
+        return waveCodes
+            .OrderBy(code => code, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BusinessTaskDockAggregateRow>> AggregateDockDashboardAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        string? waveCode,
+        string? dockCode,
+        CancellationToken ct)
+    {
+        if (endTimeLocal <= startTimeLocal)
+        {
+            return Array.Empty<BusinessTaskDockAggregateRow>();
+        }
+
+        var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct);
+        var merged = new Dictionary<string, BusinessTaskDockAggregateRow>(StringComparer.OrdinalIgnoreCase);
+        foreach (var suffix in suffixes)
+        {
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            var query = db.BusinessTasks
+                .AsNoTracking()
+                .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal);
+            if (!string.IsNullOrWhiteSpace(waveCode))
+            {
+                query = query.Where(x => (string.IsNullOrEmpty(x.WaveCode) ? EmptyWaveCode : x.WaveCode!) == waveCode);
+            }
+
+            if (!string.IsNullOrWhiteSpace(dockCode))
+            {
+                query = query.Where(x =>
+                    (string.IsNullOrEmpty(x.ActualChuteCode)
+                        ? (string.IsNullOrEmpty(x.TargetChuteCode) ? EmptyDockCode : x.TargetChuteCode!)
+                        : x.ActualChuteCode!) == dockCode);
+            }
+
+            var shardRows = await query
+                .GroupBy(x =>
+                    string.IsNullOrEmpty(x.ActualChuteCode)
+                        ? (string.IsNullOrEmpty(x.TargetChuteCode) ? EmptyDockCode : x.TargetChuteCode!)
+                        : x.ActualChuteCode!)
+                .Select(group => new BusinessTaskDockAggregateRow
+                {
+                    DockCode = group.Key,
+                    TotalCount = group.Count(),
+                    SortedCount = group.Count(task => task.Status == BusinessTaskStatus.Dropped || task.Status == BusinessTaskStatus.FeedbackPending),
+                    SplitUnsortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split && task.Status != BusinessTaskStatus.Dropped && task.Status != BusinessTaskStatus.FeedbackPending),
+                    FullCaseUnsortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase && task.Status != BusinessTaskStatus.Dropped && task.Status != BusinessTaskStatus.FeedbackPending),
+                    SplitTotalCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split),
+                    FullCaseTotalCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase),
+                    SplitSortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split && (task.Status == BusinessTaskStatus.Dropped || task.Status == BusinessTaskStatus.FeedbackPending)),
+                    FullCaseSortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase && (task.Status == BusinessTaskStatus.Dropped || task.Status == BusinessTaskStatus.FeedbackPending)),
+                    RecirculatedCount = group.Count(task => task.IsRecirculated),
+                    ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception)
+                })
+                .ToListAsync(ct);
+
+            MergeDockAggregateRows(merged, shardRows);
+        }
+
+        return merged.Values
+            .OrderBy(row => row.DockCode, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<int> CountByQueryConditionsAsync(BusinessTaskSearchFilter filter, CancellationToken ct)
+    {
+        if (filter.EndTimeLocal <= filter.StartTimeLocal)
+        {
+            return 0;
+        }
+
+        var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(filter.StartTimeLocal, filter.EndTimeLocal, ct);
+        var totalCount = 0;
+        foreach (var suffix in suffixes)
+        {
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            var query = BuildQueryBySearchFilter(db.BusinessTasks.AsNoTracking(), filter);
+            totalCount += await query.CountAsync(ct);
+        }
+
+        return totalCount;
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BusinessTaskEntity>> QueryByQueryConditionsAsync(
+        BusinessTaskSearchFilter filter,
+        int skip,
+        int take,
+        CancellationToken ct)
+    {
+        if (filter.EndTimeLocal <= filter.StartTimeLocal || take <= 0)
+        {
+            return Array.Empty<BusinessTaskEntity>();
+        }
+
+        var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(filter.StartTimeLocal, filter.EndTimeLocal, ct);
+        var rows = new List<BusinessTaskEntity>(take);
+        var remainingSkip = skip < 0 ? 0 : skip;
+        var remainingTake = take;
+        foreach (var suffix in suffixes)
+        {
+            if (remainingTake <= 0)
+            {
+                break;
+            }
+
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            var query = BuildQueryBySearchFilter(db.BusinessTasks.AsNoTracking(), filter)
+                .OrderByDescending(task => task.CreatedTimeLocal);
+
+            var shardCount = await query.CountAsync(ct);
+            if (shardCount <= remainingSkip)
+            {
+                remainingSkip -= shardCount;
+                continue;
+            }
+
+            var shardRows = await query
+                .Skip(remainingSkip)
+                .Take(remainingTake)
+                .ToListAsync(ct);
+            rows.AddRange(shardRows);
+            remainingTake -= shardRows.Count;
+            remainingSkip = 0;
+        }
+
+        return rows;
+    }
+
     /// <summary>
     /// 在全部分片中查询首条记录。
     /// </summary>
@@ -206,6 +417,121 @@ public class BusinessTaskRepository(
             .OrderBy(x => x.CreatedTimeLocal)
             .ToList();
     }
+
+    /// <summary>
+    /// 按查询过滤条件构建可组合查询。
+    /// </summary>
+    /// <param name="query">基础查询。</param>
+    /// <param name="filter">查询过滤条件。</param>
+    /// <returns>过滤后的查询。</returns>
+    private static IQueryable<BusinessTaskEntity> BuildQueryBySearchFilter(
+        IQueryable<BusinessTaskEntity> query,
+        BusinessTaskSearchFilter filter)
+    {
+        query = query.Where(task => task.CreatedTimeLocal >= filter.StartTimeLocal && task.CreatedTimeLocal < filter.EndTimeLocal);
+        if (!string.IsNullOrWhiteSpace(filter.WaveCode))
+        {
+            query = query.Where(task => (string.IsNullOrEmpty(task.WaveCode) ? EmptyWaveCode : task.WaveCode!) == filter.WaveCode);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Barcode))
+        {
+            query = query.Where(task => task.Barcode == filter.Barcode);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.DockCode))
+        {
+            query = query.Where(task =>
+                (string.IsNullOrEmpty(task.ActualChuteCode)
+                    ? (string.IsNullOrEmpty(task.TargetChuteCode) ? EmptyDockCode : task.TargetChuteCode!)
+                    : task.ActualChuteCode!) == filter.DockCode);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.ChuteCode))
+        {
+            query = query.Where(task => task.TargetChuteCode == filter.ChuteCode || task.ActualChuteCode == filter.ChuteCode);
+        }
+
+        if (filter.OnlyException)
+        {
+            query = query.Where(task => task.IsException || task.Status == BusinessTaskStatus.Exception);
+        }
+
+        if (filter.OnlyRecirculation)
+        {
+            query = query.Where(task => task.IsRecirculated);
+        }
+
+        return query;
+    }
+
+    /// <summary>
+    /// 合并波次聚合行。
+    /// </summary>
+    /// <param name="target">聚合目标字典。</param>
+    /// <param name="rows">待合并行。</param>
+    private static void MergeWaveAggregateRows(
+        Dictionary<string, BusinessTaskWaveAggregateRow> target,
+        IReadOnlyList<BusinessTaskWaveAggregateRow> rows)
+    {
+        foreach (var row in rows)
+        {
+            if (!target.TryGetValue(row.WaveCode, out var merged))
+            {
+                merged = new BusinessTaskWaveAggregateRow
+                {
+                    WaveCode = row.WaveCode
+                };
+                target[row.WaveCode] = merged;
+            }
+
+            merged.TotalCount += row.TotalCount;
+            merged.UnsortedCount += row.UnsortedCount;
+            merged.FullCaseTotalCount += row.FullCaseTotalCount;
+            merged.FullCaseUnsortedCount += row.FullCaseUnsortedCount;
+            merged.SplitTotalCount += row.SplitTotalCount;
+            merged.SplitUnsortedCount += row.SplitUnsortedCount;
+            merged.RecognitionCount += row.RecognitionCount;
+            merged.RecirculatedCount += row.RecirculatedCount;
+            merged.ExceptionCount += row.ExceptionCount;
+            merged.TotalVolumeMm3 += row.TotalVolumeMm3;
+            merged.TotalWeightGram += row.TotalWeightGram;
+        }
+    }
+
+    /// <summary>
+    /// 合并码头聚合行。
+    /// </summary>
+    /// <param name="target">聚合目标字典。</param>
+    /// <param name="rows">待合并行。</param>
+    private static void MergeDockAggregateRows(
+        Dictionary<string, BusinessTaskDockAggregateRow> target,
+        IReadOnlyList<BusinessTaskDockAggregateRow> rows)
+    {
+        foreach (var row in rows)
+        {
+            if (!target.TryGetValue(row.DockCode, out var merged))
+            {
+                merged = new BusinessTaskDockAggregateRow
+                {
+                    DockCode = row.DockCode
+                };
+                target[row.DockCode] = merged;
+            }
+
+            merged.TotalCount += row.TotalCount;
+            merged.SortedCount += row.SortedCount;
+            merged.SplitUnsortedCount += row.SplitUnsortedCount;
+            merged.FullCaseUnsortedCount += row.FullCaseUnsortedCount;
+            merged.SplitTotalCount += row.SplitTotalCount;
+            merged.FullCaseTotalCount += row.FullCaseTotalCount;
+            merged.SplitSortedCount += row.SplitSortedCount;
+            merged.FullCaseSortedCount += row.FullCaseSortedCount;
+            merged.RecirculatedCount += row.RecirculatedCount;
+            merged.ExceptionCount += row.ExceptionCount;
+        }
+    }
+
 
     /// <summary>
     /// 在全部分片查询并截断返回数量。

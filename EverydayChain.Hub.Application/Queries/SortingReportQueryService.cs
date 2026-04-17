@@ -1,7 +1,6 @@
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
-using EverydayChain.Hub.Domain.Enums;
 using System.Text;
 
 namespace EverydayChain.Hub.Application.Queries;
@@ -43,68 +42,29 @@ public sealed class SortingReportQueryService : ISortingReportQueryService
             };
         }
 
-        // 步骤 2：拉取任务并执行码头维度筛选。
+        // 步骤 2：在仓储侧执行码头维度筛选与聚合。
         var selectedDockCode = string.IsNullOrWhiteSpace(request.DockCode) ? null : request.DockCode.Trim();
-        var tasks = await _businessTaskRepository.FindByCreatedTimeRangeAsync(request.StartTimeLocal, request.EndTimeLocal, cancellationToken);
-        var filteredTasks = string.IsNullOrWhiteSpace(selectedDockCode)
-            ? tasks
-            : tasks.Where(task => string.Equals(_queryPolicy.ResolveDockCode(task), selectedDockCode, StringComparison.OrdinalIgnoreCase)).ToList();
-
-        // 步骤 3：按码头聚合统计。
-        var counters = new Dictionary<string, ReportCounter>(StringComparer.OrdinalIgnoreCase);
-        foreach (var task in filteredTasks)
-        {
-            var dockCode = _queryPolicy.ResolveDockCode(task);
-            if (!counters.TryGetValue(dockCode, out var counter))
+        var dockRows = await _businessTaskRepository.AggregateDockDashboardAsync(
+            request.StartTimeLocal,
+            request.EndTimeLocal,
+            null,
+            selectedDockCode,
+            cancellationToken);
+        var rows = dockRows
+            .Select(row => new SortingReportRow
             {
-                counter = new ReportCounter();
-                counters.Add(dockCode, counter);
-            }
-
-            var isSorted = _queryPolicy.IsSortedTask(task);
-            if (task.SourceType == BusinessTaskSourceType.Split)
-            {
-                counter.SplitTotalCount++;
-                if (isSorted)
-                {
-                    counter.SplitSortedCount++;
-                }
-            }
-            else if (task.SourceType == BusinessTaskSourceType.FullCase)
-            {
-                counter.FullCaseTotalCount++;
-                if (isSorted)
-                {
-                    counter.FullCaseSortedCount++;
-                }
-            }
-
-            if (task.IsRecirculated)
-            {
-                counter.RecirculatedCount++;
-            }
-
-            if (_queryPolicy.IsDockSeven(dockCode) && (task.IsException || task.Status == BusinessTaskStatus.Exception))
-            {
-                counter.ExceptionCount++;
-            }
-        }
-
-        var rows = counters
-            .Select(pair => new SortingReportRow
-            {
-                DockCode = pair.Key,
-                SplitTotalCount = pair.Value.SplitTotalCount,
-                FullCaseTotalCount = pair.Value.FullCaseTotalCount,
-                SplitSortedCount = pair.Value.SplitSortedCount,
-                FullCaseSortedCount = pair.Value.FullCaseSortedCount,
-                RecirculatedCount = pair.Value.RecirculatedCount,
-                ExceptionCount = pair.Value.ExceptionCount
+                DockCode = row.DockCode,
+                SplitTotalCount = row.SplitTotalCount,
+                FullCaseTotalCount = row.FullCaseTotalCount,
+                SplitSortedCount = row.SplitSortedCount,
+                FullCaseSortedCount = row.FullCaseSortedCount,
+                RecirculatedCount = row.RecirculatedCount,
+                ExceptionCount = _queryPolicy.IsDockSeven(row.DockCode) ? row.ExceptionCount : 0
             })
             .OrderBy(row => row.DockCode, StringComparer.Ordinal)
             .ToList();
 
-        // 步骤 4：返回报表结果。
+        // 步骤 3：返回报表结果。
         return new SortingReportQueryResult
         {
             StartTimeLocal = request.StartTimeLocal,
@@ -144,41 +104,5 @@ public sealed class SortingReportQueryService : ISortingReportQueryService
         }
 
         return $"\"{value.Replace("\"", "\"\"")}\"";
-    }
-
-    /// <summary>
-    /// 报表聚合计数器。
-    /// </summary>
-    private sealed class ReportCounter
-    {
-        /// <summary>
-        /// 拆零总数。
-        /// </summary>
-        public int SplitTotalCount { get; set; }
-
-        /// <summary>
-        /// 整件总数。
-        /// </summary>
-        public int FullCaseTotalCount { get; set; }
-
-        /// <summary>
-        /// 拆零分拣数。
-        /// </summary>
-        public int SplitSortedCount { get; set; }
-
-        /// <summary>
-        /// 整件分拣数。
-        /// </summary>
-        public int FullCaseSortedCount { get; set; }
-
-        /// <summary>
-        /// 回流数。
-        /// </summary>
-        public int RecirculatedCount { get; set; }
-
-        /// <summary>
-        /// 异常数。
-        /// </summary>
-        public int ExceptionCount { get; set; }
     }
 }
