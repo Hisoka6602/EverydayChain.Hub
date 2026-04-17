@@ -29,6 +29,8 @@ using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.WaveCleanup.Abstractions;
 using EverydayChain.Hub.Application.Abstractions.Integrations;
 using EverydayChain.Hub.Application.Recirculation.Abstractions;
+using EverydayChain.Hub.Application.Abstractions.Queries;
+using EverydayChain.Hub.Application.Queries;
 
 namespace EverydayChain.Hub.Infrastructure.DependencyInjection;
 
@@ -123,6 +125,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IScanIngressService, ScanIngressService>();
         services.AddSingleton<IChuteQueryService, ChuteQueryService>();
         services.AddSingleton<IDropFeedbackService, DropFeedbackService>();
+        services.AddSingleton<IGlobalDashboardQueryService, GlobalDashboardQueryService>();
         services.AddSingleton<IDeletionExecutionService, DeletionExecutionService>();
         services.AddSingleton<IRetentionExecutionService, RetentionExecutionService>();
         services.AddSingleton<ISyncExecutionService, SyncExecutionService>();

@@ -94,4 +94,13 @@ public interface IBusinessTaskRepository
     /// <param name="ct">取消令牌。</param>
     /// <returns>该条码关联的所有非终态业务任务列表。</returns>
     Task<IReadOnlyList<BusinessTaskEntity>> FindActiveByBarcodeAsync(string barcode, CancellationToken ct);
+
+    /// <summary>
+    /// 按创建时间区间查询业务任务列表（左闭右开），按创建时间升序返回。
+    /// </summary>
+    /// <param name="startTimeLocal">区间起始本地时间（包含）。</param>
+    /// <param name="endTimeLocal">区间结束本地时间（不包含）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>命中的业务任务列表。</returns>
+    Task<IReadOnlyList<BusinessTaskEntity>> FindByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct);
 }

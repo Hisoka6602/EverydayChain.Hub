@@ -122,6 +122,13 @@ public class BusinessTaskRepository(
                 && x.Status != BusinessTaskStatus.Exception), ct);
     }
 
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BusinessTaskEntity>> FindByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
+    {
+        return await QueryAcrossShardsAsync(query => query
+            .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal), ct);
+    }
+
     /// <summary>
     /// 在全部分片中查询首条记录。
     /// </summary>
