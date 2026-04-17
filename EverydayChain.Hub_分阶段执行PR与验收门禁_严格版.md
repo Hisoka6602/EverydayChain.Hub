@@ -118,6 +118,46 @@
 
 ---
 
+## 3.1 当前实现盘点（2026-04-17，本地代码基线）
+
+> 盘点范围：`Domain`/`Application`/`Infrastructure`/`Host` 与 `EverydayChain.Hub.Tests` 当前主干代码。
+
+| PR | 当前状态 | 盘点结论 |
+|---|---|---|
+| PR-01 业务模型收口 | ⚠️ 部分完成 | 已有 `BusinessTaskEntity` 与迁移，但“来源类型、尺寸体积重量、扫描次数、回传时间”等统一字段尚未在本地主模型完整收口。 |
+| PR-02 扫描字段闭环 | ⚠️ 部分完成 | 扫描接口与多条码策略已落地，扫描日志保留；但扫描尺寸/重量等字段未完成统一任务主模型更新闭环。 |
+| PR-03 扫描兼容测试与日志补强 | ✅ 已完成 | 扫描控制器与扫描链路测试已覆盖，日志落地链路存在并稳定。 |
+| PR-04 回写模型与配置收口 | ⚠️ 部分完成 | 已有 `WmsFeedbackService` 与配置模型；当前仍以通用回写字段配置为主，真实业务字段映射待继续收口。 |
+| PR-05 回写执行与补偿收口 | ⚠️ 部分完成 | 已具备回写执行与失败补偿后台任务；真实业务字段全量回写与专项测试仍需补齐。 |
+| PR-06 波次清理 API 化 | ✅ 本轮补全完成 | 本轮新增 `WaveCleanupController`、`WaveCleanupRequest/Response`、`dry-run` 与正式执行端点，并补齐控制器测试。 |
+| PR-07 总看板 API | ❌ 未开始 | 代码中尚未提供总看板查询 API。 |
+| PR-08 码头看板 API | ❌ 未开始 | 代码中尚未提供码头看板查询 API。 |
+| PR-09 报表查询与导出 API | ❌ 未开始 | 代码中尚未提供报表查询与导出 API。 |
+| PR-10 业务查询与收口删除 | ❌ 未开始 | 代码中尚未提供业务任务/异常件/回流查询 API 与对应收口删除。 |
+
+## 3.2 本轮补全结果
+
+1. 新增 `Host/Controllers/WaveCleanupController.cs`，提供：
+   - `POST /api/v1/wave-cleanup/dry-run`
+   - `POST /api/v1/wave-cleanup/execute`
+2. 新增 Host 契约：
+   - `Host/Contracts/Requests/WaveCleanupRequest.cs`
+   - `Host/Contracts/Responses/WaveCleanupResponse.cs`
+3. 扩展应用层契约与实现：
+   - `IWaveCleanupService` 新增 `DryRunByWaveCodeAsync`、`ExecuteByWaveCodeAsync`
+   - `WaveCleanupService` 新增端点级 dry-run/正式执行分流能力
+4. 新增测试：
+   - `Tests/Host/Controllers/WaveCleanupControllerTests.cs`
+   - `Tests/Host/Controllers/StubWaveCleanupService.cs`
+
+## 3.3 下一步优先补全建议（按顺序）
+
+1. 优先补齐 PR-01/PR-02 未完成字段闭环（统一业务任务模型 + 扫描字段写入闭环）。
+2. 然后补齐 PR-04/PR-05 的真实业务字段回写映射与执行测试。
+3. 最后推进 PR-07~PR-10 的查询类 API 与收口删除。
+
+---
+
 # 4. 阶段 1：业务模型收口
 
 ## PR-01：拆零/整件业务字段模型补齐与迁移
