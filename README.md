@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 新增 API 失败日志治理：Host 层增加 `ApiFailureLoggingMiddleware`，统一记录 HTTP 非成功与业务失败（`ApiResponse.IsSuccess=false`）场景的请求/响应明细；`nlog.config` 新增 `api-failure-${shortdate}.log` 独立落盘路由；补充中间件单元测试覆盖失败记录与成功不记录分支。
 - 修复启动稳定性：`AutoMigrationHostedService` 在自动迁移阶段遇到数据库连接异常时改为记录错误并降级继续启动，不再因单库不可达导致整进程退出；新增对应主机层单元测试覆盖降级与阻断分支。
 - 完成“本地库查询能力极致优化”：业务任务/异常件/回流查询新增游标分页主路径并保留页码兼容；看板/报表查询引入短 TTL 缓存；EF Core 切换 DbContext 池化；新增 `NormalizedWaveCode`、`NormalizedBarcode`、`ResolvedDockCode` 与配套索引；新增 `本地库查询性能优化说明.md`。
 - 按业务需求切换 WMS 回写开关：`WmsFeedback.Enabled` 调整为 `true`，上线口径更新为“回写开启”。
@@ -356,6 +357,7 @@
 │   ├── Host/Controllers/StubDockDashboardQueryService.cs
 │   ├── Host/Controllers/StubSortingReportQueryService.cs
 │   ├── Host/Controllers/StubBusinessTaskReadService.cs
+│   ├── Host/Middlewares/ApiFailureLoggingMiddlewareTests.cs
 │   ├── Host/Workers/AutoMigrationHostedServiceTests.cs
 │   ├── Host/Workers/TestAutoMigrationService.cs
 │   ├── Host/Workers/TestDatabaseException.cs
@@ -395,6 +397,8 @@
 └── EverydayChain.Hub.Host
     ├── EverydayChain.Hub.Host.csproj
     ├── Program.cs
+    ├── Middlewares/ApiFailureLoggingMiddleware.cs
+    ├── Middlewares/Streams/BoundedCaptureWriteStream.cs
     ├── Controllers/ScanController.cs
     ├── Controllers/ChuteController.cs
     ├── Controllers/DropFeedbackController.cs
@@ -615,8 +619,10 @@
 - `20260416010041_AddSyncBatchShardTable.cs`：新增 `sync_batches` 基础表迁移，用于同步批次自动迁移基线与分片模板。
 - `20260416171508_AddSyncChangeDeletionLogShardTables.cs`：新增 `sync_change_logs` 与 `sync_deletion_logs` 基础表迁移，用于同步变更/删除日志自动迁移基线与分片模板。
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
-- `nlog.config`：NLog 日志配置，输出至控制台与两个滚动日志文件：通用日志（`hub-${shortdate}.log`，按日切割，单文件上限 10 MB，保留 30 天）；同步专属日志（`sync-${shortdate}.log`，仅收录同步链路相关组件日志，便于独立分析同步性能问题）。
-- `Program.cs`（Host）：Host 启动入口，现已支持 API + Worker 共存，启用 Controllers、Swagger（中文注释）并保留自动迁移与同步后台任务注册。
+- `nlog.config`：NLog 日志配置，输出至控制台与三个滚动日志文件：通用日志（`hub-${shortdate}.log`，按日切割，单文件上限 10 MB，保留 30 天）；同步专属日志（`sync-${shortdate}.log`，仅收录同步链路相关组件日志）；API 失败专属日志（`api-failure-${shortdate}.log`，记录失败请求响应明细）。
+- `Program.cs`（Host）：Host 启动入口，现已支持 API + Worker 共存，启用 Controllers、Swagger（中文注释）、API 失败日志中间件并保留自动迁移与同步后台任务注册。
+- `Host/Middlewares/ApiFailureLoggingMiddleware.cs`：API 失败日志中间件，统一捕获 `/api` 路径下的异常、HTTP 非成功状态与业务失败响应并输出请求/响应明细日志。
+- `Host/Middlewares/Streams/BoundedCaptureWriteStream.cs`：响应写透传捕获流，边写回客户端边按上限截取响应片段，用于失败日志判定且避免全量响应缓冲。
 - `Host/Controllers/ScanController.cs` / `ChuteController.cs` / `DropFeedbackController.cs` / `WaveCleanupController.cs` / `GlobalDashboardController.cs` / `DockDashboardController.cs` / `SortingReportController.cs` / `BusinessTaskQueryController.cs`：对外 API 控制器，仅做入参校验、调用应用服务与统一响应封装；覆盖在线链路、看板查询、报表导出与业务查询能力。
 - `Host/Contracts/Requests/*.cs` + `Host/Contracts/Responses/*.cs`：API 输入输出契约与统一响应包装，配合 Swagger 提供中文参数说明；其中 `WaveCleanup*`、`GlobalDashboard*`、`DockDashboard*`、`SortingReport*`、`BusinessTaskQuery*` 分别服务对应业务端点。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
@@ -628,6 +634,7 @@
 - `EverydayChain.Hub.Tests/Host/Workers/TestAutoMigrationService.cs`：自动迁移服务测试替身，支持统计调用次数与注入异常。
 - `EverydayChain.Hub.Tests/Host/Workers/TestDatabaseException.cs`：数据库异常测试替身，统一用于自动迁移降级分支测试。
 - `EverydayChain.Hub.Tests/Host/Workers/TestRuntimeStorageGuard.cs`：运行期存储守护测试替身，支持统计启动自检调用次数与注入异常。
+- `EverydayChain.Hub.Tests/Host/Middlewares/ApiFailureLoggingMiddlewareTests.cs`：API 失败日志中间件测试，覆盖 HTTP 失败、业务失败、成功不记录、异常抛出与 `ContentLength=null` 请求体记录分支。
 - `EverydayChain.Hub.Tests/Services/DangerZoneExecutorTests.cs`：危险操作隔离器取消语义测试，覆盖调用方取消与非调用方取消的日志等级分支。
 - `EverydayChain.Hub.Tests/Services/TestLogger.cs`：通用测试日志记录器，集中承载日志采集替身，避免在测试文件内重复声明嵌套日志类型。
 - `EverydayChain.Hub.Tests/Services/LoggerNullScope.cs`：测试日志空作用域单例，供测试日志记录器复用，避免重复创建无状态作用域实例。
