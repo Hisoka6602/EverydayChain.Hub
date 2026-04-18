@@ -126,6 +126,7 @@ public sealed class ChuteQueryServiceTests
     public async Task ExecuteAsync_ShouldSucceed_WhenTaskIsDroppedWithChute()
     {
         var (service, repo) = CreateService();
+        var now = new DateTime(2026, 4, 18, 10, 0, 0, DateTimeKind.Local);
         await repo.SaveAsync(new BusinessTaskEntity
         {
             TaskCode = "TASK-005",
@@ -133,8 +134,8 @@ public sealed class ChuteQueryServiceTests
             BusinessKey = "K5",
             Barcode = "021103013145",
             Status = BusinessTaskStatus.Dropped,
-            CreatedTimeLocal = DateTime.Now,
-            UpdatedTimeLocal = DateTime.Now
+            CreatedTimeLocal = now,
+            UpdatedTimeLocal = now
         }, CancellationToken.None);
 
         var request = new ChuteResolveApplicationRequest { Barcode = "021103013145" };
