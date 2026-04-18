@@ -1,4 +1,3 @@
-using System.Text.Json;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -6,6 +5,7 @@ using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Domain.Sync;
 using EverydayChain.Hub.Infrastructure.Services;
 using EverydayChain.Hub.SharedKernel.Utilities;
+using Newtonsoft.Json;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
@@ -21,7 +21,10 @@ public class SyncCheckpointRepository(
     private static readonly SemaphoreSlim FileLock = new(1, 1);
 
     /// <summary>检查点 JSON 序列化配置（缩进输出，复用避免重复分配）。</summary>
-    private static readonly JsonSerializerOptions CheckpointSerializerOptions = new() { WriteIndented = true };
+    private static readonly JsonSerializerSettings CheckpointSerializerSettings = new()
+    {
+        Formatting = Formatting.Indented
+    };
 
     /// <summary>检查点文件路径（由配置项 CheckpointFilePath 决定；为空时使用应用基目录下 sync-checkpoints.json）。</summary>
     private readonly string _checkpointFilePath = RuntimeStoragePathResolver.ResolveAbsolutePath(
@@ -63,7 +66,7 @@ public class SyncCheckpointRepository(
 
             var checkpoints = await LoadAllWithoutLockAsync(ct);
             checkpoints[checkpoint.TableCode] = checkpoint;
-            var json = JsonSerializer.Serialize(checkpoints, CheckpointSerializerOptions);
+            var json = JsonConvert.SerializeObject(checkpoints, CheckpointSerializerSettings);
 
             // 原子写入：先落临时文件，再通过 File.Replace/Move 替换，避免进程崩溃时产生半写 JSON。
             var tempFilePath = $"{_checkpointFilePath}.tmp";
@@ -170,7 +173,7 @@ public class SyncCheckpointRepository(
             return new Dictionary<string, SyncCheckpoint>(StringComparer.OrdinalIgnoreCase);
         }
 
-        var data = JsonSerializer.Deserialize<Dictionary<string, SyncCheckpoint>>(json) ?? new Dictionary<string, SyncCheckpoint>(StringComparer.OrdinalIgnoreCase);
+        var data = JsonConvert.DeserializeObject<Dictionary<string, SyncCheckpoint>>(json) ?? new Dictionary<string, SyncCheckpoint>(StringComparer.OrdinalIgnoreCase);
         return new Dictionary<string, SyncCheckpoint>(data, StringComparer.OrdinalIgnoreCase);
     }
 }

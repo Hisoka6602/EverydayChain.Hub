@@ -31,7 +31,9 @@ if (!swaggerSection.Exists())
 builder.Logging.ClearProviders();
 builder.Logging.AddNLog();
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddControllers().ConfigureApiBehaviorOptions(options => {
+builder.Services.AddControllers()
+    .AddNewtonsoftJson()
+    .ConfigureApiBehaviorOptions(options => {
     options.InvalidModelStateResponseFactory = context => {
         var firstError = "请求参数校验失败。";
         foreach (var modelStateEntry in context.ModelState.Values) {

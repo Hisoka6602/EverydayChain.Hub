@@ -1,10 +1,10 @@
-using System.Text.Json;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Domain.Enums;
 using Microsoft.Extensions.Logging;
 using EverydayChain.Hub.Domain.Sync;
+using Newtonsoft.Json;
 
 namespace EverydayChain.Hub.Application.Services;
 
@@ -16,9 +16,9 @@ public class DeletionExecutionService(
     ILogger<DeletionExecutionService> logger) : IDeletionExecutionService
 {
     /// <summary>快照序列化配置。</summary>
-    private static readonly JsonSerializerOptions SnapshotSerializerOptions = new()
+    private static readonly JsonSerializerSettings SnapshotSerializerSettings = new()
     {
-        WriteIndented = false,
+        Formatting = Formatting.None,
     };
 
     /// <inheritdoc/>
@@ -90,7 +90,7 @@ public class DeletionExecutionService(
             });
             if (executed)
             {
-                var snapshot = JsonSerializer.Serialize(candidate.TargetSnapshot, SnapshotSerializerOptions);
+                var snapshot = JsonConvert.SerializeObject(candidate.TargetSnapshot, SnapshotSerializerSettings);
                 changeLogs.Add(new SyncChangeLog
                 {
                     BatchId = context.BatchId,

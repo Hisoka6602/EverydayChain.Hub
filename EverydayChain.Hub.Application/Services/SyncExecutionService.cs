@@ -6,8 +6,8 @@ using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
-using System.Text.Json;
 using EverydayChain.Hub.Domain.Sync;
+using Newtonsoft.Json;
 
 namespace EverydayChain.Hub.Application.Services;
 
@@ -39,9 +39,9 @@ public class SyncExecutionService(
     private const int FullySkippedPageWarningInterval = 100;
 
     /// <summary>快照序列化配置。</summary>
-    private static readonly JsonSerializerOptions SnapshotSerializerOptions = new()
+    private static readonly JsonSerializerSettings SnapshotSerializerSettings = new()
     {
-        WriteIndented = false,
+        Formatting = Formatting.None,
     };
 
     /// <inheritdoc/>
@@ -461,7 +461,7 @@ public class SyncExecutionService(
     /// <returns>快照文本。</returns>
     private static string BuildSnapshot(IReadOnlyDictionary<string, object?> row)
     {
-        return JsonSerializer.Serialize(row, SnapshotSerializerOptions);
+        return JsonConvert.SerializeObject(row, SnapshotSerializerSettings);
     }
 
     /// <summary>
