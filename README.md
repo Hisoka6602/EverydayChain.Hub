@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 完成《EverydayChain.Hub_Copilot_精准执行指令_最终版》镜像表收口第一阶段：删除本地镜像表实体 `WmsSplitPickToLightCartonEntity`、`WmsPickToWcsEntity`，并从 `HubDbContext` 移除对应 DbSet 与映射配置，确保本地业务主路径仅保留 `business_tasks`。
 - 开始实施《EverydayChain.Hub_Copilot_精准执行指令_最终版》：补齐 `business_tasks` 直投影主路径，新增 `BusinessTaskProjectionService` 与 `BusinessTaskStatusConsumeService`，并将 `WmsSplitPickToLightCarton`/`WmsPickToWcs` 的 `StatusDriven` 主路径切换为“远端读取 → 本地业务主表幂等投影 → 可选远端状态回写”。
 - 收敛同步与回写配置：`SyncJob.Tables` 新增 `SourceType`、`BusinessKeyColumn`、`BarcodeColumn`、`WaveCodeColumn`、`WaveRemarkColumn`；`appsettings.json` 两条 WMS 同步任务目标统一为 `business_tasks`；`WmsFeedbackOptions` 与 `OracleWmsFeedbackGateway` 删除默认回退目标表语义并改为按来源强制分流。
 - 补齐幂等保障与测试：`business_tasks` 新增 `SourceTableCode + BusinessKey` 联合唯一索引，仓储新增按来源+业务键查询与投影 Upsert；新增投影服务、状态消费、仓储投影幂等相关测试并更新配置映射测试。
@@ -150,8 +151,6 @@
 │   ├── Aggregates/BusinessTaskAggregate/BusinessTaskEntity.cs
 │   ├── Aggregates/ScanLogAggregate/ScanLogEntity.cs
 │   ├── Aggregates/DropLogAggregate/DropLogEntity.cs
-│   ├── Aggregates/WmsPickToWcsAggregate/WmsPickToWcsEntity.cs
-│   ├── Aggregates/WmsSplitPickToLightCartonAggregate/WmsSplitPickToLightCartonEntity.cs
 │   ├── Aggregates/SyncBatchAggregate/SyncBatchEntity.cs
 │   ├── Aggregates/SyncChangeLogAggregate/SyncChangeLogEntity.cs
 │   ├── Aggregates/SyncDeletionLogAggregate/SyncDeletionLogEntity.cs
@@ -334,6 +333,8 @@
 │   ├── Persistence/Sharding/ShardModelCacheKeyFactory.cs
 │   ├── Migrations/20260417185400_RebuildHubBaseline.cs
 │   ├── Migrations/20260417185400_RebuildHubBaseline.Designer.cs
+│   ├── Migrations/20260418200551_RemoveLocalMirrorTables.cs
+│   ├── Migrations/20260418200551_RemoveLocalMirrorTables.Designer.cs
 │   ├── Migrations/HubDbContextModelSnapshot.cs
 │   └── Services
 │       ├── IDangerZoneExecutor.cs
@@ -362,6 +363,7 @@
 │   ├── Sync/Fakes/FakeOracleStatusDrivenSourceReader.cs
 │   ├── Sync/Fakes/FakeSqlServerAppendOnlyWriter.cs
 │   ├── Sync/Fakes/FakeOracleRemoteStatusWriter.cs
+│   ├── Architecture/BusinessTaskSingleSourceArchitectureTests.cs
 │   ├── Host/Controllers/ScanControllerTests.cs
 │   ├── Host/Controllers/ChuteControllerTests.cs
 │   ├── Host/Controllers/DropFeedbackControllerTests.cs
@@ -644,6 +646,7 @@
 - `20260413160852_AddScanDropLogTables.cs`：新增 `scan_logs` 与 `drop_logs` 迁移基线，作为分片模板来源，包含审计字段与查询索引。
 - `20260416010041_AddSyncBatchShardTable.cs`：新增 `sync_batches` 基础表迁移，用于同步批次自动迁移基线与分片模板。
 - `20260416171508_AddSyncChangeDeletionLogShardTables.cs`：新增 `sync_change_logs` 与 `sync_deletion_logs` 基础表迁移，用于同步变更/删除日志自动迁移基线与分片模板。
+- `20260418200551_RemoveLocalMirrorTables.cs`：删除本地镜像表 `IDX_PICKTOLIGHT_CARTON1`、`IDX_PICKTOWCS2` 并补齐 `business_tasks` 的 `SourceTableCode + BusinessKey` 联合唯一索引，确保业务主表单源收口。
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
 - `nlog.config`：NLog 日志配置，输出至控制台与三个滚动日志文件：通用日志（`hub-${shortdate}.log`，按日切割，单文件上限 10 MB，保留 30 天）；同步专属日志（`sync-${shortdate}.log`，仅收录同步链路相关组件日志）；API 失败专属日志（`api-failure-${shortdate}.log`，记录失败请求响应明细）。
 - `Program.cs`（Host）：Host 启动入口，现已支持 API + Worker 共存，启用 Controllers、Swagger（中文注释）、API 失败日志中间件并保留自动迁移与同步后台任务注册。
@@ -656,6 +659,7 @@
 - `FeedbackCompensationBackgroundWorker.cs`：业务回传补偿后台任务，按 `FeedbackCompensationJob.PollingIntervalSeconds` 周期重试失败回传任务，支持批次上限控制并输出补偿统计日志。
 - `AutoMigrationHostedService.cs`：启动阶段自动迁移入口；当自动迁移阶段发生数据库异常时仅记录错误并降级跳过迁移，保持宿主继续运行，避免单库不可达导致整体进程崩溃。
 - `EverydayChain.Hub.Tests/Host/Controllers/*Tests.cs`：PR-03 新增 Controller 基础行为测试，覆盖空参校验与标准成功响应路径。
+- `EverydayChain.Hub.Tests/Architecture/BusinessTaskSingleSourceArchitectureTests.cs`：架构防回退测试，校验 `HubDbContext` 模型中不再包含本地 `IDX_PICKTOLIGHT_CARTON1` / `IDX_PICKTOWCS2` 映射，且保留 `business_tasks` 主表映射。
 - `EverydayChain.Hub.Tests/Host/Workers/AutoMigrationHostedServiceTests.cs`：自动迁移托管服务容错测试，覆盖“自动迁移阶段异常降级继续启动”与“启动自检异常仍阻断启动”两条分支。
 - `EverydayChain.Hub.Tests/Host/Workers/TestAutoMigrationService.cs`：自动迁移服务测试替身，支持统计调用次数与注入异常。
 - `EverydayChain.Hub.Tests/Host/Workers/TestDatabaseException.cs`：数据库异常测试替身，统一用于自动迁移降级分支测试。
