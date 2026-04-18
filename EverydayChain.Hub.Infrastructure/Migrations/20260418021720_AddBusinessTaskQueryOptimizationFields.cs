@@ -2,14 +2,13 @@
 
 #nullable disable
 
-namespace EverydayChain.Hub.Infrastructure.Migrations
-{
+namespace EverydayChain.Hub.Infrastructure.Migrations {
+
     /// <inheritdoc />
-    public partial class AddBusinessTaskQueryOptimizationFields : Migration
-    {
+    public partial class AddBusinessTaskQueryOptimizationFields : Migration {
+
         /// <inheritdoc />
-        protected override void Up(MigrationBuilder migrationBuilder)
-        {
+        protected override void Up(MigrationBuilder migrationBuilder) {
             migrationBuilder.Sql(
                 """
                 DECLARE @SchemaName sysname;
@@ -60,7 +59,11 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                         SET @Sql += N'ALTER TABLE ' + @QualifiedTable + N' ADD [ResolvedDockCode] nvarchar(64) NOT NULL CONSTRAINT '
                             + QUOTENAME(N'DF_' + @TableName + N'_ResolvedDockCode') + N' DEFAULT N''未分配码头'';';
                     END;
-
+                 IF LEN(@Sql) > 0
+                BEGIN
+                    EXEC sp_executesql @Sql;
+                    SET @Sql = N'';
+                END;
                     SET @Sql += N'
                     UPDATE ' + @QualifiedTable + N'
                     SET [NormalizedBarcode] = CASE
@@ -161,8 +164,7 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
         }
 
         /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
+        protected override void Down(MigrationBuilder migrationBuilder) {
             migrationBuilder.Sql(
                 """
                 DECLARE @SchemaName sysname;
