@@ -2,6 +2,7 @@ using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Xunit;
 
 namespace EverydayChain.Hub.Tests.Architecture;
 
@@ -33,8 +34,10 @@ public class BusinessTaskSingleSourceArchitectureTests
     /// <returns>数据库上下文实例。</returns>
     private static HubDbContext CreateDbContext()
     {
+        var connectionString = Environment.GetEnvironmentVariable("HUB_TEST_SQLSERVER_CONNECTION_STRING")
+            ?? "Server=127.0.0.1;Database=Placeholder;User Id=Placeholder;Password=Placeholder;TrustServerCertificate=True;";
         var dbContextOptions = new DbContextOptionsBuilder<HubDbContext>()
-            .UseSqlServer("Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;")
+            .UseSqlServer(connectionString)
             .Options;
         var shardingOptions = Options.Create(new ShardingOptions
         {
