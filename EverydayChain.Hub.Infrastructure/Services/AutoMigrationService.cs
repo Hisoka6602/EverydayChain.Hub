@@ -249,7 +249,7 @@ public class AutoMigrationService(
                 FROM sys.tables AS t
                 INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
                 WHERE s.name = @schema
-                  AND t.name IN (N'business_tasks', N'IDX_PICKTOLIGHT_CARTON1', N'IDX_PICKTOWCS2');
+                  AND t.name IN (N'business_tasks');
                 """;
             command.CommandTimeout = StartupMetadataProbeTimeoutSeconds;
             var schemaParameter = command.CreateParameter();

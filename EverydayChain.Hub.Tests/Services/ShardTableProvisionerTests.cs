@@ -14,8 +14,8 @@ public class ShardTableProvisionerTests
 {
     /// <summary>分拣追踪逻辑表名。</summary>
     private const string SortingTaskTraceLogicalTable = "sorting_task_trace";
-    /// <summary>WMS 下发 WCS 逻辑表名。</summary>
-    private const string WmsPickToWcsLogicalTable = "IDX_PICKTOWCS2";
+    /// <summary>业务任务逻辑表名。</summary>
+    private const string BusinessTaskLogicalTable = "business_tasks";
 
     /// <summary>
     /// 纳管逻辑表集合为空时应立即抛出异常。
@@ -77,25 +77,25 @@ public class ShardTableProvisionerTests
     }
 
     /// <summary>
-    /// WMS 表模板应保留 Id 自增主键、倒序聚簇定义与高精度小数列类型。
+    /// 业务任务模板应保留幂等唯一索引与关键查询索引。
     /// </summary>
     [Fact]
-    public void WmsPickToWcsTemplate_ShouldContainPrimaryKeyAndDecimalColumns()
+    public void BusinessTaskTemplate_ShouldContainProjectionUniqueIndexAndStatusIndex()
     {
-        var provisioner = CreateProvisioner(WmsPickToWcsLogicalTable);
-        var template = provisioner.ResolveTableTemplate(WmsPickToWcsLogicalTable);
+        var provisioner = CreateProvisioner(BusinessTaskLogicalTable);
+        var template = provisioner.ResolveTableTemplate(BusinessTaskLogicalTable);
 
         var sql = provisioner.BuildCreateTableSql(
             template,
-            "IDX_PICKTOWCS2_202604",
-            "[dbo].[IDX_PICKTOWCS2_202604]");
+            "business_tasks_202604",
+            "[dbo].[business_tasks_202604]");
 
         Assert.Contains("[Id] bigint IDENTITY(1,1) NOT NULL", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("PRIMARY KEY CLUSTERED ([Id] DESC)", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("[R_SYSID] nvarchar(30) NULL", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("[LENGTH] decimal(18,8) NULL", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("[WIDTH] decimal(18,8) NULL", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("CREATE INDEX [IX_IDX_PICKTOWCS2_202604_DOCNO_ADDTIME] ON [dbo].[IDX_PICKTOWCS2_202604]([DOCNO], [ADDTIME]);", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("[SourceTableCode] nvarchar(64) NOT NULL", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("[BusinessKey] nvarchar(256) NOT NULL", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CREATE UNIQUE INDEX [IX_business_tasks_202604_SourceTableCode_BusinessKey] ON [dbo].[business_tasks_202604]([SourceTableCode], [BusinessKey]);", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CREATE INDEX [IX_business_tasks_202604_Status] ON [dbo].[business_tasks_202604]([Status]);", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
