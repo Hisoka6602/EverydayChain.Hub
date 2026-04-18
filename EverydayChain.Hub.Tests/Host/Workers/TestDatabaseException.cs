@@ -8,10 +8,20 @@ namespace EverydayChain.Hub.Tests.Host.Workers;
 public sealed class TestDatabaseException : DbException
 {
     /// <summary>
+    /// 是否瞬态异常。
+    /// </summary>
+    private readonly bool _isTransient;
+
+    /// <summary>
     /// 初始化数据库异常测试桩。
     /// </summary>
     /// <param name="message">异常消息。</param>
-    public TestDatabaseException(string message) : base(message)
+    /// <param name="isTransient">是否瞬态异常。</param>
+    public TestDatabaseException(string message, bool isTransient) : base(message)
     {
+        _isTransient = isTransient;
     }
+
+    /// <inheritdoc />
+    public override bool IsTransient => _isTransient;
 }

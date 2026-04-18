@@ -18,7 +18,7 @@ public sealed class AutoMigrationHostedServiceTests
     {
         var migrationService = new TestAutoMigrationService
         {
-            ExceptionToThrow = new TestDatabaseException("测试桩：数据库连接失败。")
+            ExceptionToThrow = new TestDatabaseException("测试桩：数据库连接失败。", isTransient: true)
         };
         var serviceProvider = BuildServiceProvider(migrationService);
         var scopeFactory = serviceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -55,6 +55,29 @@ public sealed class AutoMigrationHostedServiceTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => hostedService.StartAsync(CancellationToken.None));
         Assert.Equal(1, runtimeStorageGuard.StartupHealthCheckCount);
         Assert.Equal(0, migrationService.RunCount);
+    }
+
+    /// <summary>
+    /// 自动迁移阶段抛出非数据库异常时仍应中断启动。
+    /// </summary>
+    [Fact]
+    public async Task StartAsync_ShouldThrow_WhenAutoMigrationStageThrowsNonDatabaseException()
+    {
+        var migrationService = new TestAutoMigrationService
+        {
+            ExceptionToThrow = new InvalidOperationException("测试桩：自动迁移配置错误。")
+        };
+        var serviceProvider = BuildServiceProvider(migrationService);
+        var scopeFactory = serviceProvider.GetRequiredService<IServiceScopeFactory>();
+        var runtimeStorageGuard = new TestRuntimeStorageGuard();
+        var hostedService = new AutoMigrationHostedService(
+            scopeFactory,
+            runtimeStorageGuard,
+            NullLogger<AutoMigrationHostedService>.Instance);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => hostedService.StartAsync(CancellationToken.None));
+        Assert.Equal(1, runtimeStorageGuard.StartupHealthCheckCount);
+        Assert.Equal(1, migrationService.RunCount);
     }
 
     /// <summary>
