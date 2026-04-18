@@ -13,7 +13,7 @@ namespace EverydayChain.Hub.Host.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/v1/reports")]
-public sealed class SortingReportController : ControllerBase
+public sealed class SortingReportController : QueryControllerBase
 {
     /// <summary>
     /// 带 BOM 的 UTF-8 编码实例。
@@ -51,7 +51,7 @@ public sealed class SortingReportController : ControllerBase
         [FromQuery] SortingReportQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        var resolvedRequest = request ?? queryRequest ?? new SortingReportQueryRequest();
+        var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(resolvedRequest.StartTimeLocal, resolvedRequest.EndTimeLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
         {
             return BadRequest(ApiResponse<SortingReportResponse>.Fail(validationMessage));
@@ -103,7 +103,7 @@ public sealed class SortingReportController : ControllerBase
         [FromQuery] SortingReportQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        var resolvedRequest = request ?? queryRequest ?? new SortingReportQueryRequest();
+        var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(resolvedRequest.StartTimeLocal, resolvedRequest.EndTimeLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
         {
             return BadRequest(ApiResponse<object>.Fail(validationMessage));

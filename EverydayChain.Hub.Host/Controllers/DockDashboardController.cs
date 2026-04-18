@@ -12,7 +12,7 @@ namespace EverydayChain.Hub.Host.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/v1/dock-dashboard")]
-public sealed class DockDashboardController : ControllerBase
+public sealed class DockDashboardController : QueryControllerBase
 {
     /// <summary>
     /// 码头看板查询服务。
@@ -45,7 +45,7 @@ public sealed class DockDashboardController : ControllerBase
         [FromQuery] DockDashboardQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        var resolvedRequest = request ?? queryRequest ?? new DockDashboardQueryRequest();
+        var resolvedRequest = ResolveRequest(request, queryRequest);
         var todayLocal = DateTime.SpecifyKind(DateTime.Today, DateTimeKind.Local);
         if (!LocalTimeRangeValidator.TryNormalizeOptionalRange(resolvedRequest.StartTimeLocal, resolvedRequest.EndTimeLocal, todayLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
         {

@@ -12,7 +12,7 @@ namespace EverydayChain.Hub.Host.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/v1/dashboard")]
-public sealed class GlobalDashboardController : ControllerBase
+public sealed class GlobalDashboardController : QueryControllerBase
 {
     /// <summary>
     /// 总看板查询服务。
@@ -45,7 +45,7 @@ public sealed class GlobalDashboardController : ControllerBase
         [FromQuery] GlobalDashboardQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        var resolvedRequest = request ?? queryRequest ?? new GlobalDashboardQueryRequest();
+        var resolvedRequest = ResolveRequest(request, queryRequest);
 
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(resolvedRequest.StartTimeLocal, resolvedRequest.EndTimeLocal, out var normalizedStartTime, out var normalizedEndTime, out var validationMessage))
         {

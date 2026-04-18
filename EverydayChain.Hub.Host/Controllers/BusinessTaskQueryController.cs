@@ -12,7 +12,7 @@ namespace EverydayChain.Hub.Host.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/v1/business-query")]
-public sealed class BusinessTaskQueryController : ControllerBase
+public sealed class BusinessTaskQueryController : QueryControllerBase
 {
     /// <summary>
     /// 业务任务查询服务。
@@ -98,17 +98,6 @@ public sealed class BusinessTaskQueryController : ControllerBase
             (payload, ct) => _businessTaskReadService.QueryRecirculationsAsync(payload, ct),
             "回流记录查询成功。",
             cancellationToken);
-    }
-
-    /// <summary>
-    /// 解析请求来源，优先使用请求体，其次使用查询字符串。
-    /// </summary>
-    /// <param name="request">请求体查询请求。</param>
-    /// <param name="queryRequest">查询字符串请求。</param>
-    /// <returns>解析后的查询请求。</returns>
-    private static BusinessTaskQueryRequest ResolveRequest(BusinessTaskQueryRequest? request, BusinessTaskQueryRequest? queryRequest)
-    {
-        return request ?? queryRequest ?? new BusinessTaskQueryRequest();
     }
 
     /// <summary>
