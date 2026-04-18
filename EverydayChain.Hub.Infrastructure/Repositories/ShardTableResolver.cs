@@ -12,6 +12,8 @@ namespace EverydayChain.Hub.Infrastructure.Repositories;
 /// </summary>
 public class ShardTableResolver(IOptions<ShardingOptions> shardingOptions) : IShardTableResolver
 {
+    /// <summary>分表解析查询超时秒数（危险动作隔离器）。</summary>
+    private const int ResolveCommandTimeoutSeconds = 15;
     /// <summary>安全标识符校验正则（仅允许字母、数字、下划线）。</summary>
     private static readonly Regex SqlIdentifierRegex = new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
     /// <summary>分表月份解析正则。</summary>
@@ -40,6 +42,7 @@ public class ShardTableResolver(IOptions<ShardingOptions> shardingOptions) : ISh
         await connection.OpenAsync(ct);
         await using var command = connection.CreateCommand();
         command.CommandText = sql;
+        command.CommandTimeout = ResolveCommandTimeoutSeconds;
         command.Parameters.AddWithValue("@schema", _options.Schema);
         command.Parameters.AddWithValue("@prefix", logicalTableName);
         await using var reader = await command.ExecuteReaderAsync(ct);

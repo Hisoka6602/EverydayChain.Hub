@@ -12,4 +12,9 @@ public sealed class EfCoreOptions
     /// DbContext 池大小（可填写范围：32~1024；默认 256）。
     /// </summary>
     public int DbContextPoolSize { get; set; } = 256;
+
+    /// <summary>
+    /// SQL 命令超时秒数（可填写范围：1~600；默认 30）。
+    /// </summary>
+    public int CommandTimeoutSeconds { get; set; } = 30;
 }

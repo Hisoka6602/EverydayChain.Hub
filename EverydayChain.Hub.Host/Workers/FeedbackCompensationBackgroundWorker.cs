@@ -12,6 +12,8 @@ public sealed class FeedbackCompensationBackgroundWorker(
     IOptions<FeedbackCompensationJobOptions> compensationJobOptions,
     ILogger<FeedbackCompensationBackgroundWorker> logger) : BackgroundService
 {
+    /// <summary>单轮补偿执行超时秒数（危险动作隔离器）。</summary>
+    private const int SingleRunTimeoutSeconds = 300;
     /// <summary>补偿后台任务配置快照。</summary>
     private readonly FeedbackCompensationJobOptions _compensationJobOptions = compensationJobOptions.Value;
 
@@ -38,7 +40,10 @@ public sealed class FeedbackCompensationBackgroundWorker(
         {
             try
             {
-                var result = await feedbackCompensationService.RetryFailedBatchAsync(batchSize, stoppingToken);
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(SingleRunTimeoutSeconds));
+                var runToken = timeoutCts.Token;
+                var result = await feedbackCompensationService.RetryFailedBatchAsync(batchSize, runToken);
                 logger.LogInformation(
                     "业务回传补偿后台任务执行完成。TargetCount={TargetCount}, RetriedCount={RetriedCount}, SuccessCount={SuccessCount}, FailedCount={FailedCount}, SkippedCount={SkippedCount}, FailureReason={FailureReason}",
                     result.TargetCount,
@@ -47,6 +52,10 @@ public sealed class FeedbackCompensationBackgroundWorker(
                     result.FailedCount,
                     result.SkippedCount,
                     result.FailureReason ?? string.Empty);
+            }
+            catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+            {
+                logger.LogError("业务回传补偿后台任务单轮执行超时（>{TimeoutSeconds}s），已中断本轮并等待下个周期。", SingleRunTimeoutSeconds);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

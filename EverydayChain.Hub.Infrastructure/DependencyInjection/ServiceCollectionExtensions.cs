@@ -76,22 +76,27 @@ public static class ServiceCollectionExtensions {
         services.Configure<FeedbackCompensationJobOptions>(configuration.GetSection(FeedbackCompensationJobOptions.SectionName));
         services.Configure<ExceptionRuleOptions>(configuration.GetSection(ExceptionRuleOptions.SectionName));
         services.Configure<QueryCacheOptions>(configuration.GetSection(QueryCacheOptions.SectionName));
+        services.Configure<EfCoreOptions>(configuration.GetSection(EfCoreOptions.SectionName));
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
         var queryCacheOptions = configuration.GetSection(QueryCacheOptions.SectionName).Get<QueryCacheOptions>() ?? new QueryCacheOptions();
         var syncOptions = configuration.GetSection(SyncJobOptions.SectionName).Get<SyncJobOptions>() ?? new SyncJobOptions();
         var retentionJobOptions = configuration.GetSection(RetentionJobOptions.SectionName).Get<RetentionJobOptions>() ?? new RetentionJobOptions();
+        var efCoreOptions = configuration.GetSection(EfCoreOptions.SectionName).Get<EfCoreOptions>() ?? new EfCoreOptions();
         var managedLogicalTables = BuildManagedLogicalTables(syncOptions).ToArray();
+        var dbContextPoolSize = Math.Clamp(efCoreOptions.DbContextPoolSize > 0 ? efCoreOptions.DbContextPoolSize : 256, 32, 1024);
+        var commandTimeoutSeconds = Math.Clamp(efCoreOptions.CommandTimeoutSeconds > 0 ? efCoreOptions.CommandTimeoutSeconds : 30, 1, 600);
 
         services.AddMemoryCache();
-        services.AddDbContextFactory<HubDbContext>(options => {
+        services.AddPooledDbContextFactory<HubDbContext>(options => {
             options.UseSqlServer(shardingOptions.ConnectionString, sqlServerOptions => {
                 sqlServerOptions.EnableRetryOnFailure();
+                sqlServerOptions.CommandTimeout(commandTimeoutSeconds);
             });
             // 运行时自动迁移阶段仅需执行已生成迁移，忽略“模型较快照有待提交变更”的告警，避免阻断启动链路。
             options.ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
             options.ReplaceService<IModelCacheKeyFactory, ShardModelCacheKeyFactory>();
-        });
+        }, dbContextPoolSize);
         services.AddSingleton<IShardSuffixResolver, MonthShardSuffixResolver>();
         services.AddSingleton<IDangerZoneExecutor, DangerZoneExecutor>();
         services.AddSingleton<IRuntimeStorageGuard, RuntimeStorageGuard>();

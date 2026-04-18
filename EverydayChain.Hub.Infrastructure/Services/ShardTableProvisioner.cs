@@ -21,6 +21,8 @@ public class ShardTableProvisioner(
     ILogger<ShardTableProvisioner> logger,
     IDangerZoneExecutor dangerZoneExecutor) : IShardTableProvisioner
 {
+    /// <summary>分表预建 DDL 命令超时秒数（危险动作隔离器）。</summary>
+    private const int ProvisionCommandTimeoutSeconds = 30;
     /// <summary>分表配置快照。</summary>
     private readonly ShardingOptions _options = options.Value;
     /// <summary>纳管逻辑表列表。</summary>
@@ -86,6 +88,7 @@ public class ShardTableProvisioner(
             await connection.OpenAsync(token);
             await using var command = connection.CreateCommand();
             command.CommandText = sql;
+            command.CommandTimeout = ProvisionCommandTimeoutSeconds;
             await command.ExecuteNonQueryAsync(token);
             logger.LogInformation("分表自治: 已确认分表存在 {Table}", fullName);
         },
