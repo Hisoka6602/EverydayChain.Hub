@@ -134,4 +134,56 @@ public sealed class BusinessTaskQueryControllerTests
         Assert.Equal(queryRequest.StartTimeLocal, stubService.LastRequest!.StartTimeLocal);
         Assert.Equal(queryRequest.EndTimeLocal, stubService.LastRequest.EndTimeLocal);
     }
+
+    /// <summary>
+    /// 请求体为空时异常件查询应回退使用查询字符串请求。
+    /// </summary>
+    [Fact]
+    public async Task QueryExceptionsAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull()
+    {
+        var stubService = new StubBusinessTaskReadService();
+        var controller = new BusinessTaskQueryController(stubService);
+        var queryRequest = new BusinessTaskQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 0, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 18, 0, 0, 0), DateTimeKind.Local),
+            PageNumber = 1,
+            PageSize = 50
+        };
+
+        var result = await controller.QueryExceptionsAsync(null, queryRequest, CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<ApiResponse<BusinessTaskQueryResponse>>(okResult.Value);
+
+        Assert.True(response.IsSuccess);
+        Assert.NotNull(stubService.LastRequest);
+        Assert.Equal(queryRequest.StartTimeLocal, stubService.LastRequest!.StartTimeLocal);
+        Assert.Equal(queryRequest.EndTimeLocal, stubService.LastRequest.EndTimeLocal);
+    }
+
+    /// <summary>
+    /// 请求体为空时回流记录查询应回退使用查询字符串请求。
+    /// </summary>
+    [Fact]
+    public async Task QueryRecirculationsAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull()
+    {
+        var stubService = new StubBusinessTaskReadService();
+        var controller = new BusinessTaskQueryController(stubService);
+        var queryRequest = new BusinessTaskQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 0, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 18, 0, 0, 0), DateTimeKind.Local),
+            PageNumber = 1,
+            PageSize = 50
+        };
+
+        var result = await controller.QueryRecirculationsAsync(null, queryRequest, CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<ApiResponse<BusinessTaskQueryResponse>>(okResult.Value);
+
+        Assert.True(response.IsSuccess);
+        Assert.NotNull(stubService.LastRequest);
+        Assert.Equal(queryRequest.StartTimeLocal, stubService.LastRequest!.StartTimeLocal);
+        Assert.Equal(queryRequest.EndTimeLocal, stubService.LastRequest.EndTimeLocal);
+    }
 }

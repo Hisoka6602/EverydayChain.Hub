@@ -78,4 +78,27 @@ public sealed class SortingReportControllerTests
 
         Assert.True(response.IsSuccess);
     }
+
+    /// <summary>
+    /// 请求体为空时导出接口应回退使用查询字符串请求。
+    /// </summary>
+    [Fact]
+    public async Task ExportCsvAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull()
+    {
+        var stubService = new StubSortingReportQueryService();
+        var controller = new SortingReportController(stubService);
+        var queryRequest = new SortingReportQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 0, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 18, 0, 0, 0), DateTimeKind.Local)
+        };
+
+        var result = await controller.ExportCsvAsync(null, queryRequest, CancellationToken.None);
+        var fileResult = Assert.IsType<FileContentResult>(result);
+
+        Assert.Equal("text/csv; charset=utf-8", fileResult.ContentType);
+        Assert.NotNull(stubService.LastRequest);
+        Assert.Equal(queryRequest.StartTimeLocal, stubService.LastRequest!.StartTimeLocal);
+        Assert.Equal(queryRequest.EndTimeLocal, stubService.LastRequest.EndTimeLocal);
+    }
 }
