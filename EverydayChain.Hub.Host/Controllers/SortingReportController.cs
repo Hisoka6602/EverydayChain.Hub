@@ -3,6 +3,7 @@ using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using System.Text;
 
 namespace EverydayChain.Hub.Host.Controllers;
@@ -38,15 +39,20 @@ public sealed class SortingReportController : ControllerBase
     /// 请求条件：开始时间与结束时间必填，且结束时间大于开始时间。
     /// 返回语义：返回按码头聚合的分拣统计行集合；参数非法返回 400。
     /// </summary>
-    /// <param name="request">查询请求。</param>
+    /// <param name="request">请求体查询请求。</param>
+    /// <param name="queryRequest">查询字符串请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>分拣报表查询结果，包含生效查询窗口、码头筛选与报表明细行。</returns>
     [HttpPost("query")]
     [ProducesResponseType(typeof(ApiResponse<SortingReportResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<SortingReportResponse>), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<ApiResponse<SortingReportResponse>>> QueryAsync([FromBody] SortingReportQueryRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResponse<SortingReportResponse>>> QueryAsync(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] SortingReportQueryRequest? request,
+        [FromQuery] SortingReportQueryRequest? queryRequest,
+        CancellationToken cancellationToken)
     {
-        if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(request.StartTimeLocal, request.EndTimeLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
+        var resolvedRequest = request ?? queryRequest ?? new SortingReportQueryRequest();
+        if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(resolvedRequest.StartTimeLocal, resolvedRequest.EndTimeLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
         {
             return BadRequest(ApiResponse<SortingReportResponse>.Fail(validationMessage));
         }
@@ -55,7 +61,7 @@ public sealed class SortingReportController : ControllerBase
         {
             StartTimeLocal = normalizedStart,
             EndTimeLocal = normalizedEnd,
-            DockCode = request.DockCode
+            DockCode = resolvedRequest.DockCode
         }, cancellationToken);
 
         var response = new SortingReportResponse
@@ -85,15 +91,20 @@ public sealed class SortingReportController : ControllerBase
     /// 请求条件：时间范围校验规则与报表查询一致。
     /// 返回语义：成功返回 UTF-8 BOM 编码的 CSV 文件流；参数校验失败返回 400；系统异常返回结果遵循项目实际异常处理策略。
     /// </summary>
-    /// <param name="request">查询请求。</param>
+    /// <param name="request">请求体查询请求。</param>
+    /// <param name="queryRequest">查询字符串请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>分拣报表 CSV 文件流或参数校验失败结果。</returns>
     [HttpPost("export/csv")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult> ExportCsvAsync([FromBody] SortingReportQueryRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult> ExportCsvAsync(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] SortingReportQueryRequest? request,
+        [FromQuery] SortingReportQueryRequest? queryRequest,
+        CancellationToken cancellationToken)
     {
-        if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(request.StartTimeLocal, request.EndTimeLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
+        var resolvedRequest = request ?? queryRequest ?? new SortingReportQueryRequest();
+        if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(resolvedRequest.StartTimeLocal, resolvedRequest.EndTimeLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
         {
             return BadRequest(ApiResponse<object>.Fail(validationMessage));
         }
@@ -102,7 +113,7 @@ public sealed class SortingReportController : ControllerBase
         {
             StartTimeLocal = normalizedStart,
             EndTimeLocal = normalizedEnd,
-            DockCode = request.DockCode
+            DockCode = resolvedRequest.DockCode
         }, cancellationToken);
 
         var localNow = DateTimeOffset.Now.LocalDateTime;

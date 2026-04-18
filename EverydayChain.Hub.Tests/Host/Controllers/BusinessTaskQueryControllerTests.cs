@@ -27,7 +27,7 @@ public sealed class BusinessTaskQueryControllerTests
             PageSize = 50
         };
 
-        var result = await controller.QueryTasksAsync(request, CancellationToken.None);
+        var result = await controller.QueryTasksAsync(request, null, CancellationToken.None);
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var response = Assert.IsType<ApiResponse<BusinessTaskQueryResponse>>(okResult.Value);
         Assert.NotNull(response.Data);
@@ -56,7 +56,7 @@ public sealed class BusinessTaskQueryControllerTests
             PageSize = 0
         };
 
-        var result = await controller.QueryTasksAsync(request, CancellationToken.None);
+        var result = await controller.QueryTasksAsync(request, null, CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
@@ -76,7 +76,7 @@ public sealed class BusinessTaskQueryControllerTests
             LastCreatedTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 10, 0, 0), DateTimeKind.Local)
         };
 
-        var result = await controller.QueryTasksAsync(request, CancellationToken.None);
+        var result = await controller.QueryTasksAsync(request, null, CancellationToken.None);
         var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
         var apiResponse = Assert.IsType<ApiResponse<BusinessTaskQueryResponse>>(badRequest.Value);
@@ -102,10 +102,36 @@ public sealed class BusinessTaskQueryControllerTests
             LastId = lastId
         };
 
-        var result = await controller.QueryTasksAsync(request, CancellationToken.None);
+        var result = await controller.QueryTasksAsync(request, null, CancellationToken.None);
         var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
         var apiResponse = Assert.IsType<ApiResponse<BusinessTaskQueryResponse>>(badRequest.Value);
         Assert.Contains("LastId 必须大于 0", apiResponse.Message);
+    }
+
+    /// <summary>
+    /// 请求体为空时任务查询应回退使用查询字符串请求。
+    /// </summary>
+    [Fact]
+    public async Task QueryTasksAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull()
+    {
+        var stubService = new StubBusinessTaskReadService();
+        var controller = new BusinessTaskQueryController(stubService);
+        var queryRequest = new BusinessTaskQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 0, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 18, 0, 0, 0), DateTimeKind.Local),
+            PageNumber = 1,
+            PageSize = 50
+        };
+
+        var result = await controller.QueryTasksAsync(null, queryRequest, CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<ApiResponse<BusinessTaskQueryResponse>>(okResult.Value);
+
+        Assert.True(response.IsSuccess);
+        Assert.NotNull(stubService.LastRequest);
+        Assert.Equal(queryRequest.StartTimeLocal, stubService.LastRequest!.StartTimeLocal);
+        Assert.Equal(queryRequest.EndTimeLocal, stubService.LastRequest.EndTimeLocal);
     }
 }
