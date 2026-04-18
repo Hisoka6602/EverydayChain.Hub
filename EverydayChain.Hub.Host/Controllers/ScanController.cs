@@ -49,6 +49,7 @@ public sealed class ScanController : ControllerBase {
 
     /// <summary>
     /// 接收扫描上传请求并批量处理条码。
+    /// 绑定语义：允许空请求体进入方法体并返回统一错误消息。
     /// 请求条件：<see cref="ScanUploadRequest.DeviceCode"/> 与 <see cref="ScanUploadRequest.Barcodes"/> 必填。
     /// 返回语义：全部条码受理成功返回 200；存在任意条码失败返回 400 且返回逐条处理结果。
     /// </summary>

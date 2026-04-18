@@ -11,7 +11,6 @@ public sealed class ScanUploadRequest {
     /// 可填写范围：1~100 项，每项长度 1~128；必填。
     /// 空值语义：为空或 null 均视为无效请求。
     /// </summary>
-    [MinLength(1)]
     public List<string> Barcodes { get; set; } = [];
 
     /// <summary>
