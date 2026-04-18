@@ -83,27 +83,49 @@ public sealed class TaskExecutionServiceTests
     public async Task MarkScannedAsync_ShouldSucceed_WhenTaskIsDropped()
     {
         var (service, repo) = CreateService();
+        var droppedTime = new DateTime(2026, 4, 18, 9, 30, 0, DateTimeKind.Local);
+        var feedbackTime = new DateTime(2026, 4, 18, 9, 45, 0, DateTimeKind.Local);
+        var scanTime = new DateTime(2026, 4, 18, 10, 0, 0, DateTimeKind.Local);
         await repo.SaveAsync(new BusinessTaskEntity
         {
             TaskCode = "TASK-002",
             SourceTableCode = "WMS",
             BusinessKey = "K2",
             Barcode = "BC-002",
+            TargetChuteCode = "7",
+            ActualChuteCode = "7",
             Status = BusinessTaskStatus.Dropped,
-            CreatedTimeLocal = DateTime.Now,
-            UpdatedTimeLocal = DateTime.Now
+            FeedbackStatus = BusinessTaskFeedbackStatus.Pending,
+            IsFeedbackReported = true,
+            DroppedAtLocal = droppedTime,
+            FeedbackTimeLocal = feedbackTime,
+            ScanCount = 2,
+            CreatedTimeLocal = droppedTime,
+            UpdatedTimeLocal = droppedTime
         }, CancellationToken.None);
 
         var request = new ScanUploadApplicationRequest
         {
             Barcode = "BC-002",
-            ScanTimeLocal = DateTime.Now
+            ScanTimeLocal = scanTime
         };
 
         var result = await service.MarkScannedAsync(request, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(nameof(BusinessTaskStatus.Scanned), result.TaskStatus);
+
+        var updatedTask = await repo.FindByTaskCodeAsync("TASK-002", CancellationToken.None);
+        Assert.NotNull(updatedTask);
+        Assert.Equal(BusinessTaskStatus.Scanned, updatedTask!.Status);
+        Assert.Equal(scanTime, updatedTask.ScannedAtLocal);
+        Assert.Equal("7", updatedTask.TargetChuteCode);
+        Assert.Null(updatedTask.ActualChuteCode);
+        Assert.Null(updatedTask.DroppedAtLocal);
+        Assert.Equal(BusinessTaskFeedbackStatus.NotRequired, updatedTask.FeedbackStatus);
+        Assert.False(updatedTask.IsFeedbackReported);
+        Assert.Null(updatedTask.FeedbackTimeLocal);
+        Assert.Equal(3, updatedTask.ScanCount);
     }
 
     /// <summary>

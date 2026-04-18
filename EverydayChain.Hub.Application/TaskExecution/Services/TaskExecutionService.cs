@@ -1,6 +1,7 @@
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Aggregates.ScanLogAggregate;
 using EverydayChain.Hub.Domain.Enums;
 using Microsoft.Extensions.Logging;
@@ -122,6 +123,11 @@ public sealed class TaskExecutionService : ITaskExecutionService
         }
 
         // 步骤 3：更新状态与扫描信息。
+        if (task.Status == BusinessTaskStatus.Dropped)
+        {
+            ResetDropAndFeedbackFieldsForRescan(task);
+        }
+
         task.Status = BusinessTaskStatus.Scanned;
         task.ScannedAtLocal = request.ScanTimeLocal;
         task.DeviceCode = normalizedDeviceCode ?? task.DeviceCode;
@@ -171,6 +177,19 @@ public sealed class TaskExecutionService : ITaskExecutionService
         return status is BusinessTaskStatus.Created
             or BusinessTaskStatus.Scanned
             or BusinessTaskStatus.Dropped;
+    }
+
+    /// <summary>
+    /// 已落格任务重复扫描时重置落格与回传语义字段，避免状态与字段不一致。
+    /// </summary>
+    /// <param name="task">业务任务实体。</param>
+    private static void ResetDropAndFeedbackFieldsForRescan(BusinessTaskEntity task)
+    {
+        task.DroppedAtLocal = null;
+        task.ActualChuteCode = null;
+        task.FeedbackStatus = BusinessTaskFeedbackStatus.NotRequired;
+        task.IsFeedbackReported = false;
+        task.FeedbackTimeLocal = null;
     }
 
     /// <summary>

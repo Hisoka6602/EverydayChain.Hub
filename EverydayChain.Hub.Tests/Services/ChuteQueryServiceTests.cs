@@ -120,10 +120,10 @@ public sealed class ChuteQueryServiceTests
     }
 
     /// <summary>
-    /// 任务已落格且有目标格口时应支持重复请求并返回成功结果。
+    /// 任务已落格且条码可解析出格口时应支持重复请求并返回成功结果。
     /// </summary>
     [Fact]
-    public async Task ExecuteAsync_ShouldSucceed_WhenTaskIsDroppedWithChute()
+    public async Task ExecuteAsync_ShouldSucceed_WhenTaskIsDroppedAndBarcodeCanResolveChute()
     {
         var (service, repo) = CreateService();
         var now = new DateTime(2026, 4, 18, 10, 0, 0, DateTimeKind.Local);
