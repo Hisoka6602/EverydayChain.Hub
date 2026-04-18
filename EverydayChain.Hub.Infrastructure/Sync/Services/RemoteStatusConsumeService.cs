@@ -1,10 +1,14 @@
+using System.Text;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using System.Security.Cryptography;
 using EverydayChain.Hub.Domain.Sync;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using EverydayChain.Hub.Application.Abstractions.Sync;
+using EverydayChain.Hub.Application.Abstractions.Services;
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 
 namespace EverydayChain.Hub.Infrastructure.Sync.Services;
 
@@ -15,6 +19,8 @@ public class RemoteStatusConsumeService(
     IOracleStatusDrivenSourceReader sourceReader,
     ISqlServerAppendOnlyWriter appendOnlyWriter,
     IOracleRemoteStatusWriter remoteStatusWriter,
+    IBusinessTaskMaterializer businessTaskMaterializer,
+    IBusinessTaskRepository businessTaskRepository,
     ILogger<RemoteStatusConsumeService> logger) : IRemoteStatusConsumeService {
 
     /// <summary>状态驱动分页进度日志采样间隔。</summary>
@@ -119,6 +125,7 @@ public class RemoteStatusConsumeService(
             var appendCount = await appendOnlyWriter.AppendAsync(definition.TableCode, definition.TargetLogicalTable, rows, definition.UniqueKeys, ct);
             appendStopwatch.Stop();
             result.AppendCount += appendCount;
+            await MaterializeBusinessTasksAsync(definition, rows, ct);
             if (appendStopwatch.ElapsedMilliseconds >= SlowStepWarningThresholdMs) {
                 logger.LogWarning(
                     "状态驱动本地追加耗时较高。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, AppendRows={AppendRows}, AppendElapsedMs={AppendElapsedMs}, SlowThresholdMs={SlowThresholdMs}",
@@ -243,5 +250,137 @@ public class RemoteStatusConsumeService(
             result.SkippedWriteBackCount,
             result.PageCount);
         return result;
+    }
+
+    /// <summary>
+    /// 按同步行尝试物化业务任务（幂等）。
+    /// </summary>
+    /// <param name="definition">同步定义。</param>
+    /// <param name="rows">当前页同步行。</param>
+    /// <param name="ct">取消令牌。</param>
+    private async Task MaterializeBusinessTasksAsync(
+        SyncTableDefinition definition,
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> rows,
+        CancellationToken ct) {
+        if (rows.Count == 0) {
+            return;
+        }
+
+        foreach (var row in rows) {
+            var request = BuildMaterializeRequest(definition, row);
+            if (request is null) {
+                continue;
+            }
+
+            var exists = await businessTaskRepository.FindByTaskCodeAsync(request.TaskCode, ct);
+            if (exists is not null) {
+                continue;
+            }
+
+            var entity = businessTaskMaterializer.Materialize(request);
+            await businessTaskRepository.SaveAsync(entity, ct);
+        }
+    }
+
+    /// <summary>
+    /// 根据表定义与源行构建物化请求；不支持的表或关键字段缺失时返回空值。
+    /// </summary>
+    /// <param name="definition">同步定义。</param>
+    /// <param name="row">源行。</param>
+    /// <returns>物化请求。</returns>
+    private static BusinessTaskMaterializeRequest? BuildMaterializeRequest(
+        SyncTableDefinition definition,
+        IReadOnlyDictionary<string, object?> row) {
+        if (definition.TableCode.Equals("WmsSplitPickToLightCarton", StringComparison.OrdinalIgnoreCase)) {
+            var barcode = ReadOptionalString(row, "CARTONNO");
+            if (string.IsNullOrWhiteSpace(barcode)) {
+                return null;
+            }
+
+            var taskCode = BuildTaskCode(definition.TableCode, barcode);
+            return new BusinessTaskMaterializeRequest {
+                TaskCode = taskCode,
+                SourceTableCode = definition.TableCode,
+                SourceType = BusinessTaskSourceType.Split,
+                BusinessKey = barcode,
+                Barcode = barcode,
+                WaveCode = ReadOptionalString(row, "WAVENO"),
+                WaveRemark = ReadOptionalString(row, "DESCR"),
+                MaterializedTimeLocal = ReadOptionalDateTime(row, "ADDTIME") ?? DateTime.Now,
+            };
+        }
+
+        if (definition.TableCode.Equals("WmsPickToWcs", StringComparison.OrdinalIgnoreCase)) {
+            var barcode = ReadOptionalString(row, "SKUID");
+            if (string.IsNullOrWhiteSpace(barcode)) {
+                return null;
+            }
+
+            var taskCode = BuildTaskCode(definition.TableCode, barcode);
+            return new BusinessTaskMaterializeRequest {
+                TaskCode = taskCode,
+                SourceTableCode = definition.TableCode,
+                SourceType = BusinessTaskSourceType.FullCase,
+                BusinessKey = barcode,
+                Barcode = barcode,
+                WaveCode = ReadOptionalString(row, "WAVENO"),
+                WaveRemark = ReadOptionalString(row, "DESCR"),
+                MaterializedTimeLocal = ReadOptionalDateTime(row, "ADDTIME") ?? DateTime.Now,
+            };
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 读取可选字符串列（忽略大小写键）。
+    /// </summary>
+    /// <param name="row">行数据。</param>
+    /// <param name="columnName">列名。</param>
+    /// <returns>列值字符串。</returns>
+    private static string? ReadOptionalString(IReadOnlyDictionary<string, object?> row, string columnName) {
+        if (!row.TryGetValue(columnName, out var value) || value is null) {
+            return null;
+        }
+
+        var text = value.ToString();
+        return string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+    }
+
+    /// <summary>
+    /// 读取可选时间列（忽略大小写键）。
+    /// </summary>
+    /// <param name="row">行数据。</param>
+    /// <param name="columnName">列名。</param>
+    /// <returns>本地时间。</returns>
+    private static DateTime? ReadOptionalDateTime(IReadOnlyDictionary<string, object?> row, string columnName) {
+        if (!row.TryGetValue(columnName, out var value) || value is null) {
+            return null;
+        }
+
+        if (value is DateTime dateTime) {
+            return dateTime;
+        }
+
+        return DateTime.TryParse(value.ToString(), out var parsed) ? parsed : null;
+    }
+
+    /// <summary>
+    /// 构建稳定任务编码，超长时附加哈希并截断。
+    /// </summary>
+    /// <param name="tableCode">表编码。</param>
+    /// <param name="businessKey">业务键。</param>
+    /// <returns>任务编码。</returns>
+    private static string BuildTaskCode(string tableCode, string businessKey) {
+        var raw = $"{tableCode}:{businessKey}";
+        if (raw.Length <= 64) {
+            return raw;
+        }
+
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
+        var hash = Convert.ToHexString(bytes[..4]);
+        var prefixMaxLength = 64 - hash.Length - 1;
+        var prefix = raw[..prefixMaxLength];
+        return $"{prefix}-{hash}";
     }
 }
