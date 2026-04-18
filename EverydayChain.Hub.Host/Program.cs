@@ -9,6 +9,15 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi.Models;
 using EverydayChain.Hub.Infrastructure.DependencyInjection;
 
+// 默认参数校验失败消息。
+const string DefaultValidationFailureMessage = "请求参数校验失败。";
+
+// 空请求体校验失败消息。
+const string EmptyRequestBodyValidationMessage = "请求体不能为空，且请求头 Content-Type 必须为 application/json。";
+
+// 时间格式校验失败消息。
+const string DateTimeFormatValidationMessage = "时间字段格式无效，请使用本地时间格式 yyyy-MM-dd HH:mm:ss 或 yyyy-MM-dd HH:mm:ss.fff，禁止使用 Z 或时区偏移。";
+
 var builder = WebApplication.CreateBuilder(args);
 var logger = NLog.LogManager.GetCurrentClassLogger();
 var webEndpointSection = builder.Configuration.GetSection(WebEndpointOptions.SectionName);
@@ -31,9 +40,11 @@ if (!swaggerSection.Exists())
 builder.Logging.ClearProviders();
 builder.Logging.AddNLog();
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddControllers().ConfigureApiBehaviorOptions(options => {
+builder.Services.AddControllers()
+    .AddNewtonsoftJson()
+    .ConfigureApiBehaviorOptions(options => {
     options.InvalidModelStateResponseFactory = context => {
-        var firstError = "请求参数校验失败。";
+        var firstError = DefaultValidationFailureMessage;
         foreach (var modelStateEntry in context.ModelState.Values) {
             foreach (var error in modelStateEntry.Errors) {
                 if (!string.IsNullOrWhiteSpace(error.ErrorMessage)) {
@@ -44,6 +55,7 @@ builder.Services.AddControllers().ConfigureApiBehaviorOptions(options => {
         }
 
 BuildResponse:
+        firstError = NormalizeValidationMessage(firstError);
         return new BadRequestObjectResult(ApiResponse<object>.Fail(firstError));
     };
 });
@@ -128,4 +140,32 @@ static string NormalizeSwaggerRoutePrefix(string? path) {
     }
 
     return trimmed.Trim('/').ToLowerInvariant();
+}
+
+// 归一化模型绑定错误消息，避免直接暴露底层序列化器实现细节。
+// rawMessage: 原始错误文本。
+// 返回值：可直接用于响应的统一错误文本。
+static string NormalizeValidationMessage(string rawMessage) {
+    if (string.IsNullOrWhiteSpace(rawMessage)) {
+        return DefaultValidationFailureMessage;
+    }
+
+    if (rawMessage.Contains("The request field is required.", StringComparison.OrdinalIgnoreCase)
+        || rawMessage.Contains("A non-empty request body is required.", StringComparison.OrdinalIgnoreCase)) {
+        return EmptyRequestBodyValidationMessage;
+    }
+
+    var isDateTimeConversionFailure =
+        rawMessage.Contains("could not be converted to System.DateTime", StringComparison.OrdinalIgnoreCase)
+        || rawMessage.Contains("could not be converted to System.Nullable`1[System.DateTime]", StringComparison.OrdinalIgnoreCase)
+        || (rawMessage.Contains("Error converting value", StringComparison.OrdinalIgnoreCase)
+            && rawMessage.Contains("to type 'System.DateTime'", StringComparison.OrdinalIgnoreCase))
+        || (rawMessage.Contains("Error converting value", StringComparison.OrdinalIgnoreCase)
+            && rawMessage.Contains("to type 'System.Nullable`1[System.DateTime]'", StringComparison.OrdinalIgnoreCase))
+        || rawMessage.Contains("Could not convert string to DateTime", StringComparison.OrdinalIgnoreCase);
+    if (isDateTimeConversionFailure) {
+        return DateTimeFormatValidationMessage;
+    }
+
+    return rawMessage;
 }

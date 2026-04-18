@@ -1,7 +1,8 @@
 using System.Diagnostics;
 using System.Text;
-using System.Text.Json;
 using EverydayChain.Hub.Host.Middlewares.Streams;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace EverydayChain.Hub.Host.Middlewares;
 
@@ -144,12 +145,12 @@ public sealed class ApiFailureLoggingMiddleware {
         }
 
         try {
-            using var document = JsonDocument.Parse(responseBody);
-            if (document.RootElement.ValueKind != JsonValueKind.Object) {
+            var rootToken = JsonConvert.DeserializeObject<JToken>(responseBody);
+            if (rootToken is not JObject rootObject) {
                 return false;
             }
 
-            if (!TryReadIsSuccessProperty(document.RootElement, out var isSuccess)) {
+            if (!TryReadIsSuccessProperty(rootObject, out var isSuccess)) {
                 return false;
             }
 
@@ -166,18 +167,12 @@ public sealed class ApiFailureLoggingMiddleware {
     /// <param name="root">响应对象根节点。</param>
     /// <param name="isSuccess">业务成功标记。</param>
     /// <returns>读取成功返回 true，否则返回 false。</returns>
-    private static bool TryReadIsSuccessProperty(JsonElement root, out bool isSuccess) {
+    private static bool TryReadIsSuccessProperty(JObject root, out bool isSuccess) {
         isSuccess = false;
-        if (root.TryGetProperty("isSuccess", out var value) || root.TryGetProperty("IsSuccess", out value)) {
-            if (value.ValueKind == JsonValueKind.True) {
-                isSuccess = true;
-                return true;
-            }
-
-            if (value.ValueKind == JsonValueKind.False) {
-                isSuccess = false;
-                return true;
-            }
+        var value = root.GetValue("isSuccess", StringComparison.OrdinalIgnoreCase);
+        if (value?.Type == JTokenType.Boolean) {
+            isSuccess = value.Value<bool>();
+            return true;
         }
 
         return false;

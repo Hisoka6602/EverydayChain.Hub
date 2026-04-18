@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Host.Contracts.Requests;
@@ -13,6 +14,11 @@ namespace EverydayChain.Hub.Host.Controllers;
 [ApiController]
 [Route("api/v1/scan")]
 public sealed class ScanController : ControllerBase {
+    /// <summary>
+    /// 当请求体为空时返回的错误消息。
+    /// </summary>
+    private const string EmptyRequestBodyMessage = "扫描上传请求体不能为空。";
+
     /// <summary>
     /// 多条码场景下非首条条码的尺寸与重量回写值。
     /// </summary>
@@ -43,7 +49,10 @@ public sealed class ScanController : ControllerBase {
 
     /// <summary>
     /// 接收扫描上传请求并批量处理条码。
-    /// 请求条件：<see cref="ScanUploadRequest.DeviceCode"/> 必填；且 <see cref="ScanUploadRequest.Barcodes"/> 与 <see cref="ScanUploadRequest.Barcode"/> 至少提供一项。
+    /// 绑定语义：允许空请求体进入方法体并返回统一错误消息。
+    /// 设计意图：通过 <see cref="EmptyBodyBehavior.Allow"/> 统一返回 <see cref="EmptyRequestBodyMessage"/>，
+    /// 避免框架默认模型绑定错误消息导致的接口响应语义不一致。
+    /// 请求条件：<see cref="ScanUploadRequest.DeviceCode"/> 与 <see cref="ScanUploadRequest.Barcodes"/> 必填。
     /// 返回语义：全部条码受理成功返回 200；存在任意条码失败返回 400 且返回逐条处理结果。
     /// </summary>
     /// <param name="request">扫描上传请求。</param>
@@ -52,7 +61,11 @@ public sealed class ScanController : ControllerBase {
     [HttpPost("upload")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ScanUploadResponse>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ScanUploadResponse>>), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<ApiResponse<IReadOnlyList<ScanUploadResponse>>>> UploadAsync([FromBody] ScanUploadRequest request, CancellationToken cancellationToken) {
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<ScanUploadResponse>>>> UploadAsync([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] ScanUploadRequest? request, CancellationToken cancellationToken) {
+        if (request is null) {
+            return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail(EmptyRequestBodyMessage));
+        }
+
         if (!TryBuildBarcodes(request, out var barcodes, out var barcodeValidationMessage)) {
             return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail(barcodeValidationMessage));
         }
@@ -107,7 +120,7 @@ public sealed class ScanController : ControllerBase {
     }
 
     /// <summary>
-    /// 统一整理请求中的条码列表，优先使用批量条码字段。
+    /// 统一整理请求中的条码列表。
     /// </summary>
     /// <param name="request">扫描上传请求。</param>
     /// <param name="normalizedBarcodes">整理后的条码列表。</param>
@@ -117,48 +130,29 @@ public sealed class ScanController : ControllerBase {
         validationMessage = string.Empty;
         normalizedBarcodes = [];
         var requestBarcodes = request.Barcodes ?? [];
-        if (requestBarcodes.Count > 0) {
-            if (requestBarcodes.Count > MaxBarcodeCountPerRequest) {
-                validationMessage = $"单次最多允许提交 {MaxBarcodeCountPerRequest} 个条码。";
-                return false;
-            }
-
-            foreach (var barcode in requestBarcodes) {
-                if (string.IsNullOrWhiteSpace(barcode)) {
-                    validationMessage = "条码列表中存在空条码，请检查后重试。";
-                    return false;
-                }
-
-                var trimmedBarcode = barcode.Trim();
-                if (trimmedBarcode.Length > MaxBarcodeLength) {
-                    validationMessage = $"条码长度不能超过 {MaxBarcodeLength}。";
-                    return false;
-                }
-
-                normalizedBarcodes.Add(trimmedBarcode);
-            }
-
-            if (normalizedBarcodes.Count == 0) {
-                validationMessage = "条码不能为空。";
-                return false;
-            }
-
-            return true;
+        if (requestBarcodes.Count == 0) {
+            validationMessage = "条码不能为空。";
+            return false;
         }
 
-        if (!string.IsNullOrWhiteSpace(request.Barcode)) {
-            var trimmedBarcode = request.Barcode.Trim();
+        if (requestBarcodes.Count > MaxBarcodeCountPerRequest) {
+            validationMessage = $"单次最多允许提交 {MaxBarcodeCountPerRequest} 个条码。";
+            return false;
+        }
+
+        foreach (var barcode in requestBarcodes) {
+            if (string.IsNullOrWhiteSpace(barcode)) {
+                validationMessage = "条码列表中存在空条码，请检查后重试。";
+                return false;
+            }
+
+            var trimmedBarcode = barcode.Trim();
             if (trimmedBarcode.Length > MaxBarcodeLength) {
                 validationMessage = $"条码长度不能超过 {MaxBarcodeLength}。";
                 return false;
             }
 
             normalizedBarcodes.Add(trimmedBarcode);
-        }
-
-        if (normalizedBarcodes.Count == 0) {
-            validationMessage = "条码不能为空。";
-            return false;
         }
 
         return true;

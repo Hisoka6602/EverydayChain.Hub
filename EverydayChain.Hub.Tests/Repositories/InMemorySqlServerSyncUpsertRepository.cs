@@ -1,4 +1,3 @@
-using System.Text.Json;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Options;
@@ -7,6 +6,7 @@ using EverydayChain.Hub.Infrastructure.Repositories;
 using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 
 namespace EverydayChain.Hub.Tests.Repositories;
 
@@ -71,7 +71,7 @@ public sealed class InMemorySqlServerSyncUpsertRepository : SqlServerSyncUpsertR
         foreach (var row in request.Rows)
         {
             var businessKey = row["CARTONNO"]?.ToString() ?? string.Empty;
-            var digest = JsonSerializer.Serialize(row);
+            var digest = JsonConvert.SerializeObject(row);
             var addTime = row.TryGetValue("ADDTIME", out var addTimeValue) && addTimeValue is DateTime dateTime
                 ? dateTime
                 : DateTime.Now;

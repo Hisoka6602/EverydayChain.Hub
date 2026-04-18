@@ -1,6 +1,5 @@
 using System.Text;
 using System.Buffers;
-using System.Text.Json;
 using System.Globalization;
 using System.Data;
 using System.Buffers.Binary;
@@ -15,6 +14,7 @@ using EverydayChain.Hub.SharedKernel.Utilities;
 using EverydayChain.Hub.Infrastructure.Services;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
+using Newtonsoft.Json;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
@@ -42,8 +42,8 @@ public class SqlServerSyncUpsertRepository(
     private const int TempTableCleanupTimeoutSeconds = 5;
 
     /// <summary>行摘要序列化配置（紧凑输出）。</summary>
-    private static readonly JsonSerializerOptions DigestSerializerOptions = new() {
-        WriteIndented = false,
+    private static readonly JsonSerializerSettings DigestSerializerSettings = new() {
+        Formatting = Formatting.None,
     };
 
     /// <summary>同步配置快照。</summary>
@@ -1622,7 +1622,7 @@ ORDER BY t.[name] DESC;";
             return formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty;
         }
 
-        return JsonSerializer.Serialize(value, DigestSerializerOptions);
+        return JsonConvert.SerializeObject(value, DigestSerializerSettings);
     }
 
     /// <summary>
