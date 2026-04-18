@@ -3,6 +3,7 @@ using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace EverydayChain.Hub.Host.Controllers;
 
@@ -11,7 +12,7 @@ namespace EverydayChain.Hub.Host.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/v1/dashboard")]
-public sealed class GlobalDashboardController : ControllerBase
+public sealed class GlobalDashboardController : QueryControllerBase
 {
     /// <summary>
     /// 总看板查询服务。
@@ -32,15 +33,21 @@ public sealed class GlobalDashboardController : ControllerBase
     /// 请求条件：开始时间与结束时间均为本地时间，且结束时间大于开始时间。
     /// 返回语义：返回整件/拆零/回流/异常与波次聚合指标；参数非法返回 400。
     /// </summary>
-    /// <param name="request">查询请求。</param>
+    /// <param name="request">请求体查询请求。</param>
+    /// <param name="queryRequest">查询字符串请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>总看板统计结果，包含总体指标与波次维度汇总数据。</returns>
     [HttpPost("overview")]
     [ProducesResponseType(typeof(ApiResponse<GlobalDashboardResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<GlobalDashboardResponse>), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<ApiResponse<GlobalDashboardResponse>>> QueryOverviewAsync([FromBody] GlobalDashboardQueryRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResponse<GlobalDashboardResponse>>> QueryOverviewAsync(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] GlobalDashboardQueryRequest? request,
+        [FromQuery] GlobalDashboardQueryRequest? queryRequest,
+        CancellationToken cancellationToken)
     {
-        if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(request.StartTimeLocal, request.EndTimeLocal, out var normalizedStartTime, out var normalizedEndTime, out var validationMessage))
+        var resolvedRequest = ResolveRequest(request, queryRequest);
+
+        if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(resolvedRequest.StartTimeLocal, resolvedRequest.EndTimeLocal, out var normalizedStartTime, out var normalizedEndTime, out var validationMessage))
         {
             return BadRequest(ApiResponse<GlobalDashboardResponse>.Fail(validationMessage));
         }

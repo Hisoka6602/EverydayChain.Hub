@@ -29,7 +29,7 @@ public sealed class GlobalDashboardControllerTests
                 : DateTime.MinValue
         };
 
-        var actionResult = await controller.QueryOverviewAsync(request, CancellationToken.None);
+        var actionResult = await controller.QueryOverviewAsync(request, null, CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(actionResult.Result);
     }
@@ -47,7 +47,7 @@ public sealed class GlobalDashboardControllerTests
             EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 10, 0, 0), DateTimeKind.Local)
         };
 
-        var actionResult = await controller.QueryOverviewAsync(request, CancellationToken.None);
+        var actionResult = await controller.QueryOverviewAsync(request, null, CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(actionResult.Result);
     }
@@ -66,7 +66,7 @@ public sealed class GlobalDashboardControllerTests
             EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 10, 0, 0), DateTimeKind.Local)
         };
 
-        var actionResult = await controller.QueryOverviewAsync(request, CancellationToken.None);
+        var actionResult = await controller.QueryOverviewAsync(request, null, CancellationToken.None);
         var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
         var response = Assert.IsType<ApiResponse<GlobalDashboardResponse>>(okResult.Value);
 
@@ -77,5 +77,29 @@ public sealed class GlobalDashboardControllerTests
         Assert.NotNull(stubService.LastRequest);
         Assert.Equal(request.StartTimeLocal, stubService.LastRequest!.StartTimeLocal);
         Assert.Equal(request.EndTimeLocal, stubService.LastRequest.EndTimeLocal);
+    }
+
+    /// <summary>
+    /// 请求体为空时应回退使用查询字符串请求。
+    /// </summary>
+    [Fact]
+    public async Task QueryOverviewAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull()
+    {
+        var stubService = new StubGlobalDashboardQueryService();
+        var controller = new GlobalDashboardController(stubService);
+        var queryRequest = new GlobalDashboardQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 9, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 10, 0, 0), DateTimeKind.Local)
+        };
+
+        var actionResult = await controller.QueryOverviewAsync(null, queryRequest, CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+        var response = Assert.IsType<ApiResponse<GlobalDashboardResponse>>(okResult.Value);
+
+        Assert.True(response.IsSuccess);
+        Assert.NotNull(stubService.LastRequest);
+        Assert.Equal(queryRequest.StartTimeLocal, stubService.LastRequest!.StartTimeLocal);
+        Assert.Equal(queryRequest.EndTimeLocal, stubService.LastRequest.EndTimeLocal);
     }
 }
