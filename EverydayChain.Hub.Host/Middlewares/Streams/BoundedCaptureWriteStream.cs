@@ -7,6 +7,11 @@ namespace EverydayChain.Hub.Host.Middlewares.Streams;
 /// </summary>
 public sealed class BoundedCaptureWriteStream : Stream {
     /// <summary>
+    /// 默认捕获缓冲区容量。
+    /// </summary>
+    private const int DefaultCaptureBufferBytes = 4096;
+
+    /// <summary>
     /// 原始响应流。
     /// </summary>
     private readonly Stream innerStream;
@@ -22,6 +27,11 @@ public sealed class BoundedCaptureWriteStream : Stream {
     private readonly int maxCaptureBytes;
 
     /// <summary>
+    /// 已解码缓存文本。
+    /// </summary>
+    private string? cachedCapturedText;
+
+    /// <summary>
     /// 初始化写透传捕获流。
     /// </summary>
     /// <param name="innerStream">原始响应流。</param>
@@ -29,7 +39,7 @@ public sealed class BoundedCaptureWriteStream : Stream {
     public BoundedCaptureWriteStream(Stream innerStream, int maxCaptureBytes) {
         this.innerStream = innerStream;
         this.maxCaptureBytes = maxCaptureBytes;
-        capturedStream = new MemoryStream(maxCaptureBytes);
+        capturedStream = new MemoryStream(Math.Min(maxCaptureBytes, DefaultCaptureBufferBytes));
     }
 
     /// <summary>
@@ -66,7 +76,12 @@ public sealed class BoundedCaptureWriteStream : Stream {
     /// <param name="encoding">文本编码。</param>
     /// <returns>已捕获响应文本。</returns>
     public string GetCapturedText(Encoding encoding) {
-        return encoding.GetString(capturedStream.GetBuffer(), 0, (int)capturedStream.Length);
+        if (cachedCapturedText is not null) {
+            return cachedCapturedText;
+        }
+
+        cachedCapturedText = encoding.GetString(capturedStream.GetBuffer(), 0, (int)capturedStream.Length);
+        return cachedCapturedText;
     }
 
     /// <summary>
@@ -160,5 +175,6 @@ public sealed class BoundedCaptureWriteStream : Stream {
         var remaining = maxCaptureBytes - (int)capturedStream.Length;
         var bytesToCapture = Math.Min(remaining, bytes.Length);
         capturedStream.Write(bytes[..bytesToCapture]);
+        cachedCapturedText = null;
     }
 }

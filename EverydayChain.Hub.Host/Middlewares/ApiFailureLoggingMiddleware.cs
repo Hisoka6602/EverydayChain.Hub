@@ -15,6 +15,16 @@ public sealed class ApiFailureLoggingMiddleware {
     private const int MaxLoggedPayloadLength = 16384;
 
     /// <summary>
+    /// UTF-8 单字符最大字节数。
+    /// </summary>
+    private const int Utf8WorstCaseBytesPerCharacter = 4;
+
+    /// <summary>
+    /// 响应捕获字节上限（按 UTF-8 最坏情况预估）。
+    /// </summary>
+    private const int MaxCapturedResponseBytes = MaxLoggedPayloadLength * Utf8WorstCaseBytesPerCharacter;
+
+    /// <summary>
     /// 下一个请求委托。
     /// </summary>
     private readonly RequestDelegate next;
@@ -51,7 +61,7 @@ public sealed class ApiFailureLoggingMiddleware {
         var queryString = SanitizeForLog(context.Request.QueryString.HasValue ? context.Request.QueryString.Value : string.Empty);
         var userAgent = SanitizeForLog(context.Request.Headers.UserAgent.ToString());
         var originalResponseBody = context.Response.Body;
-        using var responseCaptureStream = new BoundedCaptureWriteStream(originalResponseBody, MaxLoggedPayloadLength * 4);
+        using var responseCaptureStream = new BoundedCaptureWriteStream(originalResponseBody, MaxCapturedResponseBytes);
         context.Response.Body = responseCaptureStream;
         var hasUnhandledException = false;
         try {
@@ -180,9 +190,12 @@ public sealed class ApiFailureLoggingMiddleware {
         }
 
         request.EnableBuffering();
-        request.Body.Position = 0;
+        if (!TryResetStreamPosition(request.Body, 0)) {
+            return string.Empty;
+        }
+
         var content = await ReadStreamAsync(request.Body, MaxLoggedPayloadLength + 1, cancellationToken);
-        request.Body.Position = 0;
+        _ = TryResetStreamPosition(request.Body, 0);
         return content;
     }
 
@@ -197,14 +210,16 @@ public sealed class ApiFailureLoggingMiddleware {
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
         var buffer = new char[1024];
         var builder = new StringBuilder();
-        while (builder.Length < maxCharacters) {
-            var remaining = Math.Min(buffer.Length, maxCharacters - builder.Length);
+        var remainingCharacters = maxCharacters;
+        while (remainingCharacters > 0) {
+            var remaining = Math.Min(buffer.Length, remainingCharacters);
             var readCount = await reader.ReadAsync(buffer.AsMemory(0, remaining), cancellationToken);
             if (readCount == 0) {
                 break;
             }
 
             builder.Append(buffer, 0, readCount);
+            remainingCharacters -= readCount;
         }
 
         return builder.ToString();
@@ -234,5 +249,28 @@ public sealed class ApiFailureLoggingMiddleware {
         }
 
         return rawText.Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// 重置流位置。
+    /// </summary>
+    /// <param name="stream">目标流。</param>
+    /// <param name="position">目标位置。</param>
+    /// <returns>重置成功返回 true，否则返回 false。</returns>
+    private static bool TryResetStreamPosition(Stream stream, long position) {
+        if (!stream.CanSeek) {
+            return false;
+        }
+
+        try {
+            stream.Position = position;
+            return true;
+        }
+        catch (IOException) {
+            return false;
+        }
+        catch (NotSupportedException) {
+            return false;
+        }
     }
 }
