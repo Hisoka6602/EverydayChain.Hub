@@ -194,6 +194,7 @@ public class BusinessTaskEntity : IEntity<long>
 
     /// <summary>
     /// 刷新查询优化字段，统一标准化条码、波次与归并码头编码。
+    /// 当条码、波次、目标格口、实际落格任一字段发生变化后，应在持久化前调用该方法。
     /// </summary>
     public void RefreshQueryFields()
     {

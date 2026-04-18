@@ -13,6 +13,16 @@ namespace EverydayChain.Hub.Application.Queries;
 public sealed class SortingReportQueryService : ISortingReportQueryService
 {
     /// <summary>
+    /// 缓存键时间格式。
+    /// </summary>
+    private const string CacheKeyDateTimeFormat = "yyyyMMddHHmmssfffffff";
+
+    /// <summary>
+    /// 缓存键空值占位文本。
+    /// </summary>
+    private const string NullCacheValue = "(null)";
+
+    /// <summary>
     /// 业务任务仓储。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
@@ -71,7 +81,7 @@ public sealed class SortingReportQueryService : ISortingReportQueryService
         }
 
         var selectedDockCode = string.IsNullOrWhiteSpace(request.DockCode) ? null : request.DockCode.Trim();
-        var cacheKey = $"sorting-report:{request.StartTimeLocal:yyyyMMddHHmmssfffffff}:{request.EndTimeLocal:yyyyMMddHHmmssfffffff}:{selectedDockCode}";
+        var cacheKey = $"sorting-report:{request.StartTimeLocal.ToString(CacheKeyDateTimeFormat)}:{request.EndTimeLocal.ToString(CacheKeyDateTimeFormat)}:{selectedDockCode ?? NullCacheValue}";
         if (_queryCacheOptions.Enabled)
         {
             var ttl = Math.Clamp(_queryCacheOptions.SortingReportSeconds, 1, 120);

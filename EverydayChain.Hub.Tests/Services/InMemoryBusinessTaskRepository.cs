@@ -315,7 +315,9 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
 
         if (!string.IsNullOrWhiteSpace(filter.ChuteCode))
         {
-            query = query.Where(task => string.Equals(task.ResolvedDockCode, filter.ChuteCode, StringComparison.OrdinalIgnoreCase));
+            query = query.Where(task =>
+                string.Equals(task.TargetChuteCode, filter.ChuteCode, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(task.ActualChuteCode, filter.ChuteCode, StringComparison.OrdinalIgnoreCase));
         }
 
         if (filter.OnlyException)

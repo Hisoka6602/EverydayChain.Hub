@@ -21,8 +21,8 @@ public class ShardingOptions
     public int PreProvisionMaxConcurrency { get; set; } = 4;
 
     /// <summary>
-    /// 是否启用无后缀历史表读取兜底（可填写项：true、false；默认 true）。
+    /// 是否启用无后缀历史表读取兜底（可填写项：true、false；默认 false）。
     /// 当环境已完成迁移且无历史无后缀表时，可配置为 false 以减少无效查询往返。
     /// </summary>
-    public bool EnableLegacyBaseTableReadFallback { get; set; } = true;
+    public bool EnableLegacyBaseTableReadFallback { get; set; } = false;
 }

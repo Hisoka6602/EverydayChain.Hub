@@ -210,7 +210,7 @@ public static class ServiceCollectionExtensions {
     /// 归一化 DbContext 池大小配置。
     /// </summary>
     /// <param name="poolSize">配置值。</param>
-    /// <returns>归一化后的池大小。</returns>
+    /// <returns>归一化后的池大小（下限 32 用于避免池过小导致频繁创建，上限 1024 用于限制内存占用）。</returns>
     private static int NormalizeDbContextPoolSize(int poolSize)
     {
         return Math.Clamp(poolSize, 32, 1024);

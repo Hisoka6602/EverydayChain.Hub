@@ -12,6 +12,16 @@ namespace EverydayChain.Hub.Application.Queries;
 public sealed class DockDashboardQueryService : IDockDashboardQueryService
 {
     /// <summary>
+    /// 缓存键时间格式。
+    /// </summary>
+    private const string CacheKeyDateTimeFormat = "yyyyMMddHHmmssfffffff";
+
+    /// <summary>
+    /// 缓存键空值占位文本。
+    /// </summary>
+    private const string NullCacheValue = "(null)";
+
+    /// <summary>
     /// 业务任务仓储。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
@@ -70,7 +80,7 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
         }
 
         var selectedWaveCode = string.IsNullOrWhiteSpace(request.WaveCode) ? null : request.WaveCode.Trim();
-        var cacheKey = $"dock-dashboard:{request.StartTimeLocal:yyyyMMddHHmmssfffffff}:{request.EndTimeLocal:yyyyMMddHHmmssfffffff}:{selectedWaveCode}";
+        var cacheKey = $"dock-dashboard:{request.StartTimeLocal.ToString(CacheKeyDateTimeFormat)}:{request.EndTimeLocal.ToString(CacheKeyDateTimeFormat)}:{selectedWaveCode ?? NullCacheValue}";
         if (_queryCacheOptions.Enabled)
         {
             var ttl = Math.Clamp(_queryCacheOptions.DockDashboardSeconds, 1, 60);

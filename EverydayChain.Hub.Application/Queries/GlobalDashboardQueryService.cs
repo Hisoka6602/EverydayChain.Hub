@@ -11,6 +11,11 @@ namespace EverydayChain.Hub.Application.Queries;
 public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
 {
     /// <summary>
+    /// 缓存键时间格式。
+    /// </summary>
+    private const string CacheKeyDateTimeFormat = "yyyyMMddHHmmssfffffff";
+
+    /// <summary>
     /// 业务任务仓储。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
@@ -60,7 +65,7 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
         }
 
         // 步骤 2：按时间区间执行仓储侧聚合，避免全量任务加载后内存聚合。
-        var cacheKey = $"global-dashboard:{request.StartTimeLocal:yyyyMMddHHmmssfffffff}:{request.EndTimeLocal:yyyyMMddHHmmssfffffff}";
+        var cacheKey = $"global-dashboard:{request.StartTimeLocal.ToString(CacheKeyDateTimeFormat)}:{request.EndTimeLocal.ToString(CacheKeyDateTimeFormat)}";
         if (_queryCacheOptions.Enabled)
         {
             var ttl = Math.Clamp(_queryCacheOptions.GlobalDashboardSeconds, 1, 60);

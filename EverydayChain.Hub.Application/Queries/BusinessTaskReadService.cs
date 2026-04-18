@@ -5,6 +5,7 @@ using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Diagnostics;
 
 namespace EverydayChain.Hub.Application.Queries;
 
@@ -135,17 +136,19 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
         }
 
         var skip = (pageNumber - 1) * pageSize;
+        var stopwatch = Stopwatch.StartNew();
+        var pageResult = await _businessTaskRepository.QueryPageWithTotalCountByConditionsAsync(filter, skip, pageSize, cancellationToken);
+        stopwatch.Stop();
+        var items = pageResult.Items.Select(MapItem).ToList();
         if (skip >= LargeSkipWarningThreshold)
         {
             _logger.LogWarning(
-                "检测到大页码分页查询，建议改用游标分页。Skip={Skip}, PageNumber={PageNumber}, PageSize={PageSize}",
+                "检测到大页码分页查询，建议改用游标分页（传入 LastCreatedTimeLocal 与 LastId）。Skip={Skip}, PageNumber={PageNumber}, PageSize={PageSize}, ElapsedMilliseconds={ElapsedMilliseconds}",
                 skip,
                 pageNumber,
-                pageSize);
+                pageSize,
+                stopwatch.ElapsedMilliseconds);
         }
-
-        var pageResult = await _businessTaskRepository.QueryPageWithTotalCountByConditionsAsync(filter, skip, pageSize, cancellationToken);
-        var items = pageResult.Items.Select(MapItem).ToList();
 
         return new BusinessTaskQueryResult
         {

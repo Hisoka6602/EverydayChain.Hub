@@ -566,7 +566,9 @@ public class BusinessTaskRepository(
 
         if (!string.IsNullOrWhiteSpace(normalizedChuteCode))
         {
-            query = query.Where(task => task.ResolvedDockCode == normalizedChuteCode);
+            query = query.Where(task =>
+                task.TargetChuteCode == normalizedChuteCode
+                || task.ActualChuteCode == normalizedChuteCode);
         }
 
         if (filter.OnlyException)
