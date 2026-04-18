@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 收敛《EverydayChain.Hub_Copilot_精准执行指令_最终版》旧同步链路：删除 `IRemoteStatusConsumeService`、`ISqlServerAppendOnlyWriter`、`RemoteStatusConsumeService`、`SqlServerAppendOnlyWriter` 及对应测试，`StatusDriven` 主路径统一收敛到 `IBusinessTaskStatusConsumeService`。
 - 完成《EverydayChain.Hub_Copilot_精准执行指令_最终版》镜像表收口第一阶段：删除本地镜像表实体 `WmsSplitPickToLightCartonEntity`、`WmsPickToWcsEntity`，并从 `HubDbContext` 移除对应 DbSet 与映射配置，确保本地业务主路径仅保留 `business_tasks`。
 - 开始实施《EverydayChain.Hub_Copilot_精准执行指令_最终版》：补齐 `business_tasks` 直投影主路径，新增 `BusinessTaskProjectionService` 与 `BusinessTaskStatusConsumeService`，并将 `WmsSplitPickToLightCarton`/`WmsPickToWcs` 的 `StatusDriven` 主路径切换为“远端读取 → 本地业务主表幂等投影 → 可选远端状态回写”。
 - 收敛同步与回写配置：`SyncJob.Tables` 新增 `SourceType`、`BusinessKeyColumn`、`BarcodeColumn`、`WaveCodeColumn`、`WaveRemarkColumn`；`appsettings.json` 两条 WMS 同步任务目标统一为 `business_tasks`；`WmsFeedbackOptions` 与 `OracleWmsFeedbackGateway` 删除默认回退目标表语义并改为按来源强制分流。
@@ -232,8 +233,6 @@
 │   ├── Abstractions/Persistence/IDropLogRepository.cs
 │   ├── Abstractions/Sync/IOracleRemoteStatusWriter.cs
 │   ├── Abstractions/Sync/IOracleStatusDrivenSourceReader.cs
-│   ├── Abstractions/Sync/ISqlServerAppendOnlyWriter.cs
-│   ├── Abstractions/Sync/IRemoteStatusConsumeService.cs
 │   ├── Abstractions/Sync/IBusinessTaskStatusConsumeService.cs
 │   ├── Abstractions/Services/ISyncOrchestrator.cs
 │   ├── Abstractions/Services/ISyncWindowCalculator.cs
@@ -299,9 +298,7 @@
 │   ├── DependencyInjection/ServiceCollectionExtensions.cs
 │   ├── Properties/AssemblyInfo.cs
 │   ├── Sync/Readers/OracleStatusDrivenSourceReader.cs
-│   ├── Sync/Writers/SqlServerAppendOnlyWriter.cs
 │   ├── Sync/Writers/OracleRemoteStatusWriter.cs
-│   ├── Sync/Services/RemoteStatusConsumeService.cs
 │   ├── Sync/Services/BusinessTaskStatusConsumeService.cs
 │   ├── Integrations/OracleWmsFeedbackGateway.cs
 │   ├── Repositories/SyncTaskConfigRepository.cs
@@ -359,9 +356,7 @@
 │   ├── Repositories/SyncStagingRepositoryTests.cs
 │   ├── Repositories/SqlServerSyncUpsertRepositoryTests.cs
 │   ├── Repositories/SyncTaskConfigRepositoryTests.cs
-│   ├── Sync/RemoteStatusConsumeServiceTests.cs
 │   ├── Sync/Fakes/FakeOracleStatusDrivenSourceReader.cs
-│   ├── Sync/Fakes/FakeSqlServerAppendOnlyWriter.cs
 │   ├── Sync/Fakes/FakeOracleRemoteStatusWriter.cs
 │   ├── Architecture/BusinessTaskSingleSourceArchitectureTests.cs
 │   ├── Host/Controllers/ScanControllerTests.cs
@@ -599,8 +594,8 @@
 - `EverydayChain.Hub.Tests/Services/BusinessTaskReadServiceTests.cs`：业务任务查询服务测试，覆盖多条件筛选、异常件筛选与回流筛选。
 - `EverydayChain.Hub.Tests/Services/InMemoryScanLogRepository.cs`：扫描日志仓储内存替身。
 - `EverydayChain.Hub.Tests/Services/InMemoryDropLogRepository.cs`：落格日志仓储内存替身。
-- `Application/Abstractions/Sync/IOracleRemoteStatusWriter.cs` / `IOracleStatusDrivenSourceReader.cs` / `ISqlServerAppendOnlyWriter.cs`：定义 StatusDriven 模式中 Oracle 远端状态回写、Oracle 状态驱动源读取与 SQL Server 仅追加写入的外部协作能力抽象，遵循 Application 层外部协作抽象放置规则。
-- `Application/Abstractions/Sync/IRemoteStatusConsumeService.cs` + `Application/Models/RemoteStatusConsumeResult.cs`：定义 StatusDriven 模式执行入口（应用编排抽象）与读取/追加/回写统计模型。
+- `Application/Abstractions/Sync/IOracleRemoteStatusWriter.cs` / `IOracleStatusDrivenSourceReader.cs`：定义 StatusDriven 模式中 Oracle 远端状态回写与 Oracle 状态驱动源读取的外部协作能力抽象，遵循 Application 层外部协作抽象放置规则。
+- `Application/Models/RemoteStatusConsumeResult.cs`：定义 StatusDriven 模式读取/投影写入/回写统计模型。
 - `Application/Abstractions/Sync/IBusinessTaskStatusConsumeService.cs` + `Infrastructure/Sync/Services/BusinessTaskStatusConsumeService.cs`：定义并实现 WMS 两条 StatusDriven 的业务主表消费链路，串联“读取→投影→批量幂等 Upsert→可选回写”，并在固定第 1 页模式下加入无可投影/无可回写行 fail-fast 防死循环保护。
 - `Application/Abstractions/Services/IBusinessTaskProjectionService.cs` + `Application/Services/BusinessTaskProjectionService.cs` + `Application/Models/BusinessTaskProjection*.cs`：定义并实现业务任务投影契约与模型，统一执行字段校验、文本标准化与实体构造；强制 `TaskCode = BusinessKey` 且长度上限 64，避免入库超长。
 - `Application/Abstractions/Persistence/ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。
@@ -626,9 +621,7 @@
 - `OracleOptions.cs`：远端 Oracle 连接配置实体，定义连接字符串、连接库名（ServiceName/SID，决定连接目标）、只读开关、命令超时与分页上限。
 - `OracleSourceReader.cs`：源端读取器 Oracle 实现，使用参数化 SQL 执行真实只读查询，支持分页增量读取、业务键读取、`ExcludedColumns` 过滤，并在异常场景输出错误日志；支持 `Oracle.DatabaseMode` 控制库名拼接语义（ServiceName/SID）。
 - `Sync/Readers/OracleStatusDrivenSourceReader.cs`：StatusDriven 读取器，按状态列读取待处理行，支持 `PendingStatusValue=null` 时生成 `IS NULL` 条件，并输出 `__RowId` 供后续回写使用。
-- `Sync/Writers/SqlServerAppendOnlyWriter.cs`：StatusDriven 本地落库写入器，仅执行批量追加，不执行 merge/delete。
 - `Sync/Writers/OracleRemoteStatusWriter.cs`：StatusDriven 远端回写器，仅按 `ROWID` 更新远端状态列。
-- `Sync/Services/RemoteStatusConsumeService.cs`：串联“读取→追加→可选回写”流程，执行页级异常隔离并输出中文统计日志。
 - `Repositories/BusinessTaskRepository.cs`：业务任务仓储实现，新增投影批量幂等 Upsert（单页批量查询已有键 + 按分片批量新增/批量更新），降低逐条 SaveChanges 带来的 N+1 往返压力。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
 - `SqlServerSyncUpsertRepository.cs`：SQL Server 真实落库实现，按目标逻辑表+后缀分表执行集合式 MERGE（支持配置回退逐行模式），并在 `sync_target_state_{tableCode}_{yyyyMM}` 状态分表中记录后缀；读取/删除状态时跨月分表聚合，且兼容旧版 `sync_target_state` / `sync_target_state_{tableCode}` 状态表，确保升级过程幂等与删除语义连续。
@@ -691,7 +684,6 @@
 - `EverydayChain.Hub.Tests/Repositories/SyncStagingRepositoryTests.cs`：暂存仓储回归测试，覆盖暂存行字段大小写不敏感访问，防止业务键字段因列名大小写差异导致读取失败。
 - `EverydayChain.Hub.Tests/Repositories/SqlServerSyncUpsertRepositoryTests.cs`：SQL Server 落库仓储契约测试，覆盖插入/更新/跳过统计、UniqueKeys 缺失异常，以及 `sync_target_state` 状态分表命名安全边界（正常路径×3 + TableCode 非法字符 + 月份标记非法）。
 - `EverydayChain.Hub.Tests/Repositories/SyncTaskConfigRepositoryTests.cs`：配置映射测试，覆盖 `SyncMode` 默认值与 `StatusDriven + PendingStatusValue=null` 映射语义。
-- `EverydayChain.Hub.Tests/Sync/RemoteStatusConsumeServiceTests.cs` + `EverydayChain.Hub.Tests/Sync/Fakes/*.cs`：状态驱动消费测试与替身，覆盖追加、回写、缺失 `__RowId` 跳过回写统计路径。
 - `EverydayChain.Hub.Tests/Repositories/InMemorySqlServerSyncUpsertRepository.cs`：SqlServerSyncUpsertRepository 内存测试替身，集中维护状态与分片迁移断言逻辑。
 - `EverydayChain.Hub.Tests/Repositories/NoOpShardTableProvisioner.cs`：空实现分表预置器测试替身，用于隔离仓储合并测试的建表外部依赖。
 - `EFCore手动迁移操作指南.md`：提供手工迁移、脚本导出、回滚、排障流程。

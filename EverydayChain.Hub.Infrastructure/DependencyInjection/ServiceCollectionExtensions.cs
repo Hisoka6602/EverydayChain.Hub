@@ -118,9 +118,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<ISyncDeletionRepository, SyncDeletionRepository>();
         services.AddSingleton<ISyncDeletionLogRepository, SyncDeletionLogRepository>();
         services.AddSingleton<IOracleStatusDrivenSourceReader, OracleStatusDrivenSourceReader>();
-        services.AddSingleton<ISqlServerAppendOnlyWriter, SqlServerAppendOnlyWriter>();
         services.AddSingleton<IOracleRemoteStatusWriter, OracleRemoteStatusWriter>();
-        services.AddSingleton<IRemoteStatusConsumeService, RemoteStatusConsumeService>();
         services.AddSingleton<IBusinessTaskStatusConsumeService, BusinessTaskStatusConsumeService>();
         services.AddSingleton<ISyncWindowCalculator, SyncWindowCalculator>();
         services.AddSingleton<IBusinessTaskMaterializer, BusinessTaskMaterializer>();
