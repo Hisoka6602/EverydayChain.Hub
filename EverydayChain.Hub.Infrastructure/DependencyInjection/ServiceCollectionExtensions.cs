@@ -121,8 +121,10 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<ISqlServerAppendOnlyWriter, SqlServerAppendOnlyWriter>();
         services.AddSingleton<IOracleRemoteStatusWriter, OracleRemoteStatusWriter>();
         services.AddSingleton<IRemoteStatusConsumeService, RemoteStatusConsumeService>();
+        services.AddSingleton<IBusinessTaskStatusConsumeService, BusinessTaskStatusConsumeService>();
         services.AddSingleton<ISyncWindowCalculator, SyncWindowCalculator>();
         services.AddSingleton<IBusinessTaskMaterializer, BusinessTaskMaterializer>();
+        services.AddSingleton<IBusinessTaskProjectionService, BusinessTaskProjectionService>();
         services.AddSingleton<IBarcodeParser, BarcodeParser>();
         services.AddSingleton<IBusinessTaskRepository, BusinessTaskRepository>();
         services.AddSingleton<IScanMatchService, ScanMatchService>();

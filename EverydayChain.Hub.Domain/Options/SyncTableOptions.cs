@@ -98,4 +98,29 @@ public class SyncTableOptions
     /// 可填写范围：源端真实列名，仅允许字母、数字、下划线；留空表示不回写批次号审计列）。
     /// </summary>
     public string? WriteBackBatchIdColumnName { get; set; }
+
+    /// <summary>
+    /// 业务来源类型（可填写项：Split、FullCase；默认 Unknown）。
+    /// </summary>
+    public string SourceType { get; set; } = "Unknown";
+
+    /// <summary>
+    /// 业务键列名（仅业务任务状态驱动投影链路使用；可填写范围：源端真实列名，仅允许字母、数字、下划线）。
+    /// </summary>
+    public string BusinessKeyColumn { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 条码列名（可填写范围：源端真实列名，仅允许字母、数字、下划线；留空表示不映射条码）。
+    /// </summary>
+    public string? BarcodeColumn { get; set; }
+
+    /// <summary>
+    /// 波次号列名（可填写范围：源端真实列名，仅允许字母、数字、下划线；留空表示不映射波次号）。
+    /// </summary>
+    public string? WaveCodeColumn { get; set; }
+
+    /// <summary>
+    /// 波次备注列名（可填写范围：源端真实列名，仅允许字母、数字、下划线；留空表示不映射波次备注）。
+    /// </summary>
+    public string? WaveRemarkColumn { get; set; }
 }

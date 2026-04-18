@@ -60,6 +60,7 @@ public class BusinessTaskEntityTypeConfiguration : IEntityTypeConfiguration<Busi
         builder.Property(x => x.IsException).IsRequired();
         builder.Property(x => x.IsFeedbackReported).IsRequired();
         builder.HasIndex(x => x.TaskCode).IsUnique();
+        builder.HasIndex(x => new { x.SourceTableCode, x.BusinessKey }).IsUnique();
         builder.HasIndex(x => x.Barcode);
         builder.HasIndex(x => x.NormalizedBarcode);
         builder.HasIndex(x => new { x.Barcode, x.CreatedTimeLocal });

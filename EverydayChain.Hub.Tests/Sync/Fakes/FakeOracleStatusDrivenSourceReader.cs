@@ -18,6 +18,9 @@ public class FakeOracleStatusDrivenSourceReader : IOracleStatusDrivenSourceReade
     /// <summary>最近一次传入的同步窗口。</summary>
     public SyncWindow LastWindow { get; private set; }
 
+    /// <summary>最近一次传入的状态消费配置。</summary>
+    public RemoteStatusConsumeProfile? LastProfile { get; private set; }
+
     /// <inheritdoc/>
     public Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReadPendingPageAsync(
         SyncTableDefinition definition,
@@ -30,6 +33,7 @@ public class FakeOracleStatusDrivenSourceReader : IOracleStatusDrivenSourceReade
     {
         RequestedPageNos.Add(pageNo);
         LastWindow = window;
+        LastProfile = profile;
         if (Pages.Count == 0)
         {
             return Task.FromResult<IReadOnlyList<IReadOnlyDictionary<string, object?>>>([]);

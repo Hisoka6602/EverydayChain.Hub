@@ -87,4 +87,29 @@ public class SyncTableDefinition
     /// KeyedMerge 模式下此属性为 null，不产生任何效果。
     /// </summary>
     public RemoteStatusConsumeProfile? StatusConsumeProfile { get; set; }
+
+    /// <summary>
+    /// 业务来源类型（仅业务任务状态驱动投影链路使用）。
+    /// </summary>
+    public BusinessTaskSourceType SourceType { get; set; } = BusinessTaskSourceType.Unknown;
+
+    /// <summary>
+    /// 业务键列名（仅业务任务状态驱动投影链路使用）。
+    /// </summary>
+    public string BusinessKeyColumn { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 条码列名（仅业务任务状态驱动投影链路使用）。
+    /// </summary>
+    public string? BarcodeColumn { get; set; }
+
+    /// <summary>
+    /// 波次号列名（仅业务任务状态驱动投影链路使用）。
+    /// </summary>
+    public string? WaveCodeColumn { get; set; }
+
+    /// <summary>
+    /// 波次备注列名（仅业务任务状态驱动投影链路使用）。
+    /// </summary>
+    public string? WaveRemarkColumn { get; set; }
 }

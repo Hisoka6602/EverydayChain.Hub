@@ -54,6 +54,21 @@ public class BusinessTaskRepository(
     }
 
     /// <inheritdoc/>
+    public async Task<BusinessTaskEntity?> FindBySourceTableAndBusinessKeyAsync(string sourceTableCode, string businessKey, CancellationToken ct)
+    {
+        var normalizedSourceTableCode = NormalizeOptionalText(sourceTableCode);
+        var normalizedBusinessKey = NormalizeOptionalText(businessKey);
+        if (string.IsNullOrWhiteSpace(normalizedSourceTableCode) || string.IsNullOrWhiteSpace(normalizedBusinessKey))
+        {
+            return null;
+        }
+
+        return await FindFirstAcrossShardsAsync(query => query
+            .Where(x => x.SourceTableCode == normalizedSourceTableCode && x.BusinessKey == normalizedBusinessKey)
+            .OrderByDescending(x => x.CreatedTimeLocal), ct);
+    }
+
+    /// <inheritdoc/>
     public async Task<BusinessTaskEntity?> FindByIdAsync(long id, CancellationToken ct)
     {
         return await FindFirstAcrossShardsAsync(query => query.Where(x => x.Id == id), ct);
@@ -69,6 +84,107 @@ public class BusinessTaskRepository(
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         db.BusinessTasks.Add(entity);
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <inheritdoc/>
+    public async Task UpsertProjectionAsync(BusinessTaskEntity entity, CancellationToken ct)
+    {
+        await UpsertProjectionBatchAsync([entity], ct);
+    }
+
+    /// <inheritdoc/>
+    public async Task<int> UpsertProjectionBatchAsync(IReadOnlyList<BusinessTaskEntity> entities, CancellationToken ct)
+    {
+        if (entities.Count == 0)
+        {
+            return 0;
+        }
+
+        var uniqueEntitiesByKey = new Dictionary<ProjectionKey, BusinessTaskEntity>(entities.Count);
+        foreach (var entity in entities)
+        {
+            entity.RefreshQueryFields();
+            var key = ProjectionKey.Create(entity.SourceTableCode, entity.BusinessKey);
+            if (key is null)
+            {
+                continue;
+            }
+
+            uniqueEntitiesByKey[key.Value] = entity;
+        }
+
+        if (uniqueEntitiesByKey.Count == 0)
+        {
+            return 0;
+        }
+
+        var sourceTableCodes = uniqueEntitiesByKey.Keys
+            .Select(key => key.SourceTableCode)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var businessKeys = uniqueEntitiesByKey.Keys
+            .Select(key => key.BusinessKey)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var existingByKey = await LoadProjectionExistingMapAsync(uniqueEntitiesByKey.Keys, sourceTableCodes, businessKeys, ct);
+
+        var updateTargetsBySuffix = new Dictionary<string, List<ProjectionUpdateTarget>>(StringComparer.Ordinal);
+        var insertTargetsBySuffix = new Dictionary<string, List<BusinessTaskEntity>>(StringComparer.Ordinal);
+        foreach (var pair in uniqueEntitiesByKey)
+        {
+            if (existingByKey.TryGetValue(pair.Key, out var existing))
+            {
+                if (!updateTargetsBySuffix.TryGetValue(existing.Suffix, out var updates))
+                {
+                    updates = [];
+                    updateTargetsBySuffix[existing.Suffix] = updates;
+                }
+
+                updates.Add(new ProjectionUpdateTarget(existing.Entity.Id, pair.Value));
+                continue;
+            }
+
+            var insertSuffix = shardSuffixResolver.ResolveLocal(pair.Value.CreatedTimeLocal);
+            if (!insertTargetsBySuffix.TryGetValue(insertSuffix, out var inserts))
+            {
+                inserts = [];
+                insertTargetsBySuffix[insertSuffix] = inserts;
+            }
+
+            inserts.Add(pair.Value);
+        }
+
+        foreach (var pair in updateTargetsBySuffix)
+        {
+            using var scope = TableSuffixScope.Use(pair.Key);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            var ids = pair.Value.Select(target => target.Id).Distinct().ToArray();
+            var trackedById = await db.BusinessTasks
+                .Where(task => ids.Contains(task.Id))
+                .ToDictionaryAsync(task => task.Id, ct);
+            foreach (var updateTarget in pair.Value)
+            {
+                if (!trackedById.TryGetValue(updateTarget.Id, out var tracked))
+                {
+                    continue;
+                }
+
+                MergeProjectionFields(tracked, updateTarget.Incoming);
+            }
+
+            await db.SaveChangesAsync(ct);
+        }
+
+        foreach (var pair in insertTargetsBySuffix)
+        {
+            await shardTableProvisioner.EnsureShardTableAsync(BusinessTaskLogicalTable, pair.Key, ct);
+            using var scope = TableSuffixScope.Use(pair.Key);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            db.BusinessTasks.AddRange(pair.Value);
+            await db.SaveChangesAsync(ct);
+        }
+
+        return uniqueEntitiesByKey.Count;
     }
 
     /// <inheritdoc/>
@@ -595,6 +711,62 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
+    /// 合并投影字段，避免覆盖运行态字段。
+    /// </summary>
+    /// <param name="target">已存在实体。</param>
+    /// <param name="incoming">新投影实体。</param>
+    private static void MergeProjectionFields(BusinessTaskEntity target, BusinessTaskEntity incoming)
+    {
+        if (target.Status == BusinessTaskStatus.Created && target.ScannedAtLocal is null && string.IsNullOrWhiteSpace(target.Barcode))
+        {
+            target.Barcode = incoming.Barcode;
+        }
+
+        target.WaveCode = incoming.WaveCode;
+        target.WaveRemark = incoming.WaveRemark;
+        target.UpdatedTimeLocal = incoming.UpdatedTimeLocal;
+    }
+
+    /// <summary>
+    /// 加载投影幂等键在各分片中的已存在实体映射。
+    /// </summary>
+    /// <param name="keys">待匹配的投影幂等键。</param>
+    /// <param name="sourceTableCodes">来源表编码集合。</param>
+    /// <param name="businessKeys">业务键集合。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>已存在映射。</returns>
+    private async Task<Dictionary<ProjectionKey, LoadedBusinessTask>> LoadProjectionExistingMapAsync(
+        IEnumerable<ProjectionKey> keys,
+        IReadOnlyList<string> sourceTableCodes,
+        IReadOnlyList<string> businessKeys,
+        CancellationToken ct)
+    {
+        var keySet = keys.ToHashSet();
+        var existingByKey = new Dictionary<ProjectionKey, LoadedBusinessTask>();
+        foreach (var suffix in await ListShardSuffixesWithLegacyFallbackAsync(ct))
+        {
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            var shardRows = await db.BusinessTasks
+                .AsNoTracking()
+                .Where(task => sourceTableCodes.Contains(task.SourceTableCode) && businessKeys.Contains(task.BusinessKey))
+                .ToListAsync(ct);
+            foreach (var row in shardRows)
+            {
+                var key = ProjectionKey.Create(row.SourceTableCode, row.BusinessKey);
+                if (key is null || !keySet.Contains(key.Value) || existingByKey.ContainsKey(key.Value))
+                {
+                    continue;
+                }
+
+                existingByKey[key.Value] = new LoadedBusinessTask(suffix, row);
+            }
+        }
+
+        return existingByKey;
+    }
+
+    /// <summary>
     /// 合并波次聚合行。
     /// </summary>
     /// <param name="target">聚合目标字典。</param>
@@ -845,4 +1017,37 @@ public class BusinessTaskRepository(
     /// <param name="Suffix">分片后缀。</param>
     /// <param name="Entity">任务实体。</param>
     private readonly record struct LoadedBusinessTask(string Suffix, BusinessTaskEntity Entity);
+
+    /// <summary>
+    /// 投影更新目标。
+    /// </summary>
+    /// <param name="Id">目标实体主键。</param>
+    /// <param name="Incoming">投影输入实体。</param>
+    private readonly record struct ProjectionUpdateTarget(long Id, BusinessTaskEntity Incoming);
+
+    /// <summary>
+    /// 投影幂等键。
+    /// </summary>
+    /// <param name="SourceTableCode">来源表编码。</param>
+    /// <param name="BusinessKey">业务键。</param>
+    private readonly record struct ProjectionKey(string SourceTableCode, string BusinessKey)
+    {
+        /// <summary>
+        /// 创建投影幂等键。
+        /// </summary>
+        /// <param name="sourceTableCode">来源表编码。</param>
+        /// <param name="businessKey">业务键。</param>
+        /// <returns>投影幂等键；任一输入为空白时返回 null。</returns>
+        public static ProjectionKey? Create(string sourceTableCode, string businessKey)
+        {
+            var normalizedSourceTableCode = NormalizeOptionalText(sourceTableCode);
+            var normalizedBusinessKey = NormalizeOptionalText(businessKey);
+            if (string.IsNullOrWhiteSpace(normalizedSourceTableCode) || string.IsNullOrWhiteSpace(normalizedBusinessKey))
+            {
+                return null;
+            }
+
+            return new ProjectionKey(normalizedSourceTableCode, normalizedBusinessKey);
+        }
+    }
 }

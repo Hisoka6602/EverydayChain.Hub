@@ -37,6 +37,15 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     }
 
     /// <inheritdoc/>
+    public Task<BusinessTaskEntity?> FindBySourceTableAndBusinessKeyAsync(string sourceTableCode, string businessKey, CancellationToken ct)
+    {
+        var task = _tasks.FirstOrDefault(x =>
+            string.Equals(x.SourceTableCode, sourceTableCode, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(x.BusinessKey, businessKey, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(task);
+    }
+
+    /// <inheritdoc/>
     public Task<BusinessTaskEntity?> FindByIdAsync(long id, CancellationToken ct)
     {
         var task = _tasks.FirstOrDefault(x => x.Id == id);
@@ -50,6 +59,40 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
         entity.Id = _nextId++;
         _tasks.Add(entity);
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    public async Task UpsertProjectionAsync(BusinessTaskEntity entity, CancellationToken ct)
+    {
+        var existing = await FindBySourceTableAndBusinessKeyAsync(entity.SourceTableCode, entity.BusinessKey, ct);
+        if (existing is null)
+        {
+            await SaveAsync(entity, ct);
+            return;
+        }
+
+        if (existing.Status == BusinessTaskStatus.Created && existing.ScannedAtLocal is null && string.IsNullOrWhiteSpace(existing.Barcode))
+        {
+            existing.Barcode = entity.Barcode;
+        }
+
+        existing.WaveCode = entity.WaveCode;
+        existing.WaveRemark = entity.WaveRemark;
+        existing.UpdatedTimeLocal = entity.UpdatedTimeLocal;
+        await UpdateAsync(existing, ct);
+    }
+
+    /// <inheritdoc/>
+    public async Task<int> UpsertProjectionBatchAsync(IReadOnlyList<BusinessTaskEntity> entities, CancellationToken ct)
+    {
+        var processedCount = 0;
+        foreach (var entity in entities)
+        {
+            await UpsertProjectionAsync(entity, ct);
+            processedCount++;
+        }
+
+        return processedCount;
     }
 
     /// <inheritdoc/>

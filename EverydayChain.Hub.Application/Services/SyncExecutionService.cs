@@ -27,6 +27,7 @@ public class SyncExecutionService(
     ISyncDeletionLogRepository deletionLogRepository,
     ISyncCheckpointRepository checkpointRepository,
     IRemoteStatusConsumeService remoteStatusConsumeService,
+    IBusinessTaskStatusConsumeService businessTaskStatusConsumeService,
     ILogger<SyncExecutionService> logger) : ISyncExecutionService
 {
     /// <summary>失败检查点写入超时秒数。</summary>
@@ -37,6 +38,10 @@ public class SyncExecutionService(
     private const string FailBatchOnCancelErrorLogTemplate = "在处理同步批次取消时更新批次失败。TableCode={TableCode}, BatchId={BatchId}";
     /// <summary>“读取到数据但目标端0写入（全部跳过）”告警采样间隔（有效值范围：1~1000，建议值：100）。</summary>
     private const int FullySkippedPageWarningInterval = 100;
+    /// <summary>拆零任务编码。</summary>
+    private const string SplitTaskTableCode = "WmsSplitPickToLightCarton";
+    /// <summary>整件任务编码。</summary>
+    private const string FullCaseTaskTableCode = "WmsPickToWcs";
 
     /// <summary>快照序列化配置。</summary>
     private static readonly JsonSerializerSettings SnapshotSerializerSettings = new()
@@ -521,7 +526,9 @@ public class SyncExecutionService(
 
             // StatusDriven 主流程：委托给专用消费服务完成分页读取→追加→可选回写。
             stepSw.Restart();
-            var consumeResult = await remoteStatusConsumeService.ConsumeAsync(context.Definition, context.BatchId, context.Window, ct);
+            var consumeResult = IsBusinessTaskStatusDrivenTable(context.Definition.TableCode)
+                ? await businessTaskStatusConsumeService.ConsumeAsync(context.Definition, context.BatchId, context.Window, ct)
+                : await remoteStatusConsumeService.ConsumeAsync(context.Definition, context.BatchId, context.Window, ct);
             consumeElapsedMs = stepSw.ElapsedMilliseconds;
 
             // StatusDriven 不产生变更日志与删除日志，写入空集合保持链路一致。
@@ -628,5 +635,16 @@ public class SyncExecutionService(
             }
             throw;
         }
+    }
+
+    /// <summary>
+    /// 判断是否为业务任务状态驱动主路径表。
+    /// </summary>
+    /// <param name="tableCode">表编码。</param>
+    /// <returns>命中返回 true，否则返回 false。</returns>
+    private static bool IsBusinessTaskStatusDrivenTable(string tableCode)
+    {
+        return tableCode.Equals(SplitTaskTableCode, StringComparison.OrdinalIgnoreCase)
+            || tableCode.Equals(FullCaseTaskTableCode, StringComparison.OrdinalIgnoreCase);
     }
 }

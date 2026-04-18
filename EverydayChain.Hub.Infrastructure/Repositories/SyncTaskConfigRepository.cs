@@ -57,6 +57,11 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         var effectivePageSize = table.PageSize > 0 ? table.PageSize : 5000;
         var priority = ParsePriority(table.Priority, table.TableCode);
         var statusConsumeProfile = BuildStatusConsumeProfile(table, syncMode);
+        var sourceType = ParseSourceType(table.SourceType, table.TableCode);
+        var businessKeyColumn = NormalizeAndValidateOptionalIdentifier(table.BusinessKeyColumn, table.TableCode, nameof(table.BusinessKeyColumn)) ?? string.Empty;
+        var barcodeColumn = NormalizeAndValidateOptionalIdentifier(table.BarcodeColumn, table.TableCode, nameof(table.BarcodeColumn));
+        var waveCodeColumn = NormalizeAndValidateOptionalIdentifier(table.WaveCodeColumn, table.TableCode, nameof(table.WaveCodeColumn));
+        var waveRemarkColumn = NormalizeAndValidateOptionalIdentifier(table.WaveRemarkColumn, table.TableCode, nameof(table.WaveRemarkColumn));
         return new SyncTableDefinition {
             TableCode = table.TableCode,
             Enabled = table.Enabled,
@@ -82,7 +87,31 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             RetentionDryRun = table.Retention.DryRun,
             RetentionAllowDrop = table.Retention.AllowDrop,
             StatusConsumeProfile = statusConsumeProfile,
+            SourceType = sourceType,
+            BusinessKeyColumn = businessKeyColumn,
+            BarcodeColumn = barcodeColumn,
+            WaveCodeColumn = waveCodeColumn,
+            WaveRemarkColumn = waveRemarkColumn,
         };
+    }
+
+    /// <summary>
+    /// 解析来源类型配置。
+    /// </summary>
+    /// <param name="sourceTypeText">来源类型文本。</param>
+    /// <param name="tableCode">表编码。</param>
+    /// <returns>来源类型。</returns>
+    private static BusinessTaskSourceType ParseSourceType(string? sourceTypeText, string tableCode) {
+        if (string.IsNullOrWhiteSpace(sourceTypeText)) {
+            return BusinessTaskSourceType.Unknown;
+        }
+
+        var normalized = sourceTypeText.Trim();
+        if (!Enum.TryParse<BusinessTaskSourceType>(normalized, true, out var sourceType) || !Enum.IsDefined(sourceType)) {
+            throw new InvalidOperationException($"表 {tableCode} 的 SourceType 配置非法，仅支持 Split 或 FullCase。");
+        }
+
+        return sourceType;
     }
 
     /// <summary>
