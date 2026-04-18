@@ -315,7 +315,7 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
             return (_options.FullCaseSchema, _options.FullCaseTable, _options.FullCaseBusinessKeyColumn);
         }
 
-        throw new InvalidOperationException("不支持的业务来源类型，无法确定 WMS 回写目标表。");
+        throw new InvalidOperationException($"不支持的业务来源类型，无法确定 WMS 回写目标表。sourceType={sourceType}");
     }
 
     /// <summary>

@@ -83,6 +83,19 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     }
 
     /// <inheritdoc/>
+    public async Task<int> UpsertProjectionBatchAsync(IReadOnlyList<BusinessTaskEntity> entities, CancellationToken ct)
+    {
+        var processedCount = 0;
+        foreach (var entity in entities)
+        {
+            await UpsertProjectionAsync(entity, ct);
+            processedCount++;
+        }
+
+        return processedCount;
+    }
+
+    /// <inheritdoc/>
     public Task UpdateAsync(BusinessTaskEntity entity, CancellationToken ct)
     {
         entity.RefreshQueryFields();

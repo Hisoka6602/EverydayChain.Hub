@@ -110,6 +110,35 @@ public class BusinessTaskStatusConsumeServiceTests
     }
 
     /// <summary>
+    /// 固定第一页回写模式下，若当前页无可投影行应提前结束，避免死循环。
+    /// </summary>
+    [Fact]
+    public async Task ConsumeAsync_WhenFixedFirstPageAndNoProjectionRows_ShouldBreak()
+    {
+        var reader = new FakeOracleStatusDrivenSourceReader();
+        reader.Pages.Enqueue([
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["CARTONNO"] = null,
+                ["__RowId"] = "ROW-3"
+            }
+        ]);
+        var writer = new FakeOracleRemoteStatusWriter();
+        var projectionService = new BusinessTaskProjectionService();
+        var repository = new InMemoryBusinessTaskRepository();
+        var logger = new TestLogger<BusinessTaskStatusConsumeService>();
+        var service = new BusinessTaskStatusConsumeService(reader, writer, projectionService, repository, logger);
+
+        var result = await service.ConsumeAsync(BuildSplitDefinition(true), "B4", default, CancellationToken.None);
+
+        Assert.Equal(1, result.ReadCount);
+        Assert.Equal(0, result.AppendCount);
+        Assert.Equal(0, result.WriteBackCount);
+        Assert.Equal(0, writer.TotalWriteBackRows);
+        Assert.Contains(logger.Logs, log => log.Message.Contains("无可投影行", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     /// 构建拆零定义。
     /// </summary>
     /// <param name="writeBack">是否回写。</param>

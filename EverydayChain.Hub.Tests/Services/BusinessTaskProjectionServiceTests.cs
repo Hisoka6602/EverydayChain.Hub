@@ -41,4 +41,30 @@ public class BusinessTaskProjectionServiceTests
         Assert.Equal("CARTON001", entity.BusinessKey);
         Assert.Equal(BusinessTaskSourceType.Split, entity.SourceType);
     }
+
+    /// <summary>
+    /// 业务键超过 64 字符时应拒绝投影，避免 TaskCode 超长入库。
+    /// </summary>
+    [Fact]
+    public void Project_WhenBusinessKeyTooLong_ShouldThrow()
+    {
+        var service = new BusinessTaskProjectionService();
+        var longBusinessKey = new string('A', 65);
+        var request = new BusinessTaskProjectionRequest
+        {
+            Rows =
+            [
+                new BusinessTaskProjectionRow
+                {
+                    SourceTableCode = "WmsSplitPickToLightCarton",
+                    SourceType = BusinessTaskSourceType.Split,
+                    BusinessKey = longBusinessKey,
+                    Barcode = longBusinessKey
+                }
+            ]
+        };
+
+        var exception = Assert.Throws<ArgumentException>(() => service.Project(request));
+        Assert.Contains("BusinessKey", exception.Message, StringComparison.Ordinal);
+    }
 }

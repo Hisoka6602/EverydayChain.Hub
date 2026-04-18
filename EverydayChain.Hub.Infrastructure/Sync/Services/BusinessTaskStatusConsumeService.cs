@@ -90,15 +90,22 @@ public class BusinessTaskStatusConsumeService(
                 }
             }
 
+            if (projectionRows.Count == 0 && shouldUseFixedFirstPage)
+            {
+                logger.LogWarning(
+                    "业务任务状态驱动消费提前结束：固定第1页模式下当前页无可投影行，避免死循环。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, RowCount={RowCount}",
+                    definition.TableCode,
+                    batchId,
+                    currentPageNo,
+                    rows.Count);
+                break;
+            }
+
             var projectionResult = projectionService.Project(new BusinessTaskProjectionRequest
             {
                 Rows = projectionRows
             });
-            foreach (var entity in projectionResult.Entities)
-            {
-                await businessTaskRepository.UpsertProjectionAsync(entity, ct);
-                result.AppendCount++;
-            }
+            result.AppendCount += await businessTaskRepository.UpsertProjectionBatchAsync(projectionResult.Entities, ct);
 
             if (!profile.ShouldWriteBackRemoteStatus)
             {
@@ -108,6 +115,17 @@ public class BusinessTaskStatusConsumeService(
 
             if (rowIds.Count == 0)
             {
+                if (shouldUseFixedFirstPage)
+                {
+                    logger.LogWarning(
+                        "业务任务状态驱动消费提前结束：固定第1页模式下当前页无可回写 ROWID，避免死循环。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, RowCount={RowCount}",
+                        definition.TableCode,
+                        batchId,
+                        currentPageNo,
+                        rows.Count);
+                    break;
+                }
+
                 if (!shouldUseFixedFirstPage)
                 {
                     pageNo++;

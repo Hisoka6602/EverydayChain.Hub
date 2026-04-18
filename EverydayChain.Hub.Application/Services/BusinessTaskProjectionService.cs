@@ -40,7 +40,7 @@ public class BusinessTaskProjectionService : IBusinessTaskProjectionService
     private static BusinessTaskEntity BuildEntity(BusinessTaskProjectionRow row)
     {
         var sourceTableCode = ValidateRequiredText(row.SourceTableCode, nameof(row.SourceTableCode), 64);
-        var businessKey = ValidateRequiredText(row.BusinessKey, nameof(row.BusinessKey), 256);
+        var businessKey = ValidateRequiredText(row.BusinessKey, nameof(row.BusinessKey), 64);
         if (row.SourceType == BusinessTaskSourceType.Unknown)
         {
             throw new ArgumentException("SourceType 不可为 Unknown。", nameof(row.SourceType));

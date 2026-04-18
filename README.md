@@ -4,6 +4,7 @@
 - 开始实施《EverydayChain.Hub_Copilot_精准执行指令_最终版》：补齐 `business_tasks` 直投影主路径，新增 `BusinessTaskProjectionService` 与 `BusinessTaskStatusConsumeService`，并将 `WmsSplitPickToLightCarton`/`WmsPickToWcs` 的 `StatusDriven` 主路径切换为“远端读取 → 本地业务主表幂等投影 → 可选远端状态回写”。
 - 收敛同步与回写配置：`SyncJob.Tables` 新增 `SourceType`、`BusinessKeyColumn`、`BarcodeColumn`、`WaveCodeColumn`、`WaveRemarkColumn`；`appsettings.json` 两条 WMS 同步任务目标统一为 `business_tasks`；`WmsFeedbackOptions` 与 `OracleWmsFeedbackGateway` 删除默认回退目标表语义并改为按来源强制分流。
 - 补齐幂等保障与测试：`business_tasks` 新增 `SourceTableCode + BusinessKey` 联合唯一索引，仓储新增按来源+业务键查询与投影 Upsert；新增投影服务、状态消费、仓储投影幂等相关测试并更新配置映射测试。
+- 补充上线门禁：新增 `SourceTableCode + BusinessKey` 唯一索引后，上线前需先执行存量重复键校验并完成去重（按最新 `UpdatedTimeLocal` 保留一条），再执行自动迁移，避免唯一索引创建失败阻断启动。
 - 新增启动探测与分表解析超时隔离：`AutoMigrationService` 启动元数据探测 SQL 设置 `15s` 超时，`ShardTableResolver` 分表列表查询设置 `15s` 超时，进一步降低启动与分表路由阶段因系统表阻塞导致的连锁卡顿风险。
 - 新增分表治理命令超时隔离：`ShardRetentionRepository` 与 `ShardTableProvisioner` 的元数据查询/DDL/删除操作统一设置 `CommandTimeout=30s`，避免分表治理 SQL 在锁等待场景中长时间阻塞并占用连接池。
 - 新增数据库命令超时隔离：`EfCore.CommandTimeoutSeconds` 已接入 `UseSqlServer(...).CommandTimeout(...)`，并将 `HubDbContext` 注册改为 `AddPooledDbContextFactory`（读取 `EfCore.DbContextPoolSize`），防止慢 SQL/阻塞 SQL 长时间占用连接导致整体请求堆积。
@@ -213,6 +214,9 @@
 │   ├── Models/BusinessTaskQueryRequest.cs
 │   ├── Models/BusinessTaskQueryResult.cs
 │   ├── Models/BusinessTaskQueryItem.cs
+│   ├── Models/BusinessTaskProjectionRow.cs
+│   ├── Models/BusinessTaskProjectionRequest.cs
+│   ├── Models/BusinessTaskProjectionResult.cs
 │   ├── Abstractions/Persistence/ISyncTaskConfigRepository.cs
 │   ├── Abstractions/Persistence/IOracleSourceReader.cs
 │   ├── Abstractions/Persistence/ISyncStagingRepository.cs
@@ -231,6 +235,7 @@
 │   ├── Abstractions/Sync/IOracleStatusDrivenSourceReader.cs
 │   ├── Abstractions/Sync/ISqlServerAppendOnlyWriter.cs
 │   ├── Abstractions/Sync/IRemoteStatusConsumeService.cs
+│   ├── Abstractions/Sync/IBusinessTaskStatusConsumeService.cs
 │   ├── Abstractions/Services/ISyncOrchestrator.cs
 │   ├── Abstractions/Services/ISyncWindowCalculator.cs
 │   ├── Abstractions/Services/ISyncExecutionService.cs
@@ -243,6 +248,7 @@
 │   ├── Abstractions/Services/IScanIngressService.cs
 │   ├── Abstractions/Services/IChuteQueryService.cs
 │   ├── Abstractions/Services/IDropFeedbackService.cs
+│   ├── Abstractions/Services/IBusinessTaskProjectionService.cs
 │   ├── Abstractions/Services/IWmsFeedbackService.cs
 │   ├── Abstractions/Services/IFeedbackCompensationService.cs
 │   ├── Abstractions/Queries/IGlobalDashboardQueryService.cs
@@ -262,6 +268,7 @@
 │   ├── Services/SyncWindowCalculator.cs
 │   ├── Services/SyncExecutionService.cs
 │   ├── Services/BusinessTaskMaterializer.cs
+│   ├── Services/BusinessTaskProjectionService.cs
 │   ├── Services/BarcodeParser.cs
 │   ├── ScanMatch/Services/ScanMatchService.cs
 │   ├── TaskExecution/Services/TaskExecutionService.cs
@@ -296,6 +303,7 @@
 │   ├── Sync/Writers/SqlServerAppendOnlyWriter.cs
 │   ├── Sync/Writers/OracleRemoteStatusWriter.cs
 │   ├── Sync/Services/RemoteStatusConsumeService.cs
+│   ├── Sync/Services/BusinessTaskStatusConsumeService.cs
 │   ├── Integrations/OracleWmsFeedbackGateway.cs
 │   ├── Repositories/SyncTaskConfigRepository.cs
 │   ├── Repositories/OracleSourceReader.cs
@@ -591,6 +599,8 @@
 - `EverydayChain.Hub.Tests/Services/InMemoryDropLogRepository.cs`：落格日志仓储内存替身。
 - `Application/Abstractions/Sync/IOracleRemoteStatusWriter.cs` / `IOracleStatusDrivenSourceReader.cs` / `ISqlServerAppendOnlyWriter.cs`：定义 StatusDriven 模式中 Oracle 远端状态回写、Oracle 状态驱动源读取与 SQL Server 仅追加写入的外部协作能力抽象，遵循 Application 层外部协作抽象放置规则。
 - `Application/Abstractions/Sync/IRemoteStatusConsumeService.cs` + `Application/Models/RemoteStatusConsumeResult.cs`：定义 StatusDriven 模式执行入口（应用编排抽象）与读取/追加/回写统计模型。
+- `Application/Abstractions/Sync/IBusinessTaskStatusConsumeService.cs` + `Infrastructure/Sync/Services/BusinessTaskStatusConsumeService.cs`：定义并实现 WMS 两条 StatusDriven 的业务主表消费链路，串联“读取→投影→批量幂等 Upsert→可选回写”，并在固定第 1 页模式下加入无可投影/无可回写行 fail-fast 防死循环保护。
+- `Application/Abstractions/Services/IBusinessTaskProjectionService.cs` + `Application/Services/BusinessTaskProjectionService.cs` + `Application/Models/BusinessTaskProjection*.cs`：定义并实现业务任务投影契约与模型，统一执行字段校验、文本标准化与实体构造；强制 `TaskCode = BusinessKey` 且长度上限 64，避免入库超长。
 - `Application/Abstractions/Persistence/ISyncBatchRepository.cs` / `ISyncChangeLogRepository.cs` / `ISyncDeletionRepository.cs` / `ISyncDeletionLogRepository.cs`：定义批次状态、变更日志、删除识别执行与删除日志写入契约。
 - `Application/Abstractions/Persistence/IShardTableResolver.cs` / `IShardRetentionRepository.cs`：定义分表识别与分表清理执行契约（含分表完整回滚脚本生成）。
 - `Application/Abstractions/Services/ISyncOrchestrator.cs` / `SyncOrchestrator.cs`：同步任务编排入口应用抽象（位于 Abstractions/Services/）；`SyncOrchestrator.cs` 实现位于 Services/ 目录。
@@ -617,6 +627,7 @@
 - `Sync/Writers/SqlServerAppendOnlyWriter.cs`：StatusDriven 本地落库写入器，仅执行批量追加，不执行 merge/delete。
 - `Sync/Writers/OracleRemoteStatusWriter.cs`：StatusDriven 远端回写器，仅按 `ROWID` 更新远端状态列。
 - `Sync/Services/RemoteStatusConsumeService.cs`：串联“读取→追加→可选回写”流程，执行页级异常隔离并输出中文统计日志。
+- `Repositories/BusinessTaskRepository.cs`：业务任务仓储实现，新增投影批量幂等 Upsert（单页批量查询已有键 + 按分片批量新增/批量更新），降低逐条 SaveChanges 带来的 N+1 往返压力。
 - `SyncStagingRepository.cs`：暂存仓储基础实现，按 `BatchId + PageNo` 进行内存暂存，并在写入阶段过滤 `ExcludedColumns`。
 - `SqlServerSyncUpsertRepository.cs`：SQL Server 真实落库实现，按目标逻辑表+后缀分表执行集合式 MERGE（支持配置回退逐行模式），并在 `sync_target_state_{tableCode}_{yyyyMM}` 状态分表中记录后缀；读取/删除状态时跨月分表聚合，且兼容旧版 `sync_target_state` / `sync_target_state_{tableCode}` 状态表，确保升级过程幂等与删除语义连续。
 - `SyncDeletionRepository.cs`：删除同步仓储基础实现，基于轻量幂等状态执行窗口过滤与源端键差异识别，并按策略执行删除。
@@ -711,6 +722,7 @@
 - `Oracle.ConnectionString` 保持 `Data Source=host:port;User Id=...;Password=...;`（由系统按 `DatabaseMode` + `Database` 拼接库名）。
 
 ## 可继续完善内容（本次 PR 后续行动项）
+- 对 `business_tasks` 增加上线前自动校验脚本：发布前先执行 `SourceTableCode + BusinessKey` 重复键扫描与去重结果审计，校验通过后再执行自动迁移创建唯一索引。
 - 为集合式 MERGE 增加真实 SQL Server 集成基准（大页写入、锁等待、超时重试）并沉淀基线阈值告警。
 - 评估 TVP 版本的集合式 MERGE 实现，减少临时表 DDL 与批次内元数据开销。
 - 增加“取消触发下的数据库事务回滚”集成测试，补齐真实数据库回滚行为验收。

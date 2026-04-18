@@ -57,6 +57,14 @@ public interface IBusinessTaskRepository
     Task UpsertProjectionAsync(BusinessTaskEntity entity, CancellationToken ct);
 
     /// <summary>
+    /// 按投影规则执行批量幂等 Upsert。
+    /// </summary>
+    /// <param name="entities">投影后的业务任务实体集合。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>实际处理的实体数量。</returns>
+    Task<int> UpsertProjectionBatchAsync(IReadOnlyList<BusinessTaskEntity> entities, CancellationToken ct);
+
+    /// <summary>
     /// 更新已有业务任务并持久化。
     /// </summary>
     /// <param name="entity">业务任务实体（Id 必须有效）。</param>
