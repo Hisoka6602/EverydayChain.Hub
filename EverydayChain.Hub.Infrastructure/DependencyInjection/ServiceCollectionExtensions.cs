@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using EverydayChain.Hub.Domain.Options;
 using Microsoft.Extensions.Configuration;
 using EverydayChain.Hub.Application.Services;
@@ -74,12 +75,15 @@ public static class ServiceCollectionExtensions {
         services.Configure<WmsFeedbackOptions>(configuration.GetSection(WmsFeedbackOptions.SectionName));
         services.Configure<FeedbackCompensationJobOptions>(configuration.GetSection(FeedbackCompensationJobOptions.SectionName));
         services.Configure<ExceptionRuleOptions>(configuration.GetSection(ExceptionRuleOptions.SectionName));
+        services.Configure<QueryCacheOptions>(configuration.GetSection(QueryCacheOptions.SectionName));
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
+        var queryCacheOptions = configuration.GetSection(QueryCacheOptions.SectionName).Get<QueryCacheOptions>() ?? new QueryCacheOptions();
         var syncOptions = configuration.GetSection(SyncJobOptions.SectionName).Get<SyncJobOptions>() ?? new SyncJobOptions();
         var retentionJobOptions = configuration.GetSection(RetentionJobOptions.SectionName).Get<RetentionJobOptions>() ?? new RetentionJobOptions();
         var managedLogicalTables = BuildManagedLogicalTables(syncOptions).ToArray();
 
+        services.AddMemoryCache();
         services.AddDbContextFactory<HubDbContext>(options => {
             options.UseSqlServer(shardingOptions.ConnectionString, sqlServerOptions => {
                 sqlServerOptions.EnableRetryOnFailure();
@@ -125,9 +129,21 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IScanIngressService, ScanIngressService>();
         services.AddSingleton<IChuteQueryService, ChuteQueryService>();
         services.AddSingleton<IDropFeedbackService, DropFeedbackService>();
-        services.AddSingleton<IGlobalDashboardQueryService, GlobalDashboardQueryService>();
-        services.AddSingleton<IDockDashboardQueryService, DockDashboardQueryService>();
-        services.AddSingleton<ISortingReportQueryService, SortingReportQueryService>();
+        services.AddSingleton<IGlobalDashboardQueryService>(sp =>
+            new GlobalDashboardQueryService(
+                sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<IMemoryCache>(),
+                queryCacheOptions));
+        services.AddSingleton<IDockDashboardQueryService>(sp =>
+            new DockDashboardQueryService(
+                sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<IMemoryCache>(),
+                queryCacheOptions));
+        services.AddSingleton<ISortingReportQueryService>(sp =>
+            new SortingReportQueryService(
+                sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<IMemoryCache>(),
+                queryCacheOptions));
         services.AddSingleton<IBusinessTaskReadService, BusinessTaskReadService>();
         services.AddSingleton<IDeletionExecutionService, DeletionExecutionService>();
         services.AddSingleton<IRetentionExecutionService, RetentionExecutionService>();
@@ -187,4 +203,5 @@ public static class ServiceCollectionExtensions {
 
         return managedTables;
     }
+
 }

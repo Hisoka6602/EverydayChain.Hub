@@ -103,7 +103,9 @@ public sealed class BusinessTaskQueryController : ControllerBase
             DockCode = request.DockCode,
             ChuteCode = request.ChuteCode,
             PageNumber = request.PageNumber,
-            PageSize = request.PageSize
+            PageSize = request.PageSize,
+            LastCreatedTimeLocal = request.LastCreatedTimeLocal,
+            LastId = request.LastId
         };
 
         var queryResult = await executor(appRequest, cancellationToken);
@@ -112,6 +114,10 @@ public sealed class BusinessTaskQueryController : ControllerBase
             TotalCount = queryResult.TotalCount,
             PageNumber = queryResult.PageNumber,
             PageSize = queryResult.PageSize,
+            HasMore = queryResult.HasMore,
+            NextLastCreatedTimeLocal = queryResult.NextLastCreatedTimeLocal,
+            NextLastId = queryResult.NextLastId,
+            PaginationMode = queryResult.PaginationMode,
             Items = queryResult.Items
                 .Select(item => new BusinessTaskItemResponse
                 {
@@ -166,6 +172,18 @@ public sealed class BusinessTaskQueryController : ControllerBase
         if (request.PageSize < 1 || request.PageSize > 1000)
         {
             validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("页大小范围必须在 1 到 1000 之间。"));
+            return false;
+        }
+
+        if (request.LastCreatedTimeLocal.HasValue != request.LastId.HasValue)
+        {
+            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("游标分页参数 LastCreatedTimeLocal 与 LastId 必须同时传入或同时为空。"));
+            return false;
+        }
+
+        if (request.LastId.HasValue && request.LastId.Value <= 0)
+        {
+            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("游标分页参数 LastId 必须大于 0。"));
             return false;
         }
 

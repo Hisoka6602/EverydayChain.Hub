@@ -19,4 +19,10 @@ public class ShardingOptions
 
     /// <summary>分表预建并发上限，范围 1-64，默认 4。</summary>
     public int PreProvisionMaxConcurrency { get; set; } = 4;
+
+    /// <summary>
+    /// 是否启用无后缀历史表读取兜底（可填写项：true、false；默认 false）。
+    /// 当环境已完成迁移且无历史无后缀表时，可配置为 false 以减少无效查询往返。
+    /// </summary>
+    public bool EnableLegacyBaseTableReadFallback { get; set; } = false;
 }

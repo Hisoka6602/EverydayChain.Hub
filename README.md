@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 完成“本地库查询能力极致优化”：业务任务/异常件/回流查询新增游标分页主路径并保留页码兼容；看板/报表查询引入短 TTL 缓存；EF Core 切换 DbContext 池化；新增 `NormalizedWaveCode`、`NormalizedBarcode`、`ResolvedDockCode` 与配套索引；新增 `本地库查询性能优化说明.md`。
 - 按业务需求切换 WMS 回写开关：`WmsFeedback.Enabled` 调整为 `true`，上线口径更新为“回写开启”。
 - 完成最后一轮上线收口：新增 `Swagger注释全量盘点清单.md` 与 `上线前最终检查清单.md`，形成可直接执行的上线门禁与逐文件注释盘点留痕。
 - 完成前端文档一致性收口：`前端对接文档.md` 已补充“一致性校验结果”，并修正请求格口、落格回传、波次清理示例消息语义。
@@ -79,6 +80,7 @@
 ├── Swagger注释全量盘点清单.md
 ├── 上线前最终检查清单.md
 ├── 性能精修说明.md
+├── 本地库查询性能优化说明.md
 ├── 前端对接文档.md
 ├── 条码规则基线.md
 ├── 对外API接口基线.md
@@ -144,6 +146,8 @@
 │   ├── Options/RetentionJobOptions.cs
 │   ├── Options/RetentionLogTableOptions.cs
 │   ├── Options/ShardingOptions.cs
+│   ├── Options/EfCoreOptions.cs
+│   ├── Options/QueryCacheOptions.cs
 │   ├── Options/SyncDeleteOptions.cs
 │   ├── Options/SyncJobOptions.cs
 │   ├── Options/SyncRetentionOptions.cs
@@ -437,6 +441,7 @@
 - `scripts/disaster-recovery.sh`：灾难恢复脚本，支持检查点重置（checkpoint-reset）、快照从归档恢复（snapshot-restore）、快照备份（snapshot-backup）、归档清理（archive-cleanup）与完全重置（full-reset）；全部操作支持 --dry-run 预览模式。
 - `scripts/stability-drill.sh`：稳定性演练脚本，串联体检与灾备动作（checkpoint-reset、snapshot-backup、snapshot-restore、archive-cleanup），支持 dry-run 与真实执行并自动生成演练记录。
 - `性能精修说明.md`：记录热路径进一步性能精修项、已完成项、当前性能边界与后续极限优化方向。
+- `本地库查询性能优化说明.md`：记录本地 SQL Server 查询高并发优化项、缓存策略、游标分页口径、索引调整与上线观察指标。
 - `前端对接文档.md`：面向调用方的接口对接说明，覆盖公开 API 路由、请求/响应字段与成功失败示例。
 - `WMS回写联调基线.md`：固化 WMS 回写联调配置、验证路径、阻塞项与生产启用门禁，并明确本次上线结论为“可上线且回写开启”。
 - `Swagger注释全量盘点清单.md`：记录 Host 层 Controller/Request/Response 逐文件 Swagger/XML 注释盘点结果与修复结论。
@@ -444,6 +449,7 @@
 - `EverydayChain.Hub.Domain/Options/WebEndpointOptions.cs`：定义 Web 监听地址配置实体，统一承载 `WebEndpoint.Url` 绑定语义。
 - `EverydayChain.Hub.Domain/Options/SwaggerOptions.cs`：Swagger 文档配置实体，新增 `Path` 用于配置化 Swagger 页面入口。
 - `EverydayChain.Hub.Infrastructure/Migrations/20260417185400_RebuildHubBaseline.cs`：EF Core 新基线迁移，覆盖当前全量模型与索引定义。
+- `EverydayChain.Hub.Infrastructure/Migrations/20260418021720_AddBusinessTaskQueryOptimizationFields.cs`：查询优化增量迁移，新增业务任务查询优化字段与组合索引，并执行历史数据回填。
 - `docs/联调证据/PR12-20260416-R1/01-联调执行记录.md`：PR-12 联调收口 R1 批次执行记录，归档本地时间窗口、回归命令与端到端链路执行状态。
 - `docs/联调证据/PR12-20260416-R1/02-关键日志索引.md`：PR-12 联调收口 R1 批次关键日志索引，固化日志范围、检索词口径与命中补录表。
 - `docs/联调证据/PR12-20260416-R1/03-结果汇总.md`：PR-12 联调收口 R1 批次结果汇总，记录统计口径、回归结果与最终收口结论。
@@ -479,6 +485,8 @@
 - `BusinessTaskFeedbackStatus.cs`：业务回传状态枚举，覆盖 NotRequired、Pending、Completed、Failed，标识任务回传 WMS 的进度。
 - `RemoteStatusConsumeProfile.cs`（`EverydayChain.Hub.Domain/Sync/Models`）：StatusDriven 消费配置模型，统一承载状态列、待处理值、完成值、回写开关与批次大小。
 - `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`SyncTable`、`SyncDelete`、`SyncRetention`、`RetentionJob`、`Oracle` 等），供 Infrastructure 绑定读取。
+- `Domain/Options/EfCoreOptions.cs`：EF Core 池化配置实体，定义 `DbContextPoolSize` 范围与默认值。
+- `Domain/Options/QueryCacheOptions.cs`：查询缓存配置实体，定义总看板、码头看板、报表缓存开关与 TTL 秒数。
 - `Domain/Options/RetentionLogTableOptions.cs`：日志表保留期配置实体，定义单日志表 `Enabled`、`LogicalTableName`、`KeepMonths`、`DryRun`、`AllowDrop` 参数。
 - `SwaggerOptions.cs`：Swagger 文档配置实体，承载标题、版本、描述与各环境开关（开发/测试/生产）。
 - `SortingTaskTraceEntity.cs`：可分表的写入实体，承载中台追踪数据；所有属性均含 XML 注释。

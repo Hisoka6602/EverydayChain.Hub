@@ -45,6 +45,13 @@ public class BusinessTaskEntity : IEntity<long>
     public string? Barcode { get; set; }
 
     /// <summary>
+    /// 条码标准化字段（去除前后空白后写入），最大 128 字符；用于高频查询等值匹配。
+    /// 空值语义：当条码为空白时写入空值。
+    /// </summary>
+    [MaxLength(128)]
+    public string? NormalizedBarcode { get; set; }
+
+    /// <summary>
     /// 目标格口编码，由格口规则计算得出，最大 64 字符；未分配格口时可为空。
     /// </summary>
     [MaxLength(64)]
@@ -55,6 +62,13 @@ public class BusinessTaskEntity : IEntity<long>
     /// </summary>
     [MaxLength(64)]
     public string? ActualChuteCode { get; set; }
+
+    /// <summary>
+    /// 查询专用归并码头编码，优先取实际落格编码，其次取目标格口编码，均为空时写入占位值。
+    /// 可填写范围：长度 1~64 的文本；默认占位值为“未分配码头”。
+    /// </summary>
+    [MaxLength(64)]
+    public string ResolvedDockCode { get; set; } = "未分配码头";
 
     /// <summary>
     /// 扫描设备编码，最大 64 字符；尚未扫描时可为空。
@@ -141,6 +155,13 @@ public class BusinessTaskEntity : IEntity<long>
     public string? WaveCode { get; set; }
 
     /// <summary>
+    /// 波次标准化字段（去除前后空白后写入），最大 64 字符；用于高频查询等值匹配。
+    /// 空值语义：当波次为空白时写入空值。
+    /// </summary>
+    [MaxLength(64)]
+    public string? NormalizedWaveCode { get; set; }
+
+    /// <summary>
     /// 波次备注，来自上游波次说明信息，最大 128 字符；无备注时为空。
     /// </summary>
     [MaxLength(128)]
@@ -170,4 +191,46 @@ public class BusinessTaskEntity : IEntity<long>
     /// 回传时间（本地时间）；回传成功后写入。
     /// </summary>
     public DateTime? FeedbackTimeLocal { get; set; }
+
+    /// <summary>
+    /// 刷新查询优化字段，统一标准化条码、波次与归并码头编码。
+    /// 当条码、波次、目标格口、实际落格任一字段发生变化后，应在持久化前调用该方法。
+    /// </summary>
+    public void RefreshQueryFields()
+    {
+        NormalizedBarcode = NormalizeOptionalText(Barcode);
+        NormalizedWaveCode = NormalizeOptionalText(WaveCode);
+        ResolvedDockCode = ResolveDockCode(ActualChuteCode, TargetChuteCode);
+    }
+
+    /// <summary>
+    /// 归一化可选文本。
+    /// </summary>
+    /// <param name="value">原始文本。</param>
+    /// <returns>归一化后的文本。</returns>
+    private static string? NormalizeOptionalText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    /// <summary>
+    /// 解析归并码头编码。
+    /// </summary>
+    /// <param name="actualChuteCode">实际落格编码。</param>
+    /// <param name="targetChuteCode">目标格口编码。</param>
+    /// <returns>归并后的码头编码。</returns>
+    private static string ResolveDockCode(string? actualChuteCode, string? targetChuteCode)
+    {
+        if (!string.IsNullOrWhiteSpace(actualChuteCode))
+        {
+            return actualChuteCode.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(targetChuteCode))
+        {
+            return targetChuteCode.Trim();
+        }
+
+        return "未分配码头";
+    }
 }

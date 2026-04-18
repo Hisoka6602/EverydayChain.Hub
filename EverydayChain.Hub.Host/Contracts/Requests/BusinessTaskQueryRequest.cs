@@ -60,4 +60,18 @@ public sealed class BusinessTaskQueryRequest
     /// 空值语义：该字段为值类型，默认值 50。
     /// </summary>
     public int PageSize { get; set; } = 50;
+
+    /// <summary>
+    /// 游标分页的上一页最后一条创建时间（本地时间）。
+    /// 可填写范围：与当前查询时间窗口一致；与 <see cref="LastId"/> 必须同时为空或同时非空。
+    /// 空值语义：为空时使用页码分页。
+    /// </summary>
+    public DateTime? LastCreatedTimeLocal { get; set; }
+
+    /// <summary>
+    /// 游标分页的上一页最后一条主键 Id。
+    /// 可填写范围：大于 0；与 <see cref="LastCreatedTimeLocal"/> 必须同时为空或同时非空。
+    /// 空值语义：为空时使用页码分页。
+    /// </summary>
+    public long? LastId { get; set; }
 }
