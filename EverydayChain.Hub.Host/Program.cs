@@ -76,6 +76,7 @@ else if (isLinux) {
 }
 #endif
 var app = builder.Build();
+app.UseRouting();
 app.UseMiddleware<ApiFailureLoggingMiddleware>();
 var shouldEnableSwagger = false;
 if (app.Environment.IsDevelopment()) {

@@ -80,12 +80,30 @@ public sealed class ApiFailureLoggingMiddlewareTests {
     }
 
     /// <summary>
+    /// ContentLength 为空时仍应读取并记录请求体。
+    /// </summary>
+    [Fact]
+    public async Task InvokeAsync_ShouldLogRequestBody_WhenContentLengthIsNull() {
+        var logger = new TestLogger<ApiFailureLoggingMiddleware>();
+        var middleware = new ApiFailureLoggingMiddleware(async context => {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsync("""{"isSuccess":false,"message":"失败"}""");
+        }, logger);
+        var context = CreateContext("/api/v1/test", """{"barcode":"BC-CHUNKED"}""", null);
+
+        await middleware.InvokeAsync(context);
+
+        Assert.Contains(logger.Logs, entry => entry.Level == LogLevel.Error && entry.Message.Contains("""请求体: {"barcode":"BC-CHUNKED"}""", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     /// 构造用于中间件执行的 HttpContext。
     /// </summary>
     /// <param name="path">请求路径。</param>
     /// <param name="requestBody">请求体。</param>
+    /// <param name="contentLength">请求体长度。</param>
     /// <returns>HTTP 上下文。</returns>
-    private static DefaultHttpContext CreateContext(string path, string requestBody) {
+    private static DefaultHttpContext CreateContext(string path, string requestBody, long? contentLength = null) {
         var context = new DefaultHttpContext();
         context.TraceIdentifier = "TRACE-UNITTEST";
         context.Request.Method = HttpMethods.Post;
@@ -94,7 +112,7 @@ public sealed class ApiFailureLoggingMiddlewareTests {
         context.Request.Headers.UserAgent = "UnitTest";
         context.Request.ContentType = "application/json";
         context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(requestBody));
-        context.Request.ContentLength = context.Request.Body.Length;
+        context.Request.ContentLength = contentLength ?? context.Request.Body.Length;
         context.Response.Body = new MemoryStream();
         return context;
     }

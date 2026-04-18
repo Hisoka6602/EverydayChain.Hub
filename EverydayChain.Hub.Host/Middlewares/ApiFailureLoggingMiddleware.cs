@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using EverydayChain.Hub.Host.Middlewares.Streams;
 
 namespace EverydayChain.Hub.Host.Middlewares;
 
@@ -48,17 +49,17 @@ public sealed class ApiFailureLoggingMiddleware {
         var elapsedStopwatch = Stopwatch.StartNew();
         var requestPath = SanitizeForLog(context.Request.Path.Value ?? string.Empty);
         var queryString = SanitizeForLog(context.Request.QueryString.HasValue ? context.Request.QueryString.Value : string.Empty);
-        var endpointName = SanitizeForLog(context.GetEndpoint()?.DisplayName ?? string.Empty);
         var userAgent = SanitizeForLog(context.Request.Headers.UserAgent.ToString());
         var originalResponseBody = context.Response.Body;
-        await using var responseBuffer = new MemoryStream();
-        context.Response.Body = responseBuffer;
+        using var responseCaptureStream = new BoundedCaptureWriteStream(originalResponseBody, MaxLoggedPayloadLength * 4);
+        context.Response.Body = responseCaptureStream;
         var hasUnhandledException = false;
         try {
             await next(context);
         }
         catch (Exception exception) {
             hasUnhandledException = true;
+            var endpointName = SanitizeForLog(context.GetEndpoint()?.DisplayName ?? string.Empty);
             logger.LogError(
                 exception,
                 "API 请求处理异常。请求方式: {Method}; 路径: {Path}; 查询字符串: {QueryString}; TraceId: {TraceId}; Endpoint: {Endpoint}; 客户端: {UserAgent}; 耗时毫秒: {ElapsedMilliseconds}; 请求体: {RequestBody}",
@@ -73,15 +74,9 @@ public sealed class ApiFailureLoggingMiddleware {
             throw;
         }
         finally {
-            responseBuffer.Position = 0;
-            var responseBody = SanitizeForLog(await ReadStreamAsync(responseBuffer, context.RequestAborted));
-            responseBuffer.Position = 0;
-            try {
-                await responseBuffer.CopyToAsync(originalResponseBody, context.RequestAborted);
-            }
-            finally {
-                context.Response.Body = originalResponseBody;
-            }
+            context.Response.Body = originalResponseBody;
+            var endpointName = SanitizeForLog(context.GetEndpoint()?.DisplayName ?? string.Empty);
+            var responseBody = SanitizeForLog(TruncatePayload(responseCaptureStream.GetCapturedText(Encoding.UTF8)));
 
             if (!hasUnhandledException && ShouldLogFailure(context.Response.StatusCode, responseBody)) {
                 logger.LogError(
@@ -180,13 +175,13 @@ public sealed class ApiFailureLoggingMiddleware {
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>请求体文本。</returns>
     private static async Task<string> ReadRequestBodyAsync(HttpRequest request, CancellationToken cancellationToken) {
-        if (request.ContentLength is null or 0 || request.Body == Stream.Null) {
+        if (request.ContentLength == 0 || request.Body == Stream.Null) {
             return string.Empty;
         }
 
         request.EnableBuffering();
         request.Body.Position = 0;
-        var content = await ReadStreamAsync(request.Body, cancellationToken);
+        var content = await ReadStreamAsync(request.Body, MaxLoggedPayloadLength + 1, cancellationToken);
         request.Body.Position = 0;
         return content;
     }
@@ -195,12 +190,24 @@ public sealed class ApiFailureLoggingMiddleware {
     /// 从流中读取文本内容并执行长度截断。
     /// </summary>
     /// <param name="stream">目标流。</param>
+    /// <param name="maxCharacters">最大读取字符数。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>截断后的文本内容。</returns>
-    private static async Task<string> ReadStreamAsync(Stream stream, CancellationToken cancellationToken) {
+    private static async Task<string> ReadStreamAsync(Stream stream, int maxCharacters, CancellationToken cancellationToken) {
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
-        var content = await reader.ReadToEndAsync(cancellationToken);
-        return TruncatePayload(content);
+        var buffer = new char[1024];
+        var builder = new StringBuilder();
+        while (builder.Length < maxCharacters) {
+            var remaining = Math.Min(buffer.Length, maxCharacters - builder.Length);
+            var readCount = await reader.ReadAsync(buffer.AsMemory(0, remaining), cancellationToken);
+            if (readCount == 0) {
+                break;
+            }
+
+            builder.Append(buffer, 0, readCount);
+        }
+
+        return builder.ToString();
     }
 
     /// <summary>
