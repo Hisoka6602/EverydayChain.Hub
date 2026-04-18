@@ -31,6 +31,8 @@ public class SyncExecutionService(
 {
     /// <summary>失败检查点写入超时秒数。</summary>
     private const int ErrorCheckpointSaveTimeoutSeconds = 3;
+    /// <summary>StatusDriven 业务任务收口目标逻辑表名。</summary>
+    private const string StatusDrivenBusinessTaskLogicalTable = "business_tasks";
     /// <summary>批次失败状态更新异常日志模板。</summary>
     private const string FailBatchStatusUpdateErrorLogTemplate = "更新同步失败批次状态异常。TableCode={TableCode}, BatchId={BatchId}";
     /// <summary>批次取消状态更新异常日志模板。</summary>
@@ -49,6 +51,7 @@ public class SyncExecutionService(
         // StatusDriven 模式委托给专用消费服务，KeyedMerge 路径保持不变。
         if (context.Definition.SyncMode == SyncMode.StatusDriven)
         {
+            ValidateStatusDrivenBusinessTaskDefinition(context.Definition);
             return await ExecuteStatusDrivenBatchAsync(context, ct);
         }
 
@@ -348,6 +351,32 @@ public class SyncExecutionService(
                 logger.LogError(checkpointEx, "写入失败检查点异常。TableCode={TableCode}, BatchId={BatchId}", context.Definition.TableCode, context.BatchId);
             }
             throw;
+        }
+    }
+
+    /// <summary>
+    /// 校验 StatusDriven 模式下业务任务收口配置合法性。
+    /// </summary>
+    /// <param name="definition">同步定义。</param>
+    /// <exception cref="InvalidOperationException">配置不满足业务任务收口要求时抛出。</exception>
+    private static void ValidateStatusDrivenBusinessTaskDefinition(SyncTableDefinition definition)
+    {
+        if (!string.Equals(definition.TargetLogicalTable, StatusDrivenBusinessTaskLogicalTable, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"StatusDriven 配置无效：表 {definition.TableCode} 的 TargetLogicalTable 必须为 {StatusDrivenBusinessTaskLogicalTable}。");
+        }
+
+        if (definition.SourceType == BusinessTaskSourceType.Unknown)
+        {
+            throw new InvalidOperationException(
+                $"StatusDriven 配置无效：表 {definition.TableCode} 的 SourceType 不能为 Unknown。");
+        }
+
+        if (string.IsNullOrWhiteSpace(definition.BusinessKeyColumn))
+        {
+            throw new InvalidOperationException(
+                $"StatusDriven 配置无效：表 {definition.TableCode} 的 BusinessKeyColumn 不能为空白。");
         }
     }
 

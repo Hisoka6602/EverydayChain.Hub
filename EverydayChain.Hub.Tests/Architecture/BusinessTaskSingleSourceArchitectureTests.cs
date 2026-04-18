@@ -68,6 +68,12 @@ public class BusinessTaskSingleSourceArchitectureTests
 
         Assert.Equal("business_tasks", splitTable.TargetLogicalTable);
         Assert.Equal("business_tasks", fullCaseTable.TargetLogicalTable);
+        Assert.Equal("StatusDriven", splitTable.SyncMode);
+        Assert.Equal("StatusDriven", fullCaseTable.SyncMode);
+        Assert.Equal("Split", splitTable.SourceType);
+        Assert.Equal("FullCase", fullCaseTable.SourceType);
+        Assert.False(string.IsNullOrWhiteSpace(splitTable.BusinessKeyColumn));
+        Assert.False(string.IsNullOrWhiteSpace(fullCaseTable.BusinessKeyColumn));
     }
 
     /// <summary>
