@@ -30,14 +30,15 @@ public class AutoMigrationHostedService(
         try {
             logger.LogInformation("启动自动迁移与分表自治流程。");
             currentStage = "启动自检阶段";
-            using var startupTimeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            startupTimeoutCts.CancelAfter(TimeSpan.FromSeconds(StartupStageTimeoutSeconds));
-            var startupToken = startupTimeoutCts.Token;
-            await runtimeStorageGuard.EnsureStartupHealthyAsync(startupToken);
+            using var healthCheckCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            healthCheckCts.CancelAfter(TimeSpan.FromSeconds(StartupStageTimeoutSeconds));
+            await runtimeStorageGuard.EnsureStartupHealthyAsync(healthCheckCts.Token);
             using var scope = scopeFactory.CreateScope();
             var autoMigrationService = scope.ServiceProvider.GetRequiredService<IAutoMigrationService>();
             currentStage = AutoMigrationStage;
-            await autoMigrationService.RunAsync(startupToken);
+            using var migrationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            migrationCts.CancelAfter(TimeSpan.FromSeconds(StartupStageTimeoutSeconds));
+            await autoMigrationService.RunAsync(migrationCts.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) {
             logger.LogError(

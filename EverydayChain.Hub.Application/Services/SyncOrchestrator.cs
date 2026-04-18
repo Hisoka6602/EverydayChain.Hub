@@ -122,7 +122,8 @@ public class SyncOrchestrator(
     }
 
     /// <summary>
-    /// 解析生效并行度：当配置小于等于 0 时，自动退化为“按启用表数并行”。
+    /// 解析生效并行度：当配置小于等于 0 时，以安全上限保护值（<see cref="DefaultParallelTablesSafetyCap"/>）
+    /// 与启用表数中的较小值作为生效并发上限，避免连接池/线程池被打满。
     /// </summary>
     /// <param name="configuredMaxParallelTables">配置并发上限。</param>
     /// <param name="enabledTableCount">启用表数量。</param>

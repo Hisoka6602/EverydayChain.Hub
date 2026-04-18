@@ -84,8 +84,8 @@ public static class ServiceCollectionExtensions {
         var retentionJobOptions = configuration.GetSection(RetentionJobOptions.SectionName).Get<RetentionJobOptions>() ?? new RetentionJobOptions();
         var efCoreOptions = configuration.GetSection(EfCoreOptions.SectionName).Get<EfCoreOptions>() ?? new EfCoreOptions();
         var managedLogicalTables = BuildManagedLogicalTables(syncOptions).ToArray();
-        var dbContextPoolSize = efCoreOptions.DbContextPoolSize > 0 ? efCoreOptions.DbContextPoolSize : 256;
-        var commandTimeoutSeconds = efCoreOptions.CommandTimeoutSeconds > 0 ? efCoreOptions.CommandTimeoutSeconds : 30;
+        var dbContextPoolSize = Math.Clamp(efCoreOptions.DbContextPoolSize > 0 ? efCoreOptions.DbContextPoolSize : 256, 32, 1024);
+        var commandTimeoutSeconds = Math.Clamp(efCoreOptions.CommandTimeoutSeconds > 0 ? efCoreOptions.CommandTimeoutSeconds : 30, 1, 600);
 
         services.AddMemoryCache();
         services.AddPooledDbContextFactory<HubDbContext>(options => {
