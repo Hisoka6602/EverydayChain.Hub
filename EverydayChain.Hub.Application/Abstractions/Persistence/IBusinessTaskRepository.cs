@@ -163,4 +163,34 @@ public interface IBusinessTaskRepository
         int skip,
         int take,
         CancellationToken ct);
+
+    /// <summary>
+    /// 按查询条件读取游标分页业务任务列表，排序固定为创建时间降序、主键降序。
+    /// </summary>
+    /// <param name="filter">查询过滤条件。</param>
+    /// <param name="lastCreatedTimeLocal">上一页最后一条创建时间（本地时间）。</param>
+    /// <param name="lastId">上一页最后一条主键 Id。</param>
+    /// <param name="take">读取条数。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>命中的分页业务任务列表。</returns>
+    Task<IReadOnlyList<BusinessTaskEntity>> QueryByCursorConditionsAsync(
+        BusinessTaskSearchFilter filter,
+        DateTime? lastCreatedTimeLocal,
+        long? lastId,
+        int take,
+        CancellationToken ct);
+
+    /// <summary>
+    /// 按查询条件读取页码分页结果，并在单次跨分表遍历中返回总数。
+    /// </summary>
+    /// <param name="filter">查询过滤条件。</param>
+    /// <param name="skip">跳过条数。</param>
+    /// <param name="take">读取条数。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>总数与结果列表。</returns>
+    Task<(int TotalCount, IReadOnlyList<BusinessTaskEntity> Items)> QueryPageWithTotalCountByConditionsAsync(
+        BusinessTaskSearchFilter filter,
+        int skip,
+        int take,
+        CancellationToken ct);
 }

@@ -46,6 +46,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     /// <inheritdoc/>
     public Task SaveAsync(BusinessTaskEntity entity, CancellationToken ct)
     {
+        entity.RefreshQueryFields();
         entity.Id = _nextId++;
         _tasks.Add(entity);
         return Task.CompletedTask;
@@ -54,6 +55,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     /// <inheritdoc/>
     public Task UpdateAsync(BusinessTaskEntity entity, CancellationToken ct)
     {
+        entity.RefreshQueryFields();
         var idx = _tasks.FindIndex(x => x.Id == entity.Id);
         if (idx >= 0)
         {
@@ -239,6 +241,47 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
         return Task.FromResult(result);
     }
 
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<BusinessTaskEntity>> QueryByCursorConditionsAsync(
+        BusinessTaskSearchFilter filter,
+        DateTime? lastCreatedTimeLocal,
+        long? lastId,
+        int take,
+        CancellationToken ct)
+    {
+        var query = BuildFilterQuery(filter)
+            .OrderByDescending(task => task.CreatedTimeLocal)
+            .ThenByDescending(task => task.Id);
+        if (lastCreatedTimeLocal.HasValue && lastId.HasValue)
+        {
+            var cursorCreatedTime = lastCreatedTimeLocal.Value;
+            var cursorId = lastId.Value;
+            query = query.Where(task =>
+                    task.CreatedTimeLocal < cursorCreatedTime
+                    || (task.CreatedTimeLocal == cursorCreatedTime && task.Id < cursorId))
+                .OrderByDescending(task => task.CreatedTimeLocal)
+                .ThenByDescending(task => task.Id);
+        }
+
+        IReadOnlyList<BusinessTaskEntity> result = query.Take(take).ToList();
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
+    public Task<(int TotalCount, IReadOnlyList<BusinessTaskEntity> Items)> QueryPageWithTotalCountByConditionsAsync(
+        BusinessTaskSearchFilter filter,
+        int skip,
+        int take,
+        CancellationToken ct)
+    {
+        var query = BuildFilterQuery(filter)
+            .OrderByDescending(task => task.CreatedTimeLocal)
+            .ThenByDescending(task => task.Id);
+        var totalCount = query.Count();
+        IReadOnlyList<BusinessTaskEntity> items = query.Skip(skip).Take(take).ToList();
+        return Task.FromResult((totalCount, items));
+    }
+
     /// <summary>
     /// 构建过滤查询。
     /// </summary>
@@ -250,17 +293,24 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
             .Where(task => task.CreatedTimeLocal >= filter.StartTimeLocal && task.CreatedTimeLocal < filter.EndTimeLocal);
         if (!string.IsNullOrWhiteSpace(filter.WaveCode))
         {
-            query = query.Where(task => string.Equals(NormalizeWaveCode(task.WaveCode), filter.WaveCode, StringComparison.OrdinalIgnoreCase));
+            if (string.Equals(filter.WaveCode, EmptyWaveCode, StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(task => task.NormalizedWaveCode == null);
+            }
+            else
+            {
+                query = query.Where(task => string.Equals(task.NormalizedWaveCode, filter.WaveCode, StringComparison.OrdinalIgnoreCase));
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(filter.Barcode))
         {
-            query = query.Where(task => string.Equals(task.Barcode, filter.Barcode, StringComparison.OrdinalIgnoreCase));
+            query = query.Where(task => string.Equals(task.NormalizedBarcode, filter.Barcode, StringComparison.OrdinalIgnoreCase));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.DockCode))
         {
-            query = query.Where(task => string.Equals(ResolveDockCode(task), filter.DockCode, StringComparison.OrdinalIgnoreCase));
+            query = query.Where(task => string.Equals(task.ResolvedDockCode, filter.DockCode, StringComparison.OrdinalIgnoreCase));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.ChuteCode))
@@ -310,16 +360,6 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     /// <returns>码头编码。</returns>
     private static string ResolveDockCode(BusinessTaskEntity task)
     {
-        if (!string.IsNullOrWhiteSpace(task.ActualChuteCode))
-        {
-            return task.ActualChuteCode.Trim();
-        }
-
-        if (!string.IsNullOrWhiteSpace(task.TargetChuteCode))
-        {
-            return task.TargetChuteCode.Trim();
-        }
-
-        return EmptyDockCode;
+        return task.ResolvedDockCode;
     }
 }

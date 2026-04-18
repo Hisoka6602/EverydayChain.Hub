@@ -44,4 +44,14 @@ public sealed class BusinessTaskQueryRequest
     /// 页大小。
     /// </summary>
     public int PageSize { get; set; } = 50;
+
+    /// <summary>
+    /// 游标分页：上一页最后一条的创建时间（本地时间）。
+    /// </summary>
+    public DateTime? LastCreatedTimeLocal { get; set; }
+
+    /// <summary>
+    /// 游标分页：上一页最后一条的主键 Id。
+    /// </summary>
+    public long? LastId { get; set; }
 }
