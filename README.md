@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 修复启动稳定性：`AutoMigrationHostedService` 在自动迁移阶段遇到数据库连接异常时改为记录错误并降级继续启动，不再因单库不可达导致整进程退出；新增对应主机层单元测试覆盖降级与阻断分支。
 - 完成“本地库查询能力极致优化”：业务任务/异常件/回流查询新增游标分页主路径并保留页码兼容；看板/报表查询引入短 TTL 缓存；EF Core 切换 DbContext 池化；新增 `NormalizedWaveCode`、`NormalizedBarcode`、`ResolvedDockCode` 与配套索引；新增 `本地库查询性能优化说明.md`。
 - 按业务需求切换 WMS 回写开关：`WmsFeedback.Enabled` 调整为 `true`，上线口径更新为“回写开启”。
 - 完成最后一轮上线收口：新增 `Swagger注释全量盘点清单.md` 与 `上线前最终检查清单.md`，形成可直接执行的上线门禁与逐文件注释盘点留痕。
@@ -355,6 +356,9 @@
 │   ├── Host/Controllers/StubDockDashboardQueryService.cs
 │   ├── Host/Controllers/StubSortingReportQueryService.cs
 │   ├── Host/Controllers/StubBusinessTaskReadService.cs
+│   ├── Host/Workers/AutoMigrationHostedServiceTests.cs
+│   ├── Host/Workers/TestAutoMigrationService.cs
+│   ├── Host/Workers/TestRuntimeStorageGuard.cs
 │   └── Services
 │       ├── AutoMigrationServiceTests.cs
 │       ├── DangerZoneExecutorTests.cs
@@ -617,7 +621,11 @@
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
 - `FeedbackCompensationBackgroundWorker.cs`：业务回传补偿后台任务，按 `FeedbackCompensationJob.PollingIntervalSeconds` 周期重试失败回传任务，支持批次上限控制并输出补偿统计日志。
+- `AutoMigrationHostedService.cs`：启动阶段自动迁移入口；当自动迁移阶段发生数据库异常时仅记录错误并降级跳过迁移，保持宿主继续运行，避免单库不可达导致整体进程崩溃。
 - `EverydayChain.Hub.Tests/Host/Controllers/*Tests.cs`：PR-03 新增 Controller 基础行为测试，覆盖空参校验与标准成功响应路径。
+- `EverydayChain.Hub.Tests/Host/Workers/AutoMigrationHostedServiceTests.cs`：自动迁移托管服务容错测试，覆盖“自动迁移阶段异常降级继续启动”与“启动自检异常仍阻断启动”两条分支。
+- `EverydayChain.Hub.Tests/Host/Workers/TestAutoMigrationService.cs`：自动迁移服务测试替身，支持统计调用次数与注入异常。
+- `EverydayChain.Hub.Tests/Host/Workers/TestRuntimeStorageGuard.cs`：运行期存储守护测试替身，支持统计启动自检调用次数与注入异常。
 - `EverydayChain.Hub.Tests/Services/DangerZoneExecutorTests.cs`：危险操作隔离器取消语义测试，覆盖调用方取消与非调用方取消的日志等级分支。
 - `EverydayChain.Hub.Tests/Services/TestLogger.cs`：通用测试日志记录器，集中承载日志采集替身，避免在测试文件内重复声明嵌套日志类型。
 - `EverydayChain.Hub.Tests/Services/LoggerNullScope.cs`：测试日志空作用域单例，供测试日志记录器复用，避免重复创建无状态作用域实例。
