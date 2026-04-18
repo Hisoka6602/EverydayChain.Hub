@@ -60,13 +60,13 @@ public sealed class BoundedCaptureWriteStream : Stream {
     /// <summary>
     /// 原始流长度。
     /// </summary>
-    public override long Length => innerStream.Length;
+    public override long Length => throw new NotSupportedException("不支持读取 Length。");
 
     /// <summary>
     /// 原始流位置。
     /// </summary>
     public override long Position {
-        get => innerStream.Position;
+        get => throw new NotSupportedException("不支持读取 Position。");
         set => throw new NotSupportedException("不支持设置 Position。");
     }
 

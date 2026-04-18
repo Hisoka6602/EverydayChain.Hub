@@ -25,6 +25,11 @@ public sealed class ApiFailureLoggingMiddleware {
     private const int MaxCapturedResponseBytes = MaxLoggedPayloadLength * Utf8WorstCaseBytesPerCharacter;
 
     /// <summary>
+    /// 流读取缓冲区大小。
+    /// </summary>
+    private const int StreamReadBufferSize = 1024;
+
+    /// <summary>
     /// 下一个请求委托。
     /// </summary>
     private readonly RequestDelegate next;
@@ -196,7 +201,7 @@ public sealed class ApiFailureLoggingMiddleware {
 
         var content = await ReadStreamAsync(request.Body, MaxLoggedPayloadLength + 1, cancellationToken);
         _ = TryResetStreamPosition(request.Body, 0);
-        return content;
+        return TruncatePayload(content);
     }
 
     /// <summary>
@@ -208,7 +213,7 @@ public sealed class ApiFailureLoggingMiddleware {
     /// <returns>截断后的文本内容。</returns>
     private static async Task<string> ReadStreamAsync(Stream stream, int maxCharacters, CancellationToken cancellationToken) {
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
-        var buffer = new char[1024];
+        var buffer = new char[StreamReadBufferSize];
         var builder = new StringBuilder();
         var remainingCharacters = maxCharacters;
         while (remainingCharacters > 0) {
