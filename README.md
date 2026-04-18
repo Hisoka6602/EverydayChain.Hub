@@ -358,6 +358,7 @@
 │   ├── Host/Controllers/StubBusinessTaskReadService.cs
 │   ├── Host/Workers/AutoMigrationHostedServiceTests.cs
 │   ├── Host/Workers/TestAutoMigrationService.cs
+│   ├── Host/Workers/TestDatabaseException.cs
 │   ├── Host/Workers/TestRuntimeStorageGuard.cs
 │   └── Services
 │       ├── AutoMigrationServiceTests.cs
@@ -625,6 +626,7 @@
 - `EverydayChain.Hub.Tests/Host/Controllers/*Tests.cs`：PR-03 新增 Controller 基础行为测试，覆盖空参校验与标准成功响应路径。
 - `EverydayChain.Hub.Tests/Host/Workers/AutoMigrationHostedServiceTests.cs`：自动迁移托管服务容错测试，覆盖“自动迁移阶段异常降级继续启动”与“启动自检异常仍阻断启动”两条分支。
 - `EverydayChain.Hub.Tests/Host/Workers/TestAutoMigrationService.cs`：自动迁移服务测试替身，支持统计调用次数与注入异常。
+- `EverydayChain.Hub.Tests/Host/Workers/TestDatabaseException.cs`：数据库异常测试替身，统一用于自动迁移降级分支测试。
 - `EverydayChain.Hub.Tests/Host/Workers/TestRuntimeStorageGuard.cs`：运行期存储守护测试替身，支持统计启动自检调用次数与注入异常。
 - `EverydayChain.Hub.Tests/Services/DangerZoneExecutorTests.cs`：危险操作隔离器取消语义测试，覆盖调用方取消与非调用方取消的日志等级分支。
 - `EverydayChain.Hub.Tests/Services/TestLogger.cs`：通用测试日志记录器，集中承载日志采集替身，避免在测试文件内重复声明嵌套日志类型。

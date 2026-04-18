@@ -2,6 +2,8 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.EntityFrameworkCore;
+using System.Data.Common;
 using Microsoft.Extensions.DependencyInjection;
 using EverydayChain.Hub.Infrastructure.Services;
 
@@ -33,7 +35,7 @@ public class AutoMigrationHostedService(
             currentStage = AutoMigrationStage;
             await autoMigrationService.RunAsync(cancellationToken);
         }
-        catch (Exception ex) when (string.Equals(currentStage, AutoMigrationStage, StringComparison.Ordinal)) {
+        catch (Exception ex) when (string.Equals(currentStage, AutoMigrationStage, StringComparison.Ordinal) && IsDatabaseException(ex)) {
             if (TryGetSqlException(ex) is { Number: 10054 } sqlException) {
                 logger.LogError(
                     ex,
@@ -74,5 +76,26 @@ public class AutoMigrationHostedService(
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// 判断异常链中是否包含数据库相关异常。
+    /// </summary>
+    /// <param name="exception">待判断异常。</param>
+    /// <returns>包含数据库异常返回 <c>true</c>。</returns>
+    private static bool IsDatabaseException(Exception exception) {
+        var current = exception;
+        while (current is not null) {
+            if (current is SqlException
+                or DbException
+                or DbUpdateException
+                or RetryLimitExceededException) {
+                return true;
+            }
+
+            current = current.InnerException;
+        }
+
+        return false;
     }
 }

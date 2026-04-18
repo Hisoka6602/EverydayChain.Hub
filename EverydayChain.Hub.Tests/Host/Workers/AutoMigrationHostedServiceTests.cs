@@ -1,4 +1,5 @@
 using EverydayChain.Hub.Host.Workers;
+using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -17,7 +18,7 @@ public sealed class AutoMigrationHostedServiceTests
     {
         var migrationService = new TestAutoMigrationService
         {
-            ExceptionToThrow = new InvalidOperationException("测试桩：数据库连接失败。")
+            ExceptionToThrow = new TestDatabaseException("测试桩：数据库连接失败。")
         };
         var serviceProvider = BuildServiceProvider(migrationService);
         var scopeFactory = serviceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -65,7 +66,7 @@ public sealed class AutoMigrationHostedServiceTests
     {
         var services = new ServiceCollection();
         services.AddScoped(_ => migrationService);
-        services.AddScoped<EverydayChain.Hub.Infrastructure.Services.IAutoMigrationService>(sp => sp.GetRequiredService<TestAutoMigrationService>());
+        services.AddScoped<IAutoMigrationService>(sp => sp.GetRequiredService<TestAutoMigrationService>());
         return services.BuildServiceProvider();
     }
 }
