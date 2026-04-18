@@ -14,49 +14,34 @@ public class WmsFeedbackOptions
     public bool Enabled { get; set; }
 
     /// <summary>
-    /// Oracle 目标 Schema（可填写范围：Oracle 有效 Schema 名称，仅允许字母、数字、下划线；示例：WMS_USER_431）。
+    /// 拆零来源目标 Schema（可填写范围：Oracle 有效 Schema 名称，仅允许字母、数字、下划线）。
     /// </summary>
-    public string Schema { get; set; } = string.Empty;
+    public string SplitSchema { get; set; } = string.Empty;
 
     /// <summary>
-    /// Oracle 默认目标表名（可填写范围：Oracle 有效表名，仅允许字母、数字、下划线；示例：IDX_SPLIT_TASK；仅在来源类型未识别时回退使用该值）。
+    /// 拆零来源目标表名（可填写范围：Oracle 有效表名，仅允许字母、数字、下划线）。
     /// </summary>
-    public string Table { get; set; } = string.Empty;
+    public string SplitTable { get; set; } = string.Empty;
 
     /// <summary>
-    /// 拆零来源目标 Schema（可填写范围：Oracle 有效 Schema 名称，仅允许字母、数字、下划线；留空时回退使用 <see cref="Schema"/>）。
+    /// 整件来源目标 Schema（可填写范围：Oracle 有效 Schema 名称，仅允许字母、数字、下划线）。
     /// </summary>
-    public string? SplitSchema { get; set; }
+    public string FullCaseSchema { get; set; } = string.Empty;
 
     /// <summary>
-    /// 拆零来源目标表名（可填写范围：Oracle 有效表名，仅允许字母、数字、下划线；留空时回退使用 <see cref="Table"/>）。
+    /// 整件来源目标表名（可填写范围：Oracle 有效表名，仅允许字母、数字、下划线）。
     /// </summary>
-    public string? SplitTable { get; set; }
+    public string FullCaseTable { get; set; } = string.Empty;
 
     /// <summary>
-    /// 整件来源目标 Schema（可填写范围：Oracle 有效 Schema 名称，仅允许字母、数字、下划线；留空时回退使用 <see cref="Schema"/>）。
+    /// 拆零来源业务键列名（可填写范围：Oracle 有效列名，仅允许字母、数字、下划线）。
     /// </summary>
-    public string? FullCaseSchema { get; set; }
+    public string SplitBusinessKeyColumn { get; set; } = string.Empty;
 
     /// <summary>
-    /// 整件来源目标表名（可填写范围：Oracle 有效表名，仅允许字母、数字、下划线；留空时回退使用 <see cref="Table"/>）。
+    /// 整件来源业务键列名（可填写范围：Oracle 有效列名，仅允许字母、数字、下划线）。
     /// </summary>
-    public string? FullCaseTable { get; set; }
-
-    /// <summary>
-    /// 默认业务键列名，用于按业务键定位目标行（可填写范围：Oracle 有效列名，仅允许字母、数字、下划线；示例：TASK_CODE）。
-    /// </summary>
-    public string BusinessKeyColumn { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 拆零来源业务键列名（可填写范围：Oracle 有效列名，仅允许字母、数字、下划线；留空时回退使用 <see cref="BusinessKeyColumn"/>）。
-    /// </summary>
-    public string? SplitBusinessKeyColumn { get; set; }
-
-    /// <summary>
-    /// 整件来源业务键列名（可填写范围：Oracle 有效列名，仅允许字母、数字、下划线；留空时回退使用 <see cref="BusinessKeyColumn"/>）。
-    /// </summary>
-    public string? FullCaseBusinessKeyColumn { get; set; }
+    public string FullCaseBusinessKeyColumn { get; set; } = string.Empty;
 
     /// <summary>
     /// 回传状态列名，写入回传完成标志（可填写范围：Oracle 有效列名，仅允许字母、数字、下划线；示例：FEEDBACK_STATUS）。

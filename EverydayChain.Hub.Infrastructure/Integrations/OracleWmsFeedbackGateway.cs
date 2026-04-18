@@ -299,27 +299,23 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
     /// <returns>目标 Schema、表名与业务键列名。</returns>
     private (string Schema, string Table, string BusinessKeyColumn) ResolveTargetBySourceType(BusinessTaskSourceType sourceType)
     {
-        var schema = _options.Schema;
-        var table = _options.Table;
-        var businessKeyColumn = _options.BusinessKeyColumn;
-
         if (sourceType == BusinessTaskSourceType.Split)
         {
-            schema = string.IsNullOrWhiteSpace(_options.SplitSchema) ? schema : _options.SplitSchema;
-            table = string.IsNullOrWhiteSpace(_options.SplitTable) ? table : _options.SplitTable;
-            businessKeyColumn = string.IsNullOrWhiteSpace(_options.SplitBusinessKeyColumn) ? businessKeyColumn : _options.SplitBusinessKeyColumn;
-        }
-        else if (sourceType == BusinessTaskSourceType.FullCase)
-        {
-            schema = string.IsNullOrWhiteSpace(_options.FullCaseSchema) ? schema : _options.FullCaseSchema;
-            table = string.IsNullOrWhiteSpace(_options.FullCaseTable) ? table : _options.FullCaseTable;
-            businessKeyColumn = string.IsNullOrWhiteSpace(_options.FullCaseBusinessKeyColumn) ? businessKeyColumn : _options.FullCaseBusinessKeyColumn;
+            EnsureSafeIdentifier(_options.SplitSchema, nameof(_options.SplitSchema));
+            EnsureSafeIdentifier(_options.SplitTable, nameof(_options.SplitTable));
+            EnsureSafeIdentifier(_options.SplitBusinessKeyColumn, nameof(_options.SplitBusinessKeyColumn));
+            return (_options.SplitSchema, _options.SplitTable, _options.SplitBusinessKeyColumn);
         }
 
-        EnsureSafeIdentifier(schema, nameof(schema));
-        EnsureSafeIdentifier(table, nameof(table));
-        EnsureSafeIdentifier(businessKeyColumn, nameof(businessKeyColumn));
-        return (schema, table, businessKeyColumn);
+        if (sourceType == BusinessTaskSourceType.FullCase)
+        {
+            EnsureSafeIdentifier(_options.FullCaseSchema, nameof(_options.FullCaseSchema));
+            EnsureSafeIdentifier(_options.FullCaseTable, nameof(_options.FullCaseTable));
+            EnsureSafeIdentifier(_options.FullCaseBusinessKeyColumn, nameof(_options.FullCaseBusinessKeyColumn));
+            return (_options.FullCaseSchema, _options.FullCaseTable, _options.FullCaseBusinessKeyColumn);
+        }
+
+        throw new InvalidOperationException("不支持的业务来源类型，无法确定 WMS 回写目标表。");
     }
 
     /// <summary>

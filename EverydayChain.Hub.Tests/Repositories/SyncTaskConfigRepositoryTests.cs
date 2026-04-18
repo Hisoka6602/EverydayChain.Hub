@@ -143,6 +143,32 @@ public class SyncTaskConfigRepositoryTests
     }
 
     /// <summary>
+    /// 业务任务投影列配置应正确映射并执行 Trim。
+    /// </summary>
+    [Fact]
+    public async Task GetByTableCodeAsync_WhenProjectionColumnsConfigured_ShouldMapProjectionColumns()
+    {
+        var options = BuildOptions(table =>
+        {
+            table.SourceType = nameof(BusinessTaskSourceType.Split);
+            table.BusinessKeyColumn = "  CARTONNO  ";
+            table.BarcodeColumn = "  CARTONNO  ";
+            table.WaveCodeColumn = "  WAVENO  ";
+            table.WaveRemarkColumn = "  DESCR  ";
+        });
+        var logger = new TestLogger<SyncTaskConfigRepository>();
+        var repository = new SyncTaskConfigRepository(Options.Create(options), logger);
+
+        var definition = await repository.GetByTableCodeAsync("T1", CancellationToken.None);
+
+        Assert.Equal(BusinessTaskSourceType.Split, definition.SourceType);
+        Assert.Equal("CARTONNO", definition.BusinessKeyColumn);
+        Assert.Equal("CARTONNO", definition.BarcodeColumn);
+        Assert.Equal("WAVENO", definition.WaveCodeColumn);
+        Assert.Equal("DESCR", definition.WaveRemarkColumn);
+    }
+
+    /// <summary>
     /// 构建默认测试配置。
     /// </summary>
     /// <param name="configureTable">表级配置回调。</param>

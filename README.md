@@ -1,6 +1,9 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 开始实施《EverydayChain.Hub_Copilot_精准执行指令_最终版》：补齐 `business_tasks` 直投影主路径，新增 `BusinessTaskProjectionService` 与 `BusinessTaskStatusConsumeService`，并将 `WmsSplitPickToLightCarton`/`WmsPickToWcs` 的 `StatusDriven` 主路径切换为“远端读取 → 本地业务主表幂等投影 → 可选远端状态回写”。
+- 收敛同步与回写配置：`SyncJob.Tables` 新增 `SourceType`、`BusinessKeyColumn`、`BarcodeColumn`、`WaveCodeColumn`、`WaveRemarkColumn`；`appsettings.json` 两条 WMS 同步任务目标统一为 `business_tasks`；`WmsFeedbackOptions` 与 `OracleWmsFeedbackGateway` 删除默认回退目标表语义并改为按来源强制分流。
+- 补齐幂等保障与测试：`business_tasks` 新增 `SourceTableCode + BusinessKey` 联合唯一索引，仓储新增按来源+业务键查询与投影 Upsert；新增投影服务、状态消费、仓储投影幂等相关测试并更新配置映射测试。
 - 新增启动探测与分表解析超时隔离：`AutoMigrationService` 启动元数据探测 SQL 设置 `15s` 超时，`ShardTableResolver` 分表列表查询设置 `15s` 超时，进一步降低启动与分表路由阶段因系统表阻塞导致的连锁卡顿风险。
 - 新增分表治理命令超时隔离：`ShardRetentionRepository` 与 `ShardTableProvisioner` 的元数据查询/DDL/删除操作统一设置 `CommandTimeout=30s`，避免分表治理 SQL 在锁等待场景中长时间阻塞并占用连接池。
 - 新增数据库命令超时隔离：`EfCore.CommandTimeoutSeconds` 已接入 `UseSqlServer(...).CommandTimeout(...)`，并将 `HubDbContext` 注册改为 `AddPooledDbContextFactory`（读取 `EfCore.DbContextPoolSize`），防止慢 SQL/阻塞 SQL 长时间占用连接导致整体请求堆积。

@@ -1,6 +1,7 @@
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Sync;
 using EverydayChain.Hub.Domain.Sync.Models;
+using EverydayChain.Hub.Application.Services;
 using EverydayChain.Hub.Infrastructure.Sync.Services;
 using EverydayChain.Hub.Tests.Services;
 using EverydayChain.Hub.Tests.Sync.Fakes;
@@ -39,7 +40,7 @@ public class RemoteStatusConsumeServiceTests
         var appendWriter = new FakeSqlServerAppendOnlyWriter();
         var remoteWriter = new FakeOracleRemoteStatusWriter();
         var logger = new TestLogger<RemoteStatusConsumeService>();
-        var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, logger);
+        var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, new BusinessTaskMaterializer(), new InMemoryBusinessTaskRepository(), logger);
         var definition = BuildStatusDrivenDefinition();
 
         var result = await service.ConsumeAsync(definition, "BATCH-001", default, CancellationToken.None);
@@ -74,7 +75,7 @@ public class RemoteStatusConsumeServiceTests
         var appendWriter = new FakeSqlServerAppendOnlyWriter();
         var remoteWriter = new FakeOracleRemoteStatusWriter();
         var logger = new TestLogger<RemoteStatusConsumeService>();
-        var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, logger);
+        var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, new BusinessTaskMaterializer(), new InMemoryBusinessTaskRepository(), logger);
         var definition = BuildStatusDrivenDefinition();
 
         var result = await service.ConsumeAsync(definition, "BATCH-002", default, CancellationToken.None);
@@ -105,7 +106,7 @@ public class RemoteStatusConsumeServiceTests
         var appendWriter = new FakeSqlServerAppendOnlyWriter();
         var remoteWriter = new FakeOracleRemoteStatusWriter();
         var logger = new TestLogger<RemoteStatusConsumeService>();
-        var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, logger);
+        var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, new BusinessTaskMaterializer(), new InMemoryBusinessTaskRepository(), logger);
         var definition = BuildStatusDrivenDefinitionWithWriteBackDisabled();
 
         var result = await service.ConsumeAsync(definition, "BATCH-003", default, CancellationToken.None);
@@ -142,7 +143,7 @@ public class RemoteStatusConsumeServiceTests
             ThrowMessage = "模拟回写失败：网络中断",
         };
         var logger = new TestLogger<RemoteStatusConsumeService>();
-        var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, logger);
+        var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, new BusinessTaskMaterializer(), new InMemoryBusinessTaskRepository(), logger);
         var definition = BuildStatusDrivenDefinition();
 
         var result = await service.ConsumeAsync(definition, "BATCH-004", default, CancellationToken.None);
@@ -167,7 +168,7 @@ public class RemoteStatusConsumeServiceTests
         var appendWriter = new FakeSqlServerAppendOnlyWriter();
         var remoteWriter = new FakeOracleRemoteStatusWriter();
         var logger = new TestLogger<RemoteStatusConsumeService>();
-        var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, logger);
+        var service = new RemoteStatusConsumeService(reader, appendWriter, remoteWriter, new BusinessTaskMaterializer(), new InMemoryBusinessTaskRepository(), logger);
         var definition = BuildStatusDrivenDefinitionWithCursorColumn();
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(

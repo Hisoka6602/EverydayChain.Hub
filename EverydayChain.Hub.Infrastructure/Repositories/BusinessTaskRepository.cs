@@ -54,6 +54,21 @@ public class BusinessTaskRepository(
     }
 
     /// <inheritdoc/>
+    public async Task<BusinessTaskEntity?> FindBySourceTableAndBusinessKeyAsync(string sourceTableCode, string businessKey, CancellationToken ct)
+    {
+        var normalizedSourceTableCode = NormalizeOptionalText(sourceTableCode);
+        var normalizedBusinessKey = NormalizeOptionalText(businessKey);
+        if (string.IsNullOrWhiteSpace(normalizedSourceTableCode) || string.IsNullOrWhiteSpace(normalizedBusinessKey))
+        {
+            return null;
+        }
+
+        return await FindFirstAcrossShardsAsync(query => query
+            .Where(x => x.SourceTableCode == normalizedSourceTableCode && x.BusinessKey == normalizedBusinessKey)
+            .OrderByDescending(x => x.CreatedTimeLocal), ct);
+    }
+
+    /// <inheritdoc/>
     public async Task<BusinessTaskEntity?> FindByIdAsync(long id, CancellationToken ct)
     {
         return await FindFirstAcrossShardsAsync(query => query.Where(x => x.Id == id), ct);
@@ -69,6 +84,20 @@ public class BusinessTaskRepository(
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         db.BusinessTasks.Add(entity);
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <inheritdoc/>
+    public async Task UpsertProjectionAsync(BusinessTaskEntity entity, CancellationToken ct)
+    {
+        var existing = await FindBySourceTableAndBusinessKeyAsync(entity.SourceTableCode, entity.BusinessKey, ct);
+        if (existing is null)
+        {
+            await SaveAsync(entity, ct);
+            return;
+        }
+
+        MergeProjectionFields(existing, entity);
+        await UpdateAsync(existing, ct);
     }
 
     /// <inheritdoc/>
@@ -592,6 +621,23 @@ public class BusinessTaskRepository(
     private static string? NormalizeOptionalText(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    /// <summary>
+    /// 合并投影字段，避免覆盖运行态字段。
+    /// </summary>
+    /// <param name="target">已存在实体。</param>
+    /// <param name="incoming">新投影实体。</param>
+    private static void MergeProjectionFields(BusinessTaskEntity target, BusinessTaskEntity incoming)
+    {
+        if (target.Status == BusinessTaskStatus.Created && target.ScannedAtLocal is null && string.IsNullOrWhiteSpace(target.Barcode))
+        {
+            target.Barcode = incoming.Barcode;
+        }
+
+        target.WaveCode = incoming.WaveCode;
+        target.WaveRemark = incoming.WaveRemark;
+        target.UpdatedTimeLocal = incoming.UpdatedTimeLocal;
     }
 
     /// <summary>

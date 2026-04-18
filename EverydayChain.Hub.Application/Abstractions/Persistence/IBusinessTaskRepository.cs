@@ -26,6 +26,15 @@ public interface IBusinessTaskRepository
     Task<BusinessTaskEntity?> FindByTaskCodeAsync(string taskCode, CancellationToken ct);
 
     /// <summary>
+    /// 按来源表编码与业务键查找业务任务；未找到返回 <c>null</c>。
+    /// </summary>
+    /// <param name="sourceTableCode">来源表编码。</param>
+    /// <param name="businessKey">业务键。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>业务任务实体或 <c>null</c>。</returns>
+    Task<BusinessTaskEntity?> FindBySourceTableAndBusinessKeyAsync(string sourceTableCode, string businessKey, CancellationToken ct);
+
+    /// <summary>
     /// 按主键 Id 查找业务任务；未找到返回 <c>null</c>。
     /// </summary>
     /// <param name="id">主键标识。</param>
@@ -39,6 +48,13 @@ public interface IBusinessTaskRepository
     /// <param name="entity">业务任务实体。</param>
     /// <param name="ct">取消令牌。</param>
     Task SaveAsync(BusinessTaskEntity entity, CancellationToken ct);
+
+    /// <summary>
+    /// 按投影规则执行幂等 Upsert。
+    /// </summary>
+    /// <param name="entity">投影后的业务任务实体。</param>
+    /// <param name="ct">取消令牌。</param>
+    Task UpsertProjectionAsync(BusinessTaskEntity entity, CancellationToken ct);
 
     /// <summary>
     /// 更新已有业务任务并持久化。
