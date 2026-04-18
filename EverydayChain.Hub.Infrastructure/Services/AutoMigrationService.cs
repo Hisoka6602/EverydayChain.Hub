@@ -29,6 +29,8 @@ public class AutoMigrationService(
     private const string BaselineMigrationId = "20260417185400_RebuildHubBaseline";
     /// <summary>EF 迁移历史写入版本号。</summary>
     private const string BaselineProductVersion = "9.0.14";
+    /// <summary>启动迁移阶段元数据探测 SQL 超时秒数（危险动作隔离器）。</summary>
+    private const int StartupMetadataProbeTimeoutSeconds = 15;
 
     /// <summary>分表配置快照。</summary>
     private readonly ShardingOptions _options = shardingOptions.Value;
@@ -249,6 +251,7 @@ public class AutoMigrationService(
                 WHERE s.name = @schema
                   AND t.name IN (N'business_tasks', N'IDX_PICKTOLIGHT_CARTON1', N'IDX_PICKTOWCS2');
                 """;
+            command.CommandTimeout = StartupMetadataProbeTimeoutSeconds;
             var schemaParameter = command.CreateParameter();
             schemaParameter.ParameterName = "@schema";
             schemaParameter.Value = ExpectedMigrationSchema;

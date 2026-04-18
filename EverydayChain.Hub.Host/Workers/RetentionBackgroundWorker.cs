@@ -12,6 +12,8 @@ public class RetentionBackgroundWorker(
     IOptions<RetentionJobOptions> retentionJobOptions,
     ILogger<RetentionBackgroundWorker> logger) : BackgroundService
 {
+    /// <summary>单轮保留期执行超时秒数（危险动作隔离器）。</summary>
+    private const int SingleRunTimeoutSeconds = 600;
     /// <summary>保留期任务配置快照。</summary>
     private readonly RetentionJobOptions _retentionJobOptions = retentionJobOptions.Value;
     /// <summary>是否已记录过总开关关闭日志。</summary>
@@ -45,9 +47,16 @@ public class RetentionBackgroundWorker(
                 else
                 {
                     _dangerSwitchOffLogged = false;
-                    var summary = await retentionExecutionService.ExecuteRetentionCleanupAsync(stoppingToken);
+                    using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                    timeoutCts.CancelAfter(TimeSpan.FromSeconds(SingleRunTimeoutSeconds));
+                    var runToken = timeoutCts.Token;
+                    var summary = await retentionExecutionService.ExecuteRetentionCleanupAsync(runToken);
                     logger.LogInformation("保留期后台任务执行完成。Summary={Summary}", summary);
                 }
+            }
+            catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+            {
+                logger.LogError("保留期后台任务单轮执行超时（>{TimeoutSeconds}s），已中断本轮并等待下个周期。", SingleRunTimeoutSeconds);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

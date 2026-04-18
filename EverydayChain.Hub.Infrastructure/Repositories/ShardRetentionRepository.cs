@@ -17,6 +17,8 @@ public class ShardRetentionRepository(
     IDangerZoneExecutor dangerZoneExecutor,
     ILogger<ShardRetentionRepository> logger) : IShardRetentionRepository
 {
+    /// <summary>分表保留期元数据与删除命令超时秒数（危险动作隔离器）。</summary>
+    private const int RetentionCommandTimeoutSeconds = 30;
     /// <summary>安全对象名校验正则（仅允许字母、数字、下划线）。</summary>
     private static readonly Regex SqlIdentifierRegex = new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
     /// <summary>分表配置快照。</summary>
@@ -246,6 +248,7 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
             await connection.OpenAsync(token);
             await using var command = connection.CreateCommand();
             command.CommandText = dropSql;
+            command.CommandTimeout = RetentionCommandTimeoutSeconds;
             await command.ExecuteNonQueryAsync(token);
             logger.LogWarning(
                 "分表保留期已删除过期分表。LogicalTable={LogicalTable}, PhysicalTable={PhysicalTable}, RollbackScript={RollbackScript}",
@@ -276,6 +279,7 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
     {
         var command = connection.CreateCommand();
         command.CommandText = sql;
+        command.CommandTimeout = RetentionCommandTimeoutSeconds;
         command.Parameters.Add(new SqlParameter("@schemaName", _options.Schema));
         command.Parameters.Add(new SqlParameter("@tableName", tableName));
         return command;

@@ -1,6 +1,14 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 新增启动探测与分表解析超时隔离：`AutoMigrationService` 启动元数据探测 SQL 设置 `15s` 超时，`ShardTableResolver` 分表列表查询设置 `15s` 超时，进一步降低启动与分表路由阶段因系统表阻塞导致的连锁卡顿风险。
+- 新增分表治理命令超时隔离：`ShardRetentionRepository` 与 `ShardTableProvisioner` 的元数据查询/DDL/删除操作统一设置 `CommandTimeout=30s`，避免分表治理 SQL 在锁等待场景中长时间阻塞并占用连接池。
+- 新增数据库命令超时隔离：`EfCore.CommandTimeoutSeconds` 已接入 `UseSqlServer(...).CommandTimeout(...)`，并将 `HubDbContext` 注册改为 `AddPooledDbContextFactory`（读取 `EfCore.DbContextPoolSize`），防止慢 SQL/阻塞 SQL 长时间占用连接导致整体请求堆积。
+- 新增同步并发安全阈值隔离：`SyncOrchestrator` 在 `MaxParallelTables` 配置无效（<=0）时不再按“启用表数量”无上限并发，而是启用 `4` 的安全上限，防止同步并发瞬时打满数据库连接池/线程池导致 API 抢占失败。
+- 新增 API 请求超时隔离：`WebEndpoint.RequestTimeoutSeconds` 配置项已接入 `Program.cs` 请求超时中间件（`AddRequestTimeouts + UseRequestTimeouts`），用于拦截长时间未完成请求，避免慢请求持续占用线程与连接资源导致端点级雪崩。
+- 新增后台危险动作隔离器：`RetentionBackgroundWorker` 与 `FeedbackCompensationBackgroundWorker` 均增加“单轮执行超时保护”（分别 600s / 300s），当单轮任务卡死或超长阻塞时自动中断并进入下一周期，避免后台危险任务长期占用资源影响整站可用性。
+- 启动阶段新增超时隔离器：`AutoMigrationHostedService` 对“启动自检阶段/自动迁移阶段”统一增加 120 秒超时保护，超时后降级跳过并继续启动，避免启动任务长时间卡死导致 API 端点不可用。
+- 修复“同步任务异常阻塞 API 端点”风险：`Program.cs` 新增 `HostOptions.BackgroundServiceExceptionBehavior=Ignore`，后台任务异常改为仅记录日志，不再触发宿主停止，保障 Web API 可持续对外服务。
 - 修复扫描/格口重复处理状态机：`TaskExecutionService` 支持 `Dropped` 任务重复扫描并回到 `Scanned`；`ChuteQueryService` 支持 `Dropped` 任务重复请求格口。
 - 修复查询类 API 空请求体回退绑定：`GlobalDashboardController`、`DockDashboardController`、`SortingReportController` （含 `export/csv`）、`BusinessTaskQueryController` 统一采用 `Body > Query > new()` 解析策略，并新增 `QueryControllerBase` 复用请求解析逻辑；补齐 `exceptions`、`recirculations`、`export/csv` 空 Body 回退 Query 回归测试，锁定修复行为并消除 CI 中 README 联动校验失败。
 - 新增 API 失败日志治理：Host 层增加 `ApiFailureLoggingMiddleware`，统一记录 HTTP 非成功与业务失败（`ApiResponse.IsSuccess=false`）场景的请求/响应明细；`nlog.config` 新增 `api-failure-${shortdate}.log` 独立落盘路由；补充中间件单元测试覆盖失败记录与成功不记录分支。

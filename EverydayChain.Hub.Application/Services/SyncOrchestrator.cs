@@ -19,6 +19,8 @@ public class SyncOrchestrator(
     ISyncWindowCalculator windowCalculator,
     ISyncExecutionService executionService,
     ILogger<SyncOrchestrator> logger) : ISyncOrchestrator {
+    /// <summary>默认同步并发上限保护阈值（当配置值无效时启用，避免连接池/线程池被打满）。</summary>
+    private const int DefaultParallelTablesSafetyCap = 4;
 
     /// <inheritdoc/>
     public async Task<SyncBatchResult> RunTableSyncAsync(string tableCode, CancellationToken ct) {
@@ -60,6 +62,14 @@ public class SyncOrchestrator(
             maxParallelTables,
             effectiveParallelTables,
             orderedDefinitions.Count);
+        if (maxParallelTables <= 0 && orderedDefinitions.Count > DefaultParallelTablesSafetyCap)
+        {
+            logger.LogWarning(
+                "同步并发配置无效，已启用安全上限保护。ConfiguredMaxParallelTables={ConfiguredMaxParallelTables}, SafetyCap={SafetyCap}, EnabledTables={EnabledTables}",
+                maxParallelTables,
+                DefaultParallelTablesSafetyCap,
+                orderedDefinitions.Count);
+        }
         if (orderedDefinitions.Count > 1 && effectiveParallelTables == 1) {
             logger.LogWarning(
                 "当前同步并发度为 1，多表将串行执行。ConfiguredMaxParallelTables={ConfiguredMaxParallelTables}, EnabledTables={EnabledTables}",
@@ -123,7 +133,7 @@ public class SyncOrchestrator(
         }
 
         if (configuredMaxParallelTables <= 0) {
-            return enabledTableCount;
+            return Math.Min(DefaultParallelTablesSafetyCap, enabledTableCount);
         }
 
         return Math.Min(configuredMaxParallelTables, enabledTableCount);

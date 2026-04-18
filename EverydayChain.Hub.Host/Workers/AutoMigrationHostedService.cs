@@ -18,6 +18,8 @@ public class AutoMigrationHostedService(
 
     /// <summary>自动迁移阶段标识。</summary>
     private const string AutoMigrationStage = "自动迁移阶段";
+    /// <summary>启动自检与自动迁移单阶段超时秒数。</summary>
+    private const int StartupStageTimeoutSeconds = 120;
 
     /// <summary>
     /// 应用启动时调用，创建作用域并执行 <see cref="IAutoMigrationService.RunAsync"/>。
@@ -28,11 +30,21 @@ public class AutoMigrationHostedService(
         try {
             logger.LogInformation("启动自动迁移与分表自治流程。");
             currentStage = "启动自检阶段";
-            await runtimeStorageGuard.EnsureStartupHealthyAsync(cancellationToken);
+            using var startupTimeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            startupTimeoutCts.CancelAfter(TimeSpan.FromSeconds(StartupStageTimeoutSeconds));
+            var startupToken = startupTimeoutCts.Token;
+            await runtimeStorageGuard.EnsureStartupHealthyAsync(startupToken);
             using var scope = scopeFactory.CreateScope();
             var autoMigrationService = scope.ServiceProvider.GetRequiredService<IAutoMigrationService>();
             currentStage = AutoMigrationStage;
-            await autoMigrationService.RunAsync(cancellationToken);
+            await autoMigrationService.RunAsync(startupToken);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) {
+            logger.LogError(
+                "自动迁移与分表自治流程在{Stage}执行超时（>{TimeoutSeconds}s），已降级跳过并继续启动。",
+                currentStage,
+                StartupStageTimeoutSeconds);
+            return;
         }
         catch (Exception ex) when (string.Equals(currentStage, AutoMigrationStage, StringComparison.Ordinal) && IsDatabaseConnectivityException(ex)) {
             if (TryGetSqlException(ex) is SqlException sqlException) {

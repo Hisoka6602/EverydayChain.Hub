@@ -6,6 +6,8 @@ using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Host.Middlewares;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http.Timeouts;
+using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using EverydayChain.Hub.Infrastructure.DependencyInjection;
 
@@ -30,6 +32,9 @@ if (!webEndpointSection.Exists())
 if (!string.IsNullOrWhiteSpace(webEndpointOptions.Url)) {
     builder.WebHost.UseUrls(webEndpointOptions.Url.Trim());
 }
+var requestTimeoutSeconds = webEndpointOptions.RequestTimeoutSeconds > 0
+    ? webEndpointOptions.RequestTimeoutSeconds
+    : 30;
 
 var swaggerSection = builder.Configuration.GetSection(SwaggerOptions.SectionName);
 var swaggerOptions = swaggerSection.Get<SwaggerOptions>() ?? new SwaggerOptions();
@@ -39,6 +44,11 @@ if (!swaggerSection.Exists())
 }
 builder.Logging.ClearProviders();
 builder.Logging.AddNLog();
+// 后台任务异常仅记录日志，不中止 Web 主机；避免同步链路瞬时故障放大为 API 全站不可用。
+builder.Services.Configure<HostOptions>(options =>
+{
+    options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
+});
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddControllers()
     .AddNewtonsoftJson()
@@ -57,6 +67,13 @@ builder.Services.AddControllers()
 BuildResponse:
         firstError = NormalizeValidationMessage(firstError);
         return new BadRequestObjectResult(ApiResponse<object>.Fail(firstError));
+    };
+});
+builder.Services.AddRequestTimeouts(options =>
+{
+    options.DefaultPolicy = new RequestTimeoutPolicy
+    {
+        Timeout = TimeSpan.FromSeconds(requestTimeoutSeconds)
     };
 });
 builder.Services.AddEndpointsApiExplorer();
@@ -89,6 +106,7 @@ else if (isLinux) {
 #endif
 var app = builder.Build();
 app.UseRouting();
+app.UseRequestTimeouts();
 app.UseMiddleware<ApiFailureLoggingMiddleware>();
 var shouldEnableSwagger = false;
 if (app.Environment.IsDevelopment()) {
