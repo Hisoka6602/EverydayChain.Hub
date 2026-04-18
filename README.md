@@ -659,7 +659,7 @@
 - `FeedbackCompensationBackgroundWorker.cs`：业务回传补偿后台任务，按 `FeedbackCompensationJob.PollingIntervalSeconds` 周期重试失败回传任务，支持批次上限控制并输出补偿统计日志。
 - `AutoMigrationHostedService.cs`：启动阶段自动迁移入口；当自动迁移阶段发生数据库异常时仅记录错误并降级跳过迁移，保持宿主继续运行，避免单库不可达导致整体进程崩溃。
 - `EverydayChain.Hub.Tests/Host/Controllers/*Tests.cs`：PR-03 新增 Controller 基础行为测试，覆盖空参校验与标准成功响应路径。
-- `EverydayChain.Hub.Tests/Architecture/BusinessTaskSingleSourceArchitectureTests.cs`：架构防回退测试，校验 `HubDbContext` 模型中不再包含本地 `IDX_PICKTOLIGHT_CARTON1` / `IDX_PICKTOWCS2` 映射，且保留 `business_tasks` 主表映射。
+- `EverydayChain.Hub.Tests/Architecture/BusinessTaskSingleSourceArchitectureTests.cs`：架构防回退测试，校验 `HubDbContext` 与 `HubDbContextModelSnapshot` 不再包含本地 `IDX_PICKTOLIGHT_CARTON1` / `IDX_PICKTOWCS2` 映射，并校验 `appsettings.json` 中两条 WMS 状态驱动任务固定投影到 `business_tasks`。
 - `EverydayChain.Hub.Tests/Host/Workers/AutoMigrationHostedServiceTests.cs`：自动迁移托管服务容错测试，覆盖“自动迁移阶段异常降级继续启动”与“启动自检异常仍阻断启动”两条分支。
 - `EverydayChain.Hub.Tests/Host/Workers/TestAutoMigrationService.cs`：自动迁移服务测试替身，支持统计调用次数与注入异常。
 - `EverydayChain.Hub.Tests/Host/Workers/TestDatabaseException.cs`：数据库异常测试替身，统一用于自动迁移降级分支测试。

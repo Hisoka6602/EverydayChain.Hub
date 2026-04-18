@@ -1,6 +1,7 @@
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -29,6 +30,47 @@ public class BusinessTaskSingleSourceArchitectureTests
     }
 
     /// <summary>
+    /// 模型快照中不应再包含本地镜像表映射文本。
+    /// </summary>
+    [Fact]
+    public void HubDbContextModelSnapshot_ShouldNotContainLocalIdxMirrorTableMappings()
+    {
+        var repositoryRoot = ResolveRepositoryRootPath();
+        var snapshotPath = Path.Combine(
+            repositoryRoot,
+            "EverydayChain.Hub.Infrastructure",
+            "Migrations",
+            "HubDbContextModelSnapshot.cs");
+        var snapshotText = File.ReadAllText(snapshotPath);
+
+        Assert.DoesNotContain("IDX_PICKTOLIGHT_CARTON1", snapshotText, StringComparison.Ordinal);
+        Assert.DoesNotContain("IDX_PICKTOWCS2", snapshotText, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// WMS 两条状态驱动任务应固定投影到业务主表。
+    /// </summary>
+    [Fact]
+    public void HostAppSettings_WmsStatusDrivenTables_ShouldProjectToBusinessTasks()
+    {
+        var repositoryRoot = ResolveRepositoryRootPath();
+        var hostProjectPath = Path.Combine(repositoryRoot, "EverydayChain.Hub.Host");
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(hostProjectPath)
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
+            .Build();
+
+        var syncTables = configuration.GetSection("SyncJob:Tables").Get<List<SyncTableOptions>>();
+        Assert.NotNull(syncTables);
+
+        var splitTable = syncTables!.Single(table => string.Equals(table.TableCode, "WmsSplitPickToLightCarton", StringComparison.Ordinal));
+        var fullCaseTable = syncTables.Single(table => string.Equals(table.TableCode, "WmsPickToWcs", StringComparison.Ordinal));
+
+        Assert.Equal("business_tasks", splitTable.TargetLogicalTable);
+        Assert.Equal("business_tasks", fullCaseTable.TargetLogicalTable);
+    }
+
+    /// <summary>
     /// 创建测试用数据库上下文。
     /// </summary>
     /// <returns>数据库上下文实例。</returns>
@@ -44,5 +86,26 @@ public class BusinessTaskSingleSourceArchitectureTests
             Schema = "dbo"
         });
         return new HubDbContext(dbContextOptions, shardingOptions);
+    }
+
+    /// <summary>
+    /// 解析仓库根目录绝对路径。
+    /// </summary>
+    /// <returns>仓库根目录。</returns>
+    private static string ResolveRepositoryRootPath()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            var solutionPath = Path.Combine(current.FullName, "EverydayChain.Hub.sln");
+            if (File.Exists(solutionPath))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new InvalidOperationException("未找到仓库根目录，无法定位 appsettings.json 与模型快照文件。");
     }
 }
