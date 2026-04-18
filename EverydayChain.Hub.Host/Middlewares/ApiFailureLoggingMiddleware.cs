@@ -71,8 +71,12 @@ public sealed class ApiFailureLoggingMiddleware {
             responseBuffer.Position = 0;
             var responseBody = await ReadStreamAsync(responseBuffer, context.RequestAborted);
             responseBuffer.Position = 0;
-            await responseBuffer.CopyToAsync(originalResponseBody, context.RequestAborted);
-            context.Response.Body = originalResponseBody;
+            try {
+                await responseBuffer.CopyToAsync(originalResponseBody, context.RequestAborted);
+            }
+            finally {
+                context.Response.Body = originalResponseBody;
+            }
 
             if (!hasUnhandledException && ShouldLogFailure(context.Response.StatusCode, responseBody)) {
                 logger.LogError(
@@ -149,24 +153,16 @@ public sealed class ApiFailureLoggingMiddleware {
     /// <returns>读取成功返回 true，否则返回 false。</returns>
     private static bool TryReadIsSuccessProperty(JsonElement root, out bool isSuccess) {
         isSuccess = false;
-        if (root.TryGetProperty("isSuccess", out var camelCaseValue) && camelCaseValue.ValueKind == JsonValueKind.True) {
-            isSuccess = true;
-            return true;
-        }
+        if (root.TryGetProperty("isSuccess", out var value) || root.TryGetProperty("IsSuccess", out value)) {
+            if (value.ValueKind == JsonValueKind.True) {
+                isSuccess = true;
+                return true;
+            }
 
-        if (root.TryGetProperty("isSuccess", out camelCaseValue) && camelCaseValue.ValueKind == JsonValueKind.False) {
-            isSuccess = false;
-            return true;
-        }
-
-        if (root.TryGetProperty("IsSuccess", out var pascalCaseValue) && pascalCaseValue.ValueKind == JsonValueKind.True) {
-            isSuccess = true;
-            return true;
-        }
-
-        if (root.TryGetProperty("IsSuccess", out pascalCaseValue) && pascalCaseValue.ValueKind == JsonValueKind.False) {
-            isSuccess = false;
-            return true;
+            if (value.ValueKind == JsonValueKind.False) {
+                isSuccess = false;
+                return true;
+            }
         }
 
         return false;
