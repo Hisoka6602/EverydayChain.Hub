@@ -77,10 +77,10 @@ public sealed class TaskExecutionServiceTests
     }
 
     /// <summary>
-    /// 任务处于已落格或更高状态时应拒绝推进并返回失败。
+    /// 任务处于已落格状态时应允许重复扫描并重新推进到已扫描。
     /// </summary>
     [Fact]
-    public async Task MarkScannedAsync_ShouldFail_WhenTaskIsDropped()
+    public async Task MarkScannedAsync_ShouldSucceed_WhenTaskIsDropped()
     {
         var (service, repo) = CreateService();
         await repo.SaveAsync(new BusinessTaskEntity
@@ -102,8 +102,8 @@ public sealed class TaskExecutionServiceTests
 
         var result = await service.MarkScannedAsync(request, CancellationToken.None);
 
-        Assert.False(result.IsSuccess);
-        Assert.Contains("Dropped", result.FailureReason);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(nameof(BusinessTaskStatus.Scanned), result.TaskStatus);
     }
 
     /// <summary>

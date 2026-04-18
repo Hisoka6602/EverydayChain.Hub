@@ -90,7 +90,9 @@ public sealed class TaskExecutionService : ITaskExecutionService
         var task = matchResult.Task;
 
         // 步骤 2：检查当前状态是否允许推进到已扫描。
-        if (task.Status != BusinessTaskStatus.Created && task.Status != BusinessTaskStatus.Scanned)
+        if (task.Status != BusinessTaskStatus.Created
+            && task.Status != BusinessTaskStatus.Scanned
+            && task.Status != BusinessTaskStatus.Dropped)
         {
             var reason = $"任务当前状态 [{task.Status}] 不允许推进到已扫描。";
             var now = DateTime.Now;

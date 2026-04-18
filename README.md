@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 修复扫描/格口重复处理状态机：`TaskExecutionService` 支持 `Dropped` 任务重复扫描并回到 `Scanned`；`ChuteQueryService` 支持 `Dropped` 任务重复请求格口。
 - 修复查询类 API 空请求体回退绑定：`GlobalDashboardController`、`DockDashboardController`、`SortingReportController` （含 `export/csv`）、`BusinessTaskQueryController` 统一采用 `Body > Query > new()` 解析策略，并新增 `QueryControllerBase` 复用请求解析逻辑；补齐 `exceptions`、`recirculations`、`export/csv` 空 Body 回退 Query 回归测试，锁定修复行为并消除 CI 中 README 联动校验失败。
 - 新增 API 失败日志治理：Host 层增加 `ApiFailureLoggingMiddleware`，统一记录 HTTP 非成功与业务失败（`ApiResponse.IsSuccess=false`）场景的请求/响应明细；`nlog.config` 新增 `api-failure-${shortdate}.log` 独立落盘路由；补充中间件单元测试覆盖失败记录与成功不记录分支。
 - 修复启动稳定性：`AutoMigrationHostedService` 在自动迁移阶段遇到数据库连接异常时改为记录错误并降级继续启动，不再因单库不可达导致整进程退出；新增对应主机层单元测试覆盖降级与阻断分支。
@@ -515,7 +516,7 @@
 - `Infrastructure/Persistence/EntityConfigurations/BusinessTaskEntityTypeConfiguration.cs`：业务任务 EF Fluent API 配置，定义分片表结构、字段约束与索引。
 - `Application/Abstractions/Services/IBarcodeParser.cs` + `Application/Services/BarcodeParser.cs`：条码解析服务抽象与实现，按固定规则“拆零 `02` 开头取第 3 位数字、整件 `Z` 开头取第 2 位数字”分类并提取 `TargetChuteCode`，统一输出失败语义（InvalidBarcode、UnsupportedBarcodeType、ParseError）。
 - `Application/Abstractions/Services/IScanIngressService.cs` + `Application/Services/ScanIngressService.cs`：扫描上传应用服务，协调条码解析、任务匹配与状态推进链路，输出标准化受理结果。
-- `Application/Abstractions/Services/IChuteQueryService.cs` + `Application/Services/ChuteQueryService.cs`：请求格口应用服务抽象与实现，按任务编码或条码查询业务任务，在任务已扫描前提下按条码规则解析并返回目标格口，覆盖状态校验与不支持条码异常分支。
+- `Application/Abstractions/Services/IChuteQueryService.cs` + `Application/Services/ChuteQueryService.cs`：请求格口应用服务抽象与实现，按任务编码或条码查询业务任务，在任务已扫描或已落格前提下按条码规则解析并返回目标格口，覆盖状态校验与不支持条码异常分支。
 - `Application/Abstractions/Services/IDropFeedbackService.cs` + `Application/Services/DropFeedbackService.cs`：落格回传应用服务抽象与实现，支持双定位（TaskCode/Barcode）、参数冲突校验与状态机推进（成功→Dropped+FeedbackPending，失败→Exception），落格成功/失败均写落格日志。
 - `Application/Abstractions/Queries/IGlobalDashboardQueryService.cs` + `Application/Queries/GlobalDashboardQueryService.cs`：总看板查询服务抽象与实现，按时间区间汇总总量、整件/拆零分口径、识别率、回流数、异常数、体积重量与波次聚合数据。
 - `Application/Models/GlobalDashboardQueryRequest.cs` + `Application/Models/GlobalDashboardQueryResult.cs` + `Application/Models/WaveDashboardSummary.cs`：总看板应用层查询入参、统计结果与波次维度摘要模型。
@@ -649,8 +650,8 @@
 - `EverydayChain.Hub.Tests/Services/BarcodeParserTests.cs`：条码解析服务测试，覆盖拆零、整件、不支持条码三类解析分支。
 - `EverydayChain.Hub.Tests/Services/ScanIngressServiceTests.cs`：扫描上传应用服务测试，覆盖无效条码失败语义、无匹配任务返回未命中、有效任务受理分支；含内存仓储替身 `InMemoryBusinessTaskRepository`。
 - `EverydayChain.Hub.Tests/Services/ScanMatchServiceTests.cs`：扫描匹配服务测试，覆盖空条码拒绝、无任务未命中、有任务匹配成功分支。
-- `EverydayChain.Hub.Tests/Services/TaskExecutionServiceTests.cs`：任务执行服务测试，覆盖无任务失败、已创建任务推进、非法状态拒绝、持久化验证与扫描维度字段写入场景。
-- `EverydayChain.Hub.Tests/Services/ChuteQueryServiceTests.cs`：请求格口服务测试，覆盖任务不存在、状态非法、无目标格口、成功解析、任务编码优先五个场景。
+- `EverydayChain.Hub.Tests/Services/TaskExecutionServiceTests.cs`：任务执行服务测试，覆盖无任务失败、已创建任务推进、已落格重复扫描、非法状态拒绝、持久化验证与扫描维度字段写入场景。
+- `EverydayChain.Hub.Tests/Services/ChuteQueryServiceTests.cs`：请求格口服务测试，覆盖任务不存在、状态非法、无目标格口、已扫描成功解析、已落格重复请求成功、任务编码优先六个场景。
 - `EverydayChain.Hub.Tests/Services/DropFeedbackServiceTests.cs`：落格回传服务测试，覆盖双空参数失败、任务不存在、条码冲突、状态非法、成功落格→Dropped、失败落格→Exception 六个场景。
 - `EverydayChain.Hub.Tests/Services/SortingTaskTraceWriterTests.cs`：分表写入器兜底建表测试，覆盖首次写入先建表与同月重复写入幂等建表触发场景。
 - `EverydayChain.Hub.Tests/Services/LocalDateTimeNormalizerTests.cs`：本地时间规范化工具测试，覆盖 UTC 拒绝、`Unspecified` 转本地与 `MinValue` 回退本地当前时间分支。
