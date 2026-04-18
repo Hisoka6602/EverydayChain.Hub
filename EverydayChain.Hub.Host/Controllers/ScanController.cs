@@ -15,7 +15,7 @@ namespace EverydayChain.Hub.Host.Controllers;
 [Route("api/v1/scan")]
 public sealed class ScanController : ControllerBase {
     /// <summary>
-    /// 空请求体提示语。
+    /// 当请求体为空时返回的错误消息。
     /// </summary>
     private const string EmptyRequestBodyMessage = "扫描上传请求体不能为空。";
 

@@ -139,7 +139,7 @@ static string NormalizeSwaggerRoutePrefix(string? path) {
 
 // 归一化模型绑定错误消息，避免直接暴露底层序列化器实现细节。
 // rawMessage: 原始错误文本。
-// 返回值：可直接返回给调用方的统一错误文本。
+// 返回值：可直接用于响应的统一错误文本。
 static string NormalizeValidationMessage(string rawMessage) {
     if (string.IsNullOrWhiteSpace(rawMessage)) {
         return DefaultValidationFailureMessage;
