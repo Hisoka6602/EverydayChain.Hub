@@ -26,7 +26,7 @@ public class AutoMigrationService(
     /// <summary>迁移基线固定 Schema。</summary>
     private const string ExpectedMigrationSchema = "dbo";
     /// <summary>重建迁移基线 Id。</summary>
-    private const string BaselineMigrationId = "20260417185400_RebuildHubBaseline";
+    private const string BaselineMigrationId = "20260418204107_RebuildHubBaselineV2";
     /// <summary>EF 迁移历史写入版本号。</summary>
     private const string BaselineProductVersion = "9.0.14";
     /// <summary>启动迁移阶段元数据探测 SQL 超时秒数（危险动作隔离器）。</summary>

@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EverydayChain.Hub.Infrastructure.Migrations
 {
     [DbContext(typeof(HubDbContext))]
-    [Migration("20260417185400_RebuildHubBaseline")]
-    partial class RebuildHubBaseline
+    [Migration("20260418204107_RebuildHubBaselineV2")]
+    partial class RebuildHubBaselineV2
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -80,6 +80,19 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     b.Property<decimal?>("LengthMm")
                         .HasColumnType("decimal(18,3)");
+
+                    b.Property<string>("NormalizedBarcode")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("NormalizedWaveCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("ResolvedDockCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<int>("ScanCount")
                         .HasColumnType("int");
@@ -154,6 +167,12 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     b.HasIndex("IsRecirculated");
 
+                    b.HasIndex("NormalizedBarcode");
+
+                    b.HasIndex("NormalizedWaveCode");
+
+                    b.HasIndex("ResolvedDockCode");
+
                     b.HasIndex("SourceType");
 
                     b.HasIndex("Status");
@@ -171,11 +190,18 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     b.HasIndex("FeedbackStatus", "CreatedTimeLocal");
 
+                    b.HasIndex("NormalizedWaveCode", "CreatedTimeLocal");
+
+                    b.HasIndex("ResolvedDockCode", "CreatedTimeLocal");
+
+                    b.HasIndex("SourceTableCode", "BusinessKey")
+                        .IsUnique();
+
                     b.HasIndex("WaveCode", "CreatedTimeLocal");
 
-                    b.HasIndex("FeedbackStatus", "IsFeedbackReported", "FeedbackTimeLocal");
+                    b.HasIndex("CreatedTimeLocal", "NormalizedWaveCode", "ResolvedDockCode");
 
-                    b.HasIndex("CreatedTimeLocal", "WaveCode", "TargetChuteCode", "ActualChuteCode");
+                    b.HasIndex("FeedbackStatus", "IsFeedbackReported", "FeedbackTimeLocal");
 
                     b.HasIndex("CreatedTimeLocal", "SourceType", "Status", "IsException", "IsRecirculated");
 
@@ -521,315 +547,6 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                     b.HasIndex("TableCode", "DeletedTimeLocal");
 
                     b.ToTable("sync_deletion_logs", "dbo");
-                });
-
-            modelBuilder.Entity("EverydayChain.Hub.Domain.Aggregates.WmsPickToWcsAggregate.WmsPickToWcsEntity", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime?>("AddTime")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("ADDTIME");
-
-                    b.Property<string>("BoxBarcode")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)")
-                        .HasColumnName("SKUID");
-
-                    b.Property<int?>("ChuteNo")
-                        .HasColumnType("int")
-                        .HasColumnName("SEQNO");
-
-                    b.Property<DateTime?>("CloseTime")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("CLOSETIME");
-
-                    b.Property<string>("ConsigneeId")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasColumnName("CONSIGNEEID");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("DESCR");
-
-                    b.Property<string>("DocumentNo")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasColumnName("DOCNO");
-
-                    b.Property<DateTime?>("EditTime")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("EDITTIME");
-
-                    b.Property<string>("Flag")
-                        .HasMaxLength(1)
-                        .HasColumnType("nvarchar(1)")
-                        .HasColumnName("FLAG");
-
-                    b.Property<decimal?>("GrossWeightGram")
-                        .HasColumnType("decimal(18,8)")
-                        .HasColumnName("GROSSWEIGHT");
-
-                    b.Property<decimal?>("HeightCm")
-                        .HasColumnType("decimal(18,8)")
-                        .HasColumnName("HIGH");
-
-                    b.Property<decimal?>("LengthCm")
-                        .HasColumnType("decimal(18,8)")
-                        .HasColumnName("LENGTH");
-
-                    b.Property<string>("LocationCode")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasColumnName("LOCATION");
-
-                    b.Property<decimal?>("MinUnitQuantity")
-                        .HasColumnType("decimal(18,8)")
-                        .HasColumnName("SKUQTY1");
-
-                    b.Property<DateTime?>("OpenTime")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("OPENTIME");
-
-                    b.Property<int?>("Quantity")
-                        .HasColumnType("int")
-                        .HasColumnName("QTY");
-
-                    b.Property<int?>("ScanCount")
-                        .HasColumnType("int")
-                        .HasColumnName("SCANCOUNT");
-
-                    b.Property<string>("SequenceNo")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasColumnName("ALLNUM");
-
-                    b.Property<string>("SequenceNo1")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasColumnName("ALLNUM1");
-
-                    b.Property<string>("SkuCode")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasColumnName("SKU");
-
-                    b.Property<string>("SkuQuantityText")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasColumnName("SKUQTY");
-
-                    b.Property<string>("SkuSequence")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasColumnName("SKUSEQ");
-
-                    b.Property<string>("Status")
-                        .HasMaxLength(2)
-                        .HasColumnType("nvarchar(2)")
-                        .HasColumnName("STATUS");
-
-                    b.Property<string>("StoreName")
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)")
-                        .HasColumnName("MENDIAN");
-
-                    b.Property<string>("TaskProcess")
-                        .HasMaxLength(2)
-                        .HasColumnType("nvarchar(2)")
-                        .HasColumnName("TASKPROCESS");
-
-                    b.Property<string>("UniqueId")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasColumnName("R_SYSID");
-
-                    b.Property<decimal?>("VolumeCubicCm")
-                        .HasColumnType("decimal(18,8)")
-                        .HasColumnName("CUBE");
-
-                    b.Property<string>("WaveNo")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasColumnName("WAVENO");
-
-                    b.Property<string>("WcsNo")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasColumnName("WCSNO");
-
-                    b.Property<decimal?>("WidthCm")
-                        .HasColumnType("decimal(18,8)")
-                        .HasColumnName("WIDTH");
-
-                    b.Property<string>("ZjFlag")
-                        .HasMaxLength(1)
-                        .HasColumnType("nvarchar(1)")
-                        .HasColumnName("ZJFLAG");
-
-                    b.HasKey("Id");
-
-                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"));
-
-                    b.HasIndex("AddTime");
-
-                    b.HasIndex("UniqueId");
-
-                    b.HasIndex("DocumentNo", "AddTime");
-
-                    b.ToTable("IDX_PICKTOWCS2", "dbo");
-                });
-
-            modelBuilder.Entity("EverydayChain.Hub.Domain.Aggregates.WmsSplitPickToLightCartonAggregate.WmsSplitPickToLightCartonEntity", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime?>("AddTime")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("ADDTIME");
-
-                    b.Property<string>("AddedByUserId")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasColumnName("ADDWHO");
-
-                    b.Property<string>("AdditionalFlag")
-                        .HasMaxLength(1)
-                        .HasColumnType("nvarchar(1)")
-                        .HasColumnName("ADDITIONAL");
-
-                    b.Property<string>("CartonNo")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasColumnName("CARTONNO");
-
-                    b.Property<int?>("ChuteNo")
-                        .HasColumnType("int")
-                        .HasColumnName("SEQNO");
-
-                    b.Property<DateTime?>("CloseTime")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("CLOSETIME");
-
-                    b.Property<string>("ConsigneeId")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasColumnName("CONSIGNEEID");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("DESCR");
-
-                    b.Property<string>("DocumentNo")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasColumnName("DOCNO");
-
-                    b.Property<decimal?>("GrossWeightGram")
-                        .HasColumnType("decimal(18,8)")
-                        .HasColumnName("GROSSWEIGHT");
-
-                    b.Property<decimal?>("HeightCm")
-                        .HasColumnType("decimal(18,8)")
-                        .HasColumnName("HIGH");
-
-                    b.Property<decimal?>("LengthCm")
-                        .HasColumnType("decimal(18,8)")
-                        .HasColumnName("LENGTH");
-
-                    b.Property<DateTime?>("OpenTime")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("OPENTIME");
-
-                    b.Property<int?>("ScanCount")
-                        .HasColumnType("int")
-                        .HasColumnName("SCANCOUNT");
-
-                    b.Property<string>("SortationLocationCode")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasColumnName("SORTATIONLOCATION");
-
-                    b.Property<string>("Status")
-                        .HasMaxLength(2)
-                        .HasColumnType("nvarchar(2)")
-                        .HasColumnName("STATUS");
-
-                    b.Property<string>("StopCode")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasColumnName("STOP");
-
-                    b.Property<string>("StoreId")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasColumnName("STOREID");
-
-                    b.Property<string>("StoreName")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)")
-                        .HasColumnName("MENDIAN");
-
-                    b.Property<string>("TaskProcess")
-                        .HasMaxLength(2)
-                        .HasColumnType("nvarchar(2)")
-                        .HasColumnName("TASKPROCESS");
-
-                    b.Property<string>("UseFlag")
-                        .HasMaxLength(1)
-                        .HasColumnType("nvarchar(1)")
-                        .HasColumnName("USEFLAG");
-
-                    b.Property<decimal?>("VolumeCubicCm")
-                        .HasColumnType("decimal(18,8)")
-                        .HasColumnName("CUBE");
-
-                    b.Property<string>("WarehouseId")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasColumnName("WAREHOUSEID");
-
-                    b.Property<string>("WaveNo")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasColumnName("WAVENO");
-
-                    b.Property<string>("WcsNo")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasColumnName("WCSNO");
-
-                    b.Property<decimal?>("WidthCm")
-                        .HasColumnType("decimal(18,8)")
-                        .HasColumnName("WIDTH");
-
-                    b.Property<string>("WorkingAreaCode")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasColumnName("WORKINGAREA");
-
-                    b.HasKey("Id");
-
-                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"));
-
-                    b.HasIndex("AddTime");
-
-                    b.HasIndex("CartonNo")
-                        .IsUnique();
-
-                    b.ToTable("IDX_PICKTOLIGHT_CARTON1", "dbo");
                 });
 #pragma warning restore 612, 618
         }

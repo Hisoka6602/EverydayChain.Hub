@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace EverydayChain.Hub.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class RebuildHubBaseline : Migration
+    public partial class RebuildHubBaselineV2 : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -26,8 +26,10 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                     SourceType = table.Column<int>(type: "int", nullable: false),
                     BusinessKey = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
                     Barcode = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
+                    NormalizedBarcode = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
                     TargetChuteCode = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
                     ActualChuteCode = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
+                    ResolvedDockCode = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
                     DeviceCode = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
                     TraceId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
                     FailureReason = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
@@ -44,6 +46,7 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                     CreatedTimeLocal = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedTimeLocal = table.Column<DateTime>(type: "datetime2", nullable: false),
                     WaveCode = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
+                    NormalizedWaveCode = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
                     WaveRemark = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
                     IsRecirculated = table.Column<bool>(type: "bit", nullable: false),
                     IsException = table.Column<bool>(type: "bit", nullable: false),
@@ -76,92 +79,6 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_drop_logs", x => x.Id)
-                        .Annotation("SqlServer:Clustered", true);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "IDX_PICKTOLIGHT_CARTON1",
-                schema: "dbo",
-                columns: table => new
-                {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    DOCNO = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    WORKINGAREA = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    CARTONNO = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
-                    SORTATIONLOCATION = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    USEFLAG = table.Column<string>(type: "nvarchar(1)", maxLength: 1, nullable: true),
-                    ADDITIONAL = table.Column<string>(type: "nvarchar(1)", maxLength: 1, nullable: true),
-                    OPENTIME = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CLOSETIME = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    SEQNO = table.Column<int>(type: "int", nullable: true),
-                    ADDTIME = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    ADDWHO = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    TASKPROCESS = table.Column<string>(type: "nvarchar(2)", maxLength: 2, nullable: true),
-                    WAVENO = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    STOREID = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    STOP = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    STATUS = table.Column<string>(type: "nvarchar(2)", maxLength: 2, nullable: true),
-                    WAREHOUSEID = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    MENDIAN = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
-                    WCSNO = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    LENGTH = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
-                    WIDTH = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
-                    HIGH = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
-                    CUBE = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
-                    GROSSWEIGHT = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
-                    CONSIGNEEID = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    DESCR = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
-                    SCANCOUNT = table.Column<int>(type: "int", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_IDX_PICKTOLIGHT_CARTON1", x => x.Id)
-                        .Annotation("SqlServer:Clustered", true);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "IDX_PICKTOWCS2",
-                schema: "dbo",
-                columns: table => new
-                {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    WAVENO = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    DOCNO = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    QTY = table.Column<int>(type: "int", nullable: true),
-                    SEQNO = table.Column<int>(type: "int", nullable: true),
-                    FLAG = table.Column<string>(type: "nvarchar(1)", maxLength: 1, nullable: true),
-                    ADDTIME = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    EDITTIME = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    MENDIAN = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: true),
-                    WCSNO = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    SKUID = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
-                    SKUSEQ = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    SKUQTY = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    SKU = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    LOCATION = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    ZJFLAG = table.Column<string>(type: "nvarchar(1)", maxLength: 1, nullable: true),
-                    SKUQTY1 = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
-                    ALLNUM = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    ALLNUM1 = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    R_SYSID = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    LENGTH = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
-                    WIDTH = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
-                    HIGH = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
-                    CUBE = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
-                    GROSSWEIGHT = table.Column<decimal>(type: "decimal(18,8)", nullable: true),
-                    CONSIGNEEID = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    DESCR = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
-                    SCANCOUNT = table.Column<int>(type: "int", nullable: true),
-                    OPENTIME = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CLOSETIME = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    TASKPROCESS = table.Column<string>(type: "nvarchar(2)", maxLength: 2, nullable: true),
-                    STATUS = table.Column<string>(type: "nvarchar(2)", maxLength: 2, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_IDX_PICKTOWCS2", x => x.Id)
                         .Annotation("SqlServer:Clustered", true);
                 });
 
@@ -313,16 +230,16 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 columns: new[] { "CreatedTimeLocal", "Id" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_business_tasks_CreatedTimeLocal_NormalizedWaveCode_ResolvedDockCode",
+                schema: "dbo",
+                table: "business_tasks",
+                columns: new[] { "CreatedTimeLocal", "NormalizedWaveCode", "ResolvedDockCode" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_business_tasks_CreatedTimeLocal_SourceType_Status_IsException_IsRecirculated",
                 schema: "dbo",
                 table: "business_tasks",
                 columns: new[] { "CreatedTimeLocal", "SourceType", "Status", "IsException", "IsRecirculated" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_business_tasks_CreatedTimeLocal_WaveCode_TargetChuteCode_ActualChuteCode",
-                schema: "dbo",
-                table: "business_tasks",
-                columns: new[] { "CreatedTimeLocal", "WaveCode", "TargetChuteCode", "ActualChuteCode" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_business_tasks_FeedbackStatus",
@@ -365,6 +282,43 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 schema: "dbo",
                 table: "business_tasks",
                 column: "IsRecirculated");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_tasks_NormalizedBarcode",
+                schema: "dbo",
+                table: "business_tasks",
+                column: "NormalizedBarcode");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_tasks_NormalizedWaveCode",
+                schema: "dbo",
+                table: "business_tasks",
+                column: "NormalizedWaveCode");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_tasks_NormalizedWaveCode_CreatedTimeLocal",
+                schema: "dbo",
+                table: "business_tasks",
+                columns: new[] { "NormalizedWaveCode", "CreatedTimeLocal" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_tasks_ResolvedDockCode",
+                schema: "dbo",
+                table: "business_tasks",
+                column: "ResolvedDockCode");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_tasks_ResolvedDockCode_CreatedTimeLocal",
+                schema: "dbo",
+                table: "business_tasks",
+                columns: new[] { "ResolvedDockCode", "CreatedTimeLocal" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_tasks_SourceTableCode_BusinessKey",
+                schema: "dbo",
+                table: "business_tasks",
+                columns: new[] { "SourceTableCode", "BusinessKey" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_business_tasks_SourceType",
@@ -444,37 +398,6 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 schema: "dbo",
                 table: "drop_logs",
                 columns: new[] { "TaskCode", "DropTimeLocal" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_IDX_PICKTOLIGHT_CARTON1_ADDTIME",
-                schema: "dbo",
-                table: "IDX_PICKTOLIGHT_CARTON1",
-                column: "ADDTIME");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_IDX_PICKTOLIGHT_CARTON1_CARTONNO",
-                schema: "dbo",
-                table: "IDX_PICKTOLIGHT_CARTON1",
-                column: "CARTONNO",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_IDX_PICKTOWCS2_ADDTIME",
-                schema: "dbo",
-                table: "IDX_PICKTOWCS2",
-                column: "ADDTIME");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_IDX_PICKTOWCS2_DOCNO_ADDTIME",
-                schema: "dbo",
-                table: "IDX_PICKTOWCS2",
-                columns: new[] { "DOCNO", "ADDTIME" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_IDX_PICKTOWCS2_R_SYSID",
-                schema: "dbo",
-                table: "IDX_PICKTOWCS2",
-                column: "R_SYSID");
 
             migrationBuilder.CreateIndex(
                 name: "IX_scan_logs_Barcode",
@@ -577,14 +500,6 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "drop_logs",
-                schema: "dbo");
-
-            migrationBuilder.DropTable(
-                name: "IDX_PICKTOLIGHT_CARTON1",
-                schema: "dbo");
-
-            migrationBuilder.DropTable(
-                name: "IDX_PICKTOWCS2",
                 schema: "dbo");
 
             migrationBuilder.DropTable(

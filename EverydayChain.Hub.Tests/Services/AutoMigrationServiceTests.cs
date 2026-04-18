@@ -8,6 +8,9 @@ namespace EverydayChain.Hub.Tests.Services;
 /// </summary>
 public class AutoMigrationServiceTests
 {
+    /// <summary>重建迁移基线 Id。</summary>
+    private const string BaselineMigrationId = "20260418204107_RebuildHubBaselineV2";
+
     /// <summary>
     /// 启动预建后缀应过滤空后缀，仅保留分表后缀。
     /// </summary>
@@ -32,7 +35,7 @@ public class AutoMigrationServiceTests
     public void ShouldMarkBaselineMigration_ShouldReturnTrue_WhenOnlyBaselineExistsAndCoreTablesExist()
     {
         var shouldMark = AutoMigrationService.ShouldMarkBaselineMigration(
-            ["20260417185400_RebuildHubBaseline"],
+            [BaselineMigrationId],
             [],
             existingCoreTableCount: 2);
 
@@ -48,10 +51,10 @@ public class AutoMigrationServiceTests
     public void ShouldMarkBaselineMigration_ShouldReturnFalse_WhenCoreTableAbsentOrAlreadyApplied(int existingCoreTableCount, bool applied)
     {
         var appliedMigrations = applied
-            ? new[] { "20260417185400_RebuildHubBaseline" }
+            ? new[] { BaselineMigrationId }
             : Array.Empty<string>();
         var shouldMark = AutoMigrationService.ShouldMarkBaselineMigration(
-            ["20260417185400_RebuildHubBaseline"],
+            [BaselineMigrationId],
             appliedMigrations,
             existingCoreTableCount);
 

@@ -2,6 +2,7 @@
 
 ## 本次更新内容
 - 收敛《EverydayChain.Hub_Copilot_精准执行指令_最终版》旧同步链路：删除 `IRemoteStatusConsumeService`、`ISqlServerAppendOnlyWriter`、`RemoteStatusConsumeService`、`SqlServerAppendOnlyWriter` 及对应测试，`StatusDriven` 主路径统一收敛到 `IBusinessTaskStatusConsumeService`。
+- 继续推进《EverydayChain.Hub_Copilot_精准执行指令_最终版》迁移收口：删除旧 EF 迁移链并重建单一基线迁移 `20260418204107_RebuildHubBaselineV2`，新快照仅包含当前业务主模型，不再包含本地镜像表历史语义。
 - 完成《EverydayChain.Hub_Copilot_精准执行指令_最终版》镜像表收口第一阶段：删除本地镜像表实体 `WmsSplitPickToLightCartonEntity`、`WmsPickToWcsEntity`，并从 `HubDbContext` 移除对应 DbSet 与映射配置，确保本地业务主路径仅保留 `business_tasks`。
 - 开始实施《EverydayChain.Hub_Copilot_精准执行指令_最终版》：补齐 `business_tasks` 直投影主路径，新增 `BusinessTaskProjectionService` 与 `BusinessTaskStatusConsumeService`，并将 `WmsSplitPickToLightCarton`/`WmsPickToWcs` 的 `StatusDriven` 主路径切换为“远端读取 → 本地业务主表幂等投影 → 可选远端状态回写”。
 - 收敛同步与回写配置：`SyncJob.Tables` 新增 `SourceType`、`BusinessKeyColumn`、`BarcodeColumn`、`WaveCodeColumn`、`WaveRemarkColumn`；`appsettings.json` 两条 WMS 同步任务目标统一为 `business_tasks`；`WmsFeedbackOptions` 与 `OracleWmsFeedbackGateway` 删除默认回退目标表语义并改为按来源强制分流。
@@ -26,7 +27,7 @@
 - 完成 WMS 回写上线策略收口：`README.md`、`WMS回写联调基线.md`、`上线前最终检查清单.md` 三处统一为“当前版本可上线，且 WMS 回写开启（`WmsFeedback.Enabled=true`）”。
 - 收口 Swagger 描述文案：`appsettings.json` 与 `SwaggerOptions.cs` 文案统一为当前真实能力描述（不再使用“骨架能力”语义）。
 - 实施 PR-12 精准修复：新增 `WebEndpointOptions` 与 `Swagger.Path` 配置，`Program.cs` 改为从 `appsettings.json` 读取 Web 监听地址与 Swagger 路径，移除硬编码入口路径。
-- 完成 EF Core 迁移历史重建：删除旧迁移链并重建单一基线迁移 `20260417185400_RebuildHubBaseline`，保留自动迁移与自动分表能力。
+- 完成 EF Core 迁移历史重建：删除旧迁移链并重建单一基线迁移 `20260418204107_RebuildHubBaselineV2`，保留自动迁移与自动分表能力。
 - 补齐查询索引：`BusinessTaskEntity`、`ScanLogEntity`、`DropLogEntity`、`SyncBatchEntity` 新增高频单列与组合索引，覆盖分页、看板聚合、扫描匹配、回写补偿场景。
 - 完成进一步性能精修：热路径查询去除 `Trim()` 函数包裹以提升索引命中；扫描链路增加字符串一次归一化；补偿失败链路移除冗余“失败到失败”重复更新。
 - 新增文档：`性能精修说明.md`、`前端对接文档.md`；更新 `WMS回写联调基线.md`，补齐最终配置、联调步骤、阻塞项与生产启用门禁。
@@ -328,10 +329,8 @@
 │   ├── Persistence/Sharding/IShardSuffixResolver.cs
 │   ├── Persistence/Sharding/MonthShardSuffixResolver.cs
 │   ├── Persistence/Sharding/ShardModelCacheKeyFactory.cs
-│   ├── Migrations/20260417185400_RebuildHubBaseline.cs
-│   ├── Migrations/20260417185400_RebuildHubBaseline.Designer.cs
-│   ├── Migrations/20260418200551_RemoveLocalMirrorTables.cs
-│   ├── Migrations/20260418200551_RemoveLocalMirrorTables.Designer.cs
+│   ├── Migrations/20260418204107_RebuildHubBaselineV2.cs
+│   ├── Migrations/20260418204107_RebuildHubBaselineV2.Designer.cs
 │   ├── Migrations/HubDbContextModelSnapshot.cs
 │   └── Services
 │       ├── IDangerZoneExecutor.cs
@@ -476,8 +475,7 @@
 - `上线前最终检查清单.md`：面向开发/运维/测试/业务的最终上线门禁清单，明确 WMS 关闭上线与启用上线两种判定路径。
 - `EverydayChain.Hub.Domain/Options/WebEndpointOptions.cs`：定义 Web 监听地址配置实体，统一承载 `WebEndpoint.Url` 绑定语义。
 - `EverydayChain.Hub.Domain/Options/SwaggerOptions.cs`：Swagger 文档配置实体，新增 `Path` 用于配置化 Swagger 页面入口。
-- `EverydayChain.Hub.Infrastructure/Migrations/20260417185400_RebuildHubBaseline.cs`：EF Core 新基线迁移，覆盖当前全量模型与索引定义。
-- `EverydayChain.Hub.Infrastructure/Migrations/20260418021720_AddBusinessTaskQueryOptimizationFields.cs`：查询优化增量迁移，新增业务任务查询优化字段与组合索引，并执行历史数据回填。
+- `EverydayChain.Hub.Infrastructure/Migrations/20260418204107_RebuildHubBaselineV2.cs`：EF Core 单一基线迁移，覆盖当前全量模型与索引定义，并移除旧迁移链中的本地镜像表历史包袱。
 - `docs/联调证据/PR12-20260416-R1/01-联调执行记录.md`：PR-12 联调收口 R1 批次执行记录，归档本地时间窗口、回归命令与端到端链路执行状态。
 - `docs/联调证据/PR12-20260416-R1/02-关键日志索引.md`：PR-12 联调收口 R1 批次关键日志索引，固化日志范围、检索词口径与命中补录表。
 - `docs/联调证据/PR12-20260416-R1/03-结果汇总.md`：PR-12 联调收口 R1 批次结果汇总，记录统计口径、回归结果与最终收口结论。
@@ -639,7 +637,6 @@
 - `20260413160852_AddScanDropLogTables.cs`：新增 `scan_logs` 与 `drop_logs` 迁移基线，作为分片模板来源，包含审计字段与查询索引。
 - `20260416010041_AddSyncBatchShardTable.cs`：新增 `sync_batches` 基础表迁移，用于同步批次自动迁移基线与分片模板。
 - `20260416171508_AddSyncChangeDeletionLogShardTables.cs`：新增 `sync_change_logs` 与 `sync_deletion_logs` 基础表迁移，用于同步变更/删除日志自动迁移基线与分片模板。
-- `20260418200551_RemoveLocalMirrorTables.cs`：删除本地镜像表 `IDX_PICKTOLIGHT_CARTON1`、`IDX_PICKTOWCS2` 并补齐 `business_tasks` 的 `SourceTableCode + BusinessKey` 联合唯一索引，确保业务主表单源收口。
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
 - `nlog.config`：NLog 日志配置，输出至控制台与三个滚动日志文件：通用日志（`hub-${shortdate}.log`，按日切割，单文件上限 10 MB，保留 30 天）；同步专属日志（`sync-${shortdate}.log`，仅收录同步链路相关组件日志）；API 失败专属日志（`api-failure-${shortdate}.log`，记录失败请求响应明细）。
 - `Program.cs`（Host）：Host 启动入口，现已支持 API + Worker 共存，启用 Controllers、Swagger（中文注释）、API 失败日志中间件并保留自动迁移与同步后台任务注册。
