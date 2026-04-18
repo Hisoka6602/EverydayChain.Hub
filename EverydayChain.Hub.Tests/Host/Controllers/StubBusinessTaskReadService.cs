@@ -22,6 +22,10 @@ internal sealed class StubBusinessTaskReadService : IBusinessTaskReadService
         TotalCount = 1,
         PageNumber = 1,
         PageSize = 50,
+        HasMore = true,
+        NextLastCreatedTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 2, 0, 0), DateTimeKind.Local),
+        NextLastId = 1001,
+        PaginationMode = "Cursor",
         Items = [new BusinessTaskQueryItem
         {
             TaskCode = "T1",

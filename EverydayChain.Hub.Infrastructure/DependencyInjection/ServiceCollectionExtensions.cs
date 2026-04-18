@@ -67,7 +67,6 @@ public static class ServiceCollectionExtensions {
     /// <returns>原服务集合（链式调用）。</returns>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration) {
         services.Configure<ShardingOptions>(configuration.GetSection(ShardingOptions.SectionName));
-        services.Configure<EfCoreOptions>(configuration.GetSection(EfCoreOptions.SectionName));
         services.Configure<AutoTuneOptions>(configuration.GetSection(AutoTuneOptions.SectionName));
         services.Configure<DangerZoneOptions>(configuration.GetSection(DangerZoneOptions.SectionName));
         services.Configure<SyncJobOptions>(configuration.GetSection(SyncJobOptions.SectionName));
@@ -79,21 +78,20 @@ public static class ServiceCollectionExtensions {
         services.Configure<QueryCacheOptions>(configuration.GetSection(QueryCacheOptions.SectionName));
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
-        var efCoreOptions = configuration.GetSection(EfCoreOptions.SectionName).Get<EfCoreOptions>() ?? new EfCoreOptions();
         var queryCacheOptions = configuration.GetSection(QueryCacheOptions.SectionName).Get<QueryCacheOptions>() ?? new QueryCacheOptions();
         var syncOptions = configuration.GetSection(SyncJobOptions.SectionName).Get<SyncJobOptions>() ?? new SyncJobOptions();
         var retentionJobOptions = configuration.GetSection(RetentionJobOptions.SectionName).Get<RetentionJobOptions>() ?? new RetentionJobOptions();
         var managedLogicalTables = BuildManagedLogicalTables(syncOptions).ToArray();
 
         services.AddMemoryCache();
-        services.AddPooledDbContextFactory<HubDbContext>(options => {
+        services.AddDbContextFactory<HubDbContext>(options => {
             options.UseSqlServer(shardingOptions.ConnectionString, sqlServerOptions => {
                 sqlServerOptions.EnableRetryOnFailure();
             });
             // 运行时自动迁移阶段仅需执行已生成迁移，忽略“模型较快照有待提交变更”的告警，避免阻断启动链路。
             options.ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
             options.ReplaceService<IModelCacheKeyFactory, ShardModelCacheKeyFactory>();
-        }, NormalizeDbContextPoolSize(efCoreOptions.DbContextPoolSize));
+        });
         services.AddSingleton<IShardSuffixResolver, MonthShardSuffixResolver>();
         services.AddSingleton<IDangerZoneExecutor, DangerZoneExecutor>();
         services.AddSingleton<IRuntimeStorageGuard, RuntimeStorageGuard>();
@@ -206,13 +204,4 @@ public static class ServiceCollectionExtensions {
         return managedTables;
     }
 
-    /// <summary>
-    /// 归一化 DbContext 池大小配置。
-    /// </summary>
-    /// <param name="poolSize">配置值。</param>
-    /// <returns>归一化后的池大小（下限 32 用于避免池过小导致频繁创建，上限 1024 用于限制内存占用）。</returns>
-    private static int NormalizeDbContextPoolSize(int poolSize)
-    {
-        return Math.Clamp(poolSize, 32, 1024);
-    }
 }
