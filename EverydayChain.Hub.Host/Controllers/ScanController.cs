@@ -15,6 +15,11 @@ namespace EverydayChain.Hub.Host.Controllers;
 [Route("api/v1/scan")]
 public sealed class ScanController : ControllerBase {
     /// <summary>
+    /// 空请求体提示语。
+    /// </summary>
+    private const string EmptyRequestBodyMessage = "扫描上传请求体不能为空。";
+
+    /// <summary>
     /// 多条码场景下非首条条码的尺寸与重量回写值。
     /// </summary>
     private const decimal MultiBarcodeFallbackMeasurementValue = 0M;
@@ -55,7 +60,7 @@ public sealed class ScanController : ControllerBase {
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ScanUploadResponse>>), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<ScanUploadResponse>>>> UploadAsync([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] ScanUploadRequest? request, CancellationToken cancellationToken) {
         if (request is null) {
-            return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail("请求体不能为空，且请求头 Content-Type 必须为 application/json。"));
+            return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail(EmptyRequestBodyMessage));
         }
 
         if (!TryBuildBarcodes(request, out var barcodes, out var barcodeValidationMessage)) {

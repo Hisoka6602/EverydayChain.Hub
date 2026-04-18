@@ -9,6 +9,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi.Models;
 using EverydayChain.Hub.Infrastructure.DependencyInjection;
 
+const string DefaultValidationFailureMessage = "请求参数校验失败。";
+const string EmptyRequestBodyValidationMessage = "请求体不能为空，且请求头 Content-Type 必须为 application/json。";
+const string DateTimeFormatValidationMessage = "时间字段格式无效，请使用本地时间格式 yyyy-MM-dd HH:mm:ss 或 yyyy-MM-dd HH:mm:ss.fff，禁止使用 Z 或时区偏移。";
+
 var builder = WebApplication.CreateBuilder(args);
 var logger = NLog.LogManager.GetCurrentClassLogger();
 var webEndpointSection = builder.Configuration.GetSection(WebEndpointOptions.SectionName);
@@ -35,7 +39,7 @@ builder.Services.AddControllers()
     .AddNewtonsoftJson()
     .ConfigureApiBehaviorOptions(options => {
     options.InvalidModelStateResponseFactory = context => {
-        var firstError = "请求参数校验失败。";
+        var firstError = DefaultValidationFailureMessage;
         foreach (var modelStateEntry in context.ModelState.Values) {
             foreach (var error in modelStateEntry.Errors) {
                 if (!string.IsNullOrWhiteSpace(error.ErrorMessage)) {
@@ -138,17 +142,17 @@ static string NormalizeSwaggerRoutePrefix(string? path) {
 // 返回值：可直接返回给调用方的统一错误文本。
 static string NormalizeValidationMessage(string rawMessage) {
     if (string.IsNullOrWhiteSpace(rawMessage)) {
-        return "请求参数校验失败。";
+        return DefaultValidationFailureMessage;
     }
 
     if (rawMessage.Contains("The request field is required.", StringComparison.OrdinalIgnoreCase)
         || rawMessage.Contains("A non-empty request body is required.", StringComparison.OrdinalIgnoreCase)) {
-        return "请求体不能为空，且请求头 Content-Type 必须为 application/json。";
+        return EmptyRequestBodyValidationMessage;
     }
 
     if (rawMessage.Contains("could not be converted to System.DateTime", StringComparison.OrdinalIgnoreCase)
         || rawMessage.Contains("could not be converted to System.Nullable`1[System.DateTime]", StringComparison.OrdinalIgnoreCase)) {
-        return "时间字段格式无效，请使用本地时间格式 yyyy-MM-dd HH:mm:ss 或 yyyy-MM-dd HH:mm:ss.fff，禁止使用 Z 或时区偏移。";
+        return DateTimeFormatValidationMessage;
     }
 
     return rawMessage;
