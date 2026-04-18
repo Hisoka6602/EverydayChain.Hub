@@ -120,6 +120,34 @@ public sealed class ChuteQueryServiceTests
     }
 
     /// <summary>
+    /// 任务已落格且条码可解析出格口时应支持重复请求并返回成功结果。
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_ShouldSucceed_WhenTaskIsDroppedAndBarcodeCanResolveChute()
+    {
+        var (service, repo) = CreateService();
+        var now = new DateTime(2026, 4, 18, 10, 0, 0, DateTimeKind.Local);
+        await repo.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "TASK-005",
+            SourceTableCode = "WMS",
+            BusinessKey = "K5",
+            Barcode = "021103013145",
+            Status = BusinessTaskStatus.Dropped,
+            CreatedTimeLocal = now,
+            UpdatedTimeLocal = now
+        }, CancellationToken.None);
+
+        var request = new ChuteResolveApplicationRequest { Barcode = "021103013145" };
+
+        var result = await service.ExecuteAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsResolved);
+        Assert.Equal("TASK-005", result.TaskCode);
+        Assert.Equal("1", result.ChuteCode);
+    }
+
+    /// <summary>
     /// 按任务编码查找优先于条码查找。
     /// </summary>
     [Fact]
