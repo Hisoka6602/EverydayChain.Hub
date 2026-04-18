@@ -30,13 +30,18 @@ public class AutoMigrationHostedService(
             currentStage = "自动迁移阶段";
             await autoMigrationService.RunAsync(cancellationToken);
         }
-        catch (RetryLimitExceededException ex) when (TryGetSqlException(ex) is { Number: 10054 } sqlException) {
-            logger.LogError(
-                ex,
-                "自动迁移阶段数据库握手失败（SqlError={SqlError}）。常见原因：1) SQL Server TLS 版本与客户端不兼容；2) Encrypt/TrustServerCertificate 配置不匹配；3) 网络设备或防火墙中断连接；4) SQL Server 负载过高或重启中。请优先核对连接串中的 Encrypt 与 TrustServerCertificate，并在数据库主机上检查错误日志。ClientConnectionId={ClientConnectionId}",
-                sqlException.Number,
-                sqlException.ClientConnectionId);
-            throw;
+        catch (Exception ex) when (string.Equals(currentStage, "自动迁移阶段", StringComparison.Ordinal)) {
+            if (TryGetSqlException(ex) is { Number: 10054 } sqlException) {
+                logger.LogError(
+                    ex,
+                    "自动迁移阶段数据库握手失败（SqlError={SqlError}）。常见原因：1) SQL Server TLS 版本与客户端不兼容；2) Encrypt/TrustServerCertificate 配置不匹配；3) 网络设备或防火墙中断连接；4) SQL Server 负载过高或重启中。已降级跳过自动迁移并继续启动。ClientConnectionId={ClientConnectionId}",
+                    sqlException.Number,
+                    sqlException.ClientConnectionId);
+                return;
+            }
+
+            logger.LogError(ex, "自动迁移阶段发生异常，已降级跳过自动迁移并继续启动。");
+            return;
         }
         catch (Exception ex) {
             logger.LogError(ex, "自动迁移与分表自治流程在{Stage}发生异常，应用启动终止。", currentStage);
