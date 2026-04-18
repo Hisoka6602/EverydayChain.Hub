@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using EverydayChain.Hub.Host.Workers;
 using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.Host.Middlewares;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi.Models;
@@ -75,6 +76,7 @@ else if (isLinux) {
 }
 #endif
 var app = builder.Build();
+app.UseMiddleware<ApiFailureLoggingMiddleware>();
 var shouldEnableSwagger = false;
 if (app.Environment.IsDevelopment()) {
     shouldEnableSwagger = swaggerOptions.EnableInDevelopment;
