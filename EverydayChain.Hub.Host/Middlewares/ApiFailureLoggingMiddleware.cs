@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 
@@ -43,8 +44,12 @@ public sealed class ApiFailureLoggingMiddleware {
             return;
         }
 
-        var requestBody = await ReadRequestBodyAsync(context.Request, context.RequestAborted);
-        var startedAt = DateTime.Now;
+        var requestBody = SanitizeForLog(await ReadRequestBodyAsync(context.Request, context.RequestAborted));
+        var elapsedStopwatch = Stopwatch.StartNew();
+        var requestPath = SanitizeForLog(context.Request.Path.Value ?? string.Empty);
+        var queryString = SanitizeForLog(context.Request.QueryString.HasValue ? context.Request.QueryString.Value : string.Empty);
+        var endpointName = SanitizeForLog(context.GetEndpoint()?.DisplayName ?? string.Empty);
+        var userAgent = SanitizeForLog(context.Request.Headers.UserAgent.ToString());
         var originalResponseBody = context.Response.Body;
         await using var responseBuffer = new MemoryStream();
         context.Response.Body = responseBuffer;
@@ -58,18 +63,18 @@ public sealed class ApiFailureLoggingMiddleware {
                 exception,
                 "API 请求处理异常。请求方式: {Method}; 路径: {Path}; 查询字符串: {QueryString}; TraceId: {TraceId}; Endpoint: {Endpoint}; 客户端: {UserAgent}; 耗时毫秒: {ElapsedMilliseconds}; 请求体: {RequestBody}",
                 context.Request.Method,
-                context.Request.Path.Value ?? string.Empty,
-                context.Request.QueryString.HasValue ? context.Request.QueryString.Value : string.Empty,
+                requestPath,
+                queryString,
                 context.TraceIdentifier,
-                context.GetEndpoint()?.DisplayName ?? string.Empty,
-                context.Request.Headers.UserAgent.ToString(),
-                (DateTime.Now - startedAt).TotalMilliseconds,
+                endpointName,
+                userAgent,
+                elapsedStopwatch.Elapsed.TotalMilliseconds,
                 requestBody);
             throw;
         }
         finally {
             responseBuffer.Position = 0;
-            var responseBody = await ReadStreamAsync(responseBuffer, context.RequestAborted);
+            var responseBody = SanitizeForLog(await ReadStreamAsync(responseBuffer, context.RequestAborted));
             responseBuffer.Position = 0;
             try {
                 await responseBuffer.CopyToAsync(originalResponseBody, context.RequestAborted);
@@ -82,13 +87,13 @@ public sealed class ApiFailureLoggingMiddleware {
                 logger.LogError(
                     "API 请求响应失败。请求方式: {Method}; 路径: {Path}; 查询字符串: {QueryString}; 状态码: {StatusCode}; TraceId: {TraceId}; Endpoint: {Endpoint}; 客户端: {UserAgent}; 耗时毫秒: {ElapsedMilliseconds}; 请求体: {RequestBody}; 响应体: {ResponseBody}",
                     context.Request.Method,
-                    context.Request.Path.Value ?? string.Empty,
-                    context.Request.QueryString.HasValue ? context.Request.QueryString.Value : string.Empty,
+                    requestPath,
+                    queryString,
                     context.Response.StatusCode,
                     context.TraceIdentifier,
-                    context.GetEndpoint()?.DisplayName ?? string.Empty,
-                    context.Request.Headers.UserAgent.ToString(),
-                    (DateTime.Now - startedAt).TotalMilliseconds,
+                    endpointName,
+                    userAgent,
+                    elapsedStopwatch.Elapsed.TotalMilliseconds,
                     requestBody,
                     responseBody);
             }
@@ -209,5 +214,18 @@ public sealed class ApiFailureLoggingMiddleware {
         }
 
         return $"{payload[..MaxLoggedPayloadLength]}...(已截断，原始长度={payload.Length})";
+    }
+
+    /// <summary>
+    /// 规范化日志文本，避免换行注入影响日志结构。
+    /// </summary>
+    /// <param name="rawText">原始文本。</param>
+    /// <returns>规范化后的文本。</returns>
+    private static string SanitizeForLog(string rawText) {
+        if (string.IsNullOrEmpty(rawText)) {
+            return rawText;
+        }
+
+        return rawText.Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal);
     }
 }
