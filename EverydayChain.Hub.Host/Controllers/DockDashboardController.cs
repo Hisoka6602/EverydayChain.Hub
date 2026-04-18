@@ -3,6 +3,7 @@ using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace EverydayChain.Hub.Host.Controllers;
 
@@ -11,7 +12,7 @@ namespace EverydayChain.Hub.Host.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/v1/dock-dashboard")]
-public sealed class DockDashboardController : ControllerBase
+public sealed class DockDashboardController : QueryControllerBase
 {
     /// <summary>
     /// 码头看板查询服务。
@@ -32,16 +33,21 @@ public sealed class DockDashboardController : ControllerBase
     /// 请求条件：时间参数可选；传入时必须满足结束时间大于开始时间且为本地时间语义。
     /// 返回语义：返回码头维度统计、波次筛选选项与实际生效时间窗口。
     /// </summary>
-    /// <param name="request">查询请求。</param>
+    /// <param name="request">请求体查询请求。</param>
+    /// <param name="queryRequest">查询字符串请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>码头看板统计结果，包含码头汇总集合与当前波次筛选信息。</returns>
     [HttpPost("overview")]
     [ProducesResponseType(typeof(ApiResponse<DockDashboardResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<DockDashboardResponse>), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<ApiResponse<DockDashboardResponse>>> QueryOverviewAsync([FromBody] DockDashboardQueryRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResponse<DockDashboardResponse>>> QueryOverviewAsync(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] DockDashboardQueryRequest? request,
+        [FromQuery] DockDashboardQueryRequest? queryRequest,
+        CancellationToken cancellationToken)
     {
+        var resolvedRequest = ResolveRequest(request, queryRequest);
         var todayLocal = DateTime.SpecifyKind(DateTime.Today, DateTimeKind.Local);
-        if (!LocalTimeRangeValidator.TryNormalizeOptionalRange(request.StartTimeLocal, request.EndTimeLocal, todayLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
+        if (!LocalTimeRangeValidator.TryNormalizeOptionalRange(resolvedRequest.StartTimeLocal, resolvedRequest.EndTimeLocal, todayLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
         {
             return BadRequest(ApiResponse<DockDashboardResponse>.Fail(validationMessage));
         }
@@ -50,7 +56,7 @@ public sealed class DockDashboardController : ControllerBase
         {
             StartTimeLocal = normalizedStart,
             EndTimeLocal = normalizedEnd,
-            WaveCode = request.WaveCode
+            WaveCode = resolvedRequest.WaveCode
         }, cancellationToken);
 
         var response = new DockDashboardResponse

@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 修复查询类 API 空请求体回退绑定：`GlobalDashboardController`、`DockDashboardController`、`SortingReportController` （含 `export/csv`）、`BusinessTaskQueryController` 统一采用 `Body > Query > new()` 解析策略，并新增 `QueryControllerBase` 复用请求解析逻辑；补齐 `exceptions`、`recirculations`、`export/csv` 空 Body 回退 Query 回归测试，锁定修复行为并消除 CI 中 README 联动校验失败。
 - 新增 API 失败日志治理：Host 层增加 `ApiFailureLoggingMiddleware`，统一记录 HTTP 非成功与业务失败（`ApiResponse.IsSuccess=false`）场景的请求/响应明细；`nlog.config` 新增 `api-failure-${shortdate}.log` 独立落盘路由；补充中间件单元测试覆盖失败记录与成功不记录分支。
 - 修复启动稳定性：`AutoMigrationHostedService` 在自动迁移阶段遇到数据库连接异常时改为记录错误并降级继续启动，不再因单库不可达导致整进程退出；新增对应主机层单元测试覆盖降级与阻断分支。
 - 完成“本地库查询能力极致优化”：业务任务/异常件/回流查询新增游标分页主路径并保留页码兼容；看板/报表查询引入短 TTL 缓存；EF Core 切换 DbContext 池化；新增 `NormalizedWaveCode`、`NormalizedBarcode`、`ResolvedDockCode` 与配套索引；新增 `本地库查询性能优化说明.md`。
@@ -405,6 +406,7 @@
     ├── Controllers/WaveCleanupController.cs
     ├── Controllers/GlobalDashboardController.cs
     ├── Controllers/DockDashboardController.cs
+    ├── Controllers/QueryControllerBase.cs
     ├── Controllers/SortingReportController.cs
     ├── Controllers/BusinessTaskQueryController.cs
     ├── Contracts/Requests/ScanUploadRequest.cs
@@ -562,13 +564,14 @@
 - `EverydayChain.Hub.Tests/Services/ScanDropLogTests.cs`：扫描/落格日志落库测试，覆盖扫描成功写日志、扫描失败写日志、落格成功写日志+FeedbackPending、落格失败写日志四个场景。
 - `Host/Controllers/GlobalDashboardController.cs` + `Host/Contracts/Requests/GlobalDashboardQueryRequest.cs` + `Host/Contracts/Responses/GlobalDashboardResponse.cs` + `Host/Contracts/Responses/WaveDashboardSummaryResponse.cs`：总看板查询 API 与契约，提供时间区间查询并返回波次维度聚合数据。
 - `Host/Controllers/DockDashboardController.cs` + `Host/Contracts/Requests/DockDashboardQueryRequest.cs` + `Host/Contracts/Responses/DockDashboardResponse.cs` + `Host/Contracts/Responses/DockDashboardSummaryResponse.cs`：码头看板查询 API 与契约，提供默认当天、波次筛选与码头统计能力。
+- `Host/Controllers/QueryControllerBase.cs`：查询控制器基类，集中封装 `ResolveRequest<TRequest>`，统一空 Body 场景下的 `Body > Query > new()` 请求解析优先级。
 - `Host/Controllers/SortingReportController.cs` + `Host/Contracts/Requests/SortingReportQueryRequest.cs` + `Host/Contracts/Responses/SortingReportResponse.cs` + `Host/Contracts/Responses/SortingReportRowResponse.cs`：报表查询与 CSV 导出 API 与契约，统一报表查询和导出字段口径。
 - `Host/Controllers/BusinessTaskQueryController.cs` + `Host/Contracts/Requests/BusinessTaskQueryRequest.cs` + `Host/Contracts/Responses/BusinessTaskQueryResponse.cs` + `Host/Contracts/Responses/BusinessTaskItemResponse.cs`：业务任务、异常件与回流记录查询 API 与契约，支持多条件筛选和分页。
 - `EverydayChain.Hub.Tests/Host/Controllers/GlobalDashboardControllerTests.cs` + `EverydayChain.Hub.Tests/Host/Controllers/StubGlobalDashboardQueryService.cs`：总看板控制器测试与查询服务替身，覆盖时间语义校验、区间校验与成功返回路径。
 - `EverydayChain.Hub.Tests/Services/GlobalDashboardQueryServiceTests.cs`：总看板应用服务测试，覆盖空数据与多维统计聚合口径。
 - `EverydayChain.Hub.Tests/Host/Controllers/DockDashboardControllerTests.cs` + `StubDockDashboardQueryService.cs`：码头看板控制器测试与服务替身，覆盖时间区间校验和成功返回路径。
-- `EverydayChain.Hub.Tests/Host/Controllers/SortingReportControllerTests.cs` + `StubSortingReportQueryService.cs`：报表控制器测试与服务替身，覆盖查询成功路径与 CSV 导出路径。
-- `EverydayChain.Hub.Tests/Host/Controllers/BusinessTaskQueryControllerTests.cs` + `StubBusinessTaskReadService.cs`：业务查询控制器测试与服务替身，覆盖分页参数校验与成功返回路径。
+- `EverydayChain.Hub.Tests/Host/Controllers/SortingReportControllerTests.cs` + `StubSortingReportQueryService.cs`：报表控制器测试与服务替身，覆盖查询成功路径、CSV 导出路径及空 Body 回退 Query 行为。
+- `EverydayChain.Hub.Tests/Host/Controllers/BusinessTaskQueryControllerTests.cs` + `StubBusinessTaskReadService.cs`：业务查询控制器测试与服务替身，覆盖分页参数校验、成功返回路径及任务/异常/回流接口空 Body 回退 Query 行为。
 - `EverydayChain.Hub.Tests/Services/DockDashboardQueryServiceTests.cs`：码头看板应用服务测试，覆盖码头聚合统计与 7 号码头异常规则。
 - `EverydayChain.Hub.Tests/Services/SortingReportQueryServiceTests.cs`：报表应用服务测试，覆盖码头聚合口径与 CSV 导出内容。
 - `EverydayChain.Hub.Tests/Services/BusinessTaskReadServiceTests.cs`：业务任务查询服务测试，覆盖多条件筛选、异常件筛选与回流筛选。

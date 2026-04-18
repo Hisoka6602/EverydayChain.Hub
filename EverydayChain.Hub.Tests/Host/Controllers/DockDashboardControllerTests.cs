@@ -25,7 +25,7 @@ public sealed class DockDashboardControllerTests
             WaveCode = "W1"
         };
 
-        var result = await controller.QueryOverviewAsync(request, CancellationToken.None);
+        var result = await controller.QueryOverviewAsync(request, null, CancellationToken.None);
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var response = Assert.IsType<ApiResponse<DockDashboardResponse>>(okResult.Value);
 
@@ -47,7 +47,7 @@ public sealed class DockDashboardControllerTests
             EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 0, 0, 0), DateTimeKind.Local)
         };
 
-        var result = await controller.QueryOverviewAsync(request, CancellationToken.None);
+        var result = await controller.QueryOverviewAsync(request, null, CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
@@ -65,11 +65,35 @@ public sealed class DockDashboardControllerTests
             StartTimeLocal = startTime
         };
 
-        var result = await controller.QueryOverviewAsync(request, CancellationToken.None);
+        var result = await controller.QueryOverviewAsync(request, null, CancellationToken.None);
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         _ = Assert.IsType<ApiResponse<DockDashboardResponse>>(okResult.Value);
         Assert.NotNull(stubService.LastRequest);
         Assert.Equal(startTime, stubService.LastRequest!.StartTimeLocal);
         Assert.Equal(startTime.AddDays(1), stubService.LastRequest.EndTimeLocal);
+    }
+
+    /// <summary>
+    /// 请求体为空时应回退使用查询字符串请求。
+    /// </summary>
+    [Fact]
+    public async Task QueryOverviewAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull()
+    {
+        var stubService = new StubDockDashboardQueryService();
+        var controller = new DockDashboardController(stubService);
+        var queryRequest = new DockDashboardQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 0, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 18, 0, 0, 0), DateTimeKind.Local),
+            WaveCode = "WQ"
+        };
+
+        var result = await controller.QueryOverviewAsync(null, queryRequest, CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<ApiResponse<DockDashboardResponse>>(okResult.Value);
+
+        Assert.True(response.IsSuccess);
+        Assert.NotNull(stubService.LastRequest);
+        Assert.Equal("WQ", stubService.LastRequest!.WaveCode);
     }
 }

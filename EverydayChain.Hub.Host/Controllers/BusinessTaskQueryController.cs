@@ -3,6 +3,7 @@ using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace EverydayChain.Hub.Host.Controllers;
 
@@ -11,7 +12,7 @@ namespace EverydayChain.Hub.Host.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/v1/business-query")]
-public sealed class BusinessTaskQueryController : ControllerBase
+public sealed class BusinessTaskQueryController : QueryControllerBase
 {
     /// <summary>
     /// 业务任务查询服务。
@@ -32,15 +33,23 @@ public sealed class BusinessTaskQueryController : ControllerBase
     /// 请求条件：时间范围必填且合法，分页参数需在允许范围内。
     /// 返回语义：返回业务任务口径分页结果；参数非法返回 400。
     /// </summary>
-    /// <param name="request">查询请求。</param>
+    /// <param name="request">请求体查询请求。</param>
+    /// <param name="queryRequest">查询字符串请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>业务任务分页结果，包含总数、分页信息与任务明细列表。</returns>
     [HttpPost("tasks")]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status400BadRequest)]
-    public Task<ActionResult<ApiResponse<BusinessTaskQueryResponse>>> QueryTasksAsync([FromBody] BusinessTaskQueryRequest request, CancellationToken cancellationToken)
+    public Task<ActionResult<ApiResponse<BusinessTaskQueryResponse>>> QueryTasksAsync(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] BusinessTaskQueryRequest? request,
+        [FromQuery] BusinessTaskQueryRequest? queryRequest,
+        CancellationToken cancellationToken)
     {
-        return QueryCoreAsync(request, (payload, ct) => _businessTaskReadService.QueryTasksAsync(payload, ct), "业务任务查询成功。", cancellationToken);
+        return QueryCoreAsync(
+            ResolveRequest(request, queryRequest),
+            (payload, ct) => _businessTaskReadService.QueryTasksAsync(payload, ct),
+            "业务任务查询成功。",
+            cancellationToken);
     }
 
     /// <summary>
@@ -48,15 +57,23 @@ public sealed class BusinessTaskQueryController : ControllerBase
     /// 请求条件：与业务任务查询一致。
     /// 返回语义：仅返回异常件口径分页结果；参数非法返回 400。
     /// </summary>
-    /// <param name="request">查询请求。</param>
+    /// <param name="request">请求体查询请求。</param>
+    /// <param name="queryRequest">查询字符串请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>异常件分页结果，包含总数、分页信息与任务明细列表。</returns>
     [HttpPost("exceptions")]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status400BadRequest)]
-    public Task<ActionResult<ApiResponse<BusinessTaskQueryResponse>>> QueryExceptionsAsync([FromBody] BusinessTaskQueryRequest request, CancellationToken cancellationToken)
+    public Task<ActionResult<ApiResponse<BusinessTaskQueryResponse>>> QueryExceptionsAsync(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] BusinessTaskQueryRequest? request,
+        [FromQuery] BusinessTaskQueryRequest? queryRequest,
+        CancellationToken cancellationToken)
     {
-        return QueryCoreAsync(request, (payload, ct) => _businessTaskReadService.QueryExceptionsAsync(payload, ct), "异常件查询成功。", cancellationToken);
+        return QueryCoreAsync(
+            ResolveRequest(request, queryRequest),
+            (payload, ct) => _businessTaskReadService.QueryExceptionsAsync(payload, ct),
+            "异常件查询成功。",
+            cancellationToken);
     }
 
     /// <summary>
@@ -64,15 +81,23 @@ public sealed class BusinessTaskQueryController : ControllerBase
     /// 请求条件：与业务任务查询一致。
     /// 返回语义：仅返回回流口径分页结果；参数非法返回 400。
     /// </summary>
-    /// <param name="request">查询请求。</param>
+    /// <param name="request">请求体查询请求。</param>
+    /// <param name="queryRequest">查询字符串请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>回流记录分页结果，包含总数、分页信息与任务明细列表。</returns>
     [HttpPost("recirculations")]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status400BadRequest)]
-    public Task<ActionResult<ApiResponse<BusinessTaskQueryResponse>>> QueryRecirculationsAsync([FromBody] BusinessTaskQueryRequest request, CancellationToken cancellationToken)
+    public Task<ActionResult<ApiResponse<BusinessTaskQueryResponse>>> QueryRecirculationsAsync(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] BusinessTaskQueryRequest? request,
+        [FromQuery] BusinessTaskQueryRequest? queryRequest,
+        CancellationToken cancellationToken)
     {
-        return QueryCoreAsync(request, (payload, ct) => _businessTaskReadService.QueryRecirculationsAsync(payload, ct), "回流记录查询成功。", cancellationToken);
+        return QueryCoreAsync(
+            ResolveRequest(request, queryRequest),
+            (payload, ct) => _businessTaskReadService.QueryRecirculationsAsync(payload, ct),
+            "回流记录查询成功。",
+            cancellationToken);
     }
 
     /// <summary>
