@@ -23,7 +23,7 @@ public class BusinessTaskMaterializer : IBusinessTaskMaterializer
         var waveRemark = ValidateOptionalText(request.WaveRemark, nameof(request.WaveRemark), 128);
         var materializedTimeLocal = request.MaterializedTimeLocal ?? DateTime.Now;
 
-        return new BusinessTaskEntity
+        var entity = new BusinessTaskEntity
         {
             TaskCode = taskCode,
             SourceTableCode = sourceTableCode,
@@ -36,6 +36,8 @@ public class BusinessTaskMaterializer : IBusinessTaskMaterializer
             CreatedTimeLocal = materializedTimeLocal,
             UpdatedTimeLocal = materializedTimeLocal,
         };
+        entity.RefreshQueryFields();
+        return entity;
     }
 
     /// <summary>

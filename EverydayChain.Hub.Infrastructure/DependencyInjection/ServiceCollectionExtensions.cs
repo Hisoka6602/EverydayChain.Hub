@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using EverydayChain.Hub.Domain.Options;
 using Microsoft.Extensions.Configuration;
 using EverydayChain.Hub.Application.Services;
@@ -66,6 +67,7 @@ public static class ServiceCollectionExtensions {
     /// <returns>原服务集合（链式调用）。</returns>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration) {
         services.Configure<ShardingOptions>(configuration.GetSection(ShardingOptions.SectionName));
+        services.Configure<EfCoreOptions>(configuration.GetSection(EfCoreOptions.SectionName));
         services.Configure<AutoTuneOptions>(configuration.GetSection(AutoTuneOptions.SectionName));
         services.Configure<DangerZoneOptions>(configuration.GetSection(DangerZoneOptions.SectionName));
         services.Configure<SyncJobOptions>(configuration.GetSection(SyncJobOptions.SectionName));
@@ -74,20 +76,24 @@ public static class ServiceCollectionExtensions {
         services.Configure<WmsFeedbackOptions>(configuration.GetSection(WmsFeedbackOptions.SectionName));
         services.Configure<FeedbackCompensationJobOptions>(configuration.GetSection(FeedbackCompensationJobOptions.SectionName));
         services.Configure<ExceptionRuleOptions>(configuration.GetSection(ExceptionRuleOptions.SectionName));
+        services.Configure<QueryCacheOptions>(configuration.GetSection(QueryCacheOptions.SectionName));
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
+        var efCoreOptions = configuration.GetSection(EfCoreOptions.SectionName).Get<EfCoreOptions>() ?? new EfCoreOptions();
+        var queryCacheOptions = configuration.GetSection(QueryCacheOptions.SectionName).Get<QueryCacheOptions>() ?? new QueryCacheOptions();
         var syncOptions = configuration.GetSection(SyncJobOptions.SectionName).Get<SyncJobOptions>() ?? new SyncJobOptions();
         var retentionJobOptions = configuration.GetSection(RetentionJobOptions.SectionName).Get<RetentionJobOptions>() ?? new RetentionJobOptions();
         var managedLogicalTables = BuildManagedLogicalTables(syncOptions).ToArray();
 
-        services.AddDbContextFactory<HubDbContext>(options => {
+        services.AddMemoryCache();
+        services.AddPooledDbContextFactory<HubDbContext>(options => {
             options.UseSqlServer(shardingOptions.ConnectionString, sqlServerOptions => {
                 sqlServerOptions.EnableRetryOnFailure();
             });
             // 运行时自动迁移阶段仅需执行已生成迁移，忽略“模型较快照有待提交变更”的告警，避免阻断启动链路。
             options.ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
             options.ReplaceService<IModelCacheKeyFactory, ShardModelCacheKeyFactory>();
-        });
+        }, NormalizeDbContextPoolSize(efCoreOptions.DbContextPoolSize));
         services.AddSingleton<IShardSuffixResolver, MonthShardSuffixResolver>();
         services.AddSingleton<IDangerZoneExecutor, DangerZoneExecutor>();
         services.AddSingleton<IRuntimeStorageGuard, RuntimeStorageGuard>();
@@ -125,9 +131,21 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IScanIngressService, ScanIngressService>();
         services.AddSingleton<IChuteQueryService, ChuteQueryService>();
         services.AddSingleton<IDropFeedbackService, DropFeedbackService>();
-        services.AddSingleton<IGlobalDashboardQueryService, GlobalDashboardQueryService>();
-        services.AddSingleton<IDockDashboardQueryService, DockDashboardQueryService>();
-        services.AddSingleton<ISortingReportQueryService, SortingReportQueryService>();
+        services.AddSingleton<IGlobalDashboardQueryService>(sp =>
+            new GlobalDashboardQueryService(
+                sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<IMemoryCache>(),
+                queryCacheOptions));
+        services.AddSingleton<IDockDashboardQueryService>(sp =>
+            new DockDashboardQueryService(
+                sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<IMemoryCache>(),
+                queryCacheOptions));
+        services.AddSingleton<ISortingReportQueryService>(sp =>
+            new SortingReportQueryService(
+                sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<IMemoryCache>(),
+                queryCacheOptions));
         services.AddSingleton<IBusinessTaskReadService, BusinessTaskReadService>();
         services.AddSingleton<IDeletionExecutionService, DeletionExecutionService>();
         services.AddSingleton<IRetentionExecutionService, RetentionExecutionService>();
@@ -186,5 +204,15 @@ public static class ServiceCollectionExtensions {
         }
 
         return managedTables;
+    }
+
+    /// <summary>
+    /// 归一化 DbContext 池大小配置。
+    /// </summary>
+    /// <param name="poolSize">配置值。</param>
+    /// <returns>归一化后的池大小。</returns>
+    private static int NormalizeDbContextPoolSize(int poolSize)
+    {
+        return Math.Clamp(poolSize, 32, 1024);
     }
 }

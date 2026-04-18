@@ -135,6 +135,7 @@ public sealed class TaskExecutionService : ITaskExecutionService
         task.WeightGram = request.WeightGram ?? task.WeightGram;
         task.ScanCount++;
         task.UpdatedTimeLocal = DateTime.Now;
+        task.RefreshQueryFields();
 
         // 步骤 4：持久化。
         await _businessTaskRepository.UpdateAsync(task, ct);

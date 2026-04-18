@@ -38,8 +38,10 @@ public class BusinessTaskEntityTypeConfiguration : IEntityTypeConfiguration<Busi
         builder.Property(x => x.SourceType).IsRequired();
         builder.Property(x => x.BusinessKey).HasMaxLength(256).IsRequired();
         builder.Property(x => x.Barcode).HasMaxLength(128);
+        builder.Property(x => x.NormalizedBarcode).HasMaxLength(128);
         builder.Property(x => x.TargetChuteCode).HasMaxLength(64);
         builder.Property(x => x.ActualChuteCode).HasMaxLength(64);
+        builder.Property(x => x.ResolvedDockCode).HasMaxLength(64).IsRequired();
         builder.Property(x => x.DeviceCode).HasMaxLength(64);
         builder.Property(x => x.TraceId).HasMaxLength(64);
         builder.Property(x => x.FailureReason).HasMaxLength(256);
@@ -54,10 +56,12 @@ public class BusinessTaskEntityTypeConfiguration : IEntityTypeConfiguration<Busi
         builder.Property(x => x.CreatedTimeLocal).IsRequired();
         builder.Property(x => x.UpdatedTimeLocal).IsRequired();
         builder.Property(x => x.WaveRemark).HasMaxLength(128);
+        builder.Property(x => x.NormalizedWaveCode).HasMaxLength(64);
         builder.Property(x => x.IsException).IsRequired();
         builder.Property(x => x.IsFeedbackReported).IsRequired();
         builder.HasIndex(x => x.TaskCode).IsUnique();
         builder.HasIndex(x => x.Barcode);
+        builder.HasIndex(x => x.NormalizedBarcode);
         builder.HasIndex(x => new { x.Barcode, x.CreatedTimeLocal });
         builder.HasIndex(x => x.Status);
         builder.HasIndex(x => x.SourceType);
@@ -69,13 +73,17 @@ public class BusinessTaskEntityTypeConfiguration : IEntityTypeConfiguration<Busi
         builder.HasIndex(x => x.CreatedTimeLocal);
         builder.HasIndex(x => new { x.CreatedTimeLocal, x.Id });
         builder.Property(x => x.WaveCode).HasMaxLength(64);
+        builder.HasIndex(x => x.NormalizedWaveCode);
         builder.HasIndex(x => x.WaveCode);
         builder.HasIndex(x => x.TargetChuteCode);
         builder.HasIndex(x => x.ActualChuteCode);
+        builder.HasIndex(x => x.ResolvedDockCode);
         builder.HasIndex(x => new { x.WaveCode, x.CreatedTimeLocal });
+        builder.HasIndex(x => new { x.NormalizedWaveCode, x.CreatedTimeLocal });
+        builder.HasIndex(x => new { x.ResolvedDockCode, x.CreatedTimeLocal });
         builder.HasIndex(x => new { x.FeedbackStatus, x.CreatedTimeLocal });
         builder.HasIndex(x => new { x.FeedbackStatus, x.IsFeedbackReported, x.FeedbackTimeLocal });
         builder.HasIndex(x => new { x.CreatedTimeLocal, x.SourceType, x.Status, x.IsException, x.IsRecirculated });
-        builder.HasIndex(x => new { x.CreatedTimeLocal, x.WaveCode, x.TargetChuteCode, x.ActualChuteCode });
+        builder.HasIndex(x => new { x.CreatedTimeLocal, x.NormalizedWaveCode, x.ResolvedDockCode });
     }
 }

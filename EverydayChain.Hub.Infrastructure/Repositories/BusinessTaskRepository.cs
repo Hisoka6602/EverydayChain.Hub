@@ -2,10 +2,12 @@ using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
+using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
@@ -16,7 +18,8 @@ public class BusinessTaskRepository(
     IDbContextFactory<HubDbContext> contextFactory,
     IShardSuffixResolver shardSuffixResolver,
     IShardTableProvisioner shardTableProvisioner,
-    IShardTableResolver shardTableResolver) : IBusinessTaskRepository
+    IShardTableResolver shardTableResolver,
+    IOptions<ShardingOptions> shardingOptions) : IBusinessTaskRepository
 {
     /// <summary>业务任务逻辑表名。</summary>
     private const string BusinessTaskLogicalTable = "business_tasks";
@@ -25,11 +28,20 @@ public class BusinessTaskRepository(
     /// <summary>无码头占位文本。</summary>
     private const string EmptyDockCode = "未分配码头";
 
+    /// <summary>分表配置快照。</summary>
+    private readonly ShardingOptions _shardingOptions = shardingOptions.Value;
+
     /// <inheritdoc/>
     public async Task<BusinessTaskEntity?> FindByBarcodeAsync(string barcode, CancellationToken ct)
     {
+        var normalizedBarcode = NormalizeOptionalText(barcode);
+        if (string.IsNullOrWhiteSpace(normalizedBarcode))
+        {
+            return null;
+        }
+
         return await FindFirstAcrossShardsAsync(query => query
-            .Where(x => x.Barcode == barcode)
+            .Where(x => x.NormalizedBarcode == normalizedBarcode)
             .OrderByDescending(x => x.CreatedTimeLocal), ct);
     }
 
@@ -50,6 +62,7 @@ public class BusinessTaskRepository(
     /// <inheritdoc/>
     public async Task SaveAsync(BusinessTaskEntity entity, CancellationToken ct)
     {
+        entity.RefreshQueryFields();
         var suffix = shardSuffixResolver.ResolveLocal(entity.CreatedTimeLocal);
         await shardTableProvisioner.EnsureShardTableAsync(BusinessTaskLogicalTable, suffix, ct);
         using var scope = TableSuffixScope.Use(suffix);
@@ -61,6 +74,7 @@ public class BusinessTaskRepository(
     /// <inheritdoc/>
     public async Task UpdateAsync(BusinessTaskEntity entity, CancellationToken ct)
     {
+        entity.RefreshQueryFields();
         var loaded = await GetRequiredByIdAsync(entity.Id, entity.CreatedTimeLocal, ct);
         using var scope = TableSuffixScope.Use(loaded.Suffix);
         await using var db = await contextFactory.CreateDbContextAsync(ct);
@@ -92,13 +106,19 @@ public class BusinessTaskRepository(
         DateTime updatedTimeLocal,
         CancellationToken ct)
     {
+        var normalizedWaveCode = NormalizeOptionalText(waveCode);
+        if (string.IsNullOrWhiteSpace(normalizedWaveCode))
+        {
+            return 0;
+        }
+
         var affectedRows = 0;
         foreach (var suffix in await ListShardSuffixesWithLegacyFallbackAsync(ct))
         {
             using var scope = TableSuffixScope.Use(suffix);
             await using var db = await contextFactory.CreateDbContextAsync(ct);
             affectedRows += await db.BusinessTasks
-                .Where(x => x.WaveCode == waveCode
+                .Where(x => x.NormalizedWaveCode == normalizedWaveCode
                     && x.Status != BusinessTaskStatus.Dropped
                     && x.Status != BusinessTaskStatus.Exception)
                 .ExecuteUpdateAsync(setters => setters
@@ -115,14 +135,26 @@ public class BusinessTaskRepository(
     /// <inheritdoc/>
     public async Task<IReadOnlyList<BusinessTaskEntity>> FindByWaveCodeAsync(string waveCode, CancellationToken ct)
     {
-        return await QueryAcrossShardsAsync(query => query.Where(x => x.WaveCode == waveCode), ct);
+        var normalizedWaveCode = NormalizeOptionalText(waveCode);
+        if (string.IsNullOrWhiteSpace(normalizedWaveCode))
+        {
+            return Array.Empty<BusinessTaskEntity>();
+        }
+
+        return await QueryAcrossShardsAsync(query => query.Where(x => x.NormalizedWaveCode == normalizedWaveCode), ct);
     }
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<BusinessTaskEntity>> FindActiveByBarcodeAsync(string barcode, CancellationToken ct)
     {
+        var normalizedBarcode = NormalizeOptionalText(barcode);
+        if (string.IsNullOrWhiteSpace(normalizedBarcode))
+        {
+            return Array.Empty<BusinessTaskEntity>();
+        }
+
         return await QueryAcrossShardsAsync(query => query
-            .Where(x => x.Barcode == barcode
+            .Where(x => x.NormalizedBarcode == normalizedBarcode
                 && x.Status != BusinessTaskStatus.Dropped
                 && x.Status != BusinessTaskStatus.Exception), ct);
     }
@@ -157,10 +189,7 @@ public class BusinessTaskRepository(
             var shardRows = await db.BusinessTasks
                 .AsNoTracking()
                 .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal)
-                .GroupBy(x =>
-                    x.WaveCode == null || x.WaveCode.Trim() == string.Empty
-                        ? EmptyWaveCode
-                        : x.WaveCode.Trim())
+                .GroupBy(x => x.NormalizedWaveCode ?? EmptyWaveCode)
                 .Select(group => new BusinessTaskWaveAggregateRow
                 {
                     WaveCode = group.Key,
@@ -203,10 +232,7 @@ public class BusinessTaskRepository(
             var shardCodes = await db.BusinessTasks
                 .AsNoTracking()
                 .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal)
-                .Select(x =>
-                    x.WaveCode == null || x.WaveCode.Trim() == string.Empty
-                        ? EmptyWaveCode
-                        : x.WaveCode.Trim())
+                .Select(x => x.NormalizedWaveCode ?? EmptyWaveCode)
                 .Distinct()
                 .ToListAsync(ct);
             foreach (var code in shardCodes)
@@ -248,11 +274,11 @@ public class BusinessTaskRepository(
             {
                 if (string.Equals(normalizedWaveCode, EmptyWaveCode, StringComparison.Ordinal))
                 {
-                    query = query.Where(x => x.WaveCode == null || x.WaveCode.Trim() == string.Empty);
+                    query = query.Where(x => x.NormalizedWaveCode == null);
                 }
                 else
                 {
-                    query = query.Where(x => x.WaveCode != null && x.WaveCode.Trim() == normalizedWaveCode);
+                    query = query.Where(x => x.NormalizedWaveCode == normalizedWaveCode);
                 }
             }
 
@@ -260,26 +286,16 @@ public class BusinessTaskRepository(
             {
                 if (string.Equals(normalizedDockCode, EmptyDockCode, StringComparison.Ordinal))
                 {
-                    query = query.Where(x =>
-                        (x.ActualChuteCode == null || x.ActualChuteCode == string.Empty)
-                        && (x.TargetChuteCode == null || x.TargetChuteCode == string.Empty));
+                    query = query.Where(x => x.ResolvedDockCode == EmptyDockCode);
                 }
                 else
                 {
-                    query = query.Where(x =>
-                        x.ActualChuteCode == normalizedDockCode
-                        || ((x.ActualChuteCode == null || x.ActualChuteCode == string.Empty)
-                            && x.TargetChuteCode == normalizedDockCode));
+                    query = query.Where(x => x.ResolvedDockCode == normalizedDockCode);
                 }
             }
 
             var shardRows = await query
-                .GroupBy(x =>
-                    x.ActualChuteCode == null || x.ActualChuteCode == string.Empty
-                        ? (x.TargetChuteCode == null || x.TargetChuteCode == string.Empty
-                            ? EmptyDockCode
-                            : x.TargetChuteCode)
-                        : x.ActualChuteCode)
+                .GroupBy(x => x.ResolvedDockCode)
                 .Select(group => new BusinessTaskDockAggregateRow
                 {
                     DockCode = group.Key,
@@ -332,6 +348,73 @@ public class BusinessTaskRepository(
         int take,
         CancellationToken ct)
     {
+        var pageResult = await QueryPageWithTotalCountByConditionsAsync(filter, skip, take, ct);
+        return pageResult.Items;
+    }
+
+    /// <inheritdoc/>
+    public async Task<(int TotalCount, IReadOnlyList<BusinessTaskEntity> Items)> QueryPageWithTotalCountByConditionsAsync(
+        BusinessTaskSearchFilter filter,
+        int skip,
+        int take,
+        CancellationToken ct)
+    {
+        if (filter.EndTimeLocal <= filter.StartTimeLocal || take <= 0)
+        {
+            return (0, Array.Empty<BusinessTaskEntity>());
+        }
+
+        var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(filter.StartTimeLocal, filter.EndTimeLocal, ct);
+        var rows = new List<BusinessTaskEntity>(take);
+        var remainingSkip = skip < 0 ? 0 : skip;
+        var remainingTake = take;
+        var totalCount = 0;
+        foreach (var suffix in suffixes)
+        {
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            var baseQuery = BuildQueryBySearchFilter(db.BusinessTasks.AsNoTracking(), filter);
+            var shardCount = await baseQuery.CountAsync(ct);
+            if (shardCount <= 0)
+            {
+                continue;
+            }
+
+            totalCount += shardCount;
+            if (remainingTake <= 0)
+            {
+                continue;
+            }
+
+            if (remainingSkip >= shardCount)
+            {
+                remainingSkip -= shardCount;
+                continue;
+            }
+
+            var query = baseQuery
+                .OrderByDescending(task => task.CreatedTimeLocal)
+                .ThenByDescending(task => task.Id);
+            var shardRows = await query
+                .Skip(remainingSkip)
+                .Take(remainingTake)
+                .ToListAsync(ct);
+            rows.AddRange(shardRows);
+            remainingTake -= shardRows.Count;
+            remainingSkip = 0;
+        }
+
+        return (totalCount, rows);
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BusinessTaskEntity>> QueryByCursorConditionsAsync(
+        BusinessTaskSearchFilter filter,
+        DateTime? lastCreatedTimeLocal,
+        long? lastId,
+        int take,
+        CancellationToken ct)
+    {
         if (filter.EndTimeLocal <= filter.StartTimeLocal || take <= 0)
         {
             return Array.Empty<BusinessTaskEntity>();
@@ -339,7 +422,6 @@ public class BusinessTaskRepository(
 
         var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(filter.StartTimeLocal, filter.EndTimeLocal, ct);
         var rows = new List<BusinessTaskEntity>(take);
-        var remainingSkip = skip < 0 ? 0 : skip;
         var remainingTake = take;
         foreach (var suffix in suffixes)
         {
@@ -350,27 +432,23 @@ public class BusinessTaskRepository(
 
             using var scope = TableSuffixScope.Use(suffix);
             await using var db = await contextFactory.CreateDbContextAsync(ct);
-            var query = BuildQueryBySearchFilter(db.BusinessTasks.AsNoTracking(), filter)
-                .OrderByDescending(task => task.CreatedTimeLocal)
-                .ThenByDescending(task => task.Id);
-
-            if (remainingSkip > 0)
+            var query = BuildQueryBySearchFilter(db.BusinessTasks.AsNoTracking(), filter);
+            if (lastCreatedTimeLocal.HasValue && lastId.HasValue)
             {
-                var shardCount = await query.CountAsync(ct);
-                if (shardCount <= remainingSkip)
-                {
-                    remainingSkip -= shardCount;
-                    continue;
-                }
+                var cursorCreatedTimeLocal = lastCreatedTimeLocal.Value;
+                var cursorId = lastId.Value;
+                query = query.Where(task =>
+                    task.CreatedTimeLocal < cursorCreatedTimeLocal
+                    || (task.CreatedTimeLocal == cursorCreatedTimeLocal && task.Id < cursorId));
             }
 
             var shardRows = await query
-                .Skip(remainingSkip)
+                .OrderByDescending(task => task.CreatedTimeLocal)
+                .ThenByDescending(task => task.Id)
                 .Take(remainingTake)
                 .ToListAsync(ct);
             rows.AddRange(shardRows);
             remainingTake -= shardRows.Count;
-            remainingSkip = 0;
         }
 
         return rows;
@@ -468,41 +546,27 @@ public class BusinessTaskRepository(
         {
             if (string.Equals(normalizedWaveCode, EmptyWaveCode, StringComparison.Ordinal))
             {
-                query = query.Where(task => task.WaveCode == null || task.WaveCode.Trim() == string.Empty);
+                query = query.Where(task => task.NormalizedWaveCode == null);
             }
             else
             {
-                query = query.Where(task => task.WaveCode != null && task.WaveCode.Trim() == normalizedWaveCode);
+                query = query.Where(task => task.NormalizedWaveCode == normalizedWaveCode);
             }
         }
 
         if (!string.IsNullOrWhiteSpace(normalizedBarcode))
         {
-            query = query.Where(task => task.Barcode != null && task.Barcode.Trim() == normalizedBarcode);
+            query = query.Where(task => task.NormalizedBarcode == normalizedBarcode);
         }
 
         if (!string.IsNullOrWhiteSpace(normalizedDockCode))
         {
-            if (string.Equals(normalizedDockCode, EmptyDockCode, StringComparison.Ordinal))
-            {
-                query = query.Where(task =>
-                    (task.ActualChuteCode == null || task.ActualChuteCode == string.Empty)
-                    && (task.TargetChuteCode == null || task.TargetChuteCode == string.Empty));
-            }
-            else
-            {
-                query = query.Where(task =>
-                    task.ActualChuteCode == normalizedDockCode
-                    || ((task.ActualChuteCode == null || task.ActualChuteCode == string.Empty)
-                        && task.TargetChuteCode == normalizedDockCode));
-            }
+            query = query.Where(task => task.ResolvedDockCode == normalizedDockCode);
         }
 
         if (!string.IsNullOrWhiteSpace(normalizedChuteCode))
         {
-            query = query.Where(task =>
-                task.TargetChuteCode == normalizedChuteCode
-                || task.ActualChuteCode == normalizedChuteCode);
+            query = query.Where(task => task.ResolvedDockCode == normalizedChuteCode);
         }
 
         if (filter.OnlyException)
@@ -715,8 +779,12 @@ public class BusinessTaskRepository(
             .Distinct(StringComparer.Ordinal)
             .OrderByDescending(suffix => suffix, StringComparer.Ordinal)
             .ToList();
-        // 兼容历史固定表 business_tasks（无后缀），迁移窗口内保留读取能力。
-        suffixes.Add(string.Empty);
+        if (_shardingOptions.EnableLegacyBaseTableReadFallback)
+        {
+            // 兼容历史固定表 business_tasks（无后缀），迁移窗口内保留读取能力。
+            suffixes.Add(string.Empty);
+        }
+
         return suffixes;
     }
 
@@ -749,12 +817,18 @@ public class BusinessTaskRepository(
             currentMonth = currentMonth.AddMonths(1);
         }
 
-        // 容量预留：命中月份分片数量 + 1 个历史固定表空后缀（用于兼容未分片的历史遗留数据）。
-        var estimatedSuffixCount = targetSuffixes.Count + 1;
+        // 容量预留：命中月份分片数量 + 可选历史固定表空后缀（用于兼容未分片的历史遗留数据）。
+        var estimatedSuffixCount = targetSuffixes.Count + (_shardingOptions.EnableLegacyBaseTableReadFallback ? 1 : 0);
         var matchedSuffixes = new List<string>(estimatedSuffixCount);
         foreach (var suffix in availableSuffixes)
         {
-            if (string.IsNullOrEmpty(suffix) || targetSuffixes.Contains(suffix))
+            if (targetSuffixes.Contains(suffix))
+            {
+                matchedSuffixes.Add(suffix);
+                continue;
+            }
+
+            if (_shardingOptions.EnableLegacyBaseTableReadFallback && string.IsNullOrEmpty(suffix))
             {
                 matchedSuffixes.Add(suffix);
             }

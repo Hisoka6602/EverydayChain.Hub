@@ -1,6 +1,8 @@
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Domain.Options;
+using Microsoft.Extensions.Caching.Memory;
 namespace EverydayChain.Hub.Application.Queries;
 
 /// <summary>
@@ -14,12 +16,38 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
     private readonly IBusinessTaskRepository _businessTaskRepository;
 
     /// <summary>
+    /// 内存缓存。
+    /// </summary>
+    private readonly IMemoryCache _memoryCache;
+
+    /// <summary>
+    /// 查询缓存配置。
+    /// </summary>
+    private readonly QueryCacheOptions _queryCacheOptions;
+
+    /// <summary>
     /// 初始化总看板查询服务。
     /// </summary>
     /// <param name="businessTaskRepository">业务任务仓储。</param>
     public GlobalDashboardQueryService(IBusinessTaskRepository businessTaskRepository)
+        : this(businessTaskRepository, new MemoryCache(new MemoryCacheOptions()), new QueryCacheOptions())
+    {
+    }
+
+    /// <summary>
+    /// 初始化总看板查询服务。
+    /// </summary>
+    /// <param name="businessTaskRepository">业务任务仓储。</param>
+    /// <param name="memoryCache">内存缓存。</param>
+    /// <param name="queryCacheOptions">缓存配置。</param>
+    public GlobalDashboardQueryService(
+        IBusinessTaskRepository businessTaskRepository,
+        IMemoryCache memoryCache,
+        QueryCacheOptions queryCacheOptions)
     {
         _businessTaskRepository = businessTaskRepository;
+        _memoryCache = memoryCache;
+        _queryCacheOptions = queryCacheOptions;
     }
 
     /// <inheritdoc/>
@@ -32,7 +60,34 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
         }
 
         // 步骤 2：按时间区间执行仓储侧聚合，避免全量任务加载后内存聚合。
-        var waveRows = await _businessTaskRepository.AggregateWaveDashboardAsync(request.StartTimeLocal, request.EndTimeLocal, cancellationToken);
+        var cacheKey = $"global-dashboard:{request.StartTimeLocal:yyyyMMddHHmmssfffffff}:{request.EndTimeLocal:yyyyMMddHHmmssfffffff}";
+        if (_queryCacheOptions.Enabled)
+        {
+            var ttl = Math.Clamp(_queryCacheOptions.GlobalDashboardSeconds, 1, 60);
+            var cachedResult = await _memoryCache.GetOrCreateAsync(cacheKey, async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(ttl);
+                return await BuildResultAsync(request.StartTimeLocal, request.EndTimeLocal, cancellationToken);
+            });
+            return cachedResult ?? new GlobalDashboardQueryResult();
+        }
+
+        return await BuildResultAsync(request.StartTimeLocal, request.EndTimeLocal, cancellationToken);
+    }
+
+    /// <summary>
+    /// 构建总看板查询结果。
+    /// </summary>
+    /// <param name="startTimeLocal">开始时间。</param>
+    /// <param name="endTimeLocal">结束时间。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>总看板结果。</returns>
+    private async Task<GlobalDashboardQueryResult> BuildResultAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        CancellationToken cancellationToken)
+    {
+        var waveRows = await _businessTaskRepository.AggregateWaveDashboardAsync(startTimeLocal, endTimeLocal, cancellationToken);
         var totalCount = waveRows.Sum(row => row.TotalCount);
         var unsortedCount = waveRows.Sum(row => row.UnsortedCount);
         var fullCaseTotalCount = waveRows.Sum(row => row.FullCaseTotalCount);

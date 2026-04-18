@@ -117,6 +117,7 @@ public sealed class DropFeedbackService : IDropFeedbackService {
         }
 
         task.UpdatedTimeLocal = DateTime.Now;
+        task.RefreshQueryFields();
 
         // 步骤 5：持久化。
         await _businessTaskRepository.UpdateAsync(task, cancellationToken);

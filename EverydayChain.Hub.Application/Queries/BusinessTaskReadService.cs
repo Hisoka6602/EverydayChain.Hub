@@ -3,6 +3,8 @@ using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EverydayChain.Hub.Application.Queries;
 
@@ -22,12 +24,33 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
     private readonly BusinessTaskQueryPolicy _queryPolicy = new();
 
     /// <summary>
+    /// 日志记录器。
+    /// </summary>
+    private readonly ILogger<BusinessTaskReadService> _logger;
+
+    /// <summary>
+    /// 大页码分页告警阈值。
+    /// </summary>
+    private const int LargeSkipWarningThreshold = 10_000;
+
+    /// <summary>
     /// 初始化业务任务查询服务。
     /// </summary>
     /// <param name="businessTaskRepository">业务任务仓储。</param>
     public BusinessTaskReadService(IBusinessTaskRepository businessTaskRepository)
+        : this(businessTaskRepository, NullLogger<BusinessTaskReadService>.Instance)
+    {
+    }
+
+    /// <summary>
+    /// 初始化业务任务查询服务。
+    /// </summary>
+    /// <param name="businessTaskRepository">业务任务仓储。</param>
+    /// <param name="logger">日志记录器。</param>
+    public BusinessTaskReadService(IBusinessTaskRepository businessTaskRepository, ILogger<BusinessTaskReadService> logger)
     {
         _businessTaskRepository = businessTaskRepository;
+        _logger = logger;
     }
 
     /// <inheritdoc/>
@@ -85,18 +108,52 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
         };
         var pageNumber = request.PageNumber < 1 ? 1 : request.PageNumber;
         var pageSize = request.PageSize <= 0 ? 50 : request.PageSize;
+        if (request.LastCreatedTimeLocal.HasValue && request.LastId.HasValue)
+        {
+            var cursorRows = await _businessTaskRepository.QueryByCursorConditionsAsync(
+                filter,
+                request.LastCreatedTimeLocal,
+                request.LastId,
+                pageSize + 1,
+                cancellationToken);
+            var hasMore = cursorRows.Count > pageSize;
+            var pageRows = hasMore ? cursorRows.Take(pageSize).ToList() : cursorRows.ToList();
+            var nextCursor = hasMore ? pageRows.Last() : null;
+            return new BusinessTaskQueryResult
+            {
+                TotalCount = -1,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                HasMore = hasMore,
+                NextLastCreatedTimeLocal = nextCursor?.CreatedTimeLocal,
+                NextLastId = nextCursor?.Id,
+                PaginationMode = "Cursor",
+                Items = pageRows
+                    .Select(MapItem)
+                    .ToList()
+            };
+        }
+
         var skip = (pageNumber - 1) * pageSize;
-        var totalCount = await _businessTaskRepository.CountByQueryConditionsAsync(filter, cancellationToken);
-        var pagedTasks = await _businessTaskRepository.QueryByQueryConditionsAsync(filter, skip, pageSize, cancellationToken);
-        var items = pagedTasks
-            .Select(MapItem)
-            .ToList();
+        if (skip >= LargeSkipWarningThreshold)
+        {
+            _logger.LogWarning(
+                "检测到大页码分页查询，建议改用游标分页。Skip={Skip}, PageNumber={PageNumber}, PageSize={PageSize}",
+                skip,
+                pageNumber,
+                pageSize);
+        }
+
+        var pageResult = await _businessTaskRepository.QueryPageWithTotalCountByConditionsAsync(filter, skip, pageSize, cancellationToken);
+        var items = pageResult.Items.Select(MapItem).ToList();
 
         return new BusinessTaskQueryResult
         {
-            TotalCount = totalCount,
+            TotalCount = pageResult.TotalCount,
             PageNumber = pageNumber,
             PageSize = pageSize,
+            HasMore = skip + items.Count < pageResult.TotalCount,
+            PaginationMode = "PageNumber",
             Items = items
         };
     }

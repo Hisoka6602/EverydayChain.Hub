@@ -1,6 +1,8 @@
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Domain.Options;
+using Microsoft.Extensions.Caching.Memory;
 using System.Text;
 
 namespace EverydayChain.Hub.Application.Queries;
@@ -21,12 +23,38 @@ public sealed class SortingReportQueryService : ISortingReportQueryService
     private readonly BusinessTaskQueryPolicy _queryPolicy = new();
 
     /// <summary>
+    /// 内存缓存。
+    /// </summary>
+    private readonly IMemoryCache _memoryCache;
+
+    /// <summary>
+    /// 查询缓存配置。
+    /// </summary>
+    private readonly QueryCacheOptions _queryCacheOptions;
+
+    /// <summary>
     /// 初始化分拣报表查询服务。
     /// </summary>
     /// <param name="businessTaskRepository">业务任务仓储。</param>
     public SortingReportQueryService(IBusinessTaskRepository businessTaskRepository)
+        : this(businessTaskRepository, new MemoryCache(new MemoryCacheOptions()), new QueryCacheOptions())
+    {
+    }
+
+    /// <summary>
+    /// 初始化分拣报表查询服务。
+    /// </summary>
+    /// <param name="businessTaskRepository">业务任务仓储。</param>
+    /// <param name="memoryCache">内存缓存。</param>
+    /// <param name="queryCacheOptions">缓存配置。</param>
+    public SortingReportQueryService(
+        IBusinessTaskRepository businessTaskRepository,
+        IMemoryCache memoryCache,
+        QueryCacheOptions queryCacheOptions)
     {
         _businessTaskRepository = businessTaskRepository;
+        _memoryCache = memoryCache;
+        _queryCacheOptions = queryCacheOptions;
     }
 
     /// <inheritdoc/>
@@ -42,11 +70,44 @@ public sealed class SortingReportQueryService : ISortingReportQueryService
             };
         }
 
-        // 步骤 2：在仓储侧执行码头维度筛选与聚合。
         var selectedDockCode = string.IsNullOrWhiteSpace(request.DockCode) ? null : request.DockCode.Trim();
+        var cacheKey = $"sorting-report:{request.StartTimeLocal:yyyyMMddHHmmssfffffff}:{request.EndTimeLocal:yyyyMMddHHmmssfffffff}:{selectedDockCode}";
+        if (_queryCacheOptions.Enabled)
+        {
+            var ttl = Math.Clamp(_queryCacheOptions.SortingReportSeconds, 1, 120);
+            var cached = await _memoryCache.GetOrCreateAsync(cacheKey, async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(ttl);
+                return await BuildResultAsync(request.StartTimeLocal, request.EndTimeLocal, selectedDockCode, cancellationToken);
+            });
+            return cached ?? new SortingReportQueryResult
+            {
+                StartTimeLocal = request.StartTimeLocal,
+                EndTimeLocal = request.EndTimeLocal
+            };
+        }
+
+        return await BuildResultAsync(request.StartTimeLocal, request.EndTimeLocal, selectedDockCode, cancellationToken);
+    }
+
+    /// <summary>
+    /// 构建报表查询结果。
+    /// </summary>
+    /// <param name="startTimeLocal">开始时间。</param>
+    /// <param name="endTimeLocal">结束时间。</param>
+    /// <param name="selectedDockCode">选中码头。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>报表结果。</returns>
+    private async Task<SortingReportQueryResult> BuildResultAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        string? selectedDockCode,
+        CancellationToken cancellationToken)
+    {
+        // 步骤 1：在仓储侧执行码头维度筛选与聚合。
         var dockRows = await _businessTaskRepository.AggregateDockDashboardAsync(
-            request.StartTimeLocal,
-            request.EndTimeLocal,
+            startTimeLocal,
+            endTimeLocal,
             null,
             selectedDockCode,
             cancellationToken);
@@ -67,8 +128,8 @@ public sealed class SortingReportQueryService : ISortingReportQueryService
         // 步骤 3：返回报表结果。
         return new SortingReportQueryResult
         {
-            StartTimeLocal = request.StartTimeLocal,
-            EndTimeLocal = request.EndTimeLocal,
+            StartTimeLocal = startTimeLocal,
+            EndTimeLocal = endTimeLocal,
             SelectedDockCode = selectedDockCode,
             Rows = rows
         };
