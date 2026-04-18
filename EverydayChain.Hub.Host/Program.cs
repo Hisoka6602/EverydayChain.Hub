@@ -46,6 +46,7 @@ builder.Services.AddControllers()
         }
 
 BuildResponse:
+        firstError = NormalizeValidationMessage(firstError);
         return new BadRequestObjectResult(ApiResponse<object>.Fail(firstError));
     };
 });
@@ -130,4 +131,25 @@ static string NormalizeSwaggerRoutePrefix(string? path) {
     }
 
     return trimmed.Trim('/').ToLowerInvariant();
+}
+
+// 归一化模型绑定错误消息，避免直接暴露底层序列化器实现细节。
+// rawMessage: 原始错误文本。
+// 返回值：可直接返回给调用方的统一错误文本。
+static string NormalizeValidationMessage(string rawMessage) {
+    if (string.IsNullOrWhiteSpace(rawMessage)) {
+        return "请求参数校验失败。";
+    }
+
+    if (rawMessage.Contains("The request field is required.", StringComparison.OrdinalIgnoreCase)
+        || rawMessage.Contains("A non-empty request body is required.", StringComparison.OrdinalIgnoreCase)) {
+        return "请求体不能为空，且请求头 Content-Type 必须为 application/json。";
+    }
+
+    if (rawMessage.Contains("could not be converted to System.DateTime", StringComparison.OrdinalIgnoreCase)
+        || rawMessage.Contains("could not be converted to System.Nullable`1[System.DateTime]", StringComparison.OrdinalIgnoreCase)) {
+        return "时间字段格式无效，请使用本地时间格式 yyyy-MM-dd HH:mm:ss 或 yyyy-MM-dd HH:mm:ss.fff，禁止使用 Z 或时区偏移。";
+    }
+
+    return rawMessage;
 }

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Host.Contracts.Requests;
@@ -52,7 +53,11 @@ public sealed class ScanController : ControllerBase {
     [HttpPost("upload")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ScanUploadResponse>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ScanUploadResponse>>), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<ApiResponse<IReadOnlyList<ScanUploadResponse>>>> UploadAsync([FromBody] ScanUploadRequest request, CancellationToken cancellationToken) {
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<ScanUploadResponse>>>> UploadAsync([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] ScanUploadRequest? request, CancellationToken cancellationToken) {
+        if (request is null) {
+            return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail("请求体不能为空，且请求头 Content-Type 必须为 application/json。"));
+        }
+
         if (!TryBuildBarcodes(request, out var barcodes, out var barcodeValidationMessage)) {
             return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail(barcodeValidationMessage));
         }
