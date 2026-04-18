@@ -128,31 +128,26 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 仅传兼容字段 Barcode 时应回退为单条处理。
+    /// 条码列表为 null 时应返回 BadRequest。
     /// </summary>
     [Fact]
-    public async Task UploadAsync_ShouldFallbackToBarcode_WhenBarcodesIsNull() {
-        var stubService = new StubScanIngressService();
-        var controller = new ScanController(stubService);
+    public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodesIsNull() {
+        var controller = new ScanController(new StubScanIngressService());
         var fixedScanTime = DateTime.SpecifyKind(new DateTime(2026, 4, 14, 10, 0, 0), DateTimeKind.Local);
 #pragma warning disable CS8625
         var request = new ScanUploadRequest {
             Barcodes = null,
-            Barcode = "BC001",
             DeviceCode = "DVC-01",
             ScanTimeLocal = fixedScanTime
         };
 #pragma warning restore CS8625
 
         var actionResult = await controller.UploadAsync(request, CancellationToken.None);
-        var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
-        var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(okResult.Value);
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+        var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(badRequestResult.Value);
 
-        Assert.True(response.IsSuccess);
-        Assert.NotNull(response.Data);
-        Assert.Single(response.Data);
-        Assert.Single(stubService.Requests);
-        Assert.Equal("BC001", stubService.Requests[0].Barcode);
+        Assert.False(response.IsSuccess);
+        Assert.Equal("条码不能为空。", response.Message);
     }
 
     /// <summary>

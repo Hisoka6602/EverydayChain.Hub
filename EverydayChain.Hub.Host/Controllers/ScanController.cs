@@ -49,7 +49,7 @@ public sealed class ScanController : ControllerBase {
 
     /// <summary>
     /// 接收扫描上传请求并批量处理条码。
-    /// 请求条件：<see cref="ScanUploadRequest.DeviceCode"/> 必填；且 <see cref="ScanUploadRequest.Barcodes"/> 与 <see cref="ScanUploadRequest.Barcode"/> 至少提供一项。
+    /// 请求条件：<see cref="ScanUploadRequest.DeviceCode"/> 与 <see cref="ScanUploadRequest.Barcodes"/> 必填。
     /// 返回语义：全部条码受理成功返回 200；存在任意条码失败返回 400 且返回逐条处理结果。
     /// </summary>
     /// <param name="request">扫描上传请求。</param>
@@ -117,7 +117,7 @@ public sealed class ScanController : ControllerBase {
     }
 
     /// <summary>
-    /// 统一整理请求中的条码列表，优先使用批量条码字段。
+    /// 统一整理请求中的条码列表。
     /// </summary>
     /// <param name="request">扫描上传请求。</param>
     /// <param name="normalizedBarcodes">整理后的条码列表。</param>
@@ -127,48 +127,29 @@ public sealed class ScanController : ControllerBase {
         validationMessage = string.Empty;
         normalizedBarcodes = [];
         var requestBarcodes = request.Barcodes ?? [];
-        if (requestBarcodes.Count > 0) {
-            if (requestBarcodes.Count > MaxBarcodeCountPerRequest) {
-                validationMessage = $"单次最多允许提交 {MaxBarcodeCountPerRequest} 个条码。";
-                return false;
-            }
-
-            foreach (var barcode in requestBarcodes) {
-                if (string.IsNullOrWhiteSpace(barcode)) {
-                    validationMessage = "条码列表中存在空条码，请检查后重试。";
-                    return false;
-                }
-
-                var trimmedBarcode = barcode.Trim();
-                if (trimmedBarcode.Length > MaxBarcodeLength) {
-                    validationMessage = $"条码长度不能超过 {MaxBarcodeLength}。";
-                    return false;
-                }
-
-                normalizedBarcodes.Add(trimmedBarcode);
-            }
-
-            if (normalizedBarcodes.Count == 0) {
-                validationMessage = "条码不能为空。";
-                return false;
-            }
-
-            return true;
+        if (requestBarcodes.Count == 0) {
+            validationMessage = "条码不能为空。";
+            return false;
         }
 
-        if (!string.IsNullOrWhiteSpace(request.Barcode)) {
-            var trimmedBarcode = request.Barcode.Trim();
+        if (requestBarcodes.Count > MaxBarcodeCountPerRequest) {
+            validationMessage = $"单次最多允许提交 {MaxBarcodeCountPerRequest} 个条码。";
+            return false;
+        }
+
+        foreach (var barcode in requestBarcodes) {
+            if (string.IsNullOrWhiteSpace(barcode)) {
+                validationMessage = "条码列表中存在空条码，请检查后重试。";
+                return false;
+            }
+
+            var trimmedBarcode = barcode.Trim();
             if (trimmedBarcode.Length > MaxBarcodeLength) {
                 validationMessage = $"条码长度不能超过 {MaxBarcodeLength}。";
                 return false;
             }
 
             normalizedBarcodes.Add(trimmedBarcode);
-        }
-
-        if (normalizedBarcodes.Count == 0) {
-            validationMessage = "条码不能为空。";
-            return false;
         }
 
         return true;
