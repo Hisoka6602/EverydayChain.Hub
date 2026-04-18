@@ -134,13 +134,11 @@ public sealed class ScanControllerTests {
     public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodesIsNull() {
         var controller = new ScanController(new StubScanIngressService());
         var fixedScanTime = DateTime.SpecifyKind(new DateTime(2026, 4, 14, 10, 0, 0), DateTimeKind.Local);
-#pragma warning disable CS8625
         var request = new ScanUploadRequest {
             Barcodes = null,
             DeviceCode = "DVC-01",
             ScanTimeLocal = fixedScanTime
         };
-#pragma warning restore CS8625
 
         var actionResult = await controller.UploadAsync(request, CancellationToken.None);
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
@@ -148,6 +146,21 @@ public sealed class ScanControllerTests {
 
         Assert.False(response.IsSuccess);
         Assert.Equal("条码不能为空。", response.Message);
+    }
+
+    /// <summary>
+    /// 请求体为空时应返回统一错误消息。
+    /// </summary>
+    [Fact]
+    public async Task UploadAsync_ShouldReturnBadRequest_WhenRequestIsNull() {
+        var controller = new ScanController(new StubScanIngressService());
+
+        var actionResult = await controller.UploadAsync(null, CancellationToken.None);
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+        var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(badRequestResult.Value);
+
+        Assert.False(response.IsSuccess);
+        Assert.Equal("扫描上传请求体不能为空。", response.Message);
     }
 
     /// <summary>

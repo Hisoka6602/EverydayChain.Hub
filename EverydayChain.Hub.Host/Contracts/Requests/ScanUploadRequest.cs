@@ -8,10 +8,10 @@ namespace EverydayChain.Hub.Host.Contracts.Requests;
 public sealed class ScanUploadRequest {
     /// <summary>
     /// 多条条码文本列表。
-    /// 可填写范围：1~100 项，每项长度 1~128；必填。
-    /// 空值语义：为空或 null 均视为无效请求。
+    /// 可填写范围：1~100 项，每项长度 1~128；由控制器执行非空与非空集合校验。
+    /// 空值语义：为空或 null 均视为无效请求，并由控制器返回统一业务错误。
     /// </summary>
-    public List<string> Barcodes { get; set; } = [];
+    public List<string>? Barcodes { get; set; }
 
     /// <summary>
     /// 设备编码。
