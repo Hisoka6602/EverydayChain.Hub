@@ -137,19 +137,19 @@ public sealed class BusinessTaskSeedRepository(
         out IReadOnlyList<string> skippedBarcodes)
     {
         var insertBarcodes = new List<string>(candidateBarcodes.Count);
-        var existingSkippedBarcodes = new List<string>();
+        var skippedBarcodesList = new List<string>(candidateBarcodes.Count);
         foreach (var barcode in candidateBarcodes)
         {
             if (existingManualSeedBusinessKeys.Contains(barcode))
             {
-                existingSkippedBarcodes.Add(barcode);
+                skippedBarcodesList.Add(barcode);
                 continue;
             }
 
             insertBarcodes.Add(barcode);
         }
 
-        skippedBarcodes = existingSkippedBarcodes;
+        skippedBarcodes = skippedBarcodesList;
         return insertBarcodes;
     }
 
