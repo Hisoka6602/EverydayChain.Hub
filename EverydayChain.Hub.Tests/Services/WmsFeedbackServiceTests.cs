@@ -3,7 +3,10 @@ using EverydayChain.Hub.Application.Feedback.Services;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.Infrastructure.Integrations;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using System.Reflection;
 
 namespace EverydayChain.Hub.Tests.Services;
 
@@ -262,6 +265,82 @@ public sealed class WmsFeedbackServiceTests
         Assert.Equal(BusinessTaskFeedbackStatus.Completed, updated!.FeedbackStatus);
         Assert.True(updated.IsFeedbackReported);
         Assert.Contains(writer.CapturedTasks, task => task.SourceType == BusinessTaskSourceType.FullCase);
+    }
+
+    /// <summary>
+    /// 验证回写网关按来源类型分流到拆零与整件目标表的行为。
+    /// </summary>
+    [Fact]
+    public void ResolveTargetBySourceType_ShouldRouteToConfiguredTables()
+    {
+        var gateway = CreateGatewayForSourceTypeRoutingTests();
+        var resolveMethod = GetResolveTargetBySourceTypeMethod();
+
+        var splitTarget = ((string Schema, string Table, string BusinessKeyColumn))resolveMethod.Invoke(gateway, [BusinessTaskSourceType.Split])!;
+        var fullCaseTarget = ((string Schema, string Table, string BusinessKeyColumn))resolveMethod.Invoke(gateway, [BusinessTaskSourceType.FullCase])!;
+
+        Assert.Equal("WMS_USER_SPLIT_431", splitTarget.Schema);
+        Assert.Equal("IDX_PICKTOLIGHT_CARTON1", splitTarget.Table);
+        Assert.Equal("SPLIT_TASK_CODE", splitTarget.BusinessKeyColumn);
+        Assert.Equal("WMS_USER_FULLCASE_431", fullCaseTarget.Schema);
+        Assert.Equal("IDX_PICKTOWCS2", fullCaseTarget.Table);
+        Assert.Equal("FULLCASE_TASK_CODE", fullCaseTarget.BusinessKeyColumn);
+    }
+
+    /// <summary>
+    /// 验证回写网关遇到非法来源类型时抛出中文异常且不回退默认目标表的行为。
+    /// </summary>
+    [Fact]
+    public void ResolveTargetBySourceType_ShouldThrowChineseException_WhenSourceTypeUnsupported()
+    {
+        var gateway = CreateGatewayForSourceTypeRoutingTests();
+        var resolveMethod = GetResolveTargetBySourceTypeMethod();
+
+        var exception = Assert.Throws<TargetInvocationException>(() =>
+            resolveMethod.Invoke(gateway, [BusinessTaskSourceType.Unknown]));
+        var innerException = Assert.IsType<InvalidOperationException>(exception.InnerException);
+        Assert.Contains("不支持的业务来源类型，无法确定 WMS 回写目标表。", innerException.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// 创建用于来源分流测试的回写网关实例。
+    /// </summary>
+    /// <returns>回写网关。</returns>
+    private static OracleWmsFeedbackGateway CreateGatewayForSourceTypeRoutingTests()
+    {
+        var options = Options.Create(new WmsFeedbackOptions
+        {
+            Enabled = true,
+            SplitSchema = "WMS_USER_SPLIT_431",
+            SplitTable = "IDX_PICKTOLIGHT_CARTON1",
+            SplitBusinessKeyColumn = "SPLIT_TASK_CODE",
+            FullCaseSchema = "WMS_USER_FULLCASE_431",
+            FullCaseTable = "IDX_PICKTOWCS2",
+            FullCaseBusinessKeyColumn = "FULLCASE_TASK_CODE",
+            FeedbackStatusColumn = "STATUS",
+            FeedbackCompletedValue = "Y"
+        });
+        var oracleOptions = Options.Create(new OracleOptions
+        {
+            ConnectionString = "Data Source=127.0.0.1:1521/ORCL;User Id=PLACEHOLDER_USER;Password=PLACEHOLDER_PASSWORD;"
+        });
+        return new OracleWmsFeedbackGateway(
+            options,
+            oracleOptions,
+            new PassThroughDangerZoneExecutor(),
+            NullLogger<OracleWmsFeedbackGateway>.Instance);
+    }
+
+    /// <summary>
+    /// 通过反射获取来源分流私有方法句柄。
+    /// </summary>
+    /// <returns>方法句柄。</returns>
+    private static MethodInfo GetResolveTargetBySourceTypeMethod()
+    {
+        return typeof(OracleWmsFeedbackGateway).GetMethod(
+                "ResolveTargetBySourceType",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("未找到 ResolveTargetBySourceType 方法。");
     }
 }
 
