@@ -125,6 +125,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IBusinessTaskProjectionService, BusinessTaskProjectionService>();
         services.AddSingleton<IBarcodeParser, BarcodeParser>();
         services.AddSingleton<IBusinessTaskRepository, BusinessTaskRepository>();
+        services.AddSingleton<IBusinessTaskSeedRepository, BusinessTaskSeedRepository>();
         services.AddSingleton<IScanMatchService, ScanMatchService>();
         services.AddSingleton<ITaskExecutionService, TaskExecutionService>();
         // PR-09：注册扫描日志与落格日志仓储。
@@ -134,6 +135,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IScanIngressService, ScanIngressService>();
         services.AddSingleton<IChuteQueryService, ChuteQueryService>();
         services.AddSingleton<IDropFeedbackService, DropFeedbackService>();
+        services.AddSingleton<IBusinessTaskSeedService, BusinessTaskSeedService>();
         services.AddSingleton<IGlobalDashboardQueryService>(sp =>
             new GlobalDashboardQueryService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),

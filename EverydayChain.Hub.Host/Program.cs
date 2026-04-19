@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using EverydayChain.Hub.Infrastructure.DependencyInjection;
+using EverydayChain.Hub.Host.Swagger;
 
 // 默认参数校验失败消息。
 const string DefaultValidationFailureMessage = "请求参数校验失败。";
@@ -105,6 +106,7 @@ builder.Services.AddSwaggerGen(options => {
     if (File.Exists(xmlPath)) {
         options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
     }
+    options.SchemaFilter<BusinessTaskSeedTableSchemaFilter>();
 });
 builder.Services.AddHostedService<AutoMigrationHostedService>();
 builder.Services.AddHostedService<SyncBackgroundWorker>();
