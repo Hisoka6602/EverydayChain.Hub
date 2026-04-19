@@ -223,16 +223,17 @@ public class BusinessTaskStatusConsumeService(
         SyncWindow window,
         IReadOnlyDictionary<string, object?> row)
     {
-        if (TryResolveProjectedTimeLocal(definition, batchId, window, row, out var projectedTimeLocal))
+        if (TryResolveProjectedTimeLocal(definition, window, row, out var projectedTimeLocal, out var fallbackReason))
         {
             return projectedTimeLocal;
         }
 
         logger.LogWarning(
-            "业务任务状态驱动投影时间缺失，已降级使用当前本地时间。TableCode={TableCode}, BatchId={BatchId}, CursorColumn={CursorColumn}",
+            "业务任务状态驱动投影时间缺失，已降级使用当前本地时间。TableCode={TableCode}, BatchId={BatchId}, CursorColumn={CursorColumn}, FallbackReason={FallbackReason}",
             definition.TableCode,
             batchId,
-            definition.CursorColumn);
+            definition.CursorColumn,
+            fallbackReason);
         return DateTime.Now;
     }
 
@@ -240,19 +241,19 @@ public class BusinessTaskStatusConsumeService(
     /// 尝试解析投影业务时间。
     /// </summary>
     /// <param name="definition">同步定义。</param>
-    /// <param name="batchId">批次号。</param>
     /// <param name="window">同步窗口。</param>
     /// <param name="row">远端读取行。</param>
     /// <param name="projectedTimeLocal">解析结果。</param>
+    /// <param name="fallbackReason">降级原因。</param>
     /// <returns>解析成功返回 true，否则返回 false。</returns>
     private bool TryResolveProjectedTimeLocal(
         SyncTableDefinition definition,
-        string batchId,
         SyncWindow window,
         IReadOnlyDictionary<string, object?> row,
-        out DateTime projectedTimeLocal)
+        out DateTime projectedTimeLocal,
+        out string fallbackReason)
     {
-        if (TryResolveProjectedTimeFromCursorColumn(definition, batchId, row, out projectedTimeLocal))
+        if (TryResolveProjectedTimeFromCursorColumn(definition, row, out projectedTimeLocal, out fallbackReason))
         {
             return true;
         }
@@ -260,10 +261,14 @@ public class BusinessTaskStatusConsumeService(
         if (window.WindowEndLocal != default)
         {
             projectedTimeLocal = NormalizeLocalDateTime(window.WindowEndLocal);
+            fallbackReason = string.Empty;
             return true;
         }
 
         projectedTimeLocal = default;
+        fallbackReason = string.IsNullOrWhiteSpace(fallbackReason)
+            ? "源业务时间缺失且同步窗口结束时间缺失"
+            : $"源业务时间不可用（{fallbackReason}）且同步窗口结束时间缺失";
         return false;
     }
 
@@ -271,52 +276,43 @@ public class BusinessTaskStatusConsumeService(
     /// 从游标列尝试解析投影业务时间。
     /// </summary>
     /// <param name="definition">同步定义。</param>
-    /// <param name="batchId">批次号。</param>
     /// <param name="row">远端读取行。</param>
     /// <param name="projectedTimeLocal">解析结果。</param>
+    /// <param name="failureReason">失败原因。</param>
     /// <returns>解析成功返回 true，否则返回 false。</returns>
     private bool TryResolveProjectedTimeFromCursorColumn(
         SyncTableDefinition definition,
-        string batchId,
         IReadOnlyDictionary<string, object?> row,
-        out DateTime projectedTimeLocal)
+        out DateTime projectedTimeLocal,
+        out string failureReason)
     {
         projectedTimeLocal = default;
+        failureReason = string.Empty;
         if (string.IsNullOrWhiteSpace(definition.CursorColumn))
         {
+            failureReason = "未配置 CursorColumn";
             return false;
         }
 
         if (!row.TryGetValue(definition.CursorColumn, out var rawValue) || rawValue is null)
         {
+            failureReason = "游标列值缺失";
             return false;
         }
 
         try
         {
-            if (TryConvertToLocalDateTime(rawValue, out projectedTimeLocal))
+            if (TryConvertToLocalDateTime(rawValue, out projectedTimeLocal, out failureReason))
             {
                 return true;
             }
 
-            logger.LogWarning(
-                "业务任务状态驱动投影时间解析失败：游标列值不可解析。TableCode={TableCode}, BatchId={BatchId}, CursorColumn={CursorColumn}, RawValue={RawValue}, RawType={RawType}",
-                definition.TableCode,
-                batchId,
-                definition.CursorColumn,
-                rawValue,
-                rawValue.GetType().FullName);
+            failureReason = $"游标列值不可解析，RawType={rawValue.GetType().Name}";
             return false;
         }
         catch (Exception ex)
         {
-            logger.LogWarning(
-                ex,
-                "业务任务状态驱动投影时间解析异常。TableCode={TableCode}, BatchId={BatchId}, CursorColumn={CursorColumn}, RawType={RawType}",
-                definition.TableCode,
-                batchId,
-                definition.CursorColumn,
-                rawValue.GetType().FullName);
+            failureReason = $"游标列值解析异常：{ex.Message}";
             return false;
         }
     }
@@ -326,38 +322,54 @@ public class BusinessTaskStatusConsumeService(
     /// </summary>
     /// <param name="rawValue">源值。</param>
     /// <param name="localTime">转换后的本地时间。</param>
+    /// <param name="failureReason">失败原因。</param>
     /// <returns>转换成功返回 true，否则返回 false。</returns>
-    private static bool TryConvertToLocalDateTime(object rawValue, out DateTime localTime)
+    private static bool TryConvertToLocalDateTime(object rawValue, out DateTime localTime, out string failureReason)
     {
+        localTime = default;
+        failureReason = string.Empty;
         switch (rawValue)
         {
             case DateTime dateTime:
-                localTime = NormalizeLocalDateTime(dateTime);
-                return true;
-            case DateTimeOffset dateTimeOffset:
-                localTime = dateTimeOffset.LocalDateTime;
-                return true;
+                if (TryNormalizeLocalDateTime(dateTime, out localTime, out failureReason))
+                {
+                    return true;
+                }
+
+                return false;
+            case DateTimeOffset:
+                failureReason = "不支持包含时区偏移的时间值";
+                return false;
             case string text when !string.IsNullOrWhiteSpace(text):
                 if (DateTime.TryParse(text.Trim(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var parsedLocal)
                     || DateTime.TryParse(text.Trim(), CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal, out parsedLocal))
                 {
-                    localTime = NormalizeLocalDateTime(parsedLocal);
-                    return true;
+                    if (TryNormalizeLocalDateTime(parsedLocal, out localTime, out failureReason))
+                    {
+                        return true;
+                    }
+
+                    return false;
                 }
 
+                failureReason = "字符串时间格式不可解析";
                 break;
             default:
                 if (rawValue is IConvertible)
                 {
                     var convertedTime = Convert.ToDateTime(rawValue, CultureInfo.InvariantCulture);
-                    localTime = NormalizeLocalDateTime(convertedTime);
-                    return true;
+                    if (TryNormalizeLocalDateTime(convertedTime, out localTime, out failureReason))
+                    {
+                        return true;
+                    }
+
+                    return false;
                 }
 
+                failureReason = "值类型不支持时间转换";
                 break;
         }
 
-        localTime = default;
         return false;
     }
 
@@ -365,15 +377,40 @@ public class BusinessTaskStatusConsumeService(
     /// 规范化时间 Kind，确保后续按本地时间语义处理。
     /// </summary>
     /// <param name="time">原始时间。</param>
-    /// <returns>规范化后的本地时间。</returns>
-    private static DateTime NormalizeLocalDateTime(DateTime time)
+    /// <param name="localTime">规范化后的本地时间。</param>
+    /// <param name="failureReason">失败原因。</param>
+    /// <returns>规范化成功返回 true，否则返回 false。</returns>
+    private static bool TryNormalizeLocalDateTime(DateTime time, out DateTime localTime, out string failureReason)
     {
         if (time.Kind == DateTimeKind.Local)
         {
-            return time;
+            localTime = time;
+            failureReason = string.Empty;
+            return true;
         }
 
-        return DateTime.SpecifyKind(time, DateTimeKind.Local);
+        if (time.Kind != DateTimeKind.Unspecified)
+        {
+            localTime = default;
+            failureReason = $"不支持的时间语义 Kind={time.Kind}";
+            return false;
+        }
+
+        localTime = DateTime.SpecifyKind(time, DateTimeKind.Local);
+        failureReason = string.Empty;
+        return true;
+    }
+
+    /// <summary>
+    /// 将输入时间规范化为本地时间语义。
+    /// </summary>
+    /// <param name="time">输入时间。</param>
+    /// <returns>规范化后的本地时间。</returns>
+    private static DateTime NormalizeLocalDateTime(DateTime time)
+    {
+        return time.Kind == DateTimeKind.Local
+            ? time
+            : DateTime.SpecifyKind(time, DateTimeKind.Local);
     }
 
     /// <summary>

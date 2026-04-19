@@ -45,5 +45,5 @@ public class BusinessTaskMaterializeRequest
     /// <summary>
     /// 物化时间（本地时间）；正式业务写入必须显式提供，不允许缺失。
     /// </summary>
-    public DateTime? MaterializedTimeLocal { get; set; }
+    public required DateTime MaterializedTimeLocal { get; set; }
 }

@@ -176,6 +176,44 @@ public class BusinessTaskStatusConsumeServiceTests
     }
 
     /// <summary>
+    /// 游标列不可解析但窗口时间可用时不应输出降级当前时间告警。
+    /// </summary>
+    [Fact]
+    public async Task ConsumeAsync_WhenCursorTimeInvalidButWindowAvailable_ShouldUseWindowEndWithoutWarning()
+    {
+        var reader = new FakeOracleStatusDrivenSourceReader();
+        reader.Pages.Enqueue([
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["CARTONNO"] = "C-BIZ-2",
+                ["WAVENO"] = "W-BIZ-2",
+                ["DESCR"] = "R-BIZ-2",
+                ["ADDTIME"] = "INVALID-TIME",
+                ["__RowId"] = "ROW-BIZ-2"
+            }
+        ]);
+        reader.Pages.Enqueue([]);
+        var writer = new FakeOracleRemoteStatusWriter();
+        var projectionService = new BusinessTaskProjectionService();
+        var repository = new InMemoryBusinessTaskRepository();
+        var logger = new TestLogger<BusinessTaskStatusConsumeService>();
+        var service = new BusinessTaskStatusConsumeService(reader, writer, projectionService, repository, logger);
+        var window = new SyncWindow(
+            new DateTime(2026, 4, 21, 0, 0, 0, DateTimeKind.Local),
+            new DateTime(2026, 4, 21, 10, 30, 0, DateTimeKind.Local));
+
+        var result = await service.ConsumeAsync(BuildSplitDefinition(false), "B6", window, CancellationToken.None);
+
+        Assert.Equal(1, result.AppendCount);
+        var entity = await repository.FindByTaskCodeAsync("C-BIZ-2", CancellationToken.None);
+        Assert.NotNull(entity);
+        Assert.Equal(window.WindowEndLocal, entity!.CreatedTimeLocal);
+        Assert.DoesNotContain(logger.Logs, log =>
+            log.Level == Microsoft.Extensions.Logging.LogLevel.Warning
+            && log.Message.Contains("已降级使用当前本地时间", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     /// 构建拆零定义。
     /// </summary>
     /// <param name="writeBack">是否回写。</param>

@@ -57,11 +57,13 @@ public class BusinessTaskMaterializerTests
         string expectedParamName)
     {
         var sut = new BusinessTaskMaterializer();
+        var fixedTime = new DateTime(2026, 4, 13, 10, 20, 30, DateTimeKind.Local);
         var request = new BusinessTaskMaterializeRequest
         {
             TaskCode = taskCode,
             SourceTableCode = sourceTableCode,
             BusinessKey = businessKey,
+            MaterializedTimeLocal = fixedTime
         };
 
         var action = () => sut.Materialize(request);
@@ -82,7 +84,8 @@ public class BusinessTaskMaterializerTests
             TaskCode = "TASK-001",
             SourceTableCode = "WMS_PICK",
             BusinessKey = "ORDER-1|LINE-2",
-            SourceType = BusinessTaskSourceType.Split
+            SourceType = BusinessTaskSourceType.Split,
+            MaterializedTimeLocal = default
         };
 
         var exception = Assert.Throws<InvalidOperationException>(() => sut.Materialize(request));

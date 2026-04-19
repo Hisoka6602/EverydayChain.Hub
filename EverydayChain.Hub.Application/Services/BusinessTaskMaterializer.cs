@@ -48,15 +48,15 @@ public class BusinessTaskMaterializer : IBusinessTaskMaterializer
     /// <param name="sourceTableCode">来源表编码。</param>
     /// <returns>校验通过的时间。</returns>
     /// <exception cref="InvalidOperationException">缺失时抛出异常。</exception>
-    private static DateTime ValidateMaterializedTimeLocal(DateTime? materializedTimeLocal, string taskCode, string sourceTableCode)
+    private static DateTime ValidateMaterializedTimeLocal(DateTime materializedTimeLocal, string taskCode, string sourceTableCode)
     {
-        if (!materializedTimeLocal.HasValue || materializedTimeLocal.Value == default)
+        if (materializedTimeLocal == default)
         {
             throw new InvalidOperationException(
                 $"MaterializedTimeLocal 缺失，无法确定业务时间，禁止继续写入业务任务。TaskCode={taskCode}, SourceTableCode={sourceTableCode}");
         }
 
-        return materializedTimeLocal.Value;
+        return materializedTimeLocal;
     }
 
     /// <summary>
