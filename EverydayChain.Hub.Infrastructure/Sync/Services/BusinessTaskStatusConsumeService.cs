@@ -1,3 +1,4 @@
+using System.Globalization;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Abstractions.Sync;
@@ -5,7 +6,6 @@ using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Sync;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.Extensions.Logging;
-using System.Globalization;
 
 namespace EverydayChain.Hub.Infrastructure.Sync.Services;
 
@@ -229,7 +229,7 @@ public class BusinessTaskStatusConsumeService(
         }
 
         logger.LogWarning(
-            "业务任务状态驱动投影时间缺失，已降级使用当前本地时间。TableCode={TableCode}, BatchId={BatchId}, CursorColumn={CursorColumn}, WarningReason=源业务时间缺失，已降级使用当前本地时间",
+            "业务任务状态驱动投影时间缺失，已降级使用当前本地时间。TableCode={TableCode}, BatchId={BatchId}, CursorColumn={CursorColumn}",
             definition.TableCode,
             batchId,
             definition.CursorColumn);
@@ -368,12 +368,12 @@ public class BusinessTaskStatusConsumeService(
     /// <returns>规范化后的本地时间。</returns>
     private static DateTime NormalizeLocalDateTime(DateTime time)
     {
-        return time.Kind switch
+        if (time.Kind == DateTimeKind.Local)
         {
-            DateTimeKind.Local => time,
-            DateTimeKind.Utc => time.ToLocalTime(),
-            _ => DateTime.SpecifyKind(time, DateTimeKind.Local)
-        };
+            return time;
+        }
+
+        return DateTime.SpecifyKind(time, DateTimeKind.Local);
     }
 
     /// <summary>

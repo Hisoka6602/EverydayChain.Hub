@@ -49,7 +49,7 @@ public class BusinessTaskProjectionService : IBusinessTaskProjectionService
         var barcode = ValidateOptionalText(row.Barcode, nameof(row.Barcode), 128);
         var waveCode = ValidateOptionalText(row.WaveCode, nameof(row.WaveCode), 64);
         var waveRemark = ValidateOptionalText(row.WaveRemark, nameof(row.WaveRemark), 128);
-        var projectedTimeLocal = ValidateProjectedTimeLocal(row.ProjectedTimeLocal);
+        var projectedTimeLocal = ValidateProjectedTimeLocal(row);
 
         var entity = new BusinessTaskEntity
         {
@@ -71,17 +71,18 @@ public class BusinessTaskProjectionService : IBusinessTaskProjectionService
     /// <summary>
     /// 校验投影业务时间，缺失时阻断投影写入。
     /// </summary>
-    /// <param name="projectedTimeLocal">投影业务时间。</param>
+    /// <param name="row">投影行。</param>
     /// <returns>校验通过的业务时间。</returns>
     /// <exception cref="InvalidOperationException">缺失时抛出异常。</exception>
-    private static DateTime ValidateProjectedTimeLocal(DateTime projectedTimeLocal)
+    private static DateTime ValidateProjectedTimeLocal(BusinessTaskProjectionRow row)
     {
-        if (projectedTimeLocal == default)
+        if (row.ProjectedTimeLocal == default)
         {
-            throw new InvalidOperationException("ProjectedTimeLocal 缺失，无法确定分表月份，禁止继续写入业务任务。");
+            throw new InvalidOperationException(
+                $"ProjectedTimeLocal 缺失，无法确定分表月份，禁止继续写入业务任务。SourceTableCode={row.SourceTableCode}, BusinessKey={row.BusinessKey}");
         }
 
-        return projectedTimeLocal;
+        return row.ProjectedTimeLocal;
     }
 
     /// <summary>

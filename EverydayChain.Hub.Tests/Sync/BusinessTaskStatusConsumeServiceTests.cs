@@ -173,7 +173,6 @@ public class BusinessTaskStatusConsumeServiceTests
         Assert.NotNull(entity);
         Assert.Equal(expectedProjectedTime, entity!.CreatedTimeLocal);
         Assert.Equal(expectedProjectedTime, entity.UpdatedTimeLocal);
-        Assert.NotEqual(DateTime.Now, entity.CreatedTimeLocal);
     }
 
     /// <summary>
