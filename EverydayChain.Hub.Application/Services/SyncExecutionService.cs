@@ -15,7 +15,7 @@ namespace EverydayChain.Hub.Application.Services;
 /// 同步执行服务实现。
 /// 支持 KeyedMerge（键控合并）与 StatusDriven（状态驱动消费）两种执行模式。
 /// KeyedMerge 为默认模式，复用既有读取/合并/删除链路；
-/// StatusDriven 委托给 <see cref="IRemoteStatusConsumeService"/> 执行。
+/// StatusDriven 委托给 <see cref="IBusinessTaskStatusConsumeService"/> 执行。
 /// </summary>
 public class SyncExecutionService(
     IOracleSourceReader oracleSourceReader,
@@ -26,23 +26,19 @@ public class SyncExecutionService(
     ISyncChangeLogRepository changeLogRepository,
     ISyncDeletionLogRepository deletionLogRepository,
     ISyncCheckpointRepository checkpointRepository,
-    IRemoteStatusConsumeService remoteStatusConsumeService,
     IBusinessTaskStatusConsumeService businessTaskStatusConsumeService,
     ILogger<SyncExecutionService> logger) : ISyncExecutionService
 {
     /// <summary>失败检查点写入超时秒数。</summary>
     private const int ErrorCheckpointSaveTimeoutSeconds = 3;
+    /// <summary>StatusDriven 业务任务收口目标逻辑表名。</summary>
+    private const string StatusDrivenBusinessTaskLogicalTable = "business_tasks";
     /// <summary>批次失败状态更新异常日志模板。</summary>
     private const string FailBatchStatusUpdateErrorLogTemplate = "更新同步失败批次状态异常。TableCode={TableCode}, BatchId={BatchId}";
     /// <summary>批次取消状态更新异常日志模板。</summary>
     private const string FailBatchOnCancelErrorLogTemplate = "在处理同步批次取消时更新批次失败。TableCode={TableCode}, BatchId={BatchId}";
     /// <summary>“读取到数据但目标端0写入（全部跳过）”告警采样间隔（有效值范围：1~1000，建议值：100）。</summary>
     private const int FullySkippedPageWarningInterval = 100;
-    /// <summary>拆零任务编码。</summary>
-    private const string SplitTaskTableCode = "WmsSplitPickToLightCarton";
-    /// <summary>整件任务编码。</summary>
-    private const string FullCaseTaskTableCode = "WmsPickToWcs";
-
     /// <summary>快照序列化配置。</summary>
     private static readonly JsonSerializerSettings SnapshotSerializerSettings = new()
     {
@@ -55,6 +51,7 @@ public class SyncExecutionService(
         // StatusDriven 模式委托给专用消费服务，KeyedMerge 路径保持不变。
         if (context.Definition.SyncMode == SyncMode.StatusDriven)
         {
+            ValidateStatusDrivenBusinessTaskDefinition(context.Definition);
             return await ExecuteStatusDrivenBatchAsync(context, ct);
         }
 
@@ -358,6 +355,32 @@ public class SyncExecutionService(
     }
 
     /// <summary>
+    /// 校验 StatusDriven 模式下业务任务收口配置合法性。
+    /// </summary>
+    /// <param name="definition">同步定义。</param>
+    /// <exception cref="InvalidOperationException">配置不满足业务任务收口要求时抛出。</exception>
+    private static void ValidateStatusDrivenBusinessTaskDefinition(SyncTableDefinition definition)
+    {
+        if (!string.Equals(definition.TargetLogicalTable, StatusDrivenBusinessTaskLogicalTable, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"StatusDriven 配置无效：表 {definition.TableCode} 的 TargetLogicalTable 必须为 {StatusDrivenBusinessTaskLogicalTable}。");
+        }
+
+        if (definition.SourceType == BusinessTaskSourceType.Unknown)
+        {
+            throw new InvalidOperationException(
+                $"StatusDriven 配置无效：表 {definition.TableCode} 的 SourceType 不能为 Unknown。");
+        }
+
+        if (string.IsNullOrWhiteSpace(definition.BusinessKeyColumn))
+        {
+            throw new InvalidOperationException(
+                $"StatusDriven 配置无效：表 {definition.TableCode} 的 BusinessKeyColumn 不能为空白。");
+        }
+    }
+
+    /// <summary>
     /// 构建唯一键文本。
     /// </summary>
     /// <param name="uniqueKeys">唯一键集合。</param>
@@ -494,7 +517,7 @@ public class SyncExecutionService(
     }
 
     /// <summary>
-    /// 执行 StatusDriven 批次：委托给 <see cref="IRemoteStatusConsumeService"/> 完成读取、追加、回写。
+    /// 执行 StatusDriven 批次：委托给 <see cref="IBusinessTaskStatusConsumeService"/> 完成读取、投影、幂等写入与可选回写。
     /// 不调用 Merge/删除仓储；检查点提交与批次管理逻辑与 KeyedMerge 路径相同。
     /// </summary>
     /// <param name="context">执行上下文。</param>
@@ -524,11 +547,13 @@ public class SyncExecutionService(
             await batchRepository.MarkInProgressAsync(context.BatchId, DateTime.Now, ct);
             batchInitElapsedMs = stepSw.ElapsedMilliseconds;
 
-            // StatusDriven 主流程：委托给专用消费服务完成分页读取→追加→可选回写。
+            // StatusDriven 主流程：委托给业务任务专用消费服务完成分页读取→投影→幂等写入→可选回写。
             stepSw.Restart();
-            var consumeResult = IsBusinessTaskStatusDrivenTable(context.Definition.TableCode)
-                ? await businessTaskStatusConsumeService.ConsumeAsync(context.Definition, context.BatchId, context.Window, ct)
-                : await remoteStatusConsumeService.ConsumeAsync(context.Definition, context.BatchId, context.Window, ct);
+            var consumeResult = await businessTaskStatusConsumeService.ConsumeAsync(
+                context.Definition,
+                context.BatchId,
+                context.Window,
+                ct);
             consumeElapsedMs = stepSw.ElapsedMilliseconds;
 
             // StatusDriven 不产生变更日志与删除日志，写入空集合保持链路一致。
@@ -635,16 +660,5 @@ public class SyncExecutionService(
             }
             throw;
         }
-    }
-
-    /// <summary>
-    /// 判断是否为业务任务状态驱动主路径表。
-    /// </summary>
-    /// <param name="tableCode">表编码。</param>
-    /// <returns>命中返回 true，否则返回 false。</returns>
-    private static bool IsBusinessTaskStatusDrivenTable(string tableCode)
-    {
-        return tableCode.Equals(SplitTaskTableCode, StringComparison.OrdinalIgnoreCase)
-            || tableCode.Equals(FullCaseTaskTableCode, StringComparison.OrdinalIgnoreCase);
     }
 }
