@@ -145,7 +145,7 @@ public class BusinessTaskStatusConsumeServiceTests
     public async Task ConsumeAsync_WhenCursorColumnContainsBusinessTime_ShouldUseBusinessTime()
     {
         var reader = new FakeOracleStatusDrivenSourceReader();
-        var expectedProjectedTime = new DateTime(2026, 4, 20, 10, 30, 0, DateTimeKind.Local);
+        var expectedProjectedTime = new DateTime(2032, 4, 20, 10, 30, 0, DateTimeKind.Local);
         reader.Pages.Enqueue([
             new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
@@ -173,13 +173,14 @@ public class BusinessTaskStatusConsumeServiceTests
         Assert.NotNull(entity);
         Assert.Equal(expectedProjectedTime, entity!.CreatedTimeLocal);
         Assert.Equal(expectedProjectedTime, entity.UpdatedTimeLocal);
+        Assert.NotEqual(DateTime.Now, entity.CreatedTimeLocal);
     }
 
     /// <summary>
-    /// 游标列不可解析但窗口时间可用时不应输出降级当前时间告警。
+    /// 游标业务时间非法时应阻断并抛出中文异常。
     /// </summary>
     [Fact]
-    public async Task ConsumeAsync_WhenCursorTimeInvalidButWindowAvailable_ShouldUseWindowEndWithoutWarning()
+    public async Task ConsumeAsync_WhenCursorTimeInvalid_ShouldThrow()
     {
         var reader = new FakeOracleStatusDrivenSourceReader();
         reader.Pages.Enqueue([
@@ -198,19 +199,52 @@ public class BusinessTaskStatusConsumeServiceTests
         var repository = new InMemoryBusinessTaskRepository();
         var logger = new TestLogger<BusinessTaskStatusConsumeService>();
         var service = new BusinessTaskStatusConsumeService(reader, writer, projectionService, repository, logger);
-        var window = new SyncWindow(
-            new DateTime(2026, 4, 21, 0, 0, 0, DateTimeKind.Local),
-            new DateTime(2026, 4, 21, 10, 30, 0, DateTimeKind.Local));
 
-        var result = await service.ConsumeAsync(BuildSplitDefinition(false), "B6", window, CancellationToken.None);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ConsumeAsync(BuildSplitDefinition(true), "B6", default, CancellationToken.None));
 
-        Assert.Equal(1, result.AppendCount);
-        var entity = await repository.FindByTaskCodeAsync("C-BIZ-2", CancellationToken.None);
-        Assert.NotNull(entity);
-        Assert.Equal(window.WindowEndLocal, entity!.CreatedTimeLocal);
-        Assert.DoesNotContain(logger.Logs, log =>
-            log.Level == Microsoft.Extensions.Logging.LogLevel.Warning
-            && log.Message.Contains("已降级使用当前本地时间", StringComparison.Ordinal));
+        Assert.Contains("远端业务时间缺失", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("无法确定分表月份", exception.Message, StringComparison.Ordinal);
+        Assert.Null(await repository.FindByTaskCodeAsync("C-BIZ-2", CancellationToken.None));
+        Assert.Equal(0, writer.TotalWriteBackRows);
+        Assert.Contains(logger.Logs, log =>
+            log.Level == Microsoft.Extensions.Logging.LogLevel.Error
+            && log.Message.Contains("远端业务时间缺失", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// 游标业务时间缺失时应阻断并抛出中文异常。
+    /// </summary>
+    [Fact]
+    public async Task ConsumeAsync_WhenCursorTimeMissing_ShouldThrow()
+    {
+        var reader = new FakeOracleStatusDrivenSourceReader();
+        reader.Pages.Enqueue([
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["CARTONNO"] = "C-BIZ-3",
+                ["WAVENO"] = "W-BIZ-3",
+                ["DESCR"] = "R-BIZ-3",
+                ["__RowId"] = "ROW-BIZ-3"
+            }
+        ]);
+        reader.Pages.Enqueue([]);
+        var writer = new FakeOracleRemoteStatusWriter();
+        var projectionService = new BusinessTaskProjectionService();
+        var repository = new InMemoryBusinessTaskRepository();
+        var logger = new TestLogger<BusinessTaskStatusConsumeService>();
+        var service = new BusinessTaskStatusConsumeService(reader, writer, projectionService, repository, logger);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ConsumeAsync(BuildSplitDefinition(true), "B7", default, CancellationToken.None));
+
+        Assert.Contains("远端业务时间缺失", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("无法确定分表月份", exception.Message, StringComparison.Ordinal);
+        Assert.Null(await repository.FindByTaskCodeAsync("C-BIZ-3", CancellationToken.None));
+        Assert.Equal(0, writer.TotalWriteBackRows);
+        Assert.Contains(logger.Logs, log =>
+            log.Level == Microsoft.Extensions.Logging.LogLevel.Error
+            && log.Message.Contains("远端业务时间缺失", StringComparison.Ordinal));
     }
 
     /// <summary>
