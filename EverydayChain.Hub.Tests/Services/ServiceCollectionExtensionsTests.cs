@@ -1,6 +1,8 @@
 using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Infrastructure.DependencyInjection;
 using EverydayChain.Hub.Infrastructure.Persistence;
+using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,14 +15,14 @@ namespace EverydayChain.Hub.Tests.Services;
 public class ServiceCollectionExtensionsTests
 {
     /// <summary>
-    /// AddInfrastructure 应注册非池化 DbContextFactory，避免分表映射在上下文复用时漂移。
+    /// AddInfrastructure 注册的 DbContextFactory 应保证不同分表后缀获得独立映射。
     /// </summary>
     [Fact]
-    public void AddInfrastructure_ShouldRegisterNonPooledDbContextFactory()
+    public async Task AddInfrastructure_DbContextFactory_ShouldMapDifferentSuffixToDifferentTables()
     {
         var configData = new Dictionary<string, string?>
         {
-            ["Sharding:ConnectionString"] = "Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;"
+            ["Sharding:ConnectionString"] = "Server=mock;Database=mock;User Id=mock;Password=mock;Encrypt=false;TrustServerCertificate=true;"
         };
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configData)
@@ -30,8 +32,22 @@ public class ServiceCollectionExtensionsTests
         services.AddInfrastructure(configuration);
         using var provider = services.BuildServiceProvider();
         var dbContextFactory = provider.GetRequiredService<IDbContextFactory<HubDbContext>>();
+        string? firstTableName;
+        string? secondTableName;
+        using (TableSuffixScope.Use("_202604"))
+        {
+            await using var firstContext = await dbContextFactory.CreateDbContextAsync();
+            firstTableName = firstContext.Model.FindEntityType(typeof(BusinessTaskEntity))?.GetTableName();
+        }
 
-        Assert.DoesNotContain("Pooled", dbContextFactory.GetType().FullName, StringComparison.Ordinal);
+        using (TableSuffixScope.Use("_202605"))
+        {
+            await using var secondContext = await dbContextFactory.CreateDbContextAsync();
+            secondTableName = secondContext.Model.FindEntityType(typeof(BusinessTaskEntity))?.GetTableName();
+        }
+
+        Assert.Equal("business_tasks_202604", firstTableName);
+        Assert.Equal("business_tasks_202605", secondTableName);
     }
 
     /// <summary>
