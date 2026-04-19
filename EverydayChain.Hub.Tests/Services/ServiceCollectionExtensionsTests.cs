@@ -1,5 +1,7 @@
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.DependencyInjection;
+using EverydayChain.Hub.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -10,6 +12,28 @@ namespace EverydayChain.Hub.Tests.Services;
 /// </summary>
 public class ServiceCollectionExtensionsTests
 {
+    /// <summary>
+    /// AddInfrastructure 应注册非池化 DbContextFactory，避免分表映射在上下文复用时漂移。
+    /// </summary>
+    [Fact]
+    public void AddInfrastructure_ShouldRegisterNonPooledDbContextFactory()
+    {
+        var configData = new Dictionary<string, string?>
+        {
+            ["Sharding:ConnectionString"] = "Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;"
+        };
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(configData)
+            .Build();
+        var services = new ServiceCollection();
+
+        services.AddInfrastructure(configuration);
+        using var provider = services.BuildServiceProvider();
+        var dbContextFactory = provider.GetRequiredService<IDbContextFactory<HubDbContext>>();
+
+        Assert.DoesNotContain("Pooled", dbContextFactory.GetType().FullName, StringComparison.Ordinal);
+    }
+
     /// <summary>
     /// AddInfrastructure 应正确绑定并注入日志表保留期配置集合。
     /// </summary>

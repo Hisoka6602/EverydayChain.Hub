@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 修复 `manual_seed` 分表路由漂移：`HubDbContext` 工厂注册由 `AddPooledDbContextFactory` 调整为 `AddDbContextFactory`，避免上下文复用导致补数写入误落无后缀 `business_tasks` 基础表。
 - 按《EverydayChain.Hub_Copilot_精准执行指令_最终版》补齐门禁测试：新增 `BusinessTaskStatusWriteBackConfigurationTests`（校验 `CompletedStatusValue` 配置透传与 `PendingStatusValue=null` 语义）与 `BusinessTaskIndexCoverageTests`（校验 `business_tasks` 关键索引覆盖），并补充 `BusinessTaskEntityTypeConfiguration` 的 `UpdatedTimeLocal` 索引，同时新增迁移 `20260419033227_AddBusinessTaskUpdatedTimeLocalIndex` 以确保已部署库可自动落索引。
 - 收敛《EverydayChain.Hub_Copilot_精准执行指令_最终版》旧同步链路：删除 `IRemoteStatusConsumeService`、`ISqlServerAppendOnlyWriter`、`RemoteStatusConsumeService`、`SqlServerAppendOnlyWriter` 及对应测试，`StatusDriven` 主路径统一收敛到 `IBusinessTaskStatusConsumeService`。
 - 继续推进《EverydayChain.Hub_Copilot_精准执行指令_最终版》迁移收口：删除旧 EF 迁移链并重建单一基线迁移 `20260418204107_RebuildHubBaselineV2`，新快照仅包含当前业务主模型，不再包含本地镜像表历史语义。
