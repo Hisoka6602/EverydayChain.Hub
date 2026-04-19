@@ -268,7 +268,7 @@ public sealed class WmsFeedbackServiceTests
     }
 
     /// <summary>
-    /// 回写网关应按来源类型分流到拆零与整件目标表。
+    /// 验证回写网关按来源类型分流到拆零与整件目标表的行为。
     /// </summary>
     [Fact]
     public void ResolveTargetBySourceType_ShouldRouteToConfiguredTables()
@@ -288,7 +288,7 @@ public sealed class WmsFeedbackServiceTests
     }
 
     /// <summary>
-    /// 回写网关遇到非法来源类型时应抛出中文异常，不允许回退默认目标表。
+    /// 验证回写网关遇到非法来源类型时抛出中文异常且不回退默认目标表的行为。
     /// </summary>
     [Fact]
     public void ResolveTargetBySourceType_ShouldThrowChineseException_WhenSourceTypeUnsupported()
@@ -303,7 +303,7 @@ public sealed class WmsFeedbackServiceTests
     }
 
     /// <summary>
-    /// 构建用于来源分流测试的回写网关实例。
+    /// 创建用于来源分流测试的回写网关实例。
     /// </summary>
     /// <returns>回写网关。</returns>
     private static OracleWmsFeedbackGateway CreateGatewayForSourceTypeRoutingTests()
@@ -332,7 +332,7 @@ public sealed class WmsFeedbackServiceTests
     }
 
     /// <summary>
-    /// 获取来源分流私有方法反射句柄。
+    /// 通过反射获取来源分流私有方法句柄。
     /// </summary>
     /// <returns>方法句柄。</returns>
     private static MethodInfo GetResolveTargetBySourceTypeMethod()
