@@ -18,10 +18,9 @@
 | 配置项 | 当前基线值 |
 |---|---|
 | SplitSchema | `WMS_USER_431` |
-| SplitTable | `IDX_SPLIT_TASK` |
+| SplitTable | `IDX_PICKTOLIGHT_CARTON1` |
 | FullCaseSchema | `WMS_USER_431` |
-| FullCaseTable | `IDX_FULLCASE_TASK` |
-| BusinessKeyColumn | `TASK_CODE` |
+| FullCaseTable | `IDX_PICKTOWCS2` |
 | SplitBusinessKeyColumn | `TASK_CODE` |
 | FullCaseBusinessKeyColumn | `TASK_CODE` |
 | FeedbackStatusColumn | `FEEDBACK_STATUS` |
@@ -36,13 +35,15 @@
 | ScanCountColumn | `SCANCOUNT` |
 | BusinessStatusColumn | `STATUS` |
 
+> 说明：最终版配置已取消通用 `BusinessKeyColumn`，改为按来源拆分为 `SplitBusinessKeyColumn` 与 `FullCaseBusinessKeyColumn`。该调整用于强制“拆零写拆零表、整件写整件表”，避免“来源类型异常时仍回写到固定默认表”的兜底行为，降低误写风险。
+
 ## 4. 联调表、业务键与字段映射
 
 ### 4.1 联调目标表
 | 来源类型 | Schema | Table | 业务键列 |
 |---|---|---|---|
-| 拆零（Split） | `WMS_USER_431` | `IDX_SPLIT_TASK` | `TASK_CODE` |
-| 整件（FullCase） | `WMS_USER_431` | `IDX_FULLCASE_TASK` | `TASK_CODE` |
+| 拆零（Split） | `WMS_USER_431` | `IDX_PICKTOLIGHT_CARTON1` | `TASK_CODE` |
+| 整件（FullCase） | `WMS_USER_431` | `IDX_PICKTOWCS2` | `TASK_CODE` |
 
 ### 4.2 字段映射
 | 本地业务字段 | 远端回写列 |
@@ -60,7 +61,7 @@
 | Status | `STATUS` |
 
 ## 5. 联调前准备
-1. 联调库中存在 `IDX_SPLIT_TASK`、`IDX_FULLCASE_TASK` 且列定义与基线一致。
+1. 联调库中存在 `IDX_PICKTOLIGHT_CARTON1`、`IDX_PICKTOWCS2` 且列定义与基线一致。
 2. 联调账号具备目标表 `UPDATE` 权限。
 3. 联调环境将 `WmsFeedback.Enabled` 设为 `true`。
 4. 已准备可回放的拆零与整件任务样本。
@@ -90,7 +91,7 @@
 当前无阻塞项。
 
 ## 10. 生产启用门禁
-满足以下全部条件后才允许将生产 `WmsFeedback.Enabled` 置为 `true`：
+生产环境当前已启用 `WmsFeedback.Enabled=true`，且需持续满足以下全部条件以保持开启状态：
 1. 联调五项验证全部通过。
 2. 权限、字段、触发器评估均通过并留痕。
 3. 发布审批通过且回滚脚本已演练。
