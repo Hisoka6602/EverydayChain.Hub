@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// 业务任务状态回写配置映射测试。
+/// 业务任务状态回写配置门禁测试，校验 CompletedStatusValue 完全来自配置并保留 PendingStatusValue=null 的 IS NULL 语义映射。
 /// </summary>
 public class BusinessTaskStatusWriteBackConfigurationTests
 {
