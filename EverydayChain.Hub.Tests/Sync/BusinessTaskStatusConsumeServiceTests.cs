@@ -26,6 +26,7 @@ public class BusinessTaskStatusConsumeServiceTests
                 ["CARTONNO"] = "C1",
                 ["WAVENO"] = "W1",
                 ["DESCR"] = "R1",
+                ["ADDTIME"] = new DateTime(2032, 1, 1, 8, 0, 0, DateTimeKind.Local),
                 ["__RowId"] = "ROW-1"
             }
         ]);
@@ -60,6 +61,7 @@ public class BusinessTaskStatusConsumeServiceTests
                 ["SKUID"] = "SKU1",
                 ["WAVENO"] = "W2",
                 ["DESCR"] = "R2",
+                ["ADDTIME"] = new DateTime(2032, 1, 2, 8, 0, 0, DateTimeKind.Local),
                 ["__RowId"] = "ROW-2"
             }
         ]);
@@ -91,6 +93,7 @@ public class BusinessTaskStatusConsumeServiceTests
                 ["CARTONNO"] = "C2",
                 ["WAVENO"] = "W3",
                 ["DESCR"] = "R3",
+                ["ADDTIME"] = new DateTime(2032, 1, 3, 8, 0, 0, DateTimeKind.Local),
                 ["__RowId"] = null
             }
         ]);
