@@ -69,13 +69,15 @@ public sealed class BusinessTaskSeedTableSchemaFilter : ISchemaFilter
                 .GetResult()
                 .Where(IsValidBusinessTaskTableName)
                 .Distinct(StringComparer.Ordinal)
-                .OrderBy(name => name, StringComparer.Ordinal)
                 .ToList();
             var currentMonthTableName = $"business_tasks_{DateTime.Now:yyyyMM}";
             if (!tableNames.Contains(currentMonthTableName, StringComparer.Ordinal))
             {
                 tableNames.Add(currentMonthTableName);
             }
+            tableNames = tableNames
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToList();
 
             if (tableNames.Count == 0)
             {

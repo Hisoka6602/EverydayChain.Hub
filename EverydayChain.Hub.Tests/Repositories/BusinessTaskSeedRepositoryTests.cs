@@ -95,4 +95,22 @@ public sealed class BusinessTaskSeedRepositoryTests
         Assert.Equal(2, skippedExistingCount);
         Assert.Equal(["BC002", "BC004"], result);
     }
+
+    /// <summary>
+    /// 分批逻辑应避免超过指定批次大小。
+    /// </summary>
+    [Fact]
+    public void SplitBarcodeBatches_ShouldSplitByConfiguredBatchSize()
+    {
+        var candidateBarcodes = Enumerable.Range(1, 4501)
+            .Select(index => $"BC{index:D4}")
+            .ToArray();
+
+        var batches = BusinessTaskSeedRepository.SplitBarcodeBatches(candidateBarcodes, 2000);
+
+        Assert.Equal(3, batches.Count);
+        Assert.Equal(2000, batches[0].Count);
+        Assert.Equal(2000, batches[1].Count);
+        Assert.Equal(501, batches[2].Count);
+    }
 }

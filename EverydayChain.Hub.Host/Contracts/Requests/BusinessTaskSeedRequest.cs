@@ -17,7 +17,7 @@ public sealed class BusinessTaskSeedRequest
 
     /// <summary>
     /// 待补数条码集合。
-    /// 可填写范围：1~5000 项，元素按字符串原值去重。
+    /// 可填写范围：1~5000 项，元素按 Trim 后的值去重。
     /// 空值语义：为空或 null 时请求无效。
     /// </summary>
     [Required(ErrorMessage = "条码集合不能为空。")]
