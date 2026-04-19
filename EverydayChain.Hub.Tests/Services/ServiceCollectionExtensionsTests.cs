@@ -18,7 +18,7 @@ public class ServiceCollectionExtensionsTests
     /// AddInfrastructure 注册的 DbContextFactory 应保证不同分表后缀获得独立映射。
     /// </summary>
     [Fact]
-    public async Task AddInfrastructure_DbContextFactory_ShouldMapDifferentSuffixToDifferentTables()
+    public async Task AddInfrastructure_ShouldCreateIndependentMappingPerTableSuffix()
     {
         var configData = new Dictionary<string, string?>
         {

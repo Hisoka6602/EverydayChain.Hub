@@ -140,7 +140,7 @@ public sealed class BusinessTaskSeedRepositoryTests
     }
 
     /// <summary>
-    /// 反射调用仓储私有成功结果构建方法。
+    /// 通过反射调用私有方法、校验 BuildSuccessResult 对插入/跳过条码集合的赋值行为。
     /// </summary>
     /// <param name="targetTableName">目标表名。</param>
     /// <param name="insertedCount">插入数量。</param>

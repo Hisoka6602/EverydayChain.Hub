@@ -65,10 +65,9 @@ public sealed class BusinessTaskSeedRepository(
         var existingManualSeedKeys = await LoadExistingManualSeedKeysAsync(dbContext, candidateBarcodes, cancellationToken);
         var existingManualSeedKeySet = existingManualSeedKeys.ToHashSet(StringComparer.Ordinal);
         var insertBarcodes = FilterInsertBarcodes(candidateBarcodes, existingManualSeedKeySet, out var skippedBarcodes);
-        var skippedExistingCount = skippedBarcodes.Count;
         if (insertBarcodes.Count == 0)
         {
-            return BuildSuccessResult(targetTableName, 0, skippedExistingCount, skippedBarcodes, insertBarcodes, "模拟补数执行完成，未新增数据。");
+            return BuildSuccessResult(targetTableName, 0, skippedBarcodes.Count, skippedBarcodes, insertBarcodes, "模拟补数执行完成，未新增数据。");
         }
 
         var nowLocal = DateTime.Now;
@@ -82,7 +81,7 @@ public sealed class BusinessTaskSeedRepository(
 
         dbContext.BusinessTasks.AddRange(entities);
         _ = await dbContext.SaveChangesAsync(cancellationToken);
-        return BuildSuccessResult(targetTableName, entities.Count, skippedExistingCount, skippedBarcodes, insertBarcodes, "模拟补数写入成功。");
+        return BuildSuccessResult(targetTableName, entities.Count, skippedBarcodes.Count, skippedBarcodes, insertBarcodes, "模拟补数写入成功。");
     }
 
     /// <summary>
