@@ -35,6 +35,8 @@
 | ScanCountColumn | `SCANCOUNT` |
 | BusinessStatusColumn | `STATUS` |
 
+> 说明：最终版配置已取消通用 `BusinessKeyColumn`，改为按来源拆分为 `SplitBusinessKeyColumn` 与 `FullCaseBusinessKeyColumn`。该调整用于强制“拆零写拆零表、整件写整件表”，避免“来源类型异常时仍回写到固定默认表”的兜底行为，降低误写风险。
+
 ## 4. 联调表、业务键与字段映射
 
 ### 4.1 联调目标表
@@ -89,7 +91,7 @@
 当前无阻塞项。
 
 ## 10. 生产启用门禁
-满足以下全部条件后，生产环境继续保持 `WmsFeedback.Enabled=true`：
+生产环境当前已启用 `WmsFeedback.Enabled=true`，且需持续满足以下全部条件以保持开启状态：
 1. 联调五项验证全部通过。
 2. 权限、字段、触发器评估均通过并留痕。
 3. 发布审批通过且回滚脚本已演练。
