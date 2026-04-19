@@ -276,15 +276,15 @@ public sealed class WmsFeedbackServiceTests
         var gateway = CreateGatewayForSourceTypeRoutingTests();
         var resolveMethod = GetResolveTargetBySourceTypeMethod();
 
-        var splitTarget = (ValueTuple<string, string, string>)resolveMethod.Invoke(gateway, [BusinessTaskSourceType.Split])!;
-        var fullCaseTarget = (ValueTuple<string, string, string>)resolveMethod.Invoke(gateway, [BusinessTaskSourceType.FullCase])!;
+        var splitTarget = ((string Schema, string Table, string BusinessKeyColumn))resolveMethod.Invoke(gateway, [BusinessTaskSourceType.Split])!;
+        var fullCaseTarget = ((string Schema, string Table, string BusinessKeyColumn))resolveMethod.Invoke(gateway, [BusinessTaskSourceType.FullCase])!;
 
-        Assert.Equal("WMS_USER_431", splitTarget.Item1);
-        Assert.Equal("IDX_PICKTOLIGHT_CARTON1", splitTarget.Item2);
-        Assert.Equal("TASK_CODE", splitTarget.Item3);
-        Assert.Equal("WMS_USER_431", fullCaseTarget.Item1);
-        Assert.Equal("IDX_PICKTOWCS2", fullCaseTarget.Item2);
-        Assert.Equal("TASK_CODE", fullCaseTarget.Item3);
+        Assert.Equal("WMS_USER_431", splitTarget.Schema);
+        Assert.Equal("IDX_PICKTOLIGHT_CARTON1", splitTarget.Table);
+        Assert.Equal("TASK_CODE", splitTarget.BusinessKeyColumn);
+        Assert.Equal("WMS_USER_431", fullCaseTarget.Schema);
+        Assert.Equal("IDX_PICKTOWCS2", fullCaseTarget.Table);
+        Assert.Equal("TASK_CODE", fullCaseTarget.BusinessKeyColumn);
     }
 
     /// <summary>
@@ -322,7 +322,7 @@ public sealed class WmsFeedbackServiceTests
         });
         var oracleOptions = Options.Create(new OracleOptions
         {
-            ConnectionString = "Data Source=127.0.0.1:1521/ORCL;User Id=U;Password=P;"
+            ConnectionString = "Data Source=127.0.0.1:1521/ORCL;User Id=PLACEHOLDER_USER;Password=PLACEHOLDER_PASSWORD;"
         });
         return new OracleWmsFeedbackGateway(
             options,
