@@ -72,6 +72,7 @@ public class BusinessTaskEntityTypeConfiguration : IEntityTypeConfiguration<Busi
         builder.HasIndex(x => x.IsFeedbackReported);
         builder.HasIndex(x => x.FeedbackTimeLocal);
         builder.HasIndex(x => x.CreatedTimeLocal);
+        builder.HasIndex(x => x.UpdatedTimeLocal);
         builder.HasIndex(x => new { x.CreatedTimeLocal, x.Id });
         builder.Property(x => x.WaveCode).HasMaxLength(64);
         builder.HasIndex(x => x.NormalizedWaveCode);

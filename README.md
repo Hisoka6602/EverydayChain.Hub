@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 按《EverydayChain.Hub_Copilot_精准执行指令_最终版》补齐门禁测试：新增 `BusinessTaskStatusWriteBackConfigurationTests`（校验 `CompletedStatusValue` 配置透传与 `PendingStatusValue=null` 语义）与 `BusinessTaskIndexCoverageTests`（校验 `business_tasks` 关键索引覆盖），并补充 `BusinessTaskEntityTypeConfiguration` 的 `UpdatedTimeLocal` 索引，同时新增迁移 `20260419033227_AddBusinessTaskUpdatedTimeLocalIndex` 以确保已部署库可自动落索引。
 - 收敛《EverydayChain.Hub_Copilot_精准执行指令_最终版》旧同步链路：删除 `IRemoteStatusConsumeService`、`ISqlServerAppendOnlyWriter`、`RemoteStatusConsumeService`、`SqlServerAppendOnlyWriter` 及对应测试，`StatusDriven` 主路径统一收敛到 `IBusinessTaskStatusConsumeService`。
 - 继续推进《EverydayChain.Hub_Copilot_精准执行指令_最终版》迁移收口：删除旧 EF 迁移链并重建单一基线迁移 `20260418204107_RebuildHubBaselineV2`，新快照仅包含当前业务主模型，不再包含本地镜像表历史语义。
 - 完成《EverydayChain.Hub_Copilot_精准执行指令_最终版》镜像表收口第一阶段：删除本地镜像表实体 `WmsSplitPickToLightCartonEntity`、`WmsPickToWcsEntity`，并从 `HubDbContext` 移除对应 DbSet 与映射配置，确保本地业务主路径仅保留 `business_tasks`。
@@ -331,6 +332,8 @@
 │   ├── Persistence/Sharding/ShardModelCacheKeyFactory.cs
 │   ├── Migrations/20260418204107_RebuildHubBaselineV2.cs
 │   ├── Migrations/20260418204107_RebuildHubBaselineV2.Designer.cs
+│   ├── Migrations/20260419033227_AddBusinessTaskUpdatedTimeLocalIndex.cs
+│   ├── Migrations/20260419033227_AddBusinessTaskUpdatedTimeLocalIndex.Designer.cs
 │   ├── Migrations/HubDbContextModelSnapshot.cs
 │   └── Services
 │       ├── IDangerZoneExecutor.cs
@@ -354,9 +357,11 @@
 │   ├── Repositories/NoOpShardTableProvisioner.cs
 │   ├── Repositories/SyncStagingRepositoryTests.cs
 │   ├── Repositories/SqlServerSyncUpsertRepositoryTests.cs
+│   ├── Repositories/BusinessTaskStatusWriteBackConfigurationTests.cs
 │   ├── Repositories/SyncTaskConfigRepositoryTests.cs
 │   ├── Sync/Fakes/FakeOracleStatusDrivenSourceReader.cs
 │   ├── Sync/Fakes/FakeOracleRemoteStatusWriter.cs
+│   ├── Architecture/BusinessTaskIndexCoverageTests.cs
 │   ├── Architecture/BusinessTaskSingleSourceArchitectureTests.cs
 │   ├── Host/Controllers/ScanControllerTests.cs
 │   ├── Host/Controllers/ChuteControllerTests.cs
@@ -476,6 +481,8 @@
 - `EverydayChain.Hub.Domain/Options/WebEndpointOptions.cs`：定义 Web 监听地址配置实体，统一承载 `WebEndpoint.Url` 绑定语义。
 - `EverydayChain.Hub.Domain/Options/SwaggerOptions.cs`：Swagger 文档配置实体，新增 `Path` 用于配置化 Swagger 页面入口。
 - `EverydayChain.Hub.Infrastructure/Migrations/20260418204107_RebuildHubBaselineV2.cs`：EF Core 单一基线迁移，覆盖当前全量模型与索引定义，并移除旧迁移链中的本地镜像表历史包袱。
+- `EverydayChain.Hub.Infrastructure/Migrations/20260419033227_AddBusinessTaskUpdatedTimeLocalIndex.cs`：为 `business_tasks.UpdatedTimeLocal` 补齐单列索引迁移，确保自动迁移可在存量环境落库。
+- `EverydayChain.Hub.Infrastructure/Migrations/20260419033227_AddBusinessTaskUpdatedTimeLocalIndex.Designer.cs`：对应迁移的 EF 设计期模型快照，保证迁移链与运行时模型一致。
 - `docs/联调证据/PR12-20260416-R1/01-联调执行记录.md`：PR-12 联调收口 R1 批次执行记录，归档本地时间窗口、回归命令与端到端链路执行状态。
 - `docs/联调证据/PR12-20260416-R1/02-关键日志索引.md`：PR-12 联调收口 R1 批次关键日志索引，固化日志范围、检索词口径与命中补录表。
 - `docs/联调证据/PR12-20260416-R1/03-结果汇总.md`：PR-12 联调收口 R1 批次结果汇总，记录统计口径、回归结果与最终收口结论。
@@ -650,6 +657,8 @@
 - `AutoMigrationHostedService.cs`：启动阶段自动迁移入口；当自动迁移阶段发生数据库异常时仅记录错误并降级跳过迁移，保持宿主继续运行，避免单库不可达导致整体进程崩溃。
 - `EverydayChain.Hub.Tests/Host/Controllers/*Tests.cs`：PR-03 新增 Controller 基础行为测试，覆盖空参校验与标准成功响应路径。
 - `EverydayChain.Hub.Tests/Architecture/BusinessTaskSingleSourceArchitectureTests.cs`：架构防回退测试，校验 `HubDbContext` 与 `HubDbContextModelSnapshot` 不再包含本地 `IDX_PICKTOLIGHT_CARTON1` / `IDX_PICKTOWCS2` 映射，并校验 `appsettings.json` 中两条 WMS 状态驱动任务固定投影到 `business_tasks`。
+- `EverydayChain.Hub.Tests/Architecture/BusinessTaskIndexCoverageTests.cs`：业务主表索引覆盖门禁测试，校验 `SourceTableCode+BusinessKey` 唯一索引及 `NormalizedBarcode`、`NormalizedWaveCode`、`ResolvedDockCode`、`Status`、`FeedbackStatus`、`CreatedTimeLocal`、`UpdatedTimeLocal` 关键索引存在。
+- `EverydayChain.Hub.Tests/Repositories/BusinessTaskStatusWriteBackConfigurationTests.cs`：状态回写配置门禁测试，校验 `CompletedStatusValue` 完全来自配置并保留 `PendingStatusValue=null` 的 `IS NULL` 语义映射。
 - `EverydayChain.Hub.Tests/Host/Workers/AutoMigrationHostedServiceTests.cs`：自动迁移托管服务容错测试，覆盖“自动迁移阶段异常降级继续启动”与“启动自检异常仍阻断启动”两条分支。
 - `EverydayChain.Hub.Tests/Host/Workers/TestAutoMigrationService.cs`：自动迁移服务测试替身，支持统计调用次数与注入异常。
 - `EverydayChain.Hub.Tests/Host/Workers/TestDatabaseException.cs`：数据库异常测试替身，统一用于自动迁移降级分支测试。
