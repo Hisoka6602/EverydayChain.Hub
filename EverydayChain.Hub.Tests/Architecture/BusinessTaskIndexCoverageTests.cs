@@ -46,7 +46,7 @@ public class BusinessTaskIndexCoverageTests
     private static HubDbContext CreateDbContext()
     {
         var connectionString = Environment.GetEnvironmentVariable("HUB_TEST_SQLSERVER_CONNECTION_STRING")
-            ?? "Server=127.0.0.1;Database=Placeholder;User Id=Placeholder;Password=Placeholder;TrustServerCertificate=True;";
+            ?? "Server=127.0.0.1;Database=Placeholder;Trusted_Connection=True;TrustServerCertificate=True;";
         var dbContextOptions = new DbContextOptionsBuilder<HubDbContext>()
             .UseSqlServer(connectionString)
             .Options;

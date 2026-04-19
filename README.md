@@ -355,12 +355,12 @@
 │   ├── Repositories/NoOpShardTableProvisioner.cs
 │   ├── Repositories/SyncStagingRepositoryTests.cs
 │   ├── Repositories/SqlServerSyncUpsertRepositoryTests.cs
-│   ├── Repositories/SyncTaskConfigRepositoryTests.cs
 │   ├── Repositories/BusinessTaskStatusWriteBackConfigurationTests.cs
+│   ├── Repositories/SyncTaskConfigRepositoryTests.cs
 │   ├── Sync/Fakes/FakeOracleStatusDrivenSourceReader.cs
 │   ├── Sync/Fakes/FakeOracleRemoteStatusWriter.cs
-│   ├── Architecture/BusinessTaskSingleSourceArchitectureTests.cs
 │   ├── Architecture/BusinessTaskIndexCoverageTests.cs
+│   ├── Architecture/BusinessTaskSingleSourceArchitectureTests.cs
 │   ├── Host/Controllers/ScanControllerTests.cs
 │   ├── Host/Controllers/ChuteControllerTests.cs
 │   ├── Host/Controllers/DropFeedbackControllerTests.cs
