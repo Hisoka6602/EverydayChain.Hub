@@ -21,7 +21,7 @@ public class BusinessTaskMaterializer : IBusinessTaskMaterializer
         var barcode = ValidateOptionalText(request.Barcode, nameof(request.Barcode), 128);
         var waveCode = ValidateOptionalText(request.WaveCode, nameof(request.WaveCode), 64);
         var waveRemark = ValidateOptionalText(request.WaveRemark, nameof(request.WaveRemark), 128);
-        var materializedTimeLocal = request.MaterializedTimeLocal ?? DateTime.Now;
+        var materializedTimeLocal = ValidateMaterializedTimeLocal(request.MaterializedTimeLocal, request.TaskCode, request.SourceTableCode);
 
         var entity = new BusinessTaskEntity
         {
@@ -38,6 +38,25 @@ public class BusinessTaskMaterializer : IBusinessTaskMaterializer
         };
         entity.RefreshQueryFields();
         return entity;
+    }
+
+    /// <summary>
+    /// 校验物化业务时间，缺失时阻断写入。
+    /// </summary>
+    /// <param name="materializedTimeLocal">物化业务时间。</param>
+    /// <param name="taskCode">任务编码。</param>
+    /// <param name="sourceTableCode">来源表编码。</param>
+    /// <returns>校验通过的时间。</returns>
+    /// <exception cref="InvalidOperationException">缺失时抛出异常。</exception>
+    private static DateTime ValidateMaterializedTimeLocal(DateTime materializedTimeLocal, string taskCode, string sourceTableCode)
+    {
+        if (materializedTimeLocal == default)
+        {
+            throw new InvalidOperationException(
+                $"MaterializedTimeLocal 缺失，无法确定业务时间，禁止继续写入业务任务。TaskCode={taskCode}, SourceTableCode={sourceTableCode}");
+        }
+
+        return materializedTimeLocal;
     }
 
     /// <summary>

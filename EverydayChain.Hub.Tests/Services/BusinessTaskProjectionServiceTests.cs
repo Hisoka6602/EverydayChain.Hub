@@ -28,7 +28,7 @@ public class BusinessTaskProjectionServiceTests
                     Barcode = "CARTON001",
                     WaveCode = "W1",
                     WaveRemark = "R1",
-                    ProjectedTimeLocal = DateTime.Now
+                    ProjectedTimeLocal = new DateTime(2026, 4, 20, 10, 30, 0, DateTimeKind.Local)
                 }
             ]
         };
@@ -59,12 +59,38 @@ public class BusinessTaskProjectionServiceTests
                     SourceTableCode = "WmsSplitPickToLightCarton",
                     SourceType = BusinessTaskSourceType.Split,
                     BusinessKey = longBusinessKey,
-                    Barcode = longBusinessKey
+                    Barcode = longBusinessKey,
+                    ProjectedTimeLocal = new DateTime(2026, 4, 20, 10, 30, 0, DateTimeKind.Local)
                 }
             ]
         };
 
         var exception = Assert.Throws<ArgumentException>(() => service.Project(request));
         Assert.Contains("BusinessKey", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// 投影时间缺失时应阻断投影，避免错误分片写入。
+    /// </summary>
+    [Fact]
+    public void Project_WhenProjectedTimeLocalMissing_ShouldThrow()
+    {
+        var service = new BusinessTaskProjectionService();
+        var request = new BusinessTaskProjectionRequest
+        {
+            Rows =
+            [
+                new BusinessTaskProjectionRow
+                {
+                    SourceTableCode = "WmsSplitPickToLightCarton",
+                    SourceType = BusinessTaskSourceType.Split,
+                    BusinessKey = "CARTON001",
+                    ProjectedTimeLocal = default
+                }
+            ]
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => service.Project(request));
+        Assert.Contains("无法确定分表月份", exception.Message, StringComparison.Ordinal);
     }
 }
