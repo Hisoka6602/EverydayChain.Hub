@@ -100,6 +100,6 @@ public sealed class BusinessTaskSeedControllerTests
 
         Assert.NotNull(response.Data);
         Assert.Equal("business_tasks_202604", response.Data.TargetTableName);
-        Assert.Equal(1, stubService.LastCommand!.Barcodes.Count);
+        Assert.Single(stubService.LastCommand!.Barcodes);
     }
 }
