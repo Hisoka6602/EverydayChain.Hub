@@ -69,4 +69,23 @@ public class BusinessTaskMaterializerTests
         var exception = Assert.Throws<ArgumentException>(action);
         Assert.Equal(expectedParamName, exception.ParamName);
     }
+
+    /// <summary>
+    /// 物化时间缺失时应阻断写入，避免误用处理时间作为业务时间。
+    /// </summary>
+    [Fact]
+    public void Materialize_WhenMaterializedTimeLocalMissing_ShouldThrow()
+    {
+        var sut = new BusinessTaskMaterializer();
+        var request = new BusinessTaskMaterializeRequest
+        {
+            TaskCode = "TASK-001",
+            SourceTableCode = "WMS_PICK",
+            BusinessKey = "ORDER-1|LINE-2",
+            SourceType = BusinessTaskSourceType.Split
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => sut.Materialize(request));
+        Assert.Contains("MaterializedTimeLocal 缺失", exception.Message, StringComparison.Ordinal);
+    }
 }

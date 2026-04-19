@@ -48,7 +48,7 @@ public class BusinessTaskSingleSourceArchitectureTests
     }
 
     /// <summary>
-    /// WMS 两条状态驱动任务应固定投影到业务主表。
+    /// WMS 两条状态驱动任务应固定投影到业务逻辑表，并保持分表读取不回退固定表。
     /// </summary>
     [Fact]
     public void HostAppSettings_WmsStatusDrivenTables_ShouldProjectToBusinessTasks()
@@ -65,7 +65,11 @@ public class BusinessTaskSingleSourceArchitectureTests
 
         var splitTable = syncTables!.Single(table => string.Equals(table.TableCode, "WmsSplitPickToLightCarton", StringComparison.Ordinal));
         var fullCaseTable = syncTables.Single(table => string.Equals(table.TableCode, "WmsPickToWcs", StringComparison.Ordinal));
+        var shardingOptions = configuration.GetSection("Sharding").Get<ShardingOptions>();
 
+        Assert.NotNull(shardingOptions);
+        Assert.False(shardingOptions!.EnableLegacyBaseTableReadFallback);
+        // 此处断言为逻辑表名，运行态实际写入目标为 business_tasks_yyyyMM 月分表。
         Assert.Equal("business_tasks", splitTable.TargetLogicalTable);
         Assert.Equal("business_tasks", fullCaseTable.TargetLogicalTable);
         Assert.Equal("StatusDriven", splitTable.SyncMode);

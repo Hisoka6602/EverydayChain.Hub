@@ -40,5 +40,5 @@ public class BusinessTaskProjectionRow
     /// <summary>
     /// 投影时间（本地时间）。
     /// </summary>
-    public DateTime ProjectedTimeLocal { get; set; } = DateTime.Now;
+    public required DateTime ProjectedTimeLocal { get; set; }
 }

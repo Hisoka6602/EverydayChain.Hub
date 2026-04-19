@@ -78,6 +78,7 @@ public class AutoMigrationService(
 
     /// <summary>
     /// 判断是否需要对存量库执行“基线迁移已应用”标记。
+    /// 固定表 <c>business_tasks</c> 在此仅用于识别历史基线，不代表运行态写入目标。
     /// </summary>
     /// <param name="allMigrations">当前程序集全部迁移。</param>
     /// <param name="appliedMigrations">数据库已应用迁移。</param>
@@ -227,6 +228,7 @@ public class AutoMigrationService(
 
     /// <summary>
     /// 统计当前数据库中已存在的核心业务表数量。
+    /// 固定表 <c>business_tasks</c> 属于迁移遗留探测对象，正式运行写入目标始终为 <c>business_tasks_yyyyMM</c>。
     /// </summary>
     /// <param name="dbContext">数据库上下文。</param>
     /// <param name="cancellationToken">取消令牌。</param>
