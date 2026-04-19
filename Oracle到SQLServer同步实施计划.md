@@ -55,9 +55,9 @@
 |---|---|:---:|---|
 | 4.1 | `SyncMode` 枚举：`KeyedMerge`/`StatusDriven`，空值默认 `KeyedMerge` | ✅ 已完成 | `Domain/Enums/SyncMode.cs` |
 | 4.2 | 状态读取：`OracleStatusDrivenSourceReader` 按 `StatusColumnName=PendingStatusValue` 分页拉取，携带 `__RowId` | ✅ 已完成 | `Infrastructure/Sync/Readers/OracleStatusDrivenSourceReader.cs` |
-| 4.3 | 追加写入：`SqlServerAppendOnlyWriter` 仅追加不 Upsert、不删除 | ✅ 已完成 | `Infrastructure/Sync/Writers/SqlServerAppendOnlyWriter.cs` |
+| 4.3 | 业务主表投影写入：`BusinessTaskProjectionService` + `BusinessTaskRepository.UpsertProjectionBatchAsync`（按 `SourceTableCode+BusinessKey` 幂等） | ✅ 已完成（P3-001） | `Application/Services/BusinessTaskProjectionService.cs`、`Infrastructure/Repositories/BusinessTaskRepository.cs` |
 | 4.4 | 远端状态回写：`OracleRemoteStatusWriter` 按 `ROWID` 更新状态列 + 审计列 | ✅ 已完成 | `Infrastructure/Sync/Writers/OracleRemoteStatusWriter.cs` |
-| 4.5 | 消费服务：`RemoteStatusConsumeService` 编排读取→写入→回写闭环；`ShouldWriteBackRemoteStatus=true` 时固定读第 1 页避免跳行 | ✅ 已完成 | `Infrastructure/Sync/Services/RemoteStatusConsumeService.cs` |
+| 4.5 | 消费服务：`BusinessTaskStatusConsumeService` 编排读取→投影→幂等写入→可选回写闭环；`ShouldWriteBackRemoteStatus=true` 时固定读第 1 页避免跳行 | ✅ 已完成（P3-001） | `Infrastructure/Sync/Services/BusinessTaskStatusConsumeService.cs` |
 | 4.6 | 配置：`RemoteStatusConsumeProfile`、`StatusDriven` 配置段含 `WriteBackCompletedTimeColumnName`/`WriteBackBatchIdColumnName` 审计列 | ✅ 已完成 | `Domain/Sync/Models/RemoteStatusConsumeProfile.cs`、`Domain/Options/SyncTableOptions.cs` |
 | 4.7 | 接口归属修正：`IOracleRemoteStatusWriter`、`IOracleStatusDrivenSourceReader`、`ISqlServerAppendOnlyWriter` 迁移至 `Application/Abstractions/Sync/` | ✅ 已完成（P2-007） | `Application/Abstractions/Sync/` |
 
@@ -88,4 +88,4 @@
 | 6.1 | 增量落盘/分片持久化：优化目标快照从整表重写改为增量写入，降低大表 I/O | P1 |
 | 6.2 | 内存仓储持久化：`ISyncChangeLogRepository`、`ISyncDeletionLogRepository` 已切换为 SQL Server 分片持久化实现（`sync_change_logs_{yyyyMM}`、`sync_deletion_logs_{yyyyMM}`），默认链路已不再依赖内存仓储 | ✅ 已完成 |
 | 6.3 | Polly 熔断策略可观测：当前熔断状态不对外暴露指标，后续可接入健康检查端点 | P2 |
-| 6.4 | 扫描/落格字段强制回写规则落地：整件与拆零表在扫描阶段落实 `LENGTH/WIDTH/HIGH/CUBE/GROSSWEIGHT` 本地+远端写入，`SCANCOUNT` 按条码 `+1`，`CLOSETIME` 更新最新扫描时间；落格阶段落实 `STATUS` 本地+远端写入 | P1 |
+| 6.4 | 扫描/落格字段强制回写规则落地：扫描阶段落实 `LENGTH/WIDTH/HIGH/CUBE/GROSSWEIGHT` 本地写入、`SCANCOUNT` 按条码 `+1`、`CLOSETIME` 回写；落格阶段落实 `STATUS` 本地推进并经回传链路写入远端 | ✅ 已完成（P3-002） |
