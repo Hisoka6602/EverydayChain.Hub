@@ -71,6 +71,7 @@ public sealed class BusinessTaskSeedRepository(
         }
 
         var nowLocal = DateTime.Now;
+        // 请求级随机因子：用于降低并发场景下同毫秒 TaskCode 冲突风险。
         var requestNonce = RandomNumberGenerator.GetHexString(8).ToLowerInvariant();
         var entities = new List<BusinessTaskEntity>(insertBarcodes.Count);
         for (var index = 0; index < insertBarcodes.Count; index++)
@@ -222,6 +223,7 @@ public sealed class BusinessTaskSeedRepository(
         IReadOnlyList<string> candidateBarcodes,
         CancellationToken cancellationToken)
     {
+        // 聚合所有批次查询命中的已存在业务键。
         var existingManualSeedKeys = new List<string>(candidateBarcodes.Count);
         foreach (var barcodeBatch in SplitBarcodeBatches(candidateBarcodes, MaxInClauseBatchSize))
         {
@@ -241,8 +243,8 @@ public sealed class BusinessTaskSeedRepository(
     /// </summary>
     /// <param name="candidateBarcodes">候选条码集合。</param>
     /// <param name="batchSize">批次大小。</param>
-    /// <returns>分批结果。</returns>
-    internal static IReadOnlyList<IReadOnlyList<string>> SplitBarcodeBatches(IReadOnlyList<string> candidateBarcodes, int batchSize)
+    /// <returns>分批结果集合，每批大小不超过 <paramref name="batchSize"/>，最后一批可能不足一个批次。</returns>
+    private static IReadOnlyList<IReadOnlyList<string>> SplitBarcodeBatches(IReadOnlyList<string> candidateBarcodes, int batchSize)
     {
         var result = new List<IReadOnlyList<string>>();
         if (candidateBarcodes.Count == 0)
@@ -250,16 +252,15 @@ public sealed class BusinessTaskSeedRepository(
             return result;
         }
 
+        // 防御性兜底：当批次大小小于 1 时按 1 处理，避免循环步长为 0 导致死循环。
         var actualBatchSize = Math.Max(1, batchSize);
         for (var index = 0; index < candidateBarcodes.Count; index += actualBatchSize)
         {
             var count = Math.Min(actualBatchSize, candidateBarcodes.Count - index);
-            var batch = new List<string>(count);
-            for (var offset = 0; offset < count; offset++)
-            {
-                batch.Add(candidateBarcodes[index + offset]);
-            }
-
+            var batch = candidateBarcodes
+                .Skip(index)
+                .Take(count)
+                .ToList();
             result.Add(batch);
         }
 
