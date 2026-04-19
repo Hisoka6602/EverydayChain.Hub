@@ -279,12 +279,12 @@ public sealed class WmsFeedbackServiceTests
         var splitTarget = ((string Schema, string Table, string BusinessKeyColumn))resolveMethod.Invoke(gateway, [BusinessTaskSourceType.Split])!;
         var fullCaseTarget = ((string Schema, string Table, string BusinessKeyColumn))resolveMethod.Invoke(gateway, [BusinessTaskSourceType.FullCase])!;
 
-        Assert.Equal("WMS_USER_431", splitTarget.Schema);
+        Assert.Equal("WMS_USER_SPLIT_431", splitTarget.Schema);
         Assert.Equal("IDX_PICKTOLIGHT_CARTON1", splitTarget.Table);
-        Assert.Equal("TASK_CODE", splitTarget.BusinessKeyColumn);
-        Assert.Equal("WMS_USER_431", fullCaseTarget.Schema);
+        Assert.Equal("SPLIT_TASK_CODE", splitTarget.BusinessKeyColumn);
+        Assert.Equal("WMS_USER_FULLCASE_431", fullCaseTarget.Schema);
         Assert.Equal("IDX_PICKTOWCS2", fullCaseTarget.Table);
-        Assert.Equal("TASK_CODE", fullCaseTarget.BusinessKeyColumn);
+        Assert.Equal("FULLCASE_TASK_CODE", fullCaseTarget.BusinessKeyColumn);
     }
 
     /// <summary>
@@ -311,12 +311,12 @@ public sealed class WmsFeedbackServiceTests
         var options = Options.Create(new WmsFeedbackOptions
         {
             Enabled = true,
-            SplitSchema = "WMS_USER_431",
+            SplitSchema = "WMS_USER_SPLIT_431",
             SplitTable = "IDX_PICKTOLIGHT_CARTON1",
-            SplitBusinessKeyColumn = "TASK_CODE",
-            FullCaseSchema = "WMS_USER_431",
+            SplitBusinessKeyColumn = "SPLIT_TASK_CODE",
+            FullCaseSchema = "WMS_USER_FULLCASE_431",
             FullCaseTable = "IDX_PICKTOWCS2",
-            FullCaseBusinessKeyColumn = "TASK_CODE",
+            FullCaseBusinessKeyColumn = "FULLCASE_TASK_CODE",
             FeedbackStatusColumn = "STATUS",
             FeedbackCompletedValue = "Y"
         });
