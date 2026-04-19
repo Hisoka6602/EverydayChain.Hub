@@ -110,8 +110,25 @@ public sealed class BusinessTaskSeedService : IBusinessTaskSeedService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "业务任务模拟补数执行失败。TargetTableName={TargetTableName}", command.TargetTableName);
+            _logger.LogError(ex, "业务任务模拟补数执行失败。TargetTableName={TargetTableName}", SanitizeForLog(command.TargetTableName));
             return BusinessTaskSeedResult.Fail("模拟补数执行失败，请稍后重试。");
         }
+    }
+
+    /// <summary>
+    /// 日志安全归一化。
+    /// </summary>
+    /// <param name="value">原始文本。</param>
+    /// <returns>去除换行后的安全文本。</returns>
+    private static string SanitizeForLog(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        return value
+            .Replace("\r", string.Empty, StringComparison.Ordinal)
+            .Replace("\n", string.Empty, StringComparison.Ordinal);
     }
 }

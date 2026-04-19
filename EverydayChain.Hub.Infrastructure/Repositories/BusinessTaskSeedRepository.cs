@@ -7,8 +7,6 @@ using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
@@ -184,9 +182,27 @@ public sealed class BusinessTaskSeedRepository(
     /// <returns>任务编码。</returns>
     private static string BuildTaskCode(string barcode, DateTime nowLocal, int index)
     {
-        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes($"{barcode}|{nowLocal:yyyyMMddHHmmssfff}|{index}"));
-        var hash = Convert.ToHexString(hashBytes.AsSpan(0, 4)).ToLowerInvariant();
+        var hash = ComputeFnv1aHash($"{barcode}|{nowLocal:yyyyMMddHHmmssfff}|{index}").ToString("x8");
         return $"manual_seed_{nowLocal:yyyyMMddHHmmssfff}_{hash}_{index:D4}";
+    }
+
+    /// <summary>
+    /// 计算 FNV-1a 32 位哈希值。
+    /// </summary>
+    /// <param name="value">原始值。</param>
+    /// <returns>哈希值。</returns>
+    private static uint ComputeFnv1aHash(string value)
+    {
+        const uint offsetBasis = 2166136261;
+        const uint prime = 16777619;
+        var hash = offsetBasis;
+        foreach (var character in value)
+        {
+            hash ^= character;
+            hash *= prime;
+        }
+
+        return hash;
     }
 
     /// <summary>

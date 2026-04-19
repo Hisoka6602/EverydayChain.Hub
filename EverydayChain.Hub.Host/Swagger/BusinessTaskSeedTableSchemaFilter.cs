@@ -71,7 +71,7 @@ public sealed class BusinessTaskSeedTableSchemaFilter : ISchemaFilter
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(name => name, StringComparer.Ordinal)
                 .ToList();
-            var currentMonthTableName = $"business_tasks_{DateTime.Now.ToString("yyyyMM", CultureInfo.InvariantCulture)}";
+            var currentMonthTableName = $"business_tasks_{DateTime.Now:yyyyMM}";
             if (!tableNames.Contains(currentMonthTableName, StringComparer.Ordinal))
             {
                 tableNames.Add(currentMonthTableName);
