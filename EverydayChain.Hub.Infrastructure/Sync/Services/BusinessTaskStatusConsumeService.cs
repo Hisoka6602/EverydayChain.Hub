@@ -221,12 +221,11 @@ public class BusinessTaskStatusConsumeService(
         string businessKey,
         IReadOnlyDictionary<string, object?> row)
     {
-        if (TryResolveProjectedTimeFromCursorColumn(definition, row, out var projectedTimeLocal, out _))
+        if (TryResolveProjectedTimeFromCursorColumn(definition, row, out var projectedTimeLocal, out var fallbackReason))
         {
             return projectedTimeLocal;
         }
 
-        var fallbackReason = BuildProjectedTimeFailureReason(definition, row);
         logger.LogError(
             "远端业务时间缺失，无法确定分表月份，禁止继续写入业务任务。TableCode={TableCode}, BatchId={BatchId}, CursorColumn={CursorColumn}, BusinessKey={BusinessKey}, FailureReason={FailureReason}",
             definition.TableCode,
@@ -365,20 +364,6 @@ public class BusinessTaskStatusConsumeService(
         localTime = DateTime.SpecifyKind(time, DateTimeKind.Local);
         failureReason = string.Empty;
         return true;
-    }
-
-    /// <summary>
-    /// 构建投影业务时间缺失原因。
-    /// </summary>
-    /// <param name="definition">同步定义。</param>
-    /// <param name="row">远端读取行。</param>
-    /// <returns>失败原因文本。</returns>
-    private static string BuildProjectedTimeFailureReason(
-        SyncTableDefinition definition,
-        IReadOnlyDictionary<string, object?> row)
-    {
-        _ = TryResolveProjectedTimeFromCursorColumn(definition, row, out _, out var failureReason);
-        return string.IsNullOrWhiteSpace(failureReason) ? "远端业务时间不可用" : failureReason;
     }
 
     /// <summary>
