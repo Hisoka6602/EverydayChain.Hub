@@ -39,4 +39,14 @@ public sealed class BusinessTaskSeedResponse
     /// 目标表内已存在而跳过数量。
     /// </summary>
     public int SkippedExistingCount { get; set; }
+
+    /// <summary>
+    /// 本次实际写入的条码集合。
+    /// </summary>
+    public IReadOnlyList<string> InsertedBarcodes { get; set; } = [];
+
+    /// <summary>
+    /// 因目标表已存在而跳过的条码集合。
+    /// </summary>
+    public IReadOnlyList<string> SkippedBarcodes { get; set; } = [];
 }

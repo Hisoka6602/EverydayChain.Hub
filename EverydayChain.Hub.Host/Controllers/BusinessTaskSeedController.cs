@@ -107,7 +107,9 @@ public sealed class BusinessTaskSeedController : ControllerBase
             DeduplicatedCount = result.DeduplicatedCount,
             CandidateCount = result.CandidateCount,
             InsertedCount = result.InsertedCount,
-            SkippedExistingCount = result.SkippedExistingCount
+            SkippedExistingCount = result.SkippedExistingCount,
+            InsertedBarcodes = result.InsertedBarcodes,
+            SkippedBarcodes = result.SkippedBarcodes
         };
     }
 }

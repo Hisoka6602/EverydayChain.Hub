@@ -51,6 +51,16 @@ public sealed class BusinessTaskSeedResult
     public int SkippedExistingCount { get; set; }
 
     /// <summary>
+    /// 本次实际写入的条码集合。
+    /// </summary>
+    public IReadOnlyList<string> InsertedBarcodes { get; set; } = [];
+
+    /// <summary>
+    /// 因目标表已存在而跳过的条码集合。
+    /// </summary>
+    public IReadOnlyList<string> SkippedBarcodes { get; set; } = [];
+
+    /// <summary>
     /// 构建失败结果。
     /// </summary>
     /// <param name="message">失败消息。</param>
@@ -60,7 +70,9 @@ public sealed class BusinessTaskSeedResult
         return new BusinessTaskSeedResult
         {
             IsSuccess = false,
-            Message = message
+            Message = message,
+            InsertedBarcodes = [],
+            SkippedBarcodes = []
         };
     }
 }
