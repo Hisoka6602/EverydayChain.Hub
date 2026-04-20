@@ -14,6 +14,18 @@ public sealed class WmsFeedbackBackgroundWorker(
 {
     /// <summary>单轮主回传执行超时秒数（危险动作隔离器）。</summary>
     private const int SingleRunTimeoutSeconds = 300;
+    /// <summary>主回传任务默认轮询间隔（秒）。</summary>
+    private const int DefaultPollingIntervalSeconds = 300;
+    /// <summary>主回传任务轮询间隔最小值（秒）。</summary>
+    private const int MinPollingIntervalSeconds = 1;
+    /// <summary>主回传任务轮询间隔最大值（秒）。</summary>
+    private const int MaxPollingIntervalSeconds = 86400;
+    /// <summary>主回传任务默认批处理上限。</summary>
+    private const int DefaultBatchSize = 100;
+    /// <summary>主回传任务批处理上限最小值。</summary>
+    private const int MinBatchSize = 1;
+    /// <summary>主回传任务批处理上限最大值。</summary>
+    private const int MaxBatchSize = 1000;
 
     /// <summary>业务回传配置快照。</summary>
     private readonly WmsFeedbackOptions _wmsFeedbackOptions = wmsFeedbackOptions.Value;
@@ -30,12 +42,14 @@ public sealed class WmsFeedbackBackgroundWorker(
             return;
         }
 
-        var pollingIntervalSeconds = _wmsFeedbackOptions.PollingIntervalSeconds > 0
+        var pollingCandidate = _wmsFeedbackOptions.PollingIntervalSeconds > 0
             ? _wmsFeedbackOptions.PollingIntervalSeconds
-            : 300;
-        var batchSize = _wmsFeedbackOptions.BatchSize > 0
+            : DefaultPollingIntervalSeconds;
+        var batchCandidate = _wmsFeedbackOptions.BatchSize > 0
             ? _wmsFeedbackOptions.BatchSize
-            : 100;
+            : DefaultBatchSize;
+        var pollingIntervalSeconds = Math.Clamp(pollingCandidate, MinPollingIntervalSeconds, MaxPollingIntervalSeconds);
+        var batchSize = Math.Clamp(batchCandidate, MinBatchSize, MaxBatchSize);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -54,13 +68,14 @@ public sealed class WmsFeedbackBackgroundWorker(
                     result.FailedCount,
                     skipped);
             }
-            catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+            catch (OperationCanceledException) 
             {
+                if (stoppingToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 logger.LogError("业务回传主后台任务单轮执行超时（>{TimeoutSeconds}s），已中断本轮并等待下个周期。", SingleRunTimeoutSeconds);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                return;
             }
             catch (Exception ex)
             {
