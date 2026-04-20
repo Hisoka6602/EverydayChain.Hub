@@ -134,6 +134,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IScanIngressService, ScanIngressService>();
         services.AddSingleton<IChuteQueryService, ChuteQueryService>();
         services.AddSingleton<IDropFeedbackService, DropFeedbackService>();
+        services.AddSingleton<IApiWarmupService, ApiWarmupService>();
         services.AddSingleton<IBusinessTaskSeedService, BusinessTaskSeedService>();
         services.AddSingleton<IGlobalDashboardQueryService>(sp =>
             new GlobalDashboardQueryService(

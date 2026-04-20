@@ -37,36 +37,26 @@ public sealed class ScanIngressService : IScanIngressService {
     public async Task<ScanUploadApplicationResult> ExecuteAsync(ScanUploadApplicationRequest request, CancellationToken cancellationToken) {
         // 步骤 1：解析条码。
         var parseResult = _barcodeParser.Parse(request.Barcode);
+        var barcodeType = parseResult.BarcodeType.ToString();
         if (!parseResult.IsValid) {
             return new ScanUploadApplicationResult {
                 IsAccepted = false,
                 TaskCode = string.Empty,
-                BarcodeType = BarcodeType.Unknown.ToString(),
+                BarcodeType = barcodeType,
                 FailureReason = ConvertFailureReasonToCode(parseResult.FailureReason),
                 Message = parseResult.FailureMessage
             };
         }
 
-        // 步骤 2：将解析结果写入应用请求并推进任务状态。
-        var executionRequest = new ScanUploadApplicationRequest {
-            Barcode = request.Barcode,
-            DeviceCode = request.DeviceCode,
-            ScanTimeLocal = request.ScanTimeLocal,
-            TraceId = request.TraceId,
-            LengthMm = request.LengthMm,
-            WidthMm = request.WidthMm,
-            HeightMm = request.HeightMm,
-            VolumeMm3 = request.VolumeMm3,
-            WeightGram = request.WeightGram,
-            TargetChuteCode = parseResult.TargetChuteCode,
-            BarcodeType = parseResult.BarcodeType.ToString()
-        };
-        var execResult = await _taskExecutionService.MarkScannedAsync(executionRequest, cancellationToken);
+        // 步骤 2：将解析结果写回原请求对象并推进任务状态，避免重复分配请求对象。
+        request.TargetChuteCode = parseResult.TargetChuteCode;
+        request.BarcodeType = barcodeType;
+        var execResult = await _taskExecutionService.MarkScannedAsync(request, cancellationToken);
         if (!execResult.IsSuccess) {
             return new ScanUploadApplicationResult {
                 IsAccepted = false,
                 TaskCode = execResult.TaskCode,
-                BarcodeType = parseResult.BarcodeType.ToString(),
+                BarcodeType = barcodeType,
                 FailureReason = "TaskNotMatchedOrInvalidState",
                 Message = execResult.FailureReason
             };
@@ -75,7 +65,7 @@ public sealed class ScanIngressService : IScanIngressService {
         return new ScanUploadApplicationResult {
             IsAccepted = true,
             TaskCode = execResult.TaskCode,
-            BarcodeType = parseResult.BarcodeType.ToString(),
+            BarcodeType = barcodeType,
             FailureReason = string.Empty,
             Message = $"扫描请求已受理，任务 [{execResult.TaskCode}] 状态已更新为 {execResult.TaskStatus}。"
         };

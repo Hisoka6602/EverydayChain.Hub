@@ -71,7 +71,20 @@ public sealed class ChuteQueryService : IChuteQueryService {
             };
         }
 
-        // 步骤 5：从任务条码中解析目标格口；解析失败时返回失败。
+        // 步骤 5：优先返回任务已持久化的目标格口，避免重复条码解析。
+        var persistedTargetChuteCode = string.IsNullOrWhiteSpace(task.TargetChuteCode) ? null : task.TargetChuteCode.Trim();
+        if (persistedTargetChuteCode is not null)
+        {
+            return new ChuteResolveApplicationResult
+            {
+                IsResolved = true,
+                TaskCode = task.TaskCode,
+                ChuteCode = persistedTargetChuteCode,
+                Message = $"任务 [{task.TaskCode}] 目标格口已确认：{persistedTargetChuteCode}。"
+            };
+        }
+
+        // 步骤 6：从任务条码中解析目标格口；解析失败时返回失败。
         if (string.IsNullOrWhiteSpace(task.Barcode)) {
             return new ChuteResolveApplicationResult {
                 IsResolved = false,

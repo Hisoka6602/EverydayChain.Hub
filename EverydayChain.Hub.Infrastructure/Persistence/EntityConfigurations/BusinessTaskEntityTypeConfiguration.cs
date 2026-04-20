@@ -68,7 +68,6 @@ public class BusinessTaskEntityTypeConfiguration : IEntityTypeConfiguration<Busi
         builder.HasIndex(x => x.Status);
         builder.HasIndex(x => x.SourceType);
         builder.HasIndex(x => x.IsException);
-        builder.HasIndex(x => x.IsRecirculated);
         builder.HasIndex(x => x.WorkingArea);
         builder.HasIndex(x => x.FeedbackStatus);
         builder.HasIndex(x => x.IsFeedbackReported);
@@ -84,6 +83,7 @@ public class BusinessTaskEntityTypeConfiguration : IEntityTypeConfiguration<Busi
         builder.HasIndex(x => x.TargetChuteCode);
         builder.HasIndex(x => x.ActualChuteCode);
         builder.HasIndex(x => x.ResolvedDockCode);
+        builder.HasIndex(x => new { x.NormalizedBarcode, x.CreatedTimeLocal });
         builder.HasIndex(x => new { x.WaveCode, x.CreatedTimeLocal });
         builder.HasIndex(x => new { x.CreatedTimeLocal, x.NormalizedWaveCode });
         builder.HasIndex(x => new { x.CreatedTimeLocal, x.ResolvedDockCode });
@@ -94,7 +94,7 @@ public class BusinessTaskEntityTypeConfiguration : IEntityTypeConfiguration<Busi
         builder.HasIndex(x => new { x.CreatedTimeLocal, x.Status, x.SourceType });
         builder.HasIndex(x => new { x.FeedbackStatus, x.CreatedTimeLocal });
         builder.HasIndex(x => new { x.FeedbackStatus, x.IsFeedbackReported, x.FeedbackTimeLocal });
-        builder.HasIndex(x => new { x.CreatedTimeLocal, x.SourceType, x.Status, x.IsException, x.IsRecirculated });
+        builder.HasIndex(x => new { x.CreatedTimeLocal, x.SourceType, x.Status, x.IsException, x.ResolvedDockCode });
         builder.HasIndex(x => new { x.CreatedTimeLocal, x.NormalizedWaveCode, x.ResolvedDockCode });
     }
 }

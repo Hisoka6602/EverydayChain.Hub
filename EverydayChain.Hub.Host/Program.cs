@@ -104,6 +104,7 @@ builder.Services.AddSwaggerGen(options => {
     options.SchemaFilter<BusinessTaskSeedTableSchemaFilter>();
 });
 builder.Services.AddHostedService<AutoMigrationHostedService>();
+builder.Services.AddHostedService<ApiWarmupHostedService>();
 builder.Services.AddHostedService<SyncBackgroundWorker>();
 builder.Services.AddHostedService<RetentionBackgroundWorker>();
 builder.Services.AddHostedService<WmsFeedbackBackgroundWorker>();

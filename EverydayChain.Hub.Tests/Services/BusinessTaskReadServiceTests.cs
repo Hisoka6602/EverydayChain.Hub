@@ -162,6 +162,42 @@ public sealed class BusinessTaskReadServiceTests
     }
 
     /// <summary>
+    /// 回流筛选应按 Trim 后的归并码头编码判定。
+    /// </summary>
+    [Fact]
+    public async Task QueryRecirculationsAsync_ShouldUseTrimmedResolvedDockCode()
+    {
+        var repository = new InMemoryBusinessTaskRepository();
+        var service = new BusinessTaskReadService(repository);
+        var start = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 0, 0, 0), DateTimeKind.Local);
+        var end = start.AddDays(1);
+
+        await repository.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "R3",
+            SourceTableCode = "SRC",
+            SourceType = BusinessTaskSourceType.Split,
+            BusinessKey = "R3",
+            TargetChuteCode = "7",
+            ActualChuteCode = " 8 ",
+            Status = BusinessTaskStatus.Scanned,
+            CreatedTimeLocal = start.AddHours(1),
+            UpdatedTimeLocal = start.AddHours(1)
+        }, CancellationToken.None);
+
+        var result = await service.QueryRecirculationsAsync(new BusinessTaskQueryRequest
+        {
+            StartTimeLocal = start,
+            EndTimeLocal = end,
+            PageNumber = 1,
+            PageSize = 10
+        }, CancellationToken.None);
+
+        Assert.Single(result.Items);
+        Assert.Equal("R3", result.Items[0].TaskCode);
+    }
+
+    /// <summary>
     /// 游标分页应返回游标语义并支持连续翻页。
     /// </summary>
     [Fact]

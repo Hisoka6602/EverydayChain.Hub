@@ -37,6 +37,8 @@ public class BusinessTaskIndexCoverageTests
         Assert.Contains(indexes, index => !index.IsUnique && index.Columns.SequenceEqual(["FeedbackStatus"]));
         Assert.Contains(indexes, index => !index.IsUnique && index.Columns.SequenceEqual(["CreatedTimeLocal"]));
         Assert.Contains(indexes, index => !index.IsUnique && index.Columns.SequenceEqual(["UpdatedTimeLocal"]));
+        Assert.Contains(indexes, index => !index.IsUnique && index.Columns.SequenceEqual(["NormalizedBarcode", "CreatedTimeLocal"]));
+        Assert.Contains(indexes, index => !index.IsUnique && index.Columns.SequenceEqual(["CreatedTimeLocal", "SourceType", "Status", "IsException", "ResolvedDockCode"]));
     }
 
     /// <summary>
