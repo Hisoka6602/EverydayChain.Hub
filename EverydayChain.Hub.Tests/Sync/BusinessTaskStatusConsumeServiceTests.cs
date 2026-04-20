@@ -26,6 +26,7 @@ public class BusinessTaskStatusConsumeServiceTests
                 ["CARTONNO"] = "C1",
                 ["WAVENO"] = "W1",
                 ["DESCR"] = "R1",
+                ["WORKINGAREA"] = "1",
                 ["ADDTIME"] = new DateTime(2032, 1, 1, 8, 0, 0, DateTimeKind.Local),
                 ["__RowId"] = "ROW-1"
             }
@@ -45,6 +46,7 @@ public class BusinessTaskStatusConsumeServiceTests
         var entity = await repository.FindByTaskCodeAsync("C1", CancellationToken.None);
         Assert.NotNull(entity);
         Assert.Equal("W1", entity!.WaveCode);
+        Assert.Equal("1", entity.WorkingArea);
         Assert.Equal(BusinessTaskSourceType.Split, entity.SourceType);
     }
 
@@ -271,6 +273,7 @@ public class BusinessTaskStatusConsumeServiceTests
             BarcodeColumn = "CARTONNO",
             WaveCodeColumn = "WAVENO",
             WaveRemarkColumn = "DESCR",
+            WorkingAreaColumn = "WORKINGAREA",
             StatusConsumeProfile = new RemoteStatusConsumeProfile
             {
                 StatusColumnName = "TASKPROCESS",
@@ -303,6 +306,7 @@ public class BusinessTaskStatusConsumeServiceTests
             BarcodeColumn = "SKUID",
             WaveCodeColumn = "WAVENO",
             WaveRemarkColumn = "DESCR",
+            WorkingAreaColumn = "WORKINGAREA",
             StatusConsumeProfile = new RemoteStatusConsumeProfile
             {
                 StatusColumnName = "TASKPROCESS",

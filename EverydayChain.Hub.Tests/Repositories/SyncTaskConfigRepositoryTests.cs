@@ -155,6 +155,7 @@ public class SyncTaskConfigRepositoryTests
             table.BarcodeColumn = "  CARTONNO  ";
             table.WaveCodeColumn = "  WAVENO  ";
             table.WaveRemarkColumn = "  DESCR  ";
+            table.WorkingAreaColumn = "  WORKINGAREA  ";
         });
         var logger = new TestLogger<SyncTaskConfigRepository>();
         var repository = new SyncTaskConfigRepository(Options.Create(options), logger);
@@ -166,6 +167,7 @@ public class SyncTaskConfigRepositoryTests
         Assert.Equal("CARTONNO", definition.BarcodeColumn);
         Assert.Equal("WAVENO", definition.WaveCodeColumn);
         Assert.Equal("DESCR", definition.WaveRemarkColumn);
+        Assert.Equal("WORKINGAREA", definition.WorkingAreaColumn);
     }
 
     /// <summary>

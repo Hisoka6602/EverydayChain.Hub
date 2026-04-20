@@ -14,6 +14,11 @@ internal sealed class BusinessTaskQueryPolicy
     private const string EmptyDockCode = "未分配码头";
 
     /// <summary>
+    /// 回流码头阈值。
+    /// </summary>
+    private const int RecirculationDockThreshold = 7;
+
+    /// <summary>
     /// 解析任务所属码头号。
     /// </summary>
     /// <param name="task">业务任务实体。</param>
@@ -52,6 +57,23 @@ internal sealed class BusinessTaskQueryPolicy
         }
 
         return string.Equals(trimmed, "7", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 按归并码头编码判定是否回流。
+    /// 判定规则：码头编码可解析为整数且大于 7。
+    /// </summary>
+    /// <param name="resolvedDockCode">归并码头编码。</param>
+    /// <returns>是否回流。</returns>
+    public bool IsRecirculatedByResolvedDockCode(string? resolvedDockCode)
+    {
+        if (string.IsNullOrWhiteSpace(resolvedDockCode))
+        {
+            return false;
+        }
+
+        return int.TryParse(resolvedDockCode.Trim(), out var dockNumber)
+            && dockNumber > RecirculationDockThreshold;
     }
 
     /// <summary>

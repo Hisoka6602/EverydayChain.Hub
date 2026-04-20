@@ -149,6 +149,39 @@ public interface IBusinessTaskRepository
     Task<IReadOnlyList<string>> ListWaveCodesByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct);
 
     /// <summary>
+    /// 列出创建时间区间内的波次选项（波次号与备注，左闭右开），用于波次下拉查询。
+    /// </summary>
+    /// <param name="startTimeLocal">区间起始本地时间（包含）。</param>
+    /// <param name="endTimeLocal">区间结束本地时间（不包含）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>波次选项集合。</returns>
+    Task<IReadOnlyList<BusinessTaskWaveOptionRow>> ListWaveOptionsByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct);
+
+    /// <summary>
+    /// 按创建时间区间与波次编码查询业务任务列表（左闭右开），按创建时间升序返回。
+    /// </summary>
+    /// <param name="startTimeLocal">区间起始本地时间（包含）。</param>
+    /// <param name="endTimeLocal">区间结束本地时间（不包含）。</param>
+    /// <param name="waveCode">波次编码。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>命中的业务任务列表。</returns>
+    Task<IReadOnlyList<BusinessTaskEntity>> FindByWaveCodeAndCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, string waveCode, CancellationToken ct);
+
+    /// <summary>
+    /// 按创建时间区间与波次编码查询摘要/分区统计所需最小字段投影（左闭右开）。
+    /// </summary>
+    /// <param name="startTimeLocal">区间起始本地时间（包含）。</param>
+    /// <param name="endTimeLocal">区间结束本地时间（不包含）。</param>
+    /// <param name="waveCode">波次编码。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>统计字段投影列表。</returns>
+    Task<IReadOnlyList<BusinessTaskWaveTaskStatsRow>> ListWaveTaskStatsByWaveCodeAndCreatedTimeRangeAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        string waveCode,
+        CancellationToken ct);
+
+    /// <summary>
     /// 按创建时间区间聚合码头看板/报表所需统计数据（左闭右开），并可按波次或码头过滤。
     /// 聚合在仓储侧优先完成，应用层仅处理 7 号码头异常规则等口径细节。
     /// </summary>

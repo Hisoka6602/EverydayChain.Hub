@@ -38,6 +38,11 @@ public class BusinessTaskProjectionRow
     public string? WaveRemark { get; set; }
 
     /// <summary>
+    /// 工作区域编码。
+    /// </summary>
+    public string? WorkingArea { get; set; }
+
+    /// <summary>
     /// 投影时间（本地时间）。
     /// </summary>
     public required DateTime ProjectedTimeLocal { get; set; }

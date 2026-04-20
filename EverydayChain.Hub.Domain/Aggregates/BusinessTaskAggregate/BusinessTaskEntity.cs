@@ -168,6 +168,12 @@ public class BusinessTaskEntity : IEntity<long>
     public string? WaveRemark { get; set; }
 
     /// <summary>
+    /// 工作区域编码，来自上游 WORKINGAREA 字段；用于拆零分区统计映射。
+    /// </summary>
+    [MaxLength(32)]
+    public string? WorkingArea { get; set; }
+
+    /// <summary>
     /// 是否已被标记为回流；由回流规则服务在扫描重试超限时置为 true。
     /// </summary>
     public bool IsRecirculated { get; set; }

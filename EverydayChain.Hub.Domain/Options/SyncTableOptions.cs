@@ -123,4 +123,9 @@ public class SyncTableOptions
     /// 波次备注列名（可填写范围：源端真实列名，仅允许字母、数字、下划线；留空表示不映射波次备注）。
     /// </summary>
     public string? WaveRemarkColumn { get; set; }
+
+    /// <summary>
+    /// 工作区域列名（可填写范围：源端真实列名，仅允许字母、数字、下划线；留空表示不映射工作区域）。
+    /// </summary>
+    public string? WorkingAreaColumn { get; set; }
 }

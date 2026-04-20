@@ -112,4 +112,9 @@ public class SyncTableDefinition
     /// 波次备注列名（仅业务任务状态驱动投影链路使用）。
     /// </summary>
     public string? WaveRemarkColumn { get; set; }
+
+    /// <summary>
+    /// 工作区域列名（仅业务任务状态驱动投影链路使用）。
+    /// </summary>
+    public string? WorkingAreaColumn { get; set; }
 }

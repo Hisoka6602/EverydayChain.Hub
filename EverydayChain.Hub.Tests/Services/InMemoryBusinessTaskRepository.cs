@@ -78,6 +78,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
 
         existing.WaveCode = entity.WaveCode;
         existing.WaveRemark = entity.WaveRemark;
+        existing.WorkingArea = entity.WorkingArea;
         existing.UpdatedTimeLocal = entity.UpdatedTimeLocal;
         await UpdateAsync(existing, ct);
     }
@@ -220,6 +221,77 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
             .Select(task => NormalizeWaveCode(task.WaveCode))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(code => code, StringComparer.Ordinal)
+            .ToList();
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<BusinessTaskWaveOptionRow>> ListWaveOptionsByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
+    {
+        IReadOnlyList<BusinessTaskWaveOptionRow> result = _tasks
+            .Where(task => task.CreatedTimeLocal >= startTimeLocal && task.CreatedTimeLocal < endTimeLocal)
+            .GroupBy(task => NormalizeWaveCode(task.WaveCode), StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                var waveRemark = group
+                    .Where(task => !string.IsNullOrWhiteSpace(task.WaveRemark))
+                    .OrderByDescending(task => task.UpdatedTimeLocal)
+                    .Select(task => task.WaveRemark!.Trim())
+                    .FirstOrDefault();
+                return new BusinessTaskWaveOptionRow
+                {
+                    WaveCode = group.Key,
+                    WaveRemark = waveRemark
+                };
+            })
+            .OrderBy(row => row.WaveCode, StringComparer.Ordinal)
+            .ToList();
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<BusinessTaskEntity>> FindByWaveCodeAndCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, string waveCode, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(waveCode))
+        {
+            return Task.FromResult<IReadOnlyList<BusinessTaskEntity>>([]);
+        }
+
+        IReadOnlyList<BusinessTaskEntity> result = _tasks
+            .Where(task => task.CreatedTimeLocal >= startTimeLocal && task.CreatedTimeLocal < endTimeLocal)
+            .Where(task => string.Equals(NormalizeWaveCode(task.WaveCode), waveCode.Trim(), StringComparison.OrdinalIgnoreCase))
+            .OrderBy(task => task.CreatedTimeLocal)
+            .ToList();
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<BusinessTaskWaveTaskStatsRow>> ListWaveTaskStatsByWaveCodeAndCreatedTimeRangeAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        string waveCode,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(waveCode))
+        {
+            return Task.FromResult<IReadOnlyList<BusinessTaskWaveTaskStatsRow>>([]);
+        }
+
+        IReadOnlyList<BusinessTaskWaveTaskStatsRow> result = _tasks
+            .Where(task => task.CreatedTimeLocal >= startTimeLocal && task.CreatedTimeLocal < endTimeLocal)
+            .Where(task => string.Equals(NormalizeWaveCode(task.WaveCode), waveCode.Trim(), StringComparison.OrdinalIgnoreCase))
+            .Select(task => new BusinessTaskWaveTaskStatsRow
+            {
+                TaskCode = task.TaskCode,
+                WaveCode = NormalizeWaveCode(task.WaveCode),
+                SourceType = task.SourceType,
+                WorkingArea = task.WorkingArea,
+                Status = task.Status,
+                ResolvedDockCode = task.ResolvedDockCode,
+                IsException = task.IsException,
+                WaveRemark = task.WaveRemark,
+                UpdatedTimeLocal = task.UpdatedTimeLocal
+            })
             .ToList();
         return Task.FromResult(result);
     }
