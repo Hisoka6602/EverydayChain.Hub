@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 新增主回传后台任务 `WmsFeedbackBackgroundWorker`：按 `WmsFeedback.PollingIntervalSeconds` 周期消费 `FeedbackStatus=Pending` 任务并调用 `IWmsFeedbackService.ExecuteAsync`，与 `FeedbackCompensationBackgroundWorker` 并存分责；同时修正 `WmsFeedback.FeedbackStatusColumn=FEEDBACK_STATUS`，避免与 `BusinessStatusColumn=STATUS` 冲突导致同列重复赋值。
 - 修复 `manual_seed` 分表路由漂移：`HubDbContext` 工厂注册由 `AddPooledDbContextFactory` 调整为 `AddDbContextFactory`，避免上下文复用导致补数写入误落无后缀 `business_tasks` 基础表。
 - 按《EverydayChain.Hub_Copilot_精准执行指令_最终版》补齐门禁测试：新增 `BusinessTaskStatusWriteBackConfigurationTests`（校验 `CompletedStatusValue` 配置透传与 `PendingStatusValue=null` 语义）与 `BusinessTaskIndexCoverageTests`（校验 `business_tasks` 关键索引覆盖），并补充 `BusinessTaskEntityTypeConfiguration` 的 `UpdatedTimeLocal` 索引，同时新增迁移 `20260419033227_AddBusinessTaskUpdatedTimeLocalIndex` 以确保已部署库可自动落索引。
 - 收敛《EverydayChain.Hub_Copilot_精准执行指令_最终版》旧同步链路：删除 `IRemoteStatusConsumeService`、`ISqlServerAppendOnlyWriter`、`RemoteStatusConsumeService`、`SqlServerAppendOnlyWriter` 及对应测试，`StatusDriven` 主路径统一收敛到 `IBusinessTaskStatusConsumeService`。
@@ -455,6 +456,7 @@
     ├── Workers/SyncBackgroundWorker.cs
     ├── Workers/RetentionBackgroundWorker.cs
     ├── Workers/AutoMigrationHostedService.cs
+    ├── Workers/WmsFeedbackBackgroundWorker.cs
     ├── Workers/FeedbackCompensationBackgroundWorker.cs
     ├── Properties/launchSettings.json
     ├── nlog.config
@@ -552,7 +554,7 @@
 - `Application/Abstractions/Services/IWmsFeedbackService.cs` + `Application/Feedback/Services/WmsFeedbackService.cs`：业务回传应用服务抽象与实现，查询 `FeedbackStatus=Pending` 任务、批量调用 Oracle 写入器、按结果回填 Completed/Failed。
 - `Application/Abstractions/Services/IFeedbackCompensationService.cs` + `Application/Feedback/Services/FeedbackCompensationService.cs`：业务回传补偿服务抽象与实现，支持按任务编码重试与按批次重试 `FeedbackStatus=Failed` 任务，并回填本地回传状态。
 - `Application/Abstractions/Integrations/IWmsOracleFeedbackGateway.cs` + `Infrastructure/Integrations/OracleWmsFeedbackGateway.cs`：Oracle WMS 业务回传网关抽象与实现；实现使用数组绑定批量更新，安全标识符校验防止 SQL 注入；`Enabled=false` 时仅记录日志不实际写入 Oracle。
-- `Domain/Options/WmsFeedbackOptions.cs`：业务回传配置实体，定义 Schema、Table、BusinessKeyColumn、FeedbackStatusColumn、FeedbackCompletedValue、FeedbackTimeColumn、ActualChuteColumn、CommandTimeoutSeconds 与 Enabled 开关（默认 false）。
+- `Domain/Options/WmsFeedbackOptions.cs`：业务回传配置实体，定义 Schema、Table、BusinessKeyColumn、FeedbackStatusColumn、FeedbackCompletedValue、FeedbackTimeColumn、ActualChuteColumn、CommandTimeoutSeconds、主回传轮询间隔、主回传批次上限与 Enabled 开关（默认 false）。
 - `Domain/Options/FeedbackCompensationJobOptions.cs`：业务回传补偿后台任务配置实体，定义补偿开关、轮询间隔与每轮批次上限。
 - `Application/Models/WmsFeedbackApplicationResult.cs`：业务回传执行结果模型，汇总 PendingCount、SuccessCount、FailedCount 与 IsSuccess。
 - `Application/Models/FeedbackCompensationResult.cs`：业务回传补偿执行结果模型，汇总目标数量、重试数量、成功/失败/跳过数量与失败原因。
@@ -654,6 +656,7 @@
 - `Host/Contracts/Requests/*.cs` + `Host/Contracts/Responses/*.cs`：API 输入输出契约与统一响应包装，配合 Swagger 提供中文参数说明；其中 `WaveCleanup*`、`GlobalDashboard*`、`DockDashboard*`、`SortingReport*`、`BusinessTaskQuery*` 分别服务对应业务端点。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。
+- `WmsFeedbackBackgroundWorker.cs`：业务回传主后台任务，按 `WmsFeedback.PollingIntervalSeconds` 周期消费 `FeedbackStatus=Pending` 任务并调用 `IWmsFeedbackService.ExecuteAsync`，输出待处理/成功/失败/跳过统计并内置单轮超时保护。
 - `FeedbackCompensationBackgroundWorker.cs`：业务回传补偿后台任务，按 `FeedbackCompensationJob.PollingIntervalSeconds` 周期重试失败回传任务，支持批次上限控制并输出补偿统计日志。
 - `AutoMigrationHostedService.cs`：启动阶段自动迁移入口；当自动迁移阶段发生数据库异常时仅记录错误并降级跳过迁移，保持宿主继续运行，避免单库不可达导致整体进程崩溃。
 - `EverydayChain.Hub.Tests/Host/Controllers/*Tests.cs`：PR-03 新增 Controller 基础行为测试，覆盖空参校验与标准成功响应路径。
