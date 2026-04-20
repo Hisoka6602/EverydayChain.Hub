@@ -282,6 +282,8 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
             .Where(task => string.Equals(NormalizeWaveCode(task.WaveCode), waveCode.Trim(), StringComparison.OrdinalIgnoreCase))
             .Select(task => new BusinessTaskWaveTaskStatsRow
             {
+                TaskCode = task.TaskCode,
+                WaveCode = NormalizeWaveCode(task.WaveCode),
                 SourceType = task.SourceType,
                 WorkingArea = task.WorkingArea,
                 Status = task.Status,

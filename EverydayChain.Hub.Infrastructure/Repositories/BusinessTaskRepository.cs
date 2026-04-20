@@ -385,11 +385,11 @@ public class BusinessTaskRepository(
                     x.WaveRemark,
                 })
                 .Select(group => new ShardWaveOptionAggregateRow
-                {
-                    WaveCode = group.Key.WaveCode,
-                    WaveRemark = group.Key.WaveRemark,
-                    UpdatedTimeLocal = group.Max(x => x.UpdatedTimeLocal)
-                })
+                (
+                    group.Key.WaveCode,
+                    group.Key.WaveRemark,
+                    group.Max(x => x.UpdatedTimeLocal)
+                ))
                 .ToListAsync(ct);
             foreach (var row in shardRows)
             {
@@ -474,6 +474,8 @@ public class BusinessTaskRepository(
             var shardRows = await query
                 .Select(x => new BusinessTaskWaveTaskStatsRow
                 {
+                    TaskCode = x.TaskCode,
+                    WaveCode = x.NormalizedWaveCode ?? EmptyWaveCode,
                     SourceType = x.SourceType,
                     WorkingArea = x.WorkingArea,
                     Status = x.Status,
@@ -483,10 +485,7 @@ public class BusinessTaskRepository(
                     UpdatedTimeLocal = x.UpdatedTimeLocal
                 })
                 .ToListAsync(ct);
-            if (shardRows.Count > 0)
-            {
-                result.AddRange(shardRows);
-            }
+            result.AddRange(shardRows);
         }
 
         return result;
@@ -850,23 +849,10 @@ public class BusinessTaskRepository(
     /// <summary>
     /// 分片内波次选项聚合行。
     /// </summary>
-    private sealed class ShardWaveOptionAggregateRow
-    {
-        /// <summary>
-        /// 波次号。
-        /// </summary>
-        public string WaveCode { get; set; } = string.Empty;
-
-        /// <summary>
-        /// 波次备注。
-        /// </summary>
-        public string? WaveRemark { get; set; }
-
-        /// <summary>
-        /// 更新时间。
-        /// </summary>
-        public DateTime UpdatedTimeLocal { get; set; }
-    }
+    private readonly record struct ShardWaveOptionAggregateRow(
+        string WaveCode,
+        string? WaveRemark,
+        DateTime UpdatedTimeLocal);
 
     /// <summary>
     /// 合并投影字段，避免覆盖运行态字段。

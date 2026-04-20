@@ -8,6 +8,16 @@ namespace EverydayChain.Hub.Application.Models;
 public sealed class BusinessTaskWaveTaskStatsRow
 {
     /// <summary>
+    /// 任务编码。
+    /// </summary>
+    public string TaskCode { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 波次号。
+    /// </summary>
+    public string WaveCode { get; set; } = string.Empty;
+
+    /// <summary>
     /// 来源类型。
     /// </summary>
     public BusinessTaskSourceType SourceType { get; set; }

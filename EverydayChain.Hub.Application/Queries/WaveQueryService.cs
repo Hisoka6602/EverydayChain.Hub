@@ -160,8 +160,9 @@ public sealed class WaveQueryService(
         }
 
         var zoneSummaries = ZoneOutputOrder
-            .Where(zoneMap.ContainsKey)
-            .Select(zoneCode => zoneMap[zoneCode])
+            .Select(zoneCode => zoneMap.TryGetValue(zoneCode, out var zone) ? zone : null)
+            .Where(zone => zone is not null)
+            .Select(zone => zone!)
             .Select(zone =>
             {
                 var sortedCount = zone.TotalCount - zone.UnsortedCount;
@@ -268,7 +269,9 @@ public sealed class WaveQueryService(
         if (string.IsNullOrWhiteSpace(task.WorkingArea))
         {
             logger.LogWarning(
-                "波次分区统计跳过拆零任务：WorkingArea 为空。SourceType={SourceType}",
+                "波次分区统计跳过拆零任务：WorkingArea 为空。TaskCode={TaskCode}, WaveCode={WaveCode}, SourceType={SourceType}",
+                task.TaskCode,
+                task.WaveCode,
                 task.SourceType);
             return null;
         }
@@ -276,7 +279,9 @@ public sealed class WaveQueryService(
         if (!int.TryParse(task.WorkingArea.Trim(), out var workingArea))
         {
             logger.LogWarning(
-                "波次分区统计跳过拆零任务：WorkingArea 不是有效整数。SourceType={SourceType}, WorkingArea={WorkingArea}",
+                "波次分区统计跳过拆零任务：WorkingArea 不是有效整数。TaskCode={TaskCode}, WaveCode={WaveCode}, SourceType={SourceType}, WorkingArea={WorkingArea}",
+                task.TaskCode,
+                task.WaveCode,
                 task.SourceType,
                 task.WorkingArea);
             return null;
@@ -301,7 +306,9 @@ public sealed class WaveQueryService(
     private string? LogAndSkipInvalidWorkingArea(BusinessTaskWaveTaskStatsRow task)
     {
         logger.LogWarning(
-            "波次分区统计跳过拆零任务：WorkingArea 超出允许范围 1~4。SourceType={SourceType}, WorkingArea={WorkingArea}",
+            "波次分区统计跳过拆零任务：WorkingArea 超出允许范围 1~4。TaskCode={TaskCode}, WaveCode={WaveCode}, SourceType={SourceType}, WorkingArea={WorkingArea}",
+            task.TaskCode,
+            task.WaveCode,
             task.SourceType,
             task.WorkingArea);
         return null;
