@@ -1,6 +1,10 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 补齐 `WORKINGAREA` 投影链路：`BusinessTaskEntity/BusinessTaskProjectionRow/BusinessTaskStatusConsumeService/BusinessTaskRepository` 全链路新增 `WorkingArea` 字段映射与更新覆盖，`appsettings.json` 新增 `WorkingAreaColumn` 配置，并新增迁移 `20260420195621_AddBusinessTaskWorkingArea` 保证已部署库自动加列。
+- 新增波次专项查询能力：新增 `IWaveQueryService/WaveQueryService` 与 `WavesController`，提供 `POST /api/v1/waves/options`、`POST /api/v1/waves/summary`、`POST /api/v1/waves/zones` 三个接口，后端直接返回波次选项（含备注）、波次摘要、固定 5 组分区统计。
+- 固化新波次接口回流口径：统一按 `ResolvedDockCode`“可解析整数且大于 7”统计回流，拆零分区严格按 `WorkingArea=1~4` 映射，异常 `WorkingArea` 跳过并记录日志。
+- 修复落格覆盖语义：`DropFeedbackService` 允许已落格任务重复回传，成功回传时强制覆盖 `ActualChuteCode` 并调用 `RefreshQueryFields()`，确保 `ResolvedDockCode` 始终跟随最新回传值。
 - 新增主回传后台任务 `WmsFeedbackBackgroundWorker`：按 `WmsFeedback.PollingIntervalSeconds` 周期消费 `FeedbackStatus=Pending` 任务并调用 `IWmsFeedbackService.ExecuteAsync`，与 `FeedbackCompensationBackgroundWorker` 并存分责；同时修正 `WmsFeedback.FeedbackStatusColumn=FEEDBACK_STATUS`，避免与 `BusinessStatusColumn=STATUS` 冲突导致同列重复赋值。
 - 修复 `manual_seed` 分表路由漂移：`HubDbContext` 工厂注册由 `AddPooledDbContextFactory` 调整为 `AddDbContextFactory`，避免上下文复用导致补数写入误落无后缀 `business_tasks` 基础表。
 - 按《EverydayChain.Hub_Copilot_精准执行指令_最终版》补齐门禁测试：新增 `BusinessTaskStatusWriteBackConfigurationTests`（校验 `CompletedStatusValue` 配置透传与 `PendingStatusValue=null` 语义）与 `BusinessTaskIndexCoverageTests`（校验 `business_tasks` 关键索引覆盖），并补充 `BusinessTaskEntityTypeConfiguration` 的 `UpdatedTimeLocal` 索引，同时新增迁移 `20260419033227_AddBusinessTaskUpdatedTimeLocalIndex` 以确保已部署库可自动落索引。
@@ -427,6 +431,7 @@
     ├── Controllers/ChuteController.cs
     ├── Controllers/DropFeedbackController.cs
     ├── Controllers/WaveCleanupController.cs
+    ├── Controllers/WavesController.cs
     ├── Controllers/GlobalDashboardController.cs
     ├── Controllers/DockDashboardController.cs
     ├── Controllers/QueryControllerBase.cs
@@ -438,6 +443,9 @@
     ├── Contracts/Requests/WaveCleanupRequest.cs
     ├── Contracts/Requests/GlobalDashboardQueryRequest.cs
     ├── Contracts/Requests/DockDashboardQueryRequest.cs
+    ├── Contracts/Requests/WaveOptionsQueryRequest.cs
+    ├── Contracts/Requests/WaveSummaryQueryRequest.cs
+    ├── Contracts/Requests/WaveZoneQueryRequest.cs
     ├── Contracts/Requests/SortingReportQueryRequest.cs
     ├── Contracts/Requests/BusinessTaskQueryRequest.cs
     ├── Contracts/Responses/ApiResponse.cs
@@ -449,6 +457,11 @@
     ├── Contracts/Responses/WaveDashboardSummaryResponse.cs
     ├── Contracts/Responses/DockDashboardResponse.cs
     ├── Contracts/Responses/DockDashboardSummaryResponse.cs
+    ├── Contracts/Responses/WaveOptionsResponse.cs
+    ├── Contracts/Responses/WaveOptionItemResponse.cs
+    ├── Contracts/Responses/WaveSummaryResponse.cs
+    ├── Contracts/Responses/WaveZoneResponse.cs
+    ├── Contracts/Responses/WaveZoneSummaryResponse.cs
     ├── Contracts/Responses/SortingReportResponse.cs
     ├── Contracts/Responses/SortingReportRowResponse.cs
     ├── Contracts/Responses/BusinessTaskQueryResponse.cs
@@ -541,14 +554,19 @@
 - `Application/Abstractions/Services/IBarcodeParser.cs` + `Application/Services/BarcodeParser.cs`：条码解析服务抽象与实现，按固定规则“拆零 `02` 开头取第 3 位数字、整件 `Z` 开头取第 2 位数字”分类并提取 `TargetChuteCode`，统一输出失败语义（InvalidBarcode、UnsupportedBarcodeType、ParseError）。
 - `Application/Abstractions/Services/IScanIngressService.cs` + `Application/Services/ScanIngressService.cs`：扫描上传应用服务，协调条码解析、任务匹配与状态推进链路，输出标准化受理结果。
 - `Application/Abstractions/Services/IChuteQueryService.cs` + `Application/Services/ChuteQueryService.cs`：请求格口应用服务抽象与实现，按任务编码或条码查询业务任务，在任务已扫描或已落格前提下按条码规则解析并返回目标格口，覆盖状态校验与不支持条码异常分支。
-- `Application/Abstractions/Services/IDropFeedbackService.cs` + `Application/Services/DropFeedbackService.cs`：落格回传应用服务抽象与实现，支持双定位（TaskCode/Barcode）、参数冲突校验与状态机推进（成功→Dropped+FeedbackPending，失败→Exception），落格成功/失败均写落格日志。
+- `Application/Abstractions/Services/IDropFeedbackService.cs` + `Application/Services/DropFeedbackService.cs`：落格回传应用服务抽象与实现，支持双定位（TaskCode/Barcode）、参数冲突校验与状态机推进（成功→Dropped+FeedbackPending，失败→Exception），并支持已落格任务重复回传覆盖 `ActualChuteCode` 后刷新 `ResolvedDockCode`，落格成功/失败均写落格日志。
 - `Application/Abstractions/Queries/IGlobalDashboardQueryService.cs` + `Application/Queries/GlobalDashboardQueryService.cs`：总看板查询服务抽象与实现，按时间区间汇总总量、整件/拆零分口径、识别率、回流数、异常数、体积重量与波次聚合数据。
 - `Application/Models/GlobalDashboardQueryRequest.cs` + `Application/Models/GlobalDashboardQueryResult.cs` + `Application/Models/WaveDashboardSummary.cs`：总看板应用层查询入参、统计结果与波次维度摘要模型。
 - `Application/Abstractions/Queries/IDockDashboardQueryService.cs` + `Application/Queries/DockDashboardQueryService.cs`：码头看板查询服务抽象与实现，支持默认当天查询、波次筛选、拆零/整件未分拣统计、分拣进度、已分拣总数与“仅 7 号码头显示异常数”规则。
+- `Application/Abstractions/Queries/IWaveQueryService.cs` + `Application/Queries/WaveQueryService.cs`：波次专项查询服务抽象与实现，提供波次选项（含备注）、波次摘要、固定五分区统计，并按 `ResolvedDockCode` 可解析整数且大于 7 统计回流。
 - `Application/Abstractions/Queries/ISortingReportQueryService.cs` + `Application/Queries/SortingReportQueryService.cs`：报表查询与导出服务抽象与实现，支持按时间范围与码头维度输出统计，并提供 CSV 文本导出能力。
 - `Application/Abstractions/Queries/IBusinessTaskReadService.cs` + `Application/Queries/BusinessTaskReadService.cs`：业务任务查询服务抽象与实现，提供业务任务、异常件、回流记录三类分页查询，支持时间、波次、条码、码头与格口筛选。
 - `Application/Queries/BusinessTaskQueryPolicy.cs`：业务任务查询策略封装，统一已分拣判定、码头解析、波次归一化、7 号码头识别与百分比计算。
 - `Application/Models/DockDashboardQueryRequest.cs` + `Application/Models/DockDashboardQueryResult.cs` + `Application/Models/DockDashboardSummary.cs`：码头看板应用层查询入参、聚合结果与码头维度摘要模型。
+- `Application/Models/WaveOptionsQueryRequest.cs` + `Application/Models/WaveOptionsQueryResult.cs` + `Application/Models/WaveOptionItem.cs`：波次选项查询模型，返回时间区间内去重波次号与波次备注。
+- `Application/Models/WaveSummaryQueryRequest.cs` + `Application/Models/WaveSummaryQueryResult.cs`：波次摘要查询模型，返回总件数、未分拣数、分拣进度、回流数与异常数。
+- `Application/Models/WaveZoneQueryRequest.cs` + `Application/Models/WaveZoneQueryResult.cs` + `Application/Models/WaveZoneSummary.cs`：波次分区查询模型，返回拆零 1~4 区与整件固定分组统计。
+- `Application/Models/BusinessTaskWaveOptionRow.cs`：仓储侧波次选项聚合行模型，承载 `WaveCode + WaveRemark` 查询结果。
 - `Application/Models/SortingReportQueryRequest.cs` + `Application/Models/SortingReportQueryResult.cs` + `Application/Models/SortingReportRow.cs`：报表查询与导出模型，统一报表查询返回与导出口径。
 - `Application/Models/BusinessTaskQueryRequest.cs` + `Application/Models/BusinessTaskQueryResult.cs` + `Application/Models/BusinessTaskQueryItem.cs`：业务任务查询分页模型与结果项模型。
 - `Application/Abstractions/Services/IWmsFeedbackService.cs` + `Application/Feedback/Services/WmsFeedbackService.cs`：业务回传应用服务抽象与实现，查询 `FeedbackStatus=Pending` 任务、批量调用 Oracle 写入器、按结果回填 Completed/Failed。
@@ -589,15 +607,18 @@
 - `EverydayChain.Hub.Tests/Services/ScanDropLogTests.cs`：扫描/落格日志落库测试，覆盖扫描成功写日志、扫描失败写日志、落格成功写日志+FeedbackPending、落格失败写日志四个场景。
 - `Host/Controllers/GlobalDashboardController.cs` + `Host/Contracts/Requests/GlobalDashboardQueryRequest.cs` + `Host/Contracts/Responses/GlobalDashboardResponse.cs` + `Host/Contracts/Responses/WaveDashboardSummaryResponse.cs`：总看板查询 API 与契约，提供时间区间查询并返回波次维度聚合数据。
 - `Host/Controllers/DockDashboardController.cs` + `Host/Contracts/Requests/DockDashboardQueryRequest.cs` + `Host/Contracts/Responses/DockDashboardResponse.cs` + `Host/Contracts/Responses/DockDashboardSummaryResponse.cs`：码头看板查询 API 与契约，提供默认当天、波次筛选与码头统计能力。
+- `Host/Controllers/WavesController.cs` + `Host/Contracts/Requests/WaveOptionsQueryRequest.cs` + `Host/Contracts/Requests/WaveSummaryQueryRequest.cs` + `Host/Contracts/Requests/WaveZoneQueryRequest.cs` + `Host/Contracts/Responses/WaveOptionsResponse.cs` + `Host/Contracts/Responses/WaveOptionItemResponse.cs` + `Host/Contracts/Responses/WaveSummaryResponse.cs` + `Host/Contracts/Responses/WaveZoneResponse.cs` + `Host/Contracts/Responses/WaveZoneSummaryResponse.cs`：波次专项查询 API 与契约，提供波次选项、波次摘要、波次分区明细能力。
 - `Host/Controllers/QueryControllerBase.cs`：查询控制器基类，集中封装 `ResolveRequest<TRequest>`，统一空 Body 场景下的 `Body > Query > new()` 请求解析优先级。
 - `Host/Controllers/SortingReportController.cs` + `Host/Contracts/Requests/SortingReportQueryRequest.cs` + `Host/Contracts/Responses/SortingReportResponse.cs` + `Host/Contracts/Responses/SortingReportRowResponse.cs`：报表查询与 CSV 导出 API 与契约，统一报表查询和导出字段口径。
 - `Host/Controllers/BusinessTaskQueryController.cs` + `Host/Contracts/Requests/BusinessTaskQueryRequest.cs` + `Host/Contracts/Responses/BusinessTaskQueryResponse.cs` + `Host/Contracts/Responses/BusinessTaskItemResponse.cs`：业务任务、异常件与回流记录查询 API 与契约，支持多条件筛选和分页。
 - `EverydayChain.Hub.Tests/Host/Controllers/GlobalDashboardControllerTests.cs` + `EverydayChain.Hub.Tests/Host/Controllers/StubGlobalDashboardQueryService.cs`：总看板控制器测试与查询服务替身，覆盖时间语义校验、区间校验与成功返回路径。
 - `EverydayChain.Hub.Tests/Services/GlobalDashboardQueryServiceTests.cs`：总看板应用服务测试，覆盖空数据与多维统计聚合口径。
 - `EverydayChain.Hub.Tests/Host/Controllers/DockDashboardControllerTests.cs` + `StubDockDashboardQueryService.cs`：码头看板控制器测试与服务替身，覆盖时间区间校验和成功返回路径。
+- `EverydayChain.Hub.Tests/Host/Controllers/WavesControllerTests.cs` + `StubWaveQueryService.cs`：波次查询控制器测试与服务替身，覆盖波次选项、波次摘要参数校验与波次分区固定分组返回路径。
 - `EverydayChain.Hub.Tests/Host/Controllers/SortingReportControllerTests.cs` + `StubSortingReportQueryService.cs`：报表控制器测试与服务替身，覆盖查询成功路径、CSV 导出路径及空 Body 回退 Query 行为。
 - `EverydayChain.Hub.Tests/Host/Controllers/BusinessTaskQueryControllerTests.cs` + `StubBusinessTaskReadService.cs`：业务查询控制器测试与服务替身，覆盖分页参数校验、成功返回路径及任务/异常/回流接口空 Body 回退 Query 行为。
 - `EverydayChain.Hub.Tests/Services/DockDashboardQueryServiceTests.cs`：码头看板应用服务测试，覆盖码头聚合统计与 7 号码头异常规则。
+- `EverydayChain.Hub.Tests/Services/WaveQueryServiceTests.cs`：波次专项查询服务测试，覆盖波次选项去重、回流口径（可解析整数且大于 7）、固定五分区映射与非法 `WorkingArea` 跳过场景。
 - `EverydayChain.Hub.Tests/Services/SortingReportQueryServiceTests.cs`：报表应用服务测试，覆盖码头聚合口径与 CSV 导出内容。
 - `EverydayChain.Hub.Tests/Services/BusinessTaskReadServiceTests.cs`：业务任务查询服务测试，覆盖多条件筛选、异常件筛选与回流筛选。
 - `EverydayChain.Hub.Tests/Services/InMemoryScanLogRepository.cs`：扫描日志仓储内存替身。
@@ -647,12 +668,13 @@
 - `20260413160852_AddScanDropLogTables.cs`：新增 `scan_logs` 与 `drop_logs` 迁移基线，作为分片模板来源，包含审计字段与查询索引。
 - `20260416010041_AddSyncBatchShardTable.cs`：新增 `sync_batches` 基础表迁移，用于同步批次自动迁移基线与分片模板。
 - `20260416171508_AddSyncChangeDeletionLogShardTables.cs`：新增 `sync_change_logs` 与 `sync_deletion_logs` 基础表迁移，用于同步变更/删除日志自动迁移基线与分片模板。
+- `20260420195621_AddBusinessTaskWorkingArea.cs`：新增 `business_tasks.WorkingArea` 列迁移，保证拆零区域字段可持久化查询。
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
 - `nlog.config`：NLog 日志配置，输出至控制台与三个滚动日志文件：通用日志（`hub-${shortdate}.log`，按日切割，单文件上限 10 MB，保留 30 天）；同步专属日志（`sync-${shortdate}.log`，仅收录同步链路相关组件日志）；API 失败专属日志（`api-failure-${shortdate}.log`，记录失败请求响应明细）。
 - `Program.cs`（Host）：Host 启动入口，现已支持 API + Worker 共存，启用 Controllers、Swagger（中文注释）、API 失败日志中间件并保留自动迁移与同步后台任务注册。
 - `Host/Middlewares/ApiFailureLoggingMiddleware.cs`：API 失败日志中间件，统一捕获 `/api` 路径下的异常、HTTP 非成功状态与业务失败响应并输出请求/响应明细日志。
 - `Host/Middlewares/Streams/BoundedCaptureWriteStream.cs`：响应写透传捕获流，边写回客户端边按上限截取响应片段，用于失败日志判定且避免全量响应缓冲。
-- `Host/Controllers/ScanController.cs` / `ChuteController.cs` / `DropFeedbackController.cs` / `WaveCleanupController.cs` / `GlobalDashboardController.cs` / `DockDashboardController.cs` / `SortingReportController.cs` / `BusinessTaskQueryController.cs`：对外 API 控制器，仅做入参校验、调用应用服务与统一响应封装；覆盖在线链路、看板查询、报表导出与业务查询能力。
+- `Host/Controllers/ScanController.cs` / `ChuteController.cs` / `DropFeedbackController.cs` / `WaveCleanupController.cs` / `WavesController.cs` / `GlobalDashboardController.cs` / `DockDashboardController.cs` / `SortingReportController.cs` / `BusinessTaskQueryController.cs`：对外 API 控制器，仅做入参校验、调用应用服务与统一响应封装；覆盖在线链路、波次专项查询、看板查询、报表导出与业务查询能力。
 - `Host/Contracts/Requests/*.cs` + `Host/Contracts/Responses/*.cs`：API 输入输出契约与统一响应包装，配合 Swagger 提供中文参数说明；其中 `WaveCleanup*`、`GlobalDashboard*`、`DockDashboard*`、`SortingReport*`、`BusinessTaskQuery*` 分别服务对应业务端点。
 - `SyncBackgroundWorker.cs`：同步后台任务，按 `SyncJob.PollingIntervalSeconds` 周期触发全部启用表同步；支持表级超时保护（`TableSyncTimeoutSeconds`）；内置看门狗卡死检测（`WatchdogTimeoutSeconds`，主循环超过阈值未推进时输出 Critical 日志）；每轮输出整体汇总指标日志（总表数、失败表数、整体失败率、最大滞后/积压、轮次耗时）。
 - `RetentionBackgroundWorker.cs`：保留期后台任务，按 `RetentionJob.PollingIntervalSeconds` 周期触发分表保留期治理。

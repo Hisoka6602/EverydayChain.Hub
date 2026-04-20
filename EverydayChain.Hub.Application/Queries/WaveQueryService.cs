@@ -271,6 +271,7 @@ public sealed class WaveQueryService(
             return null;
         }
 
+        // 拆零区域映射固定为: 1→拆零1区、2→拆零2区、3→拆零3区、4→拆零4区；其余值一律跳过。
         return workingArea switch
         {
             1 => SplitZone1Code,

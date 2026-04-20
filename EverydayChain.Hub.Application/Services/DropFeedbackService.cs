@@ -104,7 +104,7 @@ public sealed class DropFeedbackService : IDropFeedbackService {
         // 步骤 4：推进状态机。
         if (request.IsSuccess) {
             var normalizedActualChuteCode = string.IsNullOrWhiteSpace(request.ActualChuteCode) ? null : request.ActualChuteCode.Trim();
-            if (string.IsNullOrWhiteSpace(normalizedActualChuteCode)) {
+            if (normalizedActualChuteCode is null) {
                 return new DropFeedbackApplicationResult
                 {
                     IsAccepted = false,
@@ -129,6 +129,7 @@ public sealed class DropFeedbackService : IDropFeedbackService {
         }
 
         task.UpdatedTimeLocal = DateTime.Now;
+        // 落格回传可能重复触发，必须基于本次 ActualChuteCode 重新计算 ResolvedDockCode，避免历史值残留。
         task.RefreshQueryFields();
 
         // 步骤 5：持久化。

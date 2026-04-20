@@ -1,7 +1,6 @@
 using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
-using EverydayChain.Hub.Application.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EverydayChain.Hub.Tests.Host.Controllers;
@@ -61,13 +60,13 @@ public sealed class WavesControllerTests
     public async Task QueryZonesAsync_ShouldReturnOk_WhenRequestIsValid()
     {
         var stubService = new StubWaveQueryService();
-        stubService.ZoneResult = new WaveZoneQueryResult
+        stubService.ZoneResult = new EverydayChain.Hub.Application.Models.WaveZoneQueryResult
         {
             WaveCode = "W1",
             WaveRemark = "备注1",
             Zones =
             [
-                new WaveZoneSummary
+                new EverydayChain.Hub.Application.Models.WaveZoneSummary
                 {
                     ZoneCode = "SplitZone1",
                     ZoneName = "拆零1区",
@@ -77,7 +76,7 @@ public sealed class WavesControllerTests
                     RecirculatedCount = 0,
                     ExceptionCount = 0
                 },
-                new WaveZoneSummary
+                new EverydayChain.Hub.Application.Models.WaveZoneSummary
                 {
                     ZoneCode = "SplitZone2",
                     ZoneName = "拆零2区",
@@ -87,7 +86,7 @@ public sealed class WavesControllerTests
                     RecirculatedCount = 0,
                     ExceptionCount = 0
                 },
-                new WaveZoneSummary
+                new EverydayChain.Hub.Application.Models.WaveZoneSummary
                 {
                     ZoneCode = "SplitZone3",
                     ZoneName = "拆零3区",
@@ -97,7 +96,7 @@ public sealed class WavesControllerTests
                     RecirculatedCount = 0,
                     ExceptionCount = 0
                 },
-                new WaveZoneSummary
+                new EverydayChain.Hub.Application.Models.WaveZoneSummary
                 {
                     ZoneCode = "SplitZone4",
                     ZoneName = "拆零4区",
@@ -107,7 +106,7 @@ public sealed class WavesControllerTests
                     RecirculatedCount = 0,
                     ExceptionCount = 0
                 },
-                new WaveZoneSummary
+                new EverydayChain.Hub.Application.Models.WaveZoneSummary
                 {
                     ZoneCode = "FullCase",
                     ZoneName = "整件数据",
