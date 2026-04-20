@@ -152,11 +152,9 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         var writeBackCompletedTimeColumnName = NormalizeAndValidateOptionalIdentifier(table.WriteBackCompletedTimeColumnName, table.TableCode, nameof(table.WriteBackCompletedTimeColumnName));
         var writeBackBatchIdColumnName = NormalizeAndValidateOptionalIdentifier(table.WriteBackBatchIdColumnName, table.TableCode, nameof(table.WriteBackBatchIdColumnName));
 
-        if (table.PendingStatusValue is not null && string.IsNullOrWhiteSpace(table.PendingStatusValue)) {
-            throw new InvalidOperationException($"表 {table.TableCode} 的 StatusDriven 模式配置 PendingStatusValue 不可为空白字符串；如需不过滤待处理状态，请将 PendingStatusValue 设为 null。");
-        }
-
-        var pendingStatusValue = table.PendingStatusValue?.Trim();
+        var pendingStatusValue = string.IsNullOrWhiteSpace(table.PendingStatusValue)
+       ? null
+       : table.PendingStatusValue.Trim();
 
         return new RemoteStatusConsumeProfile {
             StatusColumnName = statusColumnName,
