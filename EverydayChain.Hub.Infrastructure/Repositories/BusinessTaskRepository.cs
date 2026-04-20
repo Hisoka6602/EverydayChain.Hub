@@ -8,6 +8,7 @@ using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Linq.Expressions;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
@@ -27,6 +28,11 @@ public class BusinessTaskRepository(
     private const string EmptyWaveCode = "未分波次";
     /// <summary>无码头占位文本。</summary>
     private const string EmptyDockCode = "未分配码头";
+    /// <summary>回流统计统一谓词：归并码头编码可解析为整数且大于 7。</summary>
+    private static readonly Expression<Func<BusinessTaskEntity, bool>> RecirculationByResolvedDockCodeExpression = task =>
+        task.ResolvedDockCode != string.Empty
+        && !EF.Functions.Like(task.ResolvedDockCode, "%[^0-9]%")
+        && Convert.ToInt32(task.ResolvedDockCode) > 7;
 
     /// <summary>分表配置快照。</summary>
     private readonly ShardingOptions _shardingOptions = shardingOptions.Value;
@@ -323,10 +329,9 @@ public class BusinessTaskRepository(
                     SplitUnsortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split && task.Status != BusinessTaskStatus.Dropped && task.Status != BusinessTaskStatus.FeedbackPending),
                     RecognitionCount = group.Count(task => task.ScannedAtLocal != null),
                     RecirculatedCount = group.Count(task =>
-                        !string.IsNullOrWhiteSpace(task.ResolvedDockCode)
-                        && task.ResolvedDockCode.Trim() != string.Empty
-                        && !EF.Functions.Like(task.ResolvedDockCode.Trim(), "%[^0-9]%")
-                        && Convert.ToInt32(task.ResolvedDockCode.Trim()) > 7),
+                        task.ResolvedDockCode != string.Empty
+                        && !EF.Functions.Like(task.ResolvedDockCode, "%[^0-9]%")
+                        && Convert.ToInt32(task.ResolvedDockCode) > 7),
                     ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception),
                     TotalVolumeMm3 = group.Sum(task => task.VolumeMm3 ?? 0M),
                     TotalWeightGram = group.Sum(task => task.WeightGram ?? 0M)
@@ -563,10 +568,9 @@ public class BusinessTaskRepository(
                     SplitSortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split && (task.Status == BusinessTaskStatus.Dropped || task.Status == BusinessTaskStatus.FeedbackPending)),
                     FullCaseSortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase && (task.Status == BusinessTaskStatus.Dropped || task.Status == BusinessTaskStatus.FeedbackPending)),
                     RecirculatedCount = group.Count(task =>
-                        !string.IsNullOrWhiteSpace(task.ResolvedDockCode)
-                        && task.ResolvedDockCode.Trim() != string.Empty
-                        && !EF.Functions.Like(task.ResolvedDockCode.Trim(), "%[^0-9]%")
-                        && Convert.ToInt32(task.ResolvedDockCode.Trim()) > 7),
+                        task.ResolvedDockCode != string.Empty
+                        && !EF.Functions.Like(task.ResolvedDockCode, "%[^0-9]%")
+                        && Convert.ToInt32(task.ResolvedDockCode) > 7),
                     ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception)
                 })
                 .ToListAsync(ct);
@@ -837,11 +841,7 @@ public class BusinessTaskRepository(
 
         if (filter.OnlyRecirculation)
         {
-            query = query.Where(task =>
-                !string.IsNullOrWhiteSpace(task.ResolvedDockCode)
-                && task.ResolvedDockCode.Trim() != string.Empty
-                && !EF.Functions.Like(task.ResolvedDockCode.Trim(), "%[^0-9]%")
-                && Convert.ToInt32(task.ResolvedDockCode.Trim()) > 7);
+            query = query.Where(RecirculationByResolvedDockCodeExpression);
         }
 
         return query;

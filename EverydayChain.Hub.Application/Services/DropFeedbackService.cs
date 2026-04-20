@@ -55,8 +55,8 @@ public sealed class DropFeedbackService : IDropFeedbackService {
         var normalizedFailureReason = string.IsNullOrWhiteSpace(request.FailureReason) ? null : request.FailureReason.Trim();
 
         // 步骤 1：按任务编码或条码定位任务。
-        var hasTaskCode = normalizedTaskCode is not null;
-        var hasBarcode = normalizedBarcode is not null;
+        var hasTaskCode = normalizedTaskCode != null;
+        var hasBarcode = normalizedBarcode != null;
 
         if (!hasTaskCode && !hasBarcode) {
             return new DropFeedbackApplicationResult {

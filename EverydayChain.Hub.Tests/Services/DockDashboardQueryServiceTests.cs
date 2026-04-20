@@ -67,7 +67,7 @@ public sealed class DockDashboardQueryServiceTests
         }, CancellationToken.None);
 
         Assert.Equal(2, result.DockSummaries.Count);
-        Assert.Contains(result.DockSummaries, x => x.DockCode == "7" && x.ExceptionCount == 1 && x.RecirculatedCount == 1);
-        Assert.Contains(result.DockSummaries, x => x.DockCode == "8" && x.ExceptionCount == 0);
+        Assert.Contains(result.DockSummaries, x => x.DockCode == "7" && x.ExceptionCount == 1 && x.RecirculatedCount == 0);
+        Assert.Contains(result.DockSummaries, x => x.DockCode == "8" && x.ExceptionCount == 0 && x.RecirculatedCount == 2);
     }
 }

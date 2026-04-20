@@ -28,6 +28,16 @@ public class AutoMigrationHostedService(
     private const int StartupStageTimeoutSeconds = 120;
     /// <summary>启动预热总超时秒数。</summary>
     private const int WarmupTimeoutSeconds = 90;
+    /// <summary>波次查询预热占位波次编码。</summary>
+    private const string WarmupWaveCode = "WARMUP";
+    /// <summary>条码查询预热占位文本。</summary>
+    private const string WarmupBarcode = "WARMUP-BARCODE";
+    /// <summary>任务号查询预热占位文本。</summary>
+    private const string WarmupTaskCode = "WARMUP-TASK";
+    /// <summary>来源表查询预热占位文本。</summary>
+    private const string WarmupSourceTableCode = "WARMUP_SOURCE";
+    /// <summary>业务键查询预热占位文本。</summary>
+    private const string WarmupBusinessKey = "WARMUP_KEY";
 
     /// <summary>
     /// 应用启动时调用，创建作用域并执行 <see cref="IAutoMigrationService.RunAsync"/>。
@@ -153,7 +163,7 @@ public class AutoMigrationHostedService(
                 {
                     StartTimeLocal = startTimeLocal,
                     EndTimeLocal = endTimeLocal,
-                    WaveCode = "WARMUP"
+                    WaveCode = WarmupWaveCode
                 },
                 ct));
         await TryWarmupStepAsync(
@@ -163,7 +173,7 @@ public class AutoMigrationHostedService(
                 {
                     StartTimeLocal = startTimeLocal,
                     EndTimeLocal = endTimeLocal,
-                    WaveCode = "WARMUP"
+                    WaveCode = WarmupWaveCode
                 },
                 ct));
         await TryWarmupStepAsync(
@@ -171,9 +181,9 @@ public class AutoMigrationHostedService(
             async () =>
             {
                 var repository = provider.GetRequiredService<IBusinessTaskRepository>();
-                await repository.FindByBarcodeAsync("WARMUP-BARCODE", ct);
-                await repository.FindByTaskCodeAsync("WARMUP-TASK", ct);
-                await repository.FindBySourceTableAndBusinessKeyAsync("WARMUP_SOURCE", "WARMUP_KEY", ct);
+                await repository.FindByBarcodeAsync(WarmupBarcode, ct);
+                await repository.FindByTaskCodeAsync(WarmupTaskCode, ct);
+                await repository.FindBySourceTableAndBusinessKeyAsync(WarmupSourceTableCode, WarmupBusinessKey, ct);
             });
         logger.LogInformation("启动预热执行完成。");
     }
@@ -206,8 +216,11 @@ public class AutoMigrationHostedService(
         using var tableSuffixScope = TableSuffixScope.Use(suffix);
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         _ = dbContext.Model;
+        // 触发业务任务查询编译缓存与分表上下文模型热身。
         _ = await dbContext.BusinessTasks.AsNoTracking().Select(x => x.Id).Take(1).ToListAsync(ct);
+        // 触发扫描日志查询编译缓存。
         _ = await dbContext.ScanLogs.AsNoTracking().Select(x => x.Id).Take(1).ToListAsync(ct);
+        // 触发落格日志查询编译缓存。
         _ = await dbContext.DropLogs.AsNoTracking().Select(x => x.Id).Take(1).ToListAsync(ct);
     }
 
