@@ -140,6 +140,7 @@ public sealed class TaskExecutionService : ITaskExecutionService
         task.HeightMm = request.HeightMm ?? task.HeightMm;
         task.VolumeMm3 = request.VolumeMm3 ?? task.VolumeMm3;
         task.WeightGram = request.WeightGram ?? task.WeightGram;
+        // 请求提供格口编码时覆盖旧值，否则保留任务现有值。
         task.TargetChuteCode = normalizedTargetChuteCode ?? task.TargetChuteCode;
         task.ScanCount++;
         task.UpdatedTimeLocal = DateTime.Now;
