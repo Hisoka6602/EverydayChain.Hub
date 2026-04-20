@@ -2,6 +2,7 @@ using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EverydayChain.Hub.Tests.Host.Controllers;
@@ -16,11 +17,20 @@ public sealed class ScanControllerTests {
     private const DateTimeKind NonLocalKind = (DateTimeKind)1;
 
     /// <summary>
+    /// 构建扫描控制器测试实例。
+    /// </summary>
+    /// <param name="stubService">扫描上传服务替身。</param>
+    /// <returns>扫描控制器。</returns>
+    private static ScanController CreateController(StubScanIngressService stubService) {
+        return new ScanController(stubService, new BarcodeParser());
+    }
+
+    /// <summary>
     /// 条码为空时应返回 BadRequest。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodeIsEmpty() {
-        var controller = new ScanController(new StubScanIngressService());
+        var controller = CreateController(new StubScanIngressService());
         var request = new ScanUploadRequest {
             Barcodes = [],
             DeviceCode = "DVC-01",
@@ -37,7 +47,7 @@ public sealed class ScanControllerTests {
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenScanTimeKindIsNonLocal() {
-        var controller = new ScanController(new StubScanIngressService());
+        var controller = CreateController(new StubScanIngressService());
         var request = new ScanUploadRequest {
             Barcodes = ["Z130419305700070001"],
             DeviceCode = "DVC-01",
@@ -55,7 +65,7 @@ public sealed class ScanControllerTests {
     [Fact]
     public async Task UploadAsync_ShouldFallbackEmptyTraceId_WhenTraceIdIsNull() {
         var stubService = new StubScanIngressService();
-        var controller = new ScanController(stubService);
+        var controller = CreateController(stubService);
 #pragma warning disable CS8625
         var request = new ScanUploadRequest {
             Barcodes = ["Z130419305700070001"],
@@ -85,7 +95,7 @@ public sealed class ScanControllerTests {
                 Message = "条码类型不受支持。"
             }
         };
-        var controller = new ScanController(stubService);
+        var controller = CreateController(stubService);
         var request = new ScanUploadRequest {
             Barcodes = ["Z130419305700070001"],
             DeviceCode = "DVC-01",
@@ -104,11 +114,44 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
+    /// 单条码场景下即使条码不可解析也应进入应用层并返回逐条结果。
+    /// </summary>
+    [Fact]
+    public async Task UploadAsync_ShouldReturnPerItemResult_WhenSingleBarcodeIsUnresolvable() {
+        var stubService = new StubScanIngressService {
+            Result = new ScanUploadApplicationResult {
+                IsAccepted = false,
+                TaskCode = string.Empty,
+                BarcodeType = "Unknown",
+                FailureReason = "UnsupportedBarcodeType",
+                Message = "条码类型不受支持。"
+            }
+        };
+        var controller = CreateController(stubService);
+        var request = new ScanUploadRequest {
+            Barcodes = ["AB560419318300100001"],
+            DeviceCode = "DVC-01",
+            ScanTimeLocal = DateTime.Now
+        };
+
+        var actionResult = await controller.UploadAsync(request, CancellationToken.None);
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+        var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(badRequestResult.Value);
+
+        Assert.False(response.IsSuccess);
+        Assert.Equal("条码类型不受支持。", response.Message);
+        Assert.NotNull(response.Data);
+        Assert.Single(response.Data);
+        Assert.Equal("UnsupportedBarcodeType", response.Data[0].FailureReason);
+        Assert.Single(stubService.Requests);
+    }
+
+    /// <summary>
     /// 有效请求时应返回 Ok。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnOk_WhenRequestIsValid() {
-        var controller = new ScanController(new StubScanIngressService());
+        var controller = CreateController(new StubScanIngressService());
         var request = new ScanUploadRequest {
             Barcodes = ["Z130419305700070001"],
             DeviceCode = "DVC-01",
@@ -132,7 +175,7 @@ public sealed class ScanControllerTests {
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodesIsNull() {
-        var controller = new ScanController(new StubScanIngressService());
+        var controller = CreateController(new StubScanIngressService());
         var fixedScanTime = DateTime.SpecifyKind(new DateTime(2026, 4, 14, 10, 0, 0), DateTimeKind.Local);
         var request = new ScanUploadRequest {
             Barcodes = null,
@@ -153,7 +196,7 @@ public sealed class ScanControllerTests {
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenRequestIsNull() {
-        var controller = new ScanController(new StubScanIngressService());
+        var controller = CreateController(new StubScanIngressService());
 
         var actionResult = await controller.UploadAsync(null, CancellationToken.None);
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
@@ -168,7 +211,7 @@ public sealed class ScanControllerTests {
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodesContainsWhitespaceItem() {
-        var controller = new ScanController(new StubScanIngressService());
+        var controller = CreateController(new StubScanIngressService());
         var fixedScanTime = DateTime.SpecifyKind(new DateTime(2026, 4, 14, 10, 0, 0), DateTimeKind.Local);
         var request = new ScanUploadRequest {
             Barcodes = ["Z130419305700070001", " "],
@@ -189,7 +232,7 @@ public sealed class ScanControllerTests {
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodesExceedLimit() {
-        var controller = new ScanController(new StubScanIngressService());
+        var controller = CreateController(new StubScanIngressService());
         var fixedScanTime = DateTime.SpecifyKind(new DateTime(2026, 4, 14, 10, 0, 0), DateTimeKind.Local);
         var request = new ScanUploadRequest {
             Barcodes = Enumerable.Repeat("Z130419305700070001", 101).ToList(),
@@ -211,7 +254,7 @@ public sealed class ScanControllerTests {
     [Fact]
     public async Task UploadAsync_ShouldApplyZeroMeasurement_ForNonPrimaryBarcodes() {
         var stubService = new StubScanIngressService();
-        var controller = new ScanController(stubService);
+        var controller = CreateController(stubService);
         var request = new ScanUploadRequest {
             Barcodes = ["Z130419305700070001", "Z160419318300100001", "Z190419318300100001"],
             DeviceCode = "DVC-01",
@@ -255,7 +298,7 @@ public sealed class ScanControllerTests {
     [Fact]
     public async Task UploadAsync_ShouldSucceed_WhenSingleZBarcodeIsValid() {
         var stubService = new StubScanIngressService();
-        var controller = new ScanController(stubService);
+        var controller = CreateController(stubService);
         var request = new ScanUploadRequest {
             Barcodes = ["Z130419305700070001"],
             DeviceCode = "DVC-01",
@@ -273,7 +316,7 @@ public sealed class ScanControllerTests {
     [Fact]
     public async Task UploadAsync_ShouldSucceed_WhenMultipleZBarcodesShareSameChute() {
         var stubService = new StubScanIngressService();
-        var controller = new ScanController(stubService);
+        var controller = CreateController(stubService);
         var request = new ScanUploadRequest {
             Barcodes = ["Z130419305700070001", "Z160419318300100001"],
             DeviceCode = "DVC-01",
@@ -291,7 +334,7 @@ public sealed class ScanControllerTests {
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenZBarcodesContainMultipleChutes() {
         var stubService = new StubScanIngressService();
-        var controller = new ScanController(stubService);
+        var controller = CreateController(stubService);
         var request = new ScanUploadRequest {
             Barcodes = ["Z130419305700070001", "Z560419318300100001"],
             DeviceCode = "DVC-01",
@@ -313,7 +356,7 @@ public sealed class ScanControllerTests {
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodesContainUnresolvableChute() {
         var stubService = new StubScanIngressService();
-        var controller = new ScanController(stubService);
+        var controller = CreateController(stubService);
         var request = new ScanUploadRequest {
             Barcodes = ["Z130419305700070001", "AB560419318300100001"],
             DeviceCode = "DVC-01",
@@ -335,7 +378,7 @@ public sealed class ScanControllerTests {
     [Fact]
     public async Task UploadAsync_ShouldSucceed_WhenMixed02AndZBarcodesShareSameChute() {
         var stubService = new StubScanIngressService();
-        var controller = new ScanController(stubService);
+        var controller = CreateController(stubService);
         var request = new ScanUploadRequest {
             Barcodes = ["02123456", "Z130419305700070001"],
             DeviceCode = "DVC-01",
@@ -353,7 +396,7 @@ public sealed class ScanControllerTests {
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenMixed02AndZBarcodesContainDifferentChutes() {
         var stubService = new StubScanIngressService();
-        var controller = new ScanController(stubService);
+        var controller = CreateController(stubService);
         var request = new ScanUploadRequest {
             Barcodes = ["02123456", "Z560419318300100001"],
             DeviceCode = "DVC-01",

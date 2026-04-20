@@ -50,11 +50,18 @@ public sealed class ScanController : ControllerBase {
     private readonly IScanIngressService scanIngressService;
 
     /// <summary>
+    /// 条码解析服务。
+    /// </summary>
+    private readonly IBarcodeParser barcodeParser;
+
+    /// <summary>
     /// 初始化扫描上传控制器。
     /// </summary>
     /// <param name="scanIngressService">扫描上传应用服务。</param>
-    public ScanController(IScanIngressService scanIngressService) {
+    /// <param name="barcodeParser">条码解析服务。</param>
+    public ScanController(IScanIngressService scanIngressService, IBarcodeParser barcodeParser) {
         this.scanIngressService = scanIngressService;
+        this.barcodeParser = barcodeParser;
     }
 
     /// <summary>
@@ -80,7 +87,7 @@ public sealed class ScanController : ControllerBase {
             return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail(barcodeValidationMessage));
         }
 
-        if (!TryValidateBarcodeBatchChuteConsistency(barcodes, out var batchValidationMessage)) {
+        if (barcodes.Count > 1 && !TryValidateBarcodeBatchChuteConsistency(barcodes, out var batchValidationMessage)) {
             return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail(batchValidationMessage));
         }
 
@@ -178,70 +185,27 @@ public sealed class ScanController : ControllerBase {
     /// <param name="barcodes">标准化条码列表。</param>
     /// <param name="validationMessage">校验失败消息。</param>
     /// <returns>校验通过返回 true，否则返回 false。</returns>
-    private static bool TryValidateBarcodeBatchChuteConsistency(IReadOnlyList<string> barcodes, out string validationMessage) {
+    private bool TryValidateBarcodeBatchChuteConsistency(IReadOnlyList<string> barcodes, out string validationMessage) {
         validationMessage = string.Empty;
         string? firstChuteCode = null;
         foreach (var barcode in barcodes) {
-            if (!TryExtractChuteCode(barcode, out var currentChuteCode)) {
+            var parseResult = barcodeParser.Parse(barcode);
+            if (!parseResult.IsValid || string.IsNullOrWhiteSpace(parseResult.TargetChuteCode)) {
                 validationMessage = UnresolvableChuteMessage;
                 return false;
             }
 
             if (firstChuteCode is null) {
-                firstChuteCode = currentChuteCode;
+                firstChuteCode = parseResult.TargetChuteCode;
                 continue;
             }
 
-            if (!string.Equals(firstChuteCode, currentChuteCode, StringComparison.Ordinal)) {
+            if (!string.Equals(firstChuteCode, parseResult.TargetChuteCode, StringComparison.Ordinal)) {
                 validationMessage = MultipleChutesMessage;
                 return false;
             }
         }
 
         return true;
-    }
-
-    /// <summary>
-    /// 按固定条码规则提取格口编码。
-    /// </summary>
-    /// <param name="barcode">待提取条码。</param>
-    /// <param name="chuteCode">提取出的格口编码。</param>
-    /// <returns>提取成功返回 true，否则返回 false。</returns>
-    private static bool TryExtractChuteCode(string barcode, out string chuteCode) {
-        chuteCode = string.Empty;
-        if (string.IsNullOrWhiteSpace(barcode)) {
-            return false;
-        }
-
-        var normalizedBarcode = barcode.Trim().ToUpperInvariant();
-        if (normalizedBarcode.StartsWith("02", StringComparison.Ordinal)) {
-            if (normalizedBarcode.Length <= 2) {
-                return false;
-            }
-
-            var splitChuteCharacter = normalizedBarcode[2];
-            if (!char.IsAsciiDigit(splitChuteCharacter)) {
-                return false;
-            }
-
-            chuteCode = splitChuteCharacter.ToString();
-            return true;
-        }
-
-        if (normalizedBarcode.StartsWith('Z')) {
-            if (normalizedBarcode.Length <= 1) {
-                return false;
-            }
-
-            var fullCaseChuteCharacter = normalizedBarcode[1];
-            if (!char.IsAsciiDigit(fullCaseChuteCharacter)) {
-                return false;
-            }
-
-            chuteCode = fullCaseChuteCharacter.ToString();
-            return true;
-        }
-
-        return false;
     }
 }
