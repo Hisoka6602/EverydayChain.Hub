@@ -28,6 +28,7 @@ public class BusinessTaskProjectionServiceTests
                     Barcode = "CARTON001",
                     WaveCode = "W1",
                     WaveRemark = "R1",
+                    WorkingArea = "1",
                     ProjectedTimeLocal = new DateTime(2026, 4, 20, 10, 30, 0, DateTimeKind.Local)
                 }
             ]
@@ -40,6 +41,7 @@ public class BusinessTaskProjectionServiceTests
         Assert.Equal("CARTON001", entity.TaskCode);
         Assert.Equal("CARTON001", entity.BusinessKey);
         Assert.Equal(BusinessTaskSourceType.Split, entity.SourceType);
+        Assert.Equal("1", entity.WorkingArea);
     }
 
     /// <summary>

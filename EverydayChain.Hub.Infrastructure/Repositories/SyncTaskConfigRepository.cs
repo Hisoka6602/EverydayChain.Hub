@@ -62,6 +62,7 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         var barcodeColumn = NormalizeAndValidateOptionalIdentifier(table.BarcodeColumn, table.TableCode, nameof(table.BarcodeColumn));
         var waveCodeColumn = NormalizeAndValidateOptionalIdentifier(table.WaveCodeColumn, table.TableCode, nameof(table.WaveCodeColumn));
         var waveRemarkColumn = NormalizeAndValidateOptionalIdentifier(table.WaveRemarkColumn, table.TableCode, nameof(table.WaveRemarkColumn));
+        var workingAreaColumn = NormalizeAndValidateOptionalIdentifier(table.WorkingAreaColumn, table.TableCode, nameof(table.WorkingAreaColumn));
         return new SyncTableDefinition {
             TableCode = table.TableCode,
             Enabled = table.Enabled,
@@ -92,6 +93,7 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             BarcodeColumn = barcodeColumn,
             WaveCodeColumn = waveCodeColumn,
             WaveRemarkColumn = waveRemarkColumn,
+            WorkingAreaColumn = workingAreaColumn,
         };
     }
 

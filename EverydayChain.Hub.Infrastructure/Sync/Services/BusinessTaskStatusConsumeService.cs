@@ -194,6 +194,7 @@ public class BusinessTaskStatusConsumeService(
         TryReadOptionalString(row, definition.BarcodeColumn, out var barcode);
         TryReadOptionalString(row, definition.WaveCodeColumn, out var waveCode);
         TryReadOptionalString(row, definition.WaveRemarkColumn, out var waveRemark);
+        TryReadOptionalString(row, definition.WorkingAreaColumn, out var workingArea);
         var projectedTimeLocal = ResolveProjectedTimeLocal(definition, batchId, businessKey, row);
         return new BusinessTaskProjectionRow
         {
@@ -203,6 +204,7 @@ public class BusinessTaskStatusConsumeService(
             Barcode = barcode,
             WaveCode = waveCode,
             WaveRemark = waveRemark,
+            WorkingArea = workingArea,
             ProjectedTimeLocal = projectedTimeLocal
         };
     }

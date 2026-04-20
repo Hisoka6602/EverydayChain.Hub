@@ -150,6 +150,7 @@ public static class ServiceCollectionExtensions {
                 sp.GetRequiredService<IBusinessTaskRepository>(),
                 sp.GetRequiredService<IMemoryCache>(),
                 queryCacheOptions));
+        services.AddSingleton<IWaveQueryService, WaveQueryService>();
         services.AddSingleton<IBusinessTaskReadService, BusinessTaskReadService>();
         services.AddSingleton<IDeletionExecutionService, DeletionExecutionService>();
         services.AddSingleton<IRetentionExecutionService, RetentionExecutionService>();

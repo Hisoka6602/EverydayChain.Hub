@@ -363,6 +363,79 @@ public class BusinessTaskRepository(
     }
 
     /// <inheritdoc/>
+    public async Task<IReadOnlyList<BusinessTaskWaveOptionRow>> ListWaveOptionsByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
+    {
+        if (endTimeLocal <= startTimeLocal)
+        {
+            return Array.Empty<BusinessTaskWaveOptionRow>();
+        }
+
+        var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct);
+        var waveOptions = new Dictionary<string, WaveOptionCandidate>(StringComparer.OrdinalIgnoreCase);
+        foreach (var suffix in suffixes)
+        {
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            var shardRows = await db.BusinessTasks
+                .AsNoTracking()
+                .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal)
+                .Select(x => new
+                {
+                    WaveCode = x.NormalizedWaveCode ?? EmptyWaveCode,
+                    x.WaveRemark,
+                    x.UpdatedTimeLocal
+                })
+                .ToListAsync(ct);
+            foreach (var row in shardRows)
+            {
+                var normalizedRemark = NormalizeOptionalText(row.WaveRemark);
+                if (!waveOptions.TryGetValue(row.WaveCode, out var existing))
+                {
+                    waveOptions[row.WaveCode] = new WaveOptionCandidate(normalizedRemark, row.UpdatedTimeLocal);
+                    continue;
+                }
+
+                if (!string.IsNullOrWhiteSpace(normalizedRemark)
+                    && (string.IsNullOrWhiteSpace(existing.WaveRemark) || row.UpdatedTimeLocal >= existing.UpdatedTimeLocal))
+                {
+                    waveOptions[row.WaveCode] = new WaveOptionCandidate(normalizedRemark, row.UpdatedTimeLocal);
+                }
+            }
+        }
+
+        return waveOptions
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => new BusinessTaskWaveOptionRow
+            {
+                WaveCode = pair.Key,
+                WaveRemark = pair.Value.WaveRemark
+            })
+            .ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BusinessTaskEntity>> FindByWaveCodeAndCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, string waveCode, CancellationToken ct)
+    {
+        var normalizedWaveCode = NormalizeOptionalText(waveCode);
+        if (endTimeLocal <= startTimeLocal || string.IsNullOrWhiteSpace(normalizedWaveCode))
+        {
+            return Array.Empty<BusinessTaskEntity>();
+        }
+
+        var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct);
+        return await QueryAcrossSpecifiedShardsAsync(query =>
+        {
+            var filtered = query.Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal);
+            if (string.Equals(normalizedWaveCode, EmptyWaveCode, StringComparison.Ordinal))
+            {
+                return filtered.Where(x => x.NormalizedWaveCode == null);
+            }
+
+            return filtered.Where(x => x.NormalizedWaveCode == normalizedWaveCode);
+        }, suffixes, ct);
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<BusinessTaskDockAggregateRow>> AggregateDockDashboardAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
@@ -711,6 +784,13 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
+    /// 波次选项候选值。
+    /// </summary>
+    /// <param name="waveRemark">波次备注。</param>
+    /// <param name="updatedTimeLocal">更新时间。</param>
+    private readonly record struct WaveOptionCandidate(string? WaveRemark, DateTime UpdatedTimeLocal);
+
+    /// <summary>
     /// 合并投影字段，避免覆盖运行态字段。
     /// </summary>
     /// <param name="target">已存在实体。</param>
@@ -724,6 +804,7 @@ public class BusinessTaskRepository(
 
         target.WaveCode = incoming.WaveCode;
         target.WaveRemark = incoming.WaveRemark;
+        target.WorkingArea = incoming.WorkingArea;
         target.UpdatedTimeLocal = incoming.UpdatedTimeLocal;
     }
 

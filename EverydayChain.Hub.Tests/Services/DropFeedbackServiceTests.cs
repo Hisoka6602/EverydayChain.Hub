@@ -171,6 +171,49 @@ public sealed class DropFeedbackServiceTests
     }
 
     /// <summary>
+    /// 同一任务多次落格时应覆盖实际码头并刷新归并码头编码。
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_ShouldOverwriteResolvedDockCode_WhenDropFeedbackCalledMultipleTimes()
+    {
+        var (service, repo) = CreateService();
+        await repo.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "TASK-005",
+            SourceTableCode = "WMS",
+            BusinessKey = "K5",
+            Barcode = "BC-005",
+            Status = BusinessTaskStatus.Scanned,
+            CreatedTimeLocal = DateTime.Now,
+            UpdatedTimeLocal = DateTime.Now
+        }, CancellationToken.None);
+
+        var firstResult = await service.ExecuteAsync(new DropFeedbackApplicationRequest
+        {
+            Barcode = "BC-005",
+            ActualChuteCode = "2",
+            DropTimeLocal = DateTime.Now,
+            IsSuccess = true
+        }, CancellationToken.None);
+
+        Assert.True(firstResult.IsAccepted);
+
+        var secondResult = await service.ExecuteAsync(new DropFeedbackApplicationRequest
+        {
+            Barcode = "BC-005",
+            ActualChuteCode = "9",
+            DropTimeLocal = DateTime.Now,
+            IsSuccess = true
+        }, CancellationToken.None);
+
+        Assert.True(secondResult.IsAccepted);
+        var updated = await repo.FindByTaskCodeAsync("TASK-005", CancellationToken.None);
+        Assert.NotNull(updated);
+        Assert.Equal("9", updated!.ActualChuteCode);
+        Assert.Equal("9", updated.ResolvedDockCode);
+    }
+
+    /// <summary>
     /// 落格失败时任务应推进到 Exception 状态。
     /// </summary>
     [Fact]

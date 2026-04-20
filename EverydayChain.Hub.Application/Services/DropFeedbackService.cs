@@ -90,22 +90,34 @@ public sealed class DropFeedbackService : IDropFeedbackService {
             };
         }
 
-        // 步骤 3：校验任务状态是否允许推进（仅已扫描任务可落格）。
-        if (task.Status != BusinessTaskStatus.Scanned) {
+        // 步骤 3：校验任务状态是否允许推进（已扫描/已落格/待回传任务可重复落格覆盖）。
+        if (!IsDropAllowedStatus(task.Status)) {
             return new DropFeedbackApplicationResult {
                 IsAccepted = false,
                 TaskCode = task.TaskCode,
                 Status = task.Status.ToString(),
                 FailureReason = "InvalidTaskStatus",
-                Message = $"任务 [{task.TaskCode}] 当前状态 [{task.Status}] 不允许落格回传，仅已扫描任务可推进。"
+                Message = $"任务 [{task.TaskCode}] 当前状态 [{task.Status}] 不允许落格回传。"
             };
         }
 
         // 步骤 4：推进状态机。
         if (request.IsSuccess) {
+            var normalizedActualChuteCode = string.IsNullOrWhiteSpace(request.ActualChuteCode) ? null : request.ActualChuteCode.Trim();
+            if (string.IsNullOrWhiteSpace(normalizedActualChuteCode)) {
+                return new DropFeedbackApplicationResult
+                {
+                    IsAccepted = false,
+                    TaskCode = task.TaskCode,
+                    Status = task.Status.ToString(),
+                    FailureReason = "ActualChuteCodeRequired",
+                    Message = $"任务 [{task.TaskCode}] 落格成功回传时 ActualChuteCode 不能为空白。"
+                };
+            }
+
             task.Status = BusinessTaskStatus.Dropped;
             task.FeedbackStatus = BusinessTaskFeedbackStatus.Pending;
-            task.ActualChuteCode = string.IsNullOrWhiteSpace(request.ActualChuteCode) ? task.ActualChuteCode : request.ActualChuteCode.Trim();
+            task.ActualChuteCode = normalizedActualChuteCode;
             task.DroppedAtLocal = request.DropTimeLocal;
             // 落格成功后任务进入待回传阶段，需清理旧回传成功标记并等待新的 WMS 回写结果。
             task.IsFeedbackReported = false;
@@ -141,6 +153,18 @@ public sealed class DropFeedbackService : IDropFeedbackService {
                 ? $"任务 [{task.TaskCode}] 落格成功，已推进到 {task.Status}。"
                 : $"任务 [{task.TaskCode}] 落格异常，已推进到 {task.Status}。"
         };
+    }
+
+    /// <summary>
+    /// 判断当前任务状态是否允许落格回传。
+    /// </summary>
+    /// <param name="status">任务状态。</param>
+    /// <returns>允许返回 true，否则返回 false。</returns>
+    private static bool IsDropAllowedStatus(BusinessTaskStatus status)
+    {
+        return status == BusinessTaskStatus.Scanned
+            || status == BusinessTaskStatus.Dropped
+            || status == BusinessTaskStatus.FeedbackPending;
     }
 
     /// <summary>

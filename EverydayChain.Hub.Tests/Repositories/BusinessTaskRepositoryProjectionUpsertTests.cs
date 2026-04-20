@@ -26,6 +26,7 @@ public class BusinessTaskRepositoryProjectionUpsertTests
             Barcode = "BK-1",
             WaveCode = "W1",
             WaveRemark = "R1",
+            WorkingArea = "1",
             Status = BusinessTaskStatus.Created,
             CreatedTimeLocal = created,
             UpdatedTimeLocal = created
@@ -40,6 +41,7 @@ public class BusinessTaskRepositoryProjectionUpsertTests
             Barcode = "BK-1-NEW",
             WaveCode = "W2",
             WaveRemark = "R2",
+            WorkingArea = "2",
             Status = BusinessTaskStatus.Created,
             CreatedTimeLocal = DateTime.Now,
             UpdatedTimeLocal = DateTime.Now
@@ -49,6 +51,7 @@ public class BusinessTaskRepositoryProjectionUpsertTests
         Assert.NotNull(found);
         Assert.Equal("W2", found!.WaveCode);
         Assert.Equal("R2", found.WaveRemark);
+        Assert.Equal("2", found.WorkingArea);
         Assert.Equal("BK-1", found.TaskCode);
     }
 
