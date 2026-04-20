@@ -331,7 +331,13 @@ public class BusinessTaskRepository(
                     SplitTotalCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split),
                     SplitUnsortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split && task.Status != BusinessTaskStatus.Dropped && task.Status != BusinessTaskStatus.FeedbackPending),
                     RecognitionCount = group.Count(task => task.ScannedAtLocal != null),
-                    RecirculatedCount = group.Count(RecirculationByResolvedDockCodeExpression),
+                    RecirculatedCount = group.Count(task =>
+                        task.ResolvedDockCode.Trim() != string.Empty
+                        && !EF.Functions.Like(task.ResolvedDockCode.Trim(), "%[^0-9]%")
+                        && (
+                            EF.Functions.Like(task.ResolvedDockCode.Trim(), "[1-9][0-9]%")
+                            || EF.Functions.Like(task.ResolvedDockCode.Trim(), "[8-9]")
+                        )),
                     ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception),
                     TotalVolumeMm3 = group.Sum(task => task.VolumeMm3 ?? 0M),
                     TotalWeightGram = group.Sum(task => task.WeightGram ?? 0M)
@@ -567,7 +573,13 @@ public class BusinessTaskRepository(
                     FullCaseTotalCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase),
                     SplitSortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split && (task.Status == BusinessTaskStatus.Dropped || task.Status == BusinessTaskStatus.FeedbackPending)),
                     FullCaseSortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase && (task.Status == BusinessTaskStatus.Dropped || task.Status == BusinessTaskStatus.FeedbackPending)),
-                    RecirculatedCount = group.Count(RecirculationByResolvedDockCodeExpression),
+                    RecirculatedCount = group.Count(task =>
+                        task.ResolvedDockCode.Trim() != string.Empty
+                        && !EF.Functions.Like(task.ResolvedDockCode.Trim(), "%[^0-9]%")
+                        && (
+                            EF.Functions.Like(task.ResolvedDockCode.Trim(), "[1-9][0-9]%")
+                            || EF.Functions.Like(task.ResolvedDockCode.Trim(), "[8-9]")
+                        )),
                     ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception)
                 })
                 .ToListAsync(ct);

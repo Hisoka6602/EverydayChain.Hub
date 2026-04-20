@@ -1,12 +1,8 @@
 using EverydayChain.Hub.Application.Abstractions.Services;
-using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Host.Workers;
-using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Tests.Services;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Tests.Host.Workers;
 
@@ -49,14 +45,7 @@ public sealed class ApiWarmupHostedServiceTests
     /// <returns>托管服务实例。</returns>
     private static ApiWarmupHostedService CreateHostedService(IApiWarmupService apiWarmupService)
     {
-        var dbContextOptions = new DbContextOptionsBuilder<HubDbContext>()
-            .UseInMemoryDatabase($"api-warmup-tests-{Guid.NewGuid():N}")
-            .Options;
-        var shardingOptions = Options.Create(new ShardingOptions
-        {
-            Schema = "dbo"
-        });
-        var dbContextFactory = new HubDbContextTestFactory(dbContextOptions, shardingOptions);
+        var dbContextFactory = new ThrowingHubDbContextFactory();
         IShardSuffixResolver shardSuffixResolver = new FixedBootstrapShardSuffixResolver(["_202604"]);
 
         return new ApiWarmupHostedService(

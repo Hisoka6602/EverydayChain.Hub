@@ -48,7 +48,7 @@ public sealed class ScanIngressService : IScanIngressService {
             };
         }
 
-        // 步骤 2：将解析结果写回原请求对象并推进任务状态，避免重复分配请求对象。
+        // 步骤 2：将解析结果写回当前请求对象并推进任务状态，避免额外构造中间请求对象。
         request.TargetChuteCode = parseResult.TargetChuteCode;
         request.BarcodeType = barcodeType;
         var execResult = await _taskExecutionService.MarkScannedAsync(request, cancellationToken);

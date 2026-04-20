@@ -28,8 +28,8 @@ public sealed class ApiWarmupHostedService(
             {
                 using var warmupTimeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(WarmupTimeoutSeconds));
                 using var linkedWarmupCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, warmupTimeoutCts.Token);
-                await WarmupDbContextCacheAsync(linkedWarmupCts.Token);
-                await apiWarmupService.WarmupAsync(linkedWarmupCts.Token);
+                await TryWarmupStepAsync("EF模型与分表上下文缓存", async () => await WarmupDbContextCacheAsync(linkedWarmupCts.Token), linkedWarmupCts.Token);
+                await TryWarmupStepAsync("查询链路预热", async () => await apiWarmupService.WarmupAsync(linkedWarmupCts.Token), linkedWarmupCts.Token);
             }
             catch (OperationCanceledException)
             {
@@ -73,5 +73,28 @@ public sealed class ApiWarmupHostedService(
         _ = await dbContext.BusinessTasks.AsNoTracking().Select(x => x.Id).Take(1).ToListAsync(cancellationToken);
         _ = await dbContext.ScanLogs.AsNoTracking().Select(x => x.Id).Take(1).ToListAsync(cancellationToken);
         _ = await dbContext.DropLogs.AsNoTracking().Select(x => x.Id).Take(1).ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// 执行单个预热步骤，失败时记录日志并继续后续步骤。
+    /// </summary>
+    /// <param name="stepName">步骤名称。</param>
+    /// <param name="action">步骤动作。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    private async Task TryWarmupStepAsync(string stepName, Func<Task> action, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await action();
+            logger.LogInformation("启动预热步骤完成：{StepName}", stepName);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "启动预热步骤失败，已跳过：{StepName}", stepName);
+        }
     }
 }
