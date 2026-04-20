@@ -38,14 +38,17 @@ public sealed class ChuteQueryService : IChuteQueryService {
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>格口解析结果。</returns>
     public async Task<ChuteResolveApplicationResult> ExecuteAsync(ChuteResolveApplicationRequest request, CancellationToken cancellationToken) {
+        var normalizedTaskCode = string.IsNullOrWhiteSpace(request.TaskCode) ? null : request.TaskCode.Trim();
+        var normalizedBarcode = string.IsNullOrWhiteSpace(request.Barcode) ? null : request.Barcode.Trim();
+
         // 步骤 1：优先按任务编码查找任务。
-        var task = !string.IsNullOrWhiteSpace(request.TaskCode)
-            ? await _businessTaskRepository.FindByTaskCodeAsync(request.TaskCode.Trim(), cancellationToken)
+        var task = normalizedTaskCode is not null
+            ? await _businessTaskRepository.FindByTaskCodeAsync(normalizedTaskCode, cancellationToken)
             : null;
 
         // 步骤 2：任务编码为空或未命中时，按条码查找任务。
-        if (task == null && !string.IsNullOrWhiteSpace(request.Barcode)) {
-            task = await _businessTaskRepository.FindByBarcodeAsync(request.Barcode.Trim(), cancellationToken);
+        if (task == null && normalizedBarcode is not null) {
+            task = await _businessTaskRepository.FindByBarcodeAsync(normalizedBarcode, cancellationToken);
         }
 
         // 步骤 3：任务不存在时返回失败。
@@ -54,7 +57,7 @@ public sealed class ChuteQueryService : IChuteQueryService {
                 IsResolved = false,
                 TaskCode = string.Empty,
                 ChuteCode = string.Empty,
-                Message = $"未找到条码 [{request.Barcode}] 或任务编码 [{request.TaskCode}] 对应的业务任务。"
+                Message = $"未找到条码 [{normalizedBarcode}] 或任务编码 [{normalizedTaskCode}] 对应的业务任务。"
             };
         }
 

@@ -215,11 +215,11 @@ public sealed class TaskExecutionService : ITaskExecutionService
             {
                 BusinessTaskId = businessTaskId,
                 TaskCode = taskCode,
-                Barcode = barcode.Trim(),
-                DeviceCode = string.IsNullOrWhiteSpace(deviceCode) ? null : deviceCode.Trim(),
+                Barcode = barcode,
+                DeviceCode = deviceCode,
                 IsMatched = isMatched,
-                FailureReason = string.IsNullOrWhiteSpace(failureReason) ? null : failureReason.Trim(),
-                TraceId = string.IsNullOrWhiteSpace(traceId) ? null : traceId.Trim(),
+                FailureReason = failureReason,
+                TraceId = traceId,
                 ScanTimeLocal = scanTimeLocal,
                 CreatedTimeLocal = DateTime.Now
             };

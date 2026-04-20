@@ -81,9 +81,9 @@ public sealed class BusinessTaskReadServiceTests
             SourceType = BusinessTaskSourceType.Split,
             BusinessKey = "E1",
             TargetChuteCode = "7",
+            ActualChuteCode = "8",
             Status = BusinessTaskStatus.Exception,
             IsException = true,
-            IsRecirculated = true,
             CreatedTimeLocal = start.AddHours(1),
             UpdatedTimeLocal = start.AddHours(1)
         }, CancellationToken.None);
@@ -108,6 +108,57 @@ public sealed class BusinessTaskReadServiceTests
         Assert.Single(recirculationResult.Items);
         Assert.Equal("E1", exceptionResult.Items[0].TaskCode);
         Assert.Equal("E1", recirculationResult.Items[0].TaskCode);
+    }
+
+    /// <summary>
+    /// 回流查询应仅按归并码头编码口径筛选，不受 IsRecirculated 领域状态字段影响。
+    /// </summary>
+    [Fact]
+    public async Task QueryRecirculationsAsync_ShouldUseResolvedDockCodeRule()
+    {
+        var repository = new InMemoryBusinessTaskRepository();
+        var service = new BusinessTaskReadService(repository);
+        var start = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 0, 0, 0), DateTimeKind.Local);
+        var end = start.AddDays(1);
+
+        await repository.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "R1",
+            SourceTableCode = "SRC",
+            SourceType = BusinessTaskSourceType.Split,
+            BusinessKey = "R1",
+            TargetChuteCode = "7",
+            ActualChuteCode = "7",
+            IsRecirculated = true,
+            Status = BusinessTaskStatus.Scanned,
+            CreatedTimeLocal = start.AddHours(1),
+            UpdatedTimeLocal = start.AddHours(1)
+        }, CancellationToken.None);
+
+        await repository.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "R2",
+            SourceTableCode = "SRC",
+            SourceType = BusinessTaskSourceType.Split,
+            BusinessKey = "R2",
+            TargetChuteCode = "7",
+            ActualChuteCode = "8",
+            IsRecirculated = false,
+            Status = BusinessTaskStatus.Scanned,
+            CreatedTimeLocal = start.AddHours(2),
+            UpdatedTimeLocal = start.AddHours(2)
+        }, CancellationToken.None);
+
+        var result = await service.QueryRecirculationsAsync(new BusinessTaskQueryRequest
+        {
+            StartTimeLocal = start,
+            EndTimeLocal = end,
+            PageNumber = 1,
+            PageSize = 10
+        }, CancellationToken.None);
+
+        Assert.Single(result.Items);
+        Assert.Equal("R2", result.Items[0].TaskCode);
     }
 
     /// <summary>

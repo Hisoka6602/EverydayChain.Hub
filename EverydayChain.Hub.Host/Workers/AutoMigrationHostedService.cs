@@ -4,6 +4,12 @@ using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore.Storage;
 using System.Data.Common;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
+using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Application.Abstractions.Queries;
+using EverydayChain.Hub.Application.Abstractions.Persistence;
+using EverydayChain.Hub.Infrastructure.Persistence;
+using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Infrastructure.Services;
 
 namespace EverydayChain.Hub.Host.Workers;
@@ -20,6 +26,18 @@ public class AutoMigrationHostedService(
     private const string AutoMigrationStage = "自动迁移阶段";
     /// <summary>启动自检与自动迁移单阶段超时秒数。</summary>
     private const int StartupStageTimeoutSeconds = 120;
+    /// <summary>启动预热总超时秒数。</summary>
+    private const int WarmupTimeoutSeconds = 90;
+    /// <summary>波次查询预热占位波次编码。</summary>
+    private const string WarmupWaveCode = "WARMUP";
+    /// <summary>条码查询预热占位文本。</summary>
+    private const string WarmupBarcode = "WARMUP-BARCODE";
+    /// <summary>任务号查询预热占位文本。</summary>
+    private const string WarmupTaskCode = "WARMUP-TASK";
+    /// <summary>来源表查询预热占位文本。</summary>
+    private const string WarmupSourceTableCode = "WARMUP_SOURCE";
+    /// <summary>业务键查询预热占位文本。</summary>
+    private const string WarmupBusinessKey = "WARMUP_KEY";
 
     /// <summary>
     /// 应用启动时调用，创建作用域并执行 <see cref="IAutoMigrationService.RunAsync"/>。
@@ -39,6 +57,7 @@ public class AutoMigrationHostedService(
             using var migrationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             migrationCts.CancelAfter(TimeSpan.FromSeconds(StartupStageTimeoutSeconds));
             await autoMigrationService.RunAsync(migrationCts.Token);
+            StartApiWarmupInBackground(cancellationToken);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) {
             logger.LogError(
@@ -71,6 +90,171 @@ public class AutoMigrationHostedService(
     /// </summary>
     /// <param name="cancellationToken">取消令牌。</param>
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <summary>
+    /// 在后台触发 API 预热，避免阻塞主机启动。
+    /// </summary>
+    private void StartApiWarmupInBackground(CancellationToken startupCancellationToken)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var warmupTimeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(WarmupTimeoutSeconds));
+                using var linkedWarmupCts = CancellationTokenSource.CreateLinkedTokenSource(startupCancellationToken, warmupTimeoutCts.Token);
+                await WarmupReadPathAsync(linkedWarmupCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                logger.LogWarning("启动预热执行已取消（超时 >{WarmupTimeoutSeconds}s 或宿主停止信号），已跳过剩余预热步骤。", WarmupTimeoutSeconds);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "启动预热执行失败，已降级跳过，不影响主机可用性。");
+            }
+        });
+    }
+
+    /// <summary>
+    /// 预热高频查询读路径与关键仓储定位查询。
+    /// </summary>
+    /// <param name="ct">取消令牌。</param>
+    private async Task WarmupReadPathAsync(CancellationToken ct)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var provider = scope.ServiceProvider;
+        var now = DateTime.Now;
+        var startTimeLocal = now.AddHours(-1);
+        var endTimeLocal = now.AddHours(1);
+
+        await TryWarmupStepAsync(
+            "EF模型与分表上下文缓存",
+            async () => await WarmupDbContextCacheAsync(provider, ct),
+            ct);
+        await TryWarmupStepAsync(
+            "总看板查询链路",
+            async () => await provider.GetRequiredService<IGlobalDashboardQueryService>().QueryAsync(
+                new GlobalDashboardQueryRequest
+                {
+                    StartTimeLocal = startTimeLocal,
+                    EndTimeLocal = endTimeLocal
+                },
+                ct),
+            ct);
+        await TryWarmupStepAsync(
+            "码头看板查询链路",
+            async () => await provider.GetRequiredService<IDockDashboardQueryService>().QueryAsync(
+                new DockDashboardQueryRequest
+                {
+                    StartTimeLocal = startTimeLocal,
+                    EndTimeLocal = endTimeLocal
+                },
+                ct),
+            ct);
+        await TryWarmupStepAsync(
+            "波次选项查询链路",
+            async () => await provider.GetRequiredService<IWaveQueryService>().QueryOptionsAsync(
+                new WaveOptionsQueryRequest
+                {
+                    StartTimeLocal = startTimeLocal,
+                    EndTimeLocal = endTimeLocal
+                },
+                ct),
+            ct);
+        await TryWarmupStepAsync(
+            "波次摘要查询链路",
+            async () => await provider.GetRequiredService<IWaveQueryService>().QuerySummaryAsync(
+                new WaveSummaryQueryRequest
+                {
+                    StartTimeLocal = startTimeLocal,
+                    EndTimeLocal = endTimeLocal,
+                    WaveCode = WarmupWaveCode
+                },
+                ct),
+            ct);
+        await TryWarmupStepAsync(
+            "波次分区查询链路",
+            async () => await provider.GetRequiredService<IWaveQueryService>().QueryZonesAsync(
+                new WaveZoneQueryRequest
+                {
+                    StartTimeLocal = startTimeLocal,
+                    EndTimeLocal = endTimeLocal,
+                    WaveCode = WarmupWaveCode
+                },
+                ct),
+            ct);
+        await TryWarmupStepAsync(
+            "高频仓储定位查询链路",
+            async () =>
+            {
+                var repository = provider.GetRequiredService<IBusinessTaskRepository>();
+                await repository.FindByBarcodeAsync(WarmupBarcode, ct);
+                await repository.FindByTaskCodeAsync(WarmupTaskCode, ct);
+                await repository.FindBySourceTableAndBusinessKeyAsync(WarmupSourceTableCode, WarmupBusinessKey, ct);
+            },
+            ct);
+        logger.LogInformation("启动预热执行完成。");
+    }
+
+    /// <summary>
+    /// 预热 EF Core 模型缓存与分表上下文初始化。
+    /// </summary>
+    /// <param name="serviceProvider">服务提供器。</param>
+    /// <param name="ct">取消令牌。</param>
+    private static async Task WarmupDbContextCacheAsync(IServiceProvider serviceProvider, CancellationToken ct)
+    {
+        var dbContextFactory = serviceProvider.GetRequiredService<IDbContextFactory<HubDbContext>>();
+        var shardSuffixResolver = serviceProvider.GetRequiredService<IShardSuffixResolver>();
+
+        await WarmupSingleDbContextAsync(dbContextFactory, string.Empty, ct);
+        await WarmupSingleDbContextAsync(dbContextFactory, shardSuffixResolver.ResolveLocal(DateTime.Now), ct);
+    }
+
+    /// <summary>
+    /// 预热单个分片后缀对应的 DbContext 模型与只读查询编译缓存。
+    /// </summary>
+    /// <param name="dbContextFactory">DbContext 工厂。</param>
+    /// <param name="suffix">分片后缀。</param>
+    /// <param name="ct">取消令牌。</param>
+    private static async Task WarmupSingleDbContextAsync(
+        IDbContextFactory<HubDbContext> dbContextFactory,
+        string suffix,
+        CancellationToken ct)
+    {
+        using var tableSuffixScope = TableSuffixScope.Use(suffix);
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        _ = dbContext.Model;
+        // 触发业务任务查询编译缓存与分表上下文模型热身。
+        _ = await dbContext.BusinessTasks.AsNoTracking().Select(x => x.Id).Take(1).ToListAsync(ct);
+        // 触发扫描日志查询编译缓存。
+        _ = await dbContext.ScanLogs.AsNoTracking().Select(x => x.Id).Take(1).ToListAsync(ct);
+        // 触发落格日志查询编译缓存。
+        _ = await dbContext.DropLogs.AsNoTracking().Select(x => x.Id).Take(1).ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// 执行单个预热步骤，失败时记录日志并继续后续步骤。
+    /// </summary>
+    /// <param name="stepName">步骤名称。</param>
+    /// <param name="action">步骤动作。</param>
+    /// <param name="ct">取消令牌。</param>
+    private async Task TryWarmupStepAsync(string stepName, Func<Task> action, CancellationToken ct)
+    {
+        try
+        {
+            await action();
+            logger.LogInformation("启动预热步骤完成：{StepName}", stepName);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // 取消令牌请求时向上传播异常，终止后续预热步骤。
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "启动预热步骤失败，已跳过：{StepName}", stepName);
+        }
+    }
 
     /// <summary>
     /// 从异常链中提取第一个 <see cref="SqlException"/> 实例；若不存在则返回 <c>null</c>。

@@ -72,7 +72,8 @@ internal sealed class BusinessTaskQueryPolicy
             return false;
         }
 
-        return int.TryParse(resolvedDockCode.Trim(), out var dockNumber)
+        var normalizedDockCode = resolvedDockCode.Trim();
+        return int.TryParse(normalizedDockCode, out var dockNumber)
             && dockNumber > RecirculationDockThreshold;
     }
 

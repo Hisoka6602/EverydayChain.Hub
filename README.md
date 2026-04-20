@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 单 PR 收口“回流口径统一 + 启动预热 + 热路径优化 + 索引强化”：`BusinessTaskRepository` 与查询测试替身已统一按 `ResolvedDockCode.Trim()` 可解析整数且大于 7 统计回流；`OnlyRecirculation` 筛选同步切换该口径；`AutoMigrationHostedService` 增加启动后异步预热（总看板、码头看板、波次查询与条码/任务号/业务键高频定位查询），预热失败仅告警不阻断启动；扫描/请求格口/落格链路减少重复标准化；新增迁移 `20260420211433_20260420213000_StrengthenHotPathIndexesAndRecirculationFilter`，补齐 `business_tasks`、`scan_logs`、`drop_logs` 的高频时间范围与组合索引。
 - 补齐 `WORKINGAREA` 投影链路：`BusinessTaskEntity/BusinessTaskProjectionRow/BusinessTaskStatusConsumeService/BusinessTaskRepository` 全链路新增 `WorkingArea` 字段映射与更新覆盖，`appsettings.json` 新增 `WorkingAreaColumn` 配置，并新增迁移 `20260420195621_AddBusinessTaskWorkingArea` 保证已部署库自动加列。
 - 新增波次专项查询能力：新增 `IWaveQueryService/WaveQueryService` 与 `WavesController`，提供 `POST /api/v1/waves/options`、`POST /api/v1/waves/summary`、`POST /api/v1/waves/zones` 三个接口，后端直接返回波次选项（含备注）、波次摘要、固定 5 组分区统计。
 - 固化新波次接口回流口径：统一按 `ResolvedDockCode`“可解析整数且大于 7”统计回流，拆零分区严格按 `WorkingArea=1~4` 映射，异常 `WorkingArea` 跳过并记录日志。

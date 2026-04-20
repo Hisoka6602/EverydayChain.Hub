@@ -99,6 +99,8 @@ public sealed class ScanController : ControllerBase {
             return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail(validationMessage));
         }
 
+        var normalizedDeviceCode = request.DeviceCode.Trim();
+        var normalizedTraceId = string.IsNullOrWhiteSpace(request.TraceId) ? string.Empty : request.TraceId.Trim();
         var responses = new List<ScanUploadResponse>(barcodes.Count);
         var hasRejected = false;
         var firstFailureMessage = string.Empty;
@@ -106,9 +108,9 @@ public sealed class ScanController : ControllerBase {
             var isPrimaryBarcode = i == 0;
             var applicationResult = await scanIngressService.ExecuteAsync(new ScanUploadApplicationRequest {
                 Barcode = barcodes[i],
-                DeviceCode = request.DeviceCode.Trim(),
+                DeviceCode = normalizedDeviceCode,
                 ScanTimeLocal = normalizedScanTime,
-                TraceId = (request.TraceId ?? string.Empty).Trim(),
+                TraceId = normalizedTraceId,
                 LengthMm = isPrimaryBarcode ? request.LengthMm : MultiBarcodeFallbackMeasurementValue,
                 WidthMm = isPrimaryBarcode ? request.WidthMm : MultiBarcodeFallbackMeasurementValue,
                 HeightMm = isPrimaryBarcode ? request.HeightMm : MultiBarcodeFallbackMeasurementValue,
