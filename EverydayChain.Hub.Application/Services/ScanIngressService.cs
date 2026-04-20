@@ -47,8 +47,21 @@ public sealed class ScanIngressService : IScanIngressService {
             };
         }
 
-        // 步骤 2：匹配任务并推进状态。
-        var execResult = await _taskExecutionService.MarkScannedAsync(request, cancellationToken);
+        // 步骤 2：将解析结果写入应用请求并推进任务状态。
+        var executionRequest = new ScanUploadApplicationRequest {
+            Barcode = request.Barcode,
+            DeviceCode = request.DeviceCode,
+            ScanTimeLocal = request.ScanTimeLocal,
+            TraceId = request.TraceId,
+            LengthMm = request.LengthMm,
+            WidthMm = request.WidthMm,
+            HeightMm = request.HeightMm,
+            VolumeMm3 = request.VolumeMm3,
+            WeightGram = request.WeightGram,
+            TargetChuteCode = parseResult.TargetChuteCode,
+            BarcodeType = parseResult.BarcodeType.ToString()
+        };
+        var execResult = await _taskExecutionService.MarkScannedAsync(executionRequest, cancellationToken);
         if (!execResult.IsSuccess) {
             return new ScanUploadApplicationResult {
                 IsAccepted = false,

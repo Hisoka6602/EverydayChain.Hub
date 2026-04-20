@@ -172,4 +172,108 @@ public sealed class TaskExecutionServiceTests
         Assert.Equal(520, updatedTask.WeightGram);
         Assert.Equal(1, updatedTask.ScanCount);
     }
+
+    /// <summary>
+    /// 请求包含目标格口编码时应覆盖旧值并刷新归并码头编码。
+    /// </summary>
+    [Fact]
+    public async Task MarkScannedAsync_ShouldOverwriteTargetChuteCode_WhenRequestHasTargetChuteCode()
+    {
+        var (service, repo) = CreateService();
+        await repo.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "TASK-004",
+            SourceTableCode = "WMS",
+            BusinessKey = "K4",
+            Barcode = "BC-004",
+            TargetChuteCode = "9",
+            Status = BusinessTaskStatus.Created,
+            CreatedTimeLocal = DateTime.Now,
+            UpdatedTimeLocal = DateTime.Now
+        }, CancellationToken.None);
+
+        var request = new ScanUploadApplicationRequest
+        {
+            Barcode = "BC-004",
+            ScanTimeLocal = DateTime.Now,
+            TargetChuteCode = "1"
+        };
+
+        var result = await service.MarkScannedAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var updatedTask = await repo.FindByTaskCodeAsync("TASK-004", CancellationToken.None);
+        Assert.NotNull(updatedTask);
+        Assert.Equal("1", updatedTask!.TargetChuteCode);
+        Assert.Equal("1", updatedTask.ResolvedDockCode);
+    }
+
+    /// <summary>
+    /// 请求未提供目标格口编码时应保留旧值。
+    /// </summary>
+    [Fact]
+    public async Task MarkScannedAsync_ShouldKeepTargetChuteCode_WhenRequestHasNoTargetChuteCode()
+    {
+        var (service, repo) = CreateService();
+        await repo.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "TASK-005",
+            SourceTableCode = "WMS",
+            BusinessKey = "K5",
+            Barcode = "BC-005",
+            TargetChuteCode = "7",
+            Status = BusinessTaskStatus.Created,
+            CreatedTimeLocal = DateTime.Now,
+            UpdatedTimeLocal = DateTime.Now
+        }, CancellationToken.None);
+
+        var request = new ScanUploadApplicationRequest
+        {
+            Barcode = "BC-005",
+            ScanTimeLocal = DateTime.Now,
+            TargetChuteCode = null
+        };
+
+        var result = await service.MarkScannedAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var updatedTask = await repo.FindByTaskCodeAsync("TASK-005", CancellationToken.None);
+        Assert.NotNull(updatedTask);
+        Assert.Equal("7", updatedTask!.TargetChuteCode);
+        Assert.Equal("7", updatedTask.ResolvedDockCode);
+    }
+
+    /// <summary>
+    /// 扫描失败时不应错误覆盖任务目标格口编码。
+    /// </summary>
+    [Fact]
+    public async Task MarkScannedAsync_ShouldNotUpdateTargetChuteCode_WhenTaskStateIsInvalid()
+    {
+        var (service, repo) = CreateService();
+        await repo.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "TASK-006",
+            SourceTableCode = "WMS",
+            BusinessKey = "K6",
+            Barcode = "BC-006",
+            TargetChuteCode = "8",
+            Status = BusinessTaskStatus.Exception,
+            CreatedTimeLocal = DateTime.Now,
+            UpdatedTimeLocal = DateTime.Now
+        }, CancellationToken.None);
+
+        var request = new ScanUploadApplicationRequest
+        {
+            Barcode = "BC-006",
+            ScanTimeLocal = DateTime.Now,
+            TargetChuteCode = "2"
+        };
+
+        var result = await service.MarkScannedAsync(request, CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        var updatedTask = await repo.FindByTaskCodeAsync("TASK-006", CancellationToken.None);
+        Assert.NotNull(updatedTask);
+        Assert.Equal("8", updatedTask!.TargetChuteCode);
+    }
 }

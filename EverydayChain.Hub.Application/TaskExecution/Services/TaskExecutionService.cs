@@ -64,6 +64,7 @@ public sealed class TaskExecutionService : ITaskExecutionService
         var normalizedBarcode = string.IsNullOrWhiteSpace(request.Barcode) ? string.Empty : request.Barcode.Trim();
         var normalizedDeviceCode = string.IsNullOrWhiteSpace(request.DeviceCode) ? null : request.DeviceCode.Trim();
         var normalizedTraceId = string.IsNullOrWhiteSpace(request.TraceId) ? null : request.TraceId.Trim();
+        var normalizedTargetChuteCode = string.IsNullOrWhiteSpace(request.TargetChuteCode) ? null : request.TargetChuteCode.Trim();
 
         // 步骤 1：按条码匹配任务。
         var matchResult = await _scanMatchService.MatchByBarcodeAsync(normalizedBarcode, ct);
@@ -139,6 +140,7 @@ public sealed class TaskExecutionService : ITaskExecutionService
         task.HeightMm = request.HeightMm ?? task.HeightMm;
         task.VolumeMm3 = request.VolumeMm3 ?? task.VolumeMm3;
         task.WeightGram = request.WeightGram ?? task.WeightGram;
+        task.TargetChuteCode = normalizedTargetChuteCode ?? task.TargetChuteCode;
         task.ScanCount++;
         task.UpdatedTimeLocal = DateTime.Now;
         task.RefreshQueryFields();
