@@ -48,8 +48,14 @@ public class BusinessTaskRepository(
     /// <inheritdoc/>
     public async Task<BusinessTaskEntity?> FindByTaskCodeAsync(string taskCode, CancellationToken ct)
     {
+        var normalizedTaskCode = NormalizeOptionalText(taskCode);
+        if (string.IsNullOrWhiteSpace(normalizedTaskCode))
+        {
+            return null;
+        }
+
         return await FindFirstAcrossShardsAsync(query => query
-            .Where(x => x.TaskCode == taskCode)
+            .Where(x => x.TaskCode == normalizedTaskCode)
             .OrderByDescending(x => x.CreatedTimeLocal), ct);
     }
 
@@ -316,7 +322,11 @@ public class BusinessTaskRepository(
                     SplitTotalCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split),
                     SplitUnsortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split && task.Status != BusinessTaskStatus.Dropped && task.Status != BusinessTaskStatus.FeedbackPending),
                     RecognitionCount = group.Count(task => task.ScannedAtLocal != null),
-                    RecirculatedCount = group.Count(task => task.IsRecirculated),
+                    RecirculatedCount = group.Count(task =>
+                        !string.IsNullOrWhiteSpace(task.ResolvedDockCode)
+                        && task.ResolvedDockCode.Trim() != string.Empty
+                        && !EF.Functions.Like(task.ResolvedDockCode.Trim(), "%[^0-9]%")
+                        && Convert.ToInt32(task.ResolvedDockCode.Trim()) > 7),
                     ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception),
                     TotalVolumeMm3 = group.Sum(task => task.VolumeMm3 ?? 0M),
                     TotalWeightGram = group.Sum(task => task.WeightGram ?? 0M)
@@ -552,7 +562,11 @@ public class BusinessTaskRepository(
                     FullCaseTotalCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase),
                     SplitSortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split && (task.Status == BusinessTaskStatus.Dropped || task.Status == BusinessTaskStatus.FeedbackPending)),
                     FullCaseSortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase && (task.Status == BusinessTaskStatus.Dropped || task.Status == BusinessTaskStatus.FeedbackPending)),
-                    RecirculatedCount = group.Count(task => task.IsRecirculated),
+                    RecirculatedCount = group.Count(task =>
+                        !string.IsNullOrWhiteSpace(task.ResolvedDockCode)
+                        && task.ResolvedDockCode.Trim() != string.Empty
+                        && !EF.Functions.Like(task.ResolvedDockCode.Trim(), "%[^0-9]%")
+                        && Convert.ToInt32(task.ResolvedDockCode.Trim()) > 7),
                     ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception)
                 })
                 .ToListAsync(ct);
@@ -823,7 +837,11 @@ public class BusinessTaskRepository(
 
         if (filter.OnlyRecirculation)
         {
-            query = query.Where(task => task.IsRecirculated);
+            query = query.Where(task =>
+                !string.IsNullOrWhiteSpace(task.ResolvedDockCode)
+                && task.ResolvedDockCode.Trim() != string.Empty
+                && !EF.Functions.Like(task.ResolvedDockCode.Trim(), "%[^0-9]%")
+                && Convert.ToInt32(task.ResolvedDockCode.Trim()) > 7);
         }
 
         return query;

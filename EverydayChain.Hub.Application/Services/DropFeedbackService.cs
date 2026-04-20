@@ -49,9 +49,14 @@ public sealed class DropFeedbackService : IDropFeedbackService {
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>处理结果。</returns>
     public async Task<DropFeedbackApplicationResult> ExecuteAsync(DropFeedbackApplicationRequest request, CancellationToken cancellationToken) {
+        var normalizedTaskCode = string.IsNullOrWhiteSpace(request.TaskCode) ? null : request.TaskCode.Trim();
+        var normalizedBarcode = string.IsNullOrWhiteSpace(request.Barcode) ? null : request.Barcode.Trim();
+        var normalizedActualChuteCode = string.IsNullOrWhiteSpace(request.ActualChuteCode) ? null : request.ActualChuteCode.Trim();
+        var normalizedFailureReason = string.IsNullOrWhiteSpace(request.FailureReason) ? null : request.FailureReason.Trim();
+
         // 步骤 1：按任务编码或条码定位任务。
-        var hasTaskCode = !string.IsNullOrWhiteSpace(request.TaskCode);
-        var hasBarcode = !string.IsNullOrWhiteSpace(request.Barcode);
+        var hasTaskCode = normalizedTaskCode is not null;
+        var hasBarcode = normalizedBarcode is not null;
 
         if (!hasTaskCode && !hasBarcode) {
             return new DropFeedbackApplicationResult {
@@ -62,31 +67,31 @@ public sealed class DropFeedbackService : IDropFeedbackService {
         }
 
         var task = hasTaskCode
-            ? await _businessTaskRepository.FindByTaskCodeAsync(request.TaskCode.Trim(), cancellationToken)
+            ? await _businessTaskRepository.FindByTaskCodeAsync(normalizedTaskCode!, cancellationToken)
             : null;
 
         if (task == null && hasBarcode) {
-            task = await _businessTaskRepository.FindByBarcodeAsync(request.Barcode.Trim(), cancellationToken);
+            task = await _businessTaskRepository.FindByBarcodeAsync(normalizedBarcode!, cancellationToken);
         }
 
         if (task == null) {
             return new DropFeedbackApplicationResult {
                 IsAccepted = false,
                 FailureReason = "TaskNotFound",
-                Message = $"未找到任务编码 [{request.TaskCode}] 或条码 [{request.Barcode}] 对应的业务任务。"
+                Message = $"未找到任务编码 [{normalizedTaskCode}] 或条码 [{normalizedBarcode}] 对应的业务任务。"
             };
         }
 
         // 步骤 2：同时提供 TaskCode 与 Barcode 时，校验 Barcode 一致性。
         if (hasTaskCode && hasBarcode
             && !string.IsNullOrWhiteSpace(task.Barcode)
-            && !string.Equals(task.Barcode, request.Barcode.Trim(), StringComparison.OrdinalIgnoreCase)) {
+            && !string.Equals(task.Barcode, normalizedBarcode, StringComparison.OrdinalIgnoreCase)) {
             return new DropFeedbackApplicationResult {
                 IsAccepted = false,
                 TaskCode = task.TaskCode,
                 Status = task.Status.ToString(),
                 FailureReason = "BarcodeMismatch",
-                Message = $"提供的条码 [{request.Barcode}] 与任务 [{task.TaskCode}] 关联条码不一致。"
+                Message = $"提供的条码 [{normalizedBarcode}] 与任务 [{task.TaskCode}] 关联条码不一致。"
             };
         }
 
@@ -103,7 +108,6 @@ public sealed class DropFeedbackService : IDropFeedbackService {
 
         // 步骤 4：推进状态机。
         if (request.IsSuccess) {
-            var normalizedActualChuteCode = string.IsNullOrWhiteSpace(request.ActualChuteCode) ? null : request.ActualChuteCode.Trim();
             if (normalizedActualChuteCode is null) {
                 return new DropFeedbackApplicationResult
                 {
@@ -124,7 +128,7 @@ public sealed class DropFeedbackService : IDropFeedbackService {
             task.FeedbackTimeLocal = null;
         } else {
             task.Status = BusinessTaskStatus.Exception;
-            task.FailureReason = (request.FailureReason ?? string.Empty).Trim();
+            task.FailureReason = normalizedFailureReason;
             task.IsException = true;
         }
 
@@ -139,10 +143,10 @@ public sealed class DropFeedbackService : IDropFeedbackService {
         await WriteDropLogSilentlyAsync(
             businessTaskId: task.Id,
             taskCode: task.TaskCode,
-            barcode: request.Barcode,
-            actualChuteCode: request.ActualChuteCode,
+            barcode: normalizedBarcode,
+            actualChuteCode: normalizedActualChuteCode,
             isSuccess: request.IsSuccess,
-            failureReason: request.IsSuccess ? null : request.FailureReason,
+            failureReason: request.IsSuccess ? null : normalizedFailureReason,
             dropTimeLocal: request.DropTimeLocal,
             ct: cancellationToken);
 
@@ -187,10 +191,10 @@ public sealed class DropFeedbackService : IDropFeedbackService {
             {
                 BusinessTaskId = businessTaskId,
                 TaskCode = taskCode,
-                Barcode = string.IsNullOrWhiteSpace(barcode) ? null : barcode.Trim(),
-                ActualChuteCode = string.IsNullOrWhiteSpace(actualChuteCode) ? null : actualChuteCode.Trim(),
+                Barcode = barcode,
+                ActualChuteCode = actualChuteCode,
                 IsSuccess = isSuccess,
-                FailureReason = string.IsNullOrWhiteSpace(failureReason) ? null : failureReason.Trim(),
+                FailureReason = failureReason,
                 DropTimeLocal = dropTimeLocal,
                 CreatedTimeLocal = DateTime.Now
             };

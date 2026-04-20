@@ -42,7 +42,7 @@ public sealed class DockDashboardQueryServiceTests
             BusinessKey = "B",
             TargetChuteCode = "7",
             Status = BusinessTaskStatus.Dropped,
-            IsRecirculated = true,
+            ActualChuteCode = "8",
             CreatedTimeLocal = start.AddHours(2),
             UpdatedTimeLocal = start.AddHours(2)
         }, CancellationToken.None);

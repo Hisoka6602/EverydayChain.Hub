@@ -81,6 +81,27 @@ public sealed class AutoMigrationHostedServiceTests
     }
 
     /// <summary>
+    /// 启动预热依赖缺失时应仅降级告警，不影响宿主启动与自动迁移主流程。
+    /// </summary>
+    [Fact]
+    public async Task StartAsync_ShouldNotThrow_WhenWarmupDependenciesMissing()
+    {
+        var migrationService = new TestAutoMigrationService();
+        var serviceProvider = BuildServiceProvider(migrationService);
+        var scopeFactory = serviceProvider.GetRequiredService<IServiceScopeFactory>();
+        var runtimeStorageGuard = new TestRuntimeStorageGuard();
+        var hostedService = new AutoMigrationHostedService(
+            scopeFactory,
+            runtimeStorageGuard,
+            NullLogger<AutoMigrationHostedService>.Instance);
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        Assert.Equal(1, runtimeStorageGuard.StartupHealthCheckCount);
+        Assert.Equal(1, migrationService.RunCount);
+    }
+
+    /// <summary>
     /// 构建测试用服务提供器。
     /// </summary>
     /// <param name="migrationService">自动迁移服务桩。</param>

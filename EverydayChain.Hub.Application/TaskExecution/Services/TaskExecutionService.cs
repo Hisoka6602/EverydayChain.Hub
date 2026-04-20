@@ -71,11 +71,11 @@ public sealed class TaskExecutionService : ITaskExecutionService
         if (!matchResult.IsMatched || matchResult.Task == null)
         {
             // 匹配失败：写扫描失败日志后返回。
-            await WriteScanLogSilentlyAsync(
-                businessTaskId: null,
-                taskCode: null,
-                barcode: normalizedBarcode,
-                deviceCode: normalizedDeviceCode,
+        await WriteScanLogSilentlyAsync(
+            businessTaskId: null,
+            taskCode: null,
+            barcode: normalizedBarcode,
+            deviceCode: normalizedDeviceCode,
                 isMatched: false,
                 failureReason: matchResult.FailureReason,
                 traceId: normalizedTraceId,
@@ -215,11 +215,11 @@ public sealed class TaskExecutionService : ITaskExecutionService
             {
                 BusinessTaskId = businessTaskId,
                 TaskCode = taskCode,
-                Barcode = barcode.Trim(),
-                DeviceCode = string.IsNullOrWhiteSpace(deviceCode) ? null : deviceCode.Trim(),
+                Barcode = barcode,
+                DeviceCode = deviceCode,
                 IsMatched = isMatched,
-                FailureReason = string.IsNullOrWhiteSpace(failureReason) ? null : failureReason.Trim(),
-                TraceId = string.IsNullOrWhiteSpace(traceId) ? null : traceId.Trim(),
+                FailureReason = failureReason,
+                TraceId = traceId,
                 ScanTimeLocal = scanTimeLocal,
                 CreatedTimeLocal = DateTime.Now
             };

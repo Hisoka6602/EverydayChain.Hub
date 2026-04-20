@@ -1,5 +1,6 @@
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Application.Queries;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
 
@@ -18,6 +19,9 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
 
     /// <summary>内存任务存储。</summary>
     private readonly List<BusinessTaskEntity> _tasks = [];
+
+    /// <summary>回流判断策略。</summary>
+    private readonly BusinessTaskQueryPolicy _queryPolicy = new();
 
     /// <summary>自增 Id 计数器。</summary>
     private long _nextId = 1;
@@ -203,7 +207,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
                 SplitTotalCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split),
                 SplitUnsortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split && !IsSorted(task)),
                 RecognitionCount = group.Count(task => task.ScannedAtLocal.HasValue),
-                RecirculatedCount = group.Count(task => task.IsRecirculated),
+                RecirculatedCount = group.Count(task => _queryPolicy.IsRecirculatedByResolvedDockCode(task.ResolvedDockCode)),
                 ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception),
                 TotalVolumeMm3 = group.Sum(task => task.VolumeMm3 ?? 0M),
                 TotalWeightGram = group.Sum(task => task.WeightGram ?? 0M)
@@ -329,7 +333,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
                 FullCaseTotalCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase),
                 SplitSortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split && IsSorted(task)),
                 FullCaseSortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase && IsSorted(task)),
-                RecirculatedCount = group.Count(task => task.IsRecirculated),
+                RecirculatedCount = group.Count(task => _queryPolicy.IsRecirculatedByResolvedDockCode(task.ResolvedDockCode)),
                 ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception)
             })
             .OrderBy(row => row.DockCode, StringComparer.Ordinal)
@@ -442,7 +446,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
 
         if (filter.OnlyRecirculation)
         {
-            query = query.Where(task => task.IsRecirculated);
+            query = query.Where(task => _queryPolicy.IsRecirculatedByResolvedDockCode(task.ResolvedDockCode));
         }
 
         return query;

@@ -40,8 +40,12 @@ public class DropLogEntityTypeConfiguration : IEntityTypeConfiguration<DropLogEn
         builder.HasIndex(x => x.TaskCode);
         builder.HasIndex(x => x.Barcode);
         builder.HasIndex(x => x.ActualChuteCode);
+        builder.HasIndex(x => x.IsSuccess);
         builder.HasIndex(x => x.DropTimeLocal);
+        builder.HasIndex(x => x.CreatedTimeLocal);
         builder.HasIndex(x => new { x.TaskCode, x.DropTimeLocal });
         builder.HasIndex(x => new { x.Barcode, x.DropTimeLocal });
+        builder.HasIndex(x => new { x.CreatedTimeLocal, x.DropTimeLocal });
+        builder.HasIndex(x => new { x.CreatedTimeLocal, x.TaskCode });
     }
 }

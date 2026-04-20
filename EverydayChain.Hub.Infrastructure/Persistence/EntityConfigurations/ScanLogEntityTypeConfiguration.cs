@@ -41,7 +41,10 @@ public class ScanLogEntityTypeConfiguration : IEntityTypeConfiguration<ScanLogEn
         builder.HasIndex(x => x.Barcode);
         builder.HasIndex(x => x.TaskCode);
         builder.HasIndex(x => x.ScanTimeLocal);
+        builder.HasIndex(x => x.CreatedTimeLocal);
         builder.HasIndex(x => new { x.Barcode, x.ScanTimeLocal });
         builder.HasIndex(x => new { x.TaskCode, x.ScanTimeLocal });
+        builder.HasIndex(x => new { x.CreatedTimeLocal, x.ScanTimeLocal });
+        builder.HasIndex(x => new { x.CreatedTimeLocal, x.TaskCode });
     }
 }
