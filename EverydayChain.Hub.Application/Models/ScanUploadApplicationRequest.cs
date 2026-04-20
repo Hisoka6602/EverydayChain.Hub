@@ -55,7 +55,7 @@ public sealed class ScanUploadApplicationRequest {
     public string? TargetChuteCode { get; set; }
 
     /// <summary>
-    /// 条码解析得到的条码类型文本，长度范围 0~32。
+    /// 条码解析得到的条码类型文本，长度范围 0~32；可填写范围：Unknown、Split、FullCase。
     /// </summary>
     public string BarcodeType { get; set; } = string.Empty;
 }
