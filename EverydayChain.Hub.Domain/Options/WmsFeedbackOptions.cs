@@ -107,4 +107,14 @@ public class WmsFeedbackOptions
     /// 数据库命令超时秒数（可填写范围：1~3600；建议值 60）。
     /// </summary>
     public int CommandTimeoutSeconds { get; set; } = 60;
+
+    /// <summary>
+    /// 主回传后台任务轮询间隔（单位：秒；可填写范围：1~86400；默认 300）。
+    /// </summary>
+    public int PollingIntervalSeconds { get; set; } = 300;
+
+    /// <summary>
+    /// 主回传后台任务每轮批处理上限（可填写范围：1~1000；默认 100）。
+    /// </summary>
+    public int BatchSize { get; set; } = 100;
 }
