@@ -1,7 +1,6 @@
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
-using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
 using Microsoft.Extensions.Logging;
 
@@ -38,6 +37,18 @@ public sealed class WaveQueryService(
     /// 分区编码：整件。
     /// </summary>
     private const string FullCaseCode = "FullCase";
+
+    /// <summary>
+    /// 固定分区输出顺序。
+    /// </summary>
+    private static readonly IReadOnlyList<string> ZoneOutputOrder =
+    [
+        SplitZone1Code,
+        SplitZone2Code,
+        SplitZone3Code,
+        SplitZone4Code,
+        FullCaseCode
+    ];
 
     /// <summary>
     /// 查询时间区间内的波次选项。
@@ -80,25 +91,25 @@ public sealed class WaveQueryService(
     /// <returns>波次摘要结果；未命中返回空值。</returns>
     public async Task<WaveSummaryQueryResult?> QuerySummaryAsync(WaveSummaryQueryRequest request, CancellationToken cancellationToken)
     {
-        var tasks = await FindWaveTasksAsync(request.StartTimeLocal, request.EndTimeLocal, request.WaveCode, cancellationToken);
-        if (tasks.Count == 0)
+        var taskStats = await FindWaveTaskStatsAsync(request.StartTimeLocal, request.EndTimeLocal, request.WaveCode, cancellationToken);
+        if (taskStats.Count == 0)
         {
             return null;
         }
 
         var queryPolicy = new BusinessTaskQueryPolicy();
-        var totalCount = tasks.Count;
-        var unsortedCount = tasks.Count(task => !IsSorted(task));
+        var totalCount = taskStats.Count;
+        var unsortedCount = taskStats.Count(task => !IsSorted(task.Status));
         var sortedCount = totalCount - unsortedCount;
         return new WaveSummaryQueryResult
         {
             WaveCode = request.WaveCode.Trim(),
-            WaveRemark = ResolveWaveRemark(tasks),
+            WaveRemark = ResolveWaveRemark(taskStats),
             TotalCount = totalCount,
             UnsortedCount = unsortedCount,
             SortedProgressPercent = queryPolicy.CalculatePercent(sortedCount, totalCount),
-            RecirculatedCount = tasks.Count(task => queryPolicy.IsRecirculatedByResolvedDockCode(task.ResolvedDockCode)),
-            ExceptionCount = tasks.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception)
+            RecirculatedCount = taskStats.Count(task => queryPolicy.IsRecirculatedByResolvedDockCode(task.ResolvedDockCode)),
+            ExceptionCount = taskStats.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception)
         };
     }
 
@@ -110,15 +121,15 @@ public sealed class WaveQueryService(
     /// <returns>波次分区结果；未命中返回空值。</returns>
     public async Task<WaveZoneQueryResult?> QueryZonesAsync(WaveZoneQueryRequest request, CancellationToken cancellationToken)
     {
-        var tasks = await FindWaveTasksAsync(request.StartTimeLocal, request.EndTimeLocal, request.WaveCode, cancellationToken);
-        if (tasks.Count == 0)
+        var taskStats = await FindWaveTaskStatsAsync(request.StartTimeLocal, request.EndTimeLocal, request.WaveCode, cancellationToken);
+        if (taskStats.Count == 0)
         {
             return null;
         }
 
         var queryPolicy = new BusinessTaskQueryPolicy();
         var zoneMap = BuildZoneAccumulatorMap();
-        foreach (var task in tasks)
+        foreach (var task in taskStats)
         {
             var targetZone = ResolveTargetZone(task);
             if (targetZone is null)
@@ -132,7 +143,7 @@ public sealed class WaveQueryService(
             }
 
             zone.TotalCount++;
-            if (!IsSorted(task))
+            if (!IsSorted(task.Status))
             {
                 zone.UnsortedCount++;
             }
@@ -148,7 +159,9 @@ public sealed class WaveQueryService(
             }
         }
 
-        var zoneSummaries = zoneMap.Values
+        var zoneSummaries = ZoneOutputOrder
+            .Where(zoneMap.ContainsKey)
+            .Select(zoneCode => zoneMap[zoneCode])
             .Select(zone =>
             {
                 var sortedCount = zone.TotalCount - zone.UnsortedCount;
@@ -168,7 +181,7 @@ public sealed class WaveQueryService(
         return new WaveZoneQueryResult
         {
             WaveCode = request.WaveCode.Trim(),
-            WaveRemark = ResolveWaveRemark(tasks),
+            WaveRemark = ResolveWaveRemark(taskStats),
             Zones = zoneSummaries
         };
     }
@@ -181,7 +194,7 @@ public sealed class WaveQueryService(
     /// <param name="waveCode">波次号。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>任务集合。</returns>
-    private async Task<IReadOnlyList<BusinessTaskEntity>> FindWaveTasksAsync(
+    private async Task<IReadOnlyList<BusinessTaskWaveTaskStatsRow>> FindWaveTaskStatsAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
         string waveCode,
@@ -192,7 +205,7 @@ public sealed class WaveQueryService(
             return [];
         }
 
-        return await businessTaskRepository.FindByWaveCodeAndCreatedTimeRangeAsync(startTimeLocal, endTimeLocal, waveCode.Trim(), cancellationToken);
+        return await businessTaskRepository.ListWaveTaskStatsByWaveCodeAndCreatedTimeRangeAsync(startTimeLocal, endTimeLocal, waveCode.Trim(), cancellationToken);
     }
 
     /// <summary>
@@ -200,7 +213,7 @@ public sealed class WaveQueryService(
     /// </summary>
     /// <param name="tasks">任务集合。</param>
     /// <returns>波次备注。</returns>
-    private static string? ResolveWaveRemark(IReadOnlyList<BusinessTaskEntity> tasks)
+    private static string? ResolveWaveRemark(IReadOnlyList<BusinessTaskWaveTaskStatsRow> tasks)
     {
         return tasks
             .Where(task => !string.IsNullOrWhiteSpace(task.WaveRemark))
@@ -214,9 +227,9 @@ public sealed class WaveQueryService(
     /// </summary>
     /// <param name="task">业务任务。</param>
     /// <returns>是否已分拣。</returns>
-    private static bool IsSorted(BusinessTaskEntity task)
+    private static bool IsSorted(BusinessTaskStatus status)
     {
-        return task.Status == BusinessTaskStatus.Dropped || task.Status == BusinessTaskStatus.FeedbackPending;
+        return status == BusinessTaskStatus.Dropped || status == BusinessTaskStatus.FeedbackPending;
     }
 
     /// <summary>
@@ -240,7 +253,7 @@ public sealed class WaveQueryService(
     /// </summary>
     /// <param name="task">业务任务。</param>
     /// <returns>分区编码；无法归类返回空值。</returns>
-    private string? ResolveTargetZone(BusinessTaskEntity task)
+    private string? ResolveTargetZone(BusinessTaskWaveTaskStatsRow task)
     {
         if (task.SourceType == BusinessTaskSourceType.FullCase)
         {
@@ -255,18 +268,16 @@ public sealed class WaveQueryService(
         if (string.IsNullOrWhiteSpace(task.WorkingArea))
         {
             logger.LogWarning(
-                "波次分区统计跳过拆零任务：WorkingArea 为空。TaskCode={TaskCode}, WaveCode={WaveCode}",
-                task.TaskCode,
-                task.WaveCode);
+                "波次分区统计跳过拆零任务：WorkingArea 为空。SourceType={SourceType}",
+                task.SourceType);
             return null;
         }
 
         if (!int.TryParse(task.WorkingArea.Trim(), out var workingArea))
         {
             logger.LogWarning(
-                "波次分区统计跳过拆零任务：WorkingArea 不是有效整数。TaskCode={TaskCode}, WaveCode={WaveCode}, WorkingArea={WorkingArea}",
-                task.TaskCode,
-                task.WaveCode,
+                "波次分区统计跳过拆零任务：WorkingArea 不是有效整数。SourceType={SourceType}, WorkingArea={WorkingArea}",
+                task.SourceType,
                 task.WorkingArea);
             return null;
         }
@@ -287,12 +298,11 @@ public sealed class WaveQueryService(
     /// </summary>
     /// <param name="task">业务任务。</param>
     /// <returns>空值。</returns>
-    private string? LogAndSkipInvalidWorkingArea(BusinessTaskEntity task)
+    private string? LogAndSkipInvalidWorkingArea(BusinessTaskWaveTaskStatsRow task)
     {
         logger.LogWarning(
-            "波次分区统计跳过拆零任务：WorkingArea 超出允许范围 1~4。TaskCode={TaskCode}, WaveCode={WaveCode}, WorkingArea={WorkingArea}",
-            task.TaskCode,
-            task.WaveCode,
+            "波次分区统计跳过拆零任务：WorkingArea 超出允许范围 1~4。SourceType={SourceType}, WorkingArea={WorkingArea}",
+            task.SourceType,
             task.WorkingArea);
         return null;
     }

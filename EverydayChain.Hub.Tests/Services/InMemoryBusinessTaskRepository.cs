@@ -266,6 +266,35 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     }
 
     /// <inheritdoc/>
+    public Task<IReadOnlyList<BusinessTaskWaveTaskStatsRow>> ListWaveTaskStatsByWaveCodeAndCreatedTimeRangeAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        string waveCode,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(waveCode))
+        {
+            return Task.FromResult<IReadOnlyList<BusinessTaskWaveTaskStatsRow>>([]);
+        }
+
+        IReadOnlyList<BusinessTaskWaveTaskStatsRow> result = _tasks
+            .Where(task => task.CreatedTimeLocal >= startTimeLocal && task.CreatedTimeLocal < endTimeLocal)
+            .Where(task => string.Equals(NormalizeWaveCode(task.WaveCode), waveCode.Trim(), StringComparison.OrdinalIgnoreCase))
+            .Select(task => new BusinessTaskWaveTaskStatsRow
+            {
+                SourceType = task.SourceType,
+                WorkingArea = task.WorkingArea,
+                Status = task.Status,
+                ResolvedDockCode = task.ResolvedDockCode,
+                IsException = task.IsException,
+                WaveRemark = task.WaveRemark,
+                UpdatedTimeLocal = task.UpdatedTimeLocal
+            })
+            .ToList();
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
     public Task<IReadOnlyList<BusinessTaskDockAggregateRow>> AggregateDockDashboardAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,

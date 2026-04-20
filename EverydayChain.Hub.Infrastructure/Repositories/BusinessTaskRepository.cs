@@ -379,11 +379,16 @@ public class BusinessTaskRepository(
             var shardRows = await db.BusinessTasks
                 .AsNoTracking()
                 .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal)
-                .Select(x => new
+                .GroupBy(x => new
                 {
                     WaveCode = x.NormalizedWaveCode ?? EmptyWaveCode,
                     x.WaveRemark,
-                    x.UpdatedTimeLocal
+                })
+                .Select(group => new ShardWaveOptionAggregateRow
+                {
+                    WaveCode = group.Key.WaveCode,
+                    WaveRemark = group.Key.WaveRemark,
+                    UpdatedTimeLocal = group.Max(x => x.UpdatedTimeLocal)
                 })
                 .ToListAsync(ct);
             foreach (var row in shardRows)
@@ -433,6 +438,58 @@ public class BusinessTaskRepository(
 
             return filtered.Where(x => x.NormalizedWaveCode == normalizedWaveCode);
         }, suffixes, ct);
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<BusinessTaskWaveTaskStatsRow>> ListWaveTaskStatsByWaveCodeAndCreatedTimeRangeAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        string waveCode,
+        CancellationToken ct)
+    {
+        var normalizedWaveCode = NormalizeOptionalText(waveCode);
+        if (endTimeLocal <= startTimeLocal || string.IsNullOrWhiteSpace(normalizedWaveCode))
+        {
+            return Array.Empty<BusinessTaskWaveTaskStatsRow>();
+        }
+
+        var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct);
+        var result = new List<BusinessTaskWaveTaskStatsRow>();
+        foreach (var suffix in suffixes)
+        {
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            var query = db.BusinessTasks
+                .AsNoTracking()
+                .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal);
+            if (string.Equals(normalizedWaveCode, EmptyWaveCode, StringComparison.Ordinal))
+            {
+                query = query.Where(x => x.NormalizedWaveCode == null);
+            }
+            else
+            {
+                query = query.Where(x => x.NormalizedWaveCode == normalizedWaveCode);
+            }
+
+            var shardRows = await query
+                .Select(x => new BusinessTaskWaveTaskStatsRow
+                {
+                    SourceType = x.SourceType,
+                    WorkingArea = x.WorkingArea,
+                    Status = x.Status,
+                    ResolvedDockCode = x.ResolvedDockCode,
+                    IsException = x.IsException,
+                    WaveRemark = x.WaveRemark,
+                    UpdatedTimeLocal = x.UpdatedTimeLocal
+                })
+                .ToListAsync(ct);
+            if (shardRows.Count > 0)
+            {
+                result.AddRange(shardRows);
+            }
+        }
+
+        return result;
     }
 
     /// <inheritdoc/>
@@ -789,6 +846,27 @@ public class BusinessTaskRepository(
     /// <param name="waveRemark">波次备注。</param>
     /// <param name="updatedTimeLocal">更新时间。</param>
     private readonly record struct WaveOptionCandidate(string? WaveRemark, DateTime UpdatedTimeLocal);
+
+    /// <summary>
+    /// 分片内波次选项聚合行。
+    /// </summary>
+    private sealed class ShardWaveOptionAggregateRow
+    {
+        /// <summary>
+        /// 波次号。
+        /// </summary>
+        public string WaveCode { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 波次备注。
+        /// </summary>
+        public string? WaveRemark { get; set; }
+
+        /// <summary>
+        /// 更新时间。
+        /// </summary>
+        public DateTime UpdatedTimeLocal { get; set; }
+    }
 
     /// <summary>
     /// 合并投影字段，避免覆盖运行态字段。
