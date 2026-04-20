@@ -20,6 +20,16 @@ public sealed class ScanController : ControllerBase {
     private const string EmptyRequestBodyMessage = "扫描上传请求体不能为空。";
 
     /// <summary>
+    /// 批量条码包含无法解析格口时的错误消息。
+    /// </summary>
+    private const string UnresolvableChuteMessage = "扫描 barcodes 内不能包含无法解析格口的条码。";
+
+    /// <summary>
+    /// 批量条码包含多个格口时的错误消息。
+    /// </summary>
+    private const string MultipleChutesMessage = "扫描 barcodes 不能包含多个格口的条码。";
+
+    /// <summary>
     /// 多条码场景下非首条条码的尺寸与重量回写值。
     /// </summary>
     private const decimal MultiBarcodeFallbackMeasurementValue = 0M;
@@ -40,11 +50,18 @@ public sealed class ScanController : ControllerBase {
     private readonly IScanIngressService scanIngressService;
 
     /// <summary>
+    /// 条码解析服务。
+    /// </summary>
+    private readonly IBarcodeParser barcodeParser;
+
+    /// <summary>
     /// 初始化扫描上传控制器。
     /// </summary>
     /// <param name="scanIngressService">扫描上传应用服务。</param>
-    public ScanController(IScanIngressService scanIngressService) {
+    /// <param name="barcodeParser">条码解析服务。</param>
+    public ScanController(IScanIngressService scanIngressService, IBarcodeParser barcodeParser) {
         this.scanIngressService = scanIngressService;
+        this.barcodeParser = barcodeParser;
     }
 
     /// <summary>
@@ -68,6 +85,10 @@ public sealed class ScanController : ControllerBase {
 
         if (!TryBuildBarcodes(request, out var barcodes, out var barcodeValidationMessage)) {
             return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail(barcodeValidationMessage));
+        }
+
+        if (barcodes.Count > 1 && !TryValidateBarcodeBatchChuteConsistency(barcodes, out var batchValidationMessage)) {
+            return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail(batchValidationMessage));
         }
 
         if (string.IsNullOrWhiteSpace(request.DeviceCode)) {
@@ -153,6 +174,36 @@ public sealed class ScanController : ControllerBase {
             }
 
             normalizedBarcodes.Add(trimmedBarcode);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 校验批量条码是否全部可解析且格口一致。
+    /// </summary>
+    /// <param name="barcodes">标准化条码列表。</param>
+    /// <param name="validationMessage">校验失败消息。</param>
+    /// <returns>校验通过返回 true，否则返回 false。</returns>
+    private bool TryValidateBarcodeBatchChuteConsistency(IReadOnlyList<string> barcodes, out string validationMessage) {
+        validationMessage = string.Empty;
+        string? firstChuteCode = null;
+        foreach (var barcode in barcodes) {
+            var parseResult = barcodeParser.Parse(barcode);
+            if (!parseResult.IsValid || string.IsNullOrWhiteSpace(parseResult.TargetChuteCode)) {
+                validationMessage = UnresolvableChuteMessage;
+                return false;
+            }
+
+            if (firstChuteCode is null) {
+                firstChuteCode = parseResult.TargetChuteCode;
+                continue;
+            }
+
+            if (!string.Equals(firstChuteCode, parseResult.TargetChuteCode, StringComparison.Ordinal)) {
+                validationMessage = MultipleChutesMessage;
+                return false;
+            }
         }
 
         return true;

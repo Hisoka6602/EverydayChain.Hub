@@ -105,4 +105,38 @@ public sealed class ScanIngressServiceTests
         Assert.Equal(string.Empty, result.FailureReason);
         Assert.Equal("TASK-001", result.TaskCode);
     }
+
+    /// <summary>
+    /// 扫描成功时应将解析得到的目标格口编码写入任务实体。
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_ShouldPersistTargetChuteCode_WhenBarcodeIsFullCaseAndTaskExists()
+    {
+        var repo = new InMemoryBusinessTaskRepository();
+        await repo.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "TASK-002",
+            SourceTableCode = "WMS",
+            BusinessKey = "KEY-002",
+            Barcode = "Z130419305700070001",
+            Status = BusinessTaskStatus.Created,
+            CreatedTimeLocal = DateTime.Now,
+            UpdatedTimeLocal = DateTime.Now
+        }, CancellationToken.None);
+
+        var service = CreateService(repo);
+        var request = new ScanUploadApplicationRequest
+        {
+            Barcode = "Z130419305700070001",
+            DeviceCode = "DVC-01",
+            ScanTimeLocal = DateTime.Now
+        };
+
+        var result = await service.ExecuteAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsAccepted);
+        var updatedTask = await repo.FindByTaskCodeAsync("TASK-002", CancellationToken.None);
+        Assert.NotNull(updatedTask);
+        Assert.Equal("1", updatedTask!.TargetChuteCode);
+    }
 }

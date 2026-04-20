@@ -48,4 +48,14 @@ public sealed class ScanUploadApplicationRequest {
     /// 包裹重量，单位克，范围 >= 0。
     /// </summary>
     public decimal? WeightGram { get; set; }
+
+    /// <summary>
+    /// 条码解析得到的目标格口编码，长度范围 1~64。
+    /// </summary>
+    public string? TargetChuteCode { get; set; }
+
+    /// <summary>
+    /// 条码解析得到的条码类型文本，长度范围 0~32；可填写范围：Unknown、Split、FullCase；未提供时为空。
+    /// </summary>
+    public string? BarcodeType { get; set; }
 }
