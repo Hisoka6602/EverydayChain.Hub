@@ -6,7 +6,7 @@ namespace EverydayChain.Hub.Application.Queries;
 /// 业务任务查询策略集合。
 /// 该类集中封装查询服务复用的口径判定能力，统一码头归属、7 号码头识别与百分比计算规则。
 /// </summary>
-public sealed class BusinessTaskQueryPolicy
+internal sealed class BusinessTaskQueryPolicy
 {
     /// <summary>
     /// 无码头占位文本。

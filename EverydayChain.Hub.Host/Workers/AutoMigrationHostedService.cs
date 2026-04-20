@@ -57,7 +57,7 @@ public class AutoMigrationHostedService(
             using var migrationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             migrationCts.CancelAfter(TimeSpan.FromSeconds(StartupStageTimeoutSeconds));
             await autoMigrationService.RunAsync(migrationCts.Token);
-            StartApiWarmupInBackground();
+            StartApiWarmupInBackground(cancellationToken);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) {
             logger.LogError(
@@ -94,18 +94,19 @@ public class AutoMigrationHostedService(
     /// <summary>
     /// 在后台触发 API 预热，避免阻塞主机启动。
     /// </summary>
-    private void StartApiWarmupInBackground()
+    private void StartApiWarmupInBackground(CancellationToken startupCancellationToken)
     {
         _ = Task.Run(async () =>
         {
             try
             {
-                using var warmupCts = new CancellationTokenSource(TimeSpan.FromSeconds(WarmupTimeoutSeconds));
-                await WarmupReadPathAsync(warmupCts.Token);
+                using var warmupTimeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(WarmupTimeoutSeconds));
+                using var linkedWarmupCts = CancellationTokenSource.CreateLinkedTokenSource(startupCancellationToken, warmupTimeoutCts.Token);
+                await WarmupReadPathAsync(linkedWarmupCts.Token);
             }
             catch (OperationCanceledException)
             {
-                logger.LogWarning("启动预热执行超时（>{TimeoutSeconds}s），已跳过剩余预热步骤。", WarmupTimeoutSeconds);
+                logger.LogWarning("启动预热执行已取消（超时 >{WarmupTimeoutSeconds}s 或宿主停止信号），已跳过剩余预热步骤。", WarmupTimeoutSeconds);
             }
             catch (Exception ex)
             {
@@ -128,7 +129,8 @@ public class AutoMigrationHostedService(
 
         await TryWarmupStepAsync(
             "EF模型与分表上下文缓存",
-            async () => await WarmupDbContextCacheAsync(provider, ct));
+            async () => await WarmupDbContextCacheAsync(provider, ct),
+            ct);
         await TryWarmupStepAsync(
             "总看板查询链路",
             async () => await provider.GetRequiredService<IGlobalDashboardQueryService>().QueryAsync(
@@ -137,7 +139,8 @@ public class AutoMigrationHostedService(
                     StartTimeLocal = startTimeLocal,
                     EndTimeLocal = endTimeLocal
                 },
-                ct));
+                ct),
+            ct);
         await TryWarmupStepAsync(
             "码头看板查询链路",
             async () => await provider.GetRequiredService<IDockDashboardQueryService>().QueryAsync(
@@ -146,7 +149,8 @@ public class AutoMigrationHostedService(
                     StartTimeLocal = startTimeLocal,
                     EndTimeLocal = endTimeLocal
                 },
-                ct));
+                ct),
+            ct);
         await TryWarmupStepAsync(
             "波次选项查询链路",
             async () => await provider.GetRequiredService<IWaveQueryService>().QueryOptionsAsync(
@@ -155,7 +159,8 @@ public class AutoMigrationHostedService(
                     StartTimeLocal = startTimeLocal,
                     EndTimeLocal = endTimeLocal
                 },
-                ct));
+                ct),
+            ct);
         await TryWarmupStepAsync(
             "波次摘要查询链路",
             async () => await provider.GetRequiredService<IWaveQueryService>().QuerySummaryAsync(
@@ -165,7 +170,8 @@ public class AutoMigrationHostedService(
                     EndTimeLocal = endTimeLocal,
                     WaveCode = WarmupWaveCode
                 },
-                ct));
+                ct),
+            ct);
         await TryWarmupStepAsync(
             "波次分区查询链路",
             async () => await provider.GetRequiredService<IWaveQueryService>().QueryZonesAsync(
@@ -175,7 +181,8 @@ public class AutoMigrationHostedService(
                     EndTimeLocal = endTimeLocal,
                     WaveCode = WarmupWaveCode
                 },
-                ct));
+                ct),
+            ct);
         await TryWarmupStepAsync(
             "高频仓储定位查询链路",
             async () =>
@@ -184,7 +191,8 @@ public class AutoMigrationHostedService(
                 await repository.FindByBarcodeAsync(WarmupBarcode, ct);
                 await repository.FindByTaskCodeAsync(WarmupTaskCode, ct);
                 await repository.FindBySourceTableAndBusinessKeyAsync(WarmupSourceTableCode, WarmupBusinessKey, ct);
-            });
+            },
+            ct);
         logger.LogInformation("启动预热执行完成。");
     }
 
@@ -229,12 +237,18 @@ public class AutoMigrationHostedService(
     /// </summary>
     /// <param name="stepName">步骤名称。</param>
     /// <param name="action">步骤动作。</param>
-    private async Task TryWarmupStepAsync(string stepName, Func<Task> action)
+    /// <param name="ct">取消令牌。</param>
+    private async Task TryWarmupStepAsync(string stepName, Func<Task> action, CancellationToken ct)
     {
         try
         {
             await action();
             logger.LogInformation("启动预热步骤完成：{StepName}", stepName);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // 取消令牌请求时向上传播异常，终止后续预热步骤。
+            throw;
         }
         catch (Exception ex)
         {

@@ -28,11 +28,14 @@ public class BusinessTaskRepository(
     private const string EmptyWaveCode = "未分波次";
     /// <summary>无码头占位文本。</summary>
     private const string EmptyDockCode = "未分配码头";
-    /// <summary>回流统计统一谓词：归并码头编码可解析为整数且大于 7。</summary>
+    /// <summary>回流统计统一谓词：归并码头编码仅包含数字，且数值大于等于 8（单字符 8/9 或首位非零的多位数）。</summary>
     private static readonly Expression<Func<BusinessTaskEntity, bool>> RecirculationByResolvedDockCodeExpression = task =>
         task.ResolvedDockCode != string.Empty
         && !EF.Functions.Like(task.ResolvedDockCode, "%[^0-9]%")
-        && Convert.ToInt32(task.ResolvedDockCode) > 7;
+        && (
+            EF.Functions.Like(task.ResolvedDockCode, "[1-9][0-9]%")
+            || EF.Functions.Like(task.ResolvedDockCode, "[8-9]")
+        );
 
     /// <summary>分表配置快照。</summary>
     private readonly ShardingOptions _shardingOptions = shardingOptions.Value;
@@ -331,7 +334,10 @@ public class BusinessTaskRepository(
                     RecirculatedCount = group.Count(task =>
                         task.ResolvedDockCode != string.Empty
                         && !EF.Functions.Like(task.ResolvedDockCode, "%[^0-9]%")
-                        && Convert.ToInt32(task.ResolvedDockCode) > 7),
+                        && (
+                            EF.Functions.Like(task.ResolvedDockCode, "[1-9][0-9]%")
+                            || EF.Functions.Like(task.ResolvedDockCode, "[8-9]")
+                        )),
                     ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception),
                     TotalVolumeMm3 = group.Sum(task => task.VolumeMm3 ?? 0M),
                     TotalWeightGram = group.Sum(task => task.WeightGram ?? 0M)
@@ -570,7 +576,10 @@ public class BusinessTaskRepository(
                     RecirculatedCount = group.Count(task =>
                         task.ResolvedDockCode != string.Empty
                         && !EF.Functions.Like(task.ResolvedDockCode, "%[^0-9]%")
-                        && Convert.ToInt32(task.ResolvedDockCode) > 7),
+                        && (
+                            EF.Functions.Like(task.ResolvedDockCode, "[1-9][0-9]%")
+                            || EF.Functions.Like(task.ResolvedDockCode, "[8-9]")
+                        )),
                     ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception)
                 })
                 .ToListAsync(ct);
