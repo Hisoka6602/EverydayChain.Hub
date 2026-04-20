@@ -84,11 +84,10 @@ public static class ServiceCollectionExtensions {
         var retentionJobOptions = configuration.GetSection(RetentionJobOptions.SectionName).Get<RetentionJobOptions>() ?? new RetentionJobOptions();
         var efCoreOptions = configuration.GetSection(EfCoreOptions.SectionName).Get<EfCoreOptions>() ?? new EfCoreOptions();
         var managedLogicalTables = BuildManagedLogicalTables(syncOptions).ToArray();
-        var dbContextPoolSize = Math.Clamp(efCoreOptions.DbContextPoolSize > 0 ? efCoreOptions.DbContextPoolSize : 256, 32, 1024);
         var commandTimeoutSeconds = Math.Clamp(efCoreOptions.CommandTimeoutSeconds > 0 ? efCoreOptions.CommandTimeoutSeconds : 30, 1, 600);
 
         services.AddMemoryCache();
-        services.AddPooledDbContextFactory<HubDbContext>(options => {
+        services.AddDbContextFactory<HubDbContext>(options => {
             options.UseSqlServer(shardingOptions.ConnectionString, sqlServerOptions => {
                 sqlServerOptions.EnableRetryOnFailure();
                 sqlServerOptions.CommandTimeout(commandTimeoutSeconds);
@@ -96,7 +95,7 @@ public static class ServiceCollectionExtensions {
             // 运行时自动迁移阶段仅需执行已生成迁移，忽略“模型较快照有待提交变更”的告警，避免阻断启动链路。
             options.ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
             options.ReplaceService<IModelCacheKeyFactory, ShardModelCacheKeyFactory>();
-        }, dbContextPoolSize);
+        });
         services.AddSingleton<IShardSuffixResolver, MonthShardSuffixResolver>();
         services.AddSingleton<IDangerZoneExecutor, DangerZoneExecutor>();
         services.AddSingleton<IRuntimeStorageGuard, RuntimeStorageGuard>();

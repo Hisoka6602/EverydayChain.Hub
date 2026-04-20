@@ -64,10 +64,10 @@ public sealed class BusinessTaskSeedRepository(
 
         var existingManualSeedKeys = await LoadExistingManualSeedKeysAsync(dbContext, candidateBarcodes, cancellationToken);
         var existingManualSeedKeySet = existingManualSeedKeys.ToHashSet(StringComparer.Ordinal);
-        var insertBarcodes = FilterInsertBarcodes(candidateBarcodes, existingManualSeedKeySet, out var skippedExistingCount);
+        var insertBarcodes = FilterInsertBarcodes(candidateBarcodes, existingManualSeedKeySet, out var skippedBarcodes);
         if (insertBarcodes.Count == 0)
         {
-            return BuildSuccessResult(targetTableName, 0, skippedExistingCount, "模拟补数执行完成，未新增数据。");
+            return BuildSuccessResult(targetTableName, 0, skippedBarcodes.Count, skippedBarcodes, insertBarcodes, "模拟补数执行完成，未新增数据。");
         }
 
         var nowLocal = DateTime.Now;
@@ -81,7 +81,7 @@ public sealed class BusinessTaskSeedRepository(
 
         dbContext.BusinessTasks.AddRange(entities);
         _ = await dbContext.SaveChangesAsync(cancellationToken);
-        return BuildSuccessResult(targetTableName, entities.Count, skippedExistingCount, "模拟补数写入成功。");
+        return BuildSuccessResult(targetTableName, entities.Count, skippedBarcodes.Count, skippedBarcodes, insertBarcodes, "模拟补数写入成功。");
     }
 
     /// <summary>
@@ -128,26 +128,27 @@ public sealed class BusinessTaskSeedRepository(
     /// </summary>
     /// <param name="candidateBarcodes">候选条码集合。</param>
     /// <param name="existingManualSeedBusinessKeys">目标表内已存在模拟数据业务键集合。</param>
-    /// <param name="skippedExistingCount">已存在跳过数量。</param>
+    /// <param name="skippedBarcodes">已存在跳过条码集合。</param>
     /// <returns>可插入条码集合。</returns>
     public static IReadOnlyList<string> FilterInsertBarcodes(
         IReadOnlyList<string> candidateBarcodes,
         ISet<string> existingManualSeedBusinessKeys,
-        out int skippedExistingCount)
+        out IReadOnlyList<string> skippedBarcodes)
     {
-        skippedExistingCount = 0;
         var insertBarcodes = new List<string>(candidateBarcodes.Count);
+        var skippedBarcodesList = new List<string>(candidateBarcodes.Count);
         foreach (var barcode in candidateBarcodes)
         {
             if (existingManualSeedBusinessKeys.Contains(barcode))
             {
-                skippedExistingCount++;
+                skippedBarcodesList.Add(barcode);
                 continue;
             }
 
             insertBarcodes.Add(barcode);
         }
 
+        skippedBarcodes = skippedBarcodesList;
         return insertBarcodes;
     }
 
@@ -279,7 +280,9 @@ public sealed class BusinessTaskSeedRepository(
         {
             IsSuccess = false,
             Message = message,
-            TargetTableName = targetTableName
+            TargetTableName = targetTableName,
+            InsertedBarcodes = [],
+            SkippedBarcodes = []
         };
     }
 
@@ -289,9 +292,17 @@ public sealed class BusinessTaskSeedRepository(
     /// <param name="targetTableName">目标表名。</param>
     /// <param name="insertedCount">插入数量。</param>
     /// <param name="skippedExistingCount">已存在跳过数量。</param>
+    /// <param name="skippedBarcodes">已存在跳过条码集合。</param>
+    /// <param name="insertedBarcodes">成功插入条码集合。</param>
     /// <param name="message">结果消息。</param>
     /// <returns>成功结果。</returns>
-    private static BusinessTaskSeedResult BuildSuccessResult(string targetTableName, int insertedCount, int skippedExistingCount, string message)
+    private static BusinessTaskSeedResult BuildSuccessResult(
+        string targetTableName,
+        int insertedCount,
+        int skippedExistingCount,
+        IReadOnlyList<string> skippedBarcodes,
+        IReadOnlyList<string> insertedBarcodes,
+        string message)
     {
         return new BusinessTaskSeedResult
         {
@@ -299,7 +310,9 @@ public sealed class BusinessTaskSeedRepository(
             Message = message,
             TargetTableName = targetTableName,
             InsertedCount = insertedCount,
-            SkippedExistingCount = skippedExistingCount
+            SkippedExistingCount = skippedExistingCount,
+            InsertedBarcodes = insertedBarcodes,
+            SkippedBarcodes = skippedBarcodes
         };
     }
 }

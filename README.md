@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 修复 `manual_seed` 分表路由漂移：`HubDbContext` 工厂注册由 `AddPooledDbContextFactory` 调整为 `AddDbContextFactory`，避免上下文复用导致补数写入误落无后缀 `business_tasks` 基础表。
 - 按《EverydayChain.Hub_Copilot_精准执行指令_最终版》补齐门禁测试：新增 `BusinessTaskStatusWriteBackConfigurationTests`（校验 `CompletedStatusValue` 配置透传与 `PendingStatusValue=null` 语义）与 `BusinessTaskIndexCoverageTests`（校验 `business_tasks` 关键索引覆盖），并补充 `BusinessTaskEntityTypeConfiguration` 的 `UpdatedTimeLocal` 索引，同时新增迁移 `20260419033227_AddBusinessTaskUpdatedTimeLocalIndex` 以确保已部署库可自动落索引。
 - 收敛《EverydayChain.Hub_Copilot_精准执行指令_最终版》旧同步链路：删除 `IRemoteStatusConsumeService`、`ISqlServerAppendOnlyWriter`、`RemoteStatusConsumeService`、`SqlServerAppendOnlyWriter` 及对应测试，`StatusDriven` 主路径统一收敛到 `IBusinessTaskStatusConsumeService`。
 - 继续推进《EverydayChain.Hub_Copilot_精准执行指令_最终版》迁移收口：删除旧 EF 迁移链并重建单一基线迁移 `20260418204107_RebuildHubBaselineV2`，新快照仅包含当前业务主模型，不再包含本地镜像表历史语义。
@@ -11,7 +12,7 @@
 - 补充上线门禁：新增 `SourceTableCode + BusinessKey` 唯一索引后，上线前需先执行存量重复键校验并完成去重（按最新 `UpdatedTimeLocal` 保留一条），再执行自动迁移，避免唯一索引创建失败阻断启动。
 - 新增启动探测与分表解析超时隔离：`AutoMigrationService` 启动元数据探测 SQL 设置 `15s` 超时，`ShardTableResolver` 分表列表查询设置 `15s` 超时，进一步降低启动与分表路由阶段因系统表阻塞导致的连锁卡顿风险。
 - 新增分表治理命令超时隔离：`ShardRetentionRepository` 与 `ShardTableProvisioner` 的元数据查询/DDL/删除操作统一设置 `CommandTimeout=30s`，避免分表治理 SQL 在锁等待场景中长时间阻塞并占用连接池。
-- 新增数据库命令超时隔离：`EfCore.CommandTimeoutSeconds` 已接入 `UseSqlServer(...).CommandTimeout(...)`，并将 `HubDbContext` 注册改为 `AddPooledDbContextFactory`（读取 `EfCore.DbContextPoolSize`），防止慢 SQL/阻塞 SQL 长时间占用连接导致整体请求堆积。
+- 新增数据库命令超时隔离：`EfCore.CommandTimeoutSeconds` 已接入 `UseSqlServer(...).CommandTimeout(...)`，并将 `HubDbContext` 注册改为 `AddDbContextFactory`，确保分表后缀路由与上下文生命周期一致，避免补数场景写入错表。
 - 新增同步并发安全阈值隔离：`SyncOrchestrator` 在 `MaxParallelTables` 配置无效（<=0）时不再按“启用表数量”无上限并发，而是启用 `4` 的安全上限，防止同步并发瞬时打满数据库连接池/线程池导致 API 抢占失败。
 - 新增 API 请求超时隔离：`WebEndpoint.RequestTimeoutSeconds` 配置项已接入 `Program.cs` 请求超时中间件（`AddRequestTimeouts + UseRequestTimeouts`），用于拦截长时间未完成请求，避免慢请求持续占用线程与连接资源导致端点级雪崩。
 - 新增后台危险动作隔离器：`RetentionBackgroundWorker` 与 `FeedbackCompensationBackgroundWorker` 均增加“单轮执行超时保护”（分别 600s / 300s），当单轮任务卡死或超长阻塞时自动中断并进入下一周期，避免后台危险任务长期占用资源影响整站可用性。
@@ -21,7 +22,7 @@
 - 修复查询类 API 空请求体回退绑定：`GlobalDashboardController`、`DockDashboardController`、`SortingReportController` （含 `export/csv`）、`BusinessTaskQueryController` 统一采用 `Body > Query > new()` 解析策略，并新增 `QueryControllerBase` 复用请求解析逻辑；补齐 `exceptions`、`recirculations`、`export/csv` 空 Body 回退 Query 回归测试，锁定修复行为并消除 CI 中 README 联动校验失败。
 - 新增 API 失败日志治理：Host 层增加 `ApiFailureLoggingMiddleware`，统一记录 HTTP 非成功与业务失败（`ApiResponse.IsSuccess=false`）场景的请求/响应明细；`nlog.config` 新增 `api-failure-${shortdate}.log` 独立落盘路由；补充中间件单元测试覆盖失败记录与成功不记录分支。
 - 修复启动稳定性：`AutoMigrationHostedService` 在自动迁移阶段遇到数据库连接异常时改为记录错误并降级继续启动，不再因单库不可达导致整进程退出；新增对应主机层单元测试覆盖降级与阻断分支。
-- 完成“本地库查询能力极致优化”：业务任务/异常件/回流查询新增游标分页主路径并保留页码兼容；看板/报表查询引入短 TTL 缓存；EF Core 切换 DbContext 池化；新增 `NormalizedWaveCode`、`NormalizedBarcode`、`ResolvedDockCode` 与配套索引；新增 `本地库查询性能优化说明.md`。
+- 完成“本地库查询能力极致优化”：业务任务/异常件/回流查询新增游标分页主路径并保留页码兼容；看板/报表查询引入短 TTL 缓存；EF Core 上下文配置优化；新增 `NormalizedWaveCode`、`NormalizedBarcode`、`ResolvedDockCode` 与配套索引；新增 `本地库查询性能优化说明.md`。
 - 按业务需求切换 WMS 回写开关：`WmsFeedback.Enabled` 调整为 `true`，上线口径更新为“回写开启”。
 - 完成最后一轮上线收口：新增 `Swagger注释全量盘点清单.md` 与 `上线前最终检查清单.md`，形成可直接执行的上线门禁与逐文件注释盘点留痕。
 - 完成前端文档一致性收口：`前端对接文档.md` 已补充“一致性校验结果”，并修正请求格口、落格回传、波次清理示例消息语义。
@@ -518,7 +519,7 @@
 - `BusinessTaskFeedbackStatus.cs`：业务回传状态枚举，覆盖 NotRequired、Pending、Completed、Failed，标识任务回传 WMS 的进度。
 - `RemoteStatusConsumeProfile.cs`（`EverydayChain.Hub.Domain/Sync/Models`）：StatusDriven 消费配置模型，统一承载状态列、待处理值、完成值、回写开关与批次大小。
 - `EverydayChain.Hub.Domain/Options/*.cs`：统一承载全部配置实体（`Sharding`、`AutoTune`、`DangerZone`、`SyncJob`、`SyncTable`、`SyncDelete`、`SyncRetention`、`RetentionJob`、`Oracle` 等），供 Infrastructure 绑定读取。
-- `Domain/Options/EfCoreOptions.cs`：EF Core 池化配置实体，定义 `DbContextPoolSize` 范围与默认值。
+- `Domain/Options/EfCoreOptions.cs`：EF Core 配置实体，定义 `CommandTimeoutSeconds` 命令超时范围与默认值。
 - `Domain/Options/QueryCacheOptions.cs`：查询缓存配置实体，定义总看板、码头看板、报表缓存开关与 TTL 秒数。
 - `Domain/Options/RetentionLogTableOptions.cs`：日志表保留期配置实体，定义单日志表 `Enabled`、`LogicalTableName`、`KeepMonths`、`DryRun`、`AllowDrop` 参数。
 - `SwaggerOptions.cs`：Swagger 文档配置实体，承载标题、版本、描述与各环境开关（开发/测试/生产）。

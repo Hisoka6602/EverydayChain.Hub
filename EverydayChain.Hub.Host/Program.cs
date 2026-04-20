@@ -56,11 +56,6 @@ builder.Services.Configure<HostOptions>(options =>
 });
 var efCoreOptsSection = builder.Configuration.GetSection(EfCoreOptions.SectionName);
 var efCoreOpts = efCoreOptsSection.Get<EfCoreOptions>() ?? new EfCoreOptions();
-if (efCoreOpts.DbContextPoolSize > 0 && (efCoreOpts.DbContextPoolSize < 32 || efCoreOpts.DbContextPoolSize > 1024)) {
-    logger.Warn(
-        "EfCore.DbContextPoolSize 配置值 {Value} 超出约定范围 [32, 1024]，已自动钳制为有效值。",
-        efCoreOpts.DbContextPoolSize);
-}
 if (efCoreOpts.CommandTimeoutSeconds > 600) {
     logger.Warn(
         "EfCore.CommandTimeoutSeconds 配置值 {Value} 超出约定上限 600，已自动钳制为 600 秒。",

@@ -87,6 +87,38 @@ public sealed class BusinessTaskSeedServiceTests
     }
 
     /// <summary>
+    /// 仓储返回条码明细应原样透传。
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_ShouldPassThroughBarcodeDetails_FromRepositoryResult()
+    {
+        var repository = new StubBusinessTaskSeedRepository
+        {
+            ResultFactory = command => new BusinessTaskSeedResult
+            {
+                IsSuccess = true,
+                Message = "模拟补数写入成功。",
+                TargetTableName = command.TargetTableName,
+                InsertedCount = 1,
+                SkippedExistingCount = 1,
+                InsertedBarcodes = ["BC001"],
+                SkippedBarcodes = ["BC002"]
+            }
+        };
+        var service = new BusinessTaskSeedService(repository, NullLogger<BusinessTaskSeedService>.Instance);
+
+        var result = await service.ExecuteAsync(new BusinessTaskSeedCommand
+        {
+            TargetTableName = " business_tasks_202604 ",
+            Barcodes = ["BC001", "BC002"]
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["BC001"], result.InsertedBarcodes);
+        Assert.Equal(["BC002"], result.SkippedBarcodes);
+    }
+
+    /// <summary>
     /// 超出最大条码数量应失败。
     /// </summary>
     [Fact]

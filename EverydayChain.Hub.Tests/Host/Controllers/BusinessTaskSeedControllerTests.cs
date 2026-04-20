@@ -39,7 +39,9 @@ public sealed class BusinessTaskSeedControllerTests
             {
                 IsSuccess = false,
                 Message = "目标表名非法，仅允许 business_tasks_yyyyMM 格式。",
-                TargetTableName = "invalid_table"
+                TargetTableName = "invalid_table",
+                InsertedBarcodes = [],
+                SkippedBarcodes = ["BC001"]
             }
         };
         var controller = new BusinessTaskSeedController(stubService, NullLogger<BusinessTaskSeedController>.Instance);
@@ -56,6 +58,8 @@ public sealed class BusinessTaskSeedControllerTests
         Assert.Equal("目标表名非法，仅允许 business_tasks_yyyyMM 格式。", response.Message);
         Assert.NotNull(response.Data);
         Assert.Equal("invalid_table", response.Data.TargetTableName);
+        Assert.NotNull(response.Data.InsertedBarcodes);
+        Assert.NotNull(response.Data.SkippedBarcodes);
     }
 
     /// <summary>
@@ -64,7 +68,23 @@ public sealed class BusinessTaskSeedControllerTests
     [Fact]
     public async Task ManualSeedAsync_ShouldReturnOk_WhenRequestIsValid()
     {
-        var stubService = new StubBusinessTaskSeedService();
+        var stubService = new StubBusinessTaskSeedService
+        {
+            Result = new()
+            {
+                IsSuccess = true,
+                Message = "模拟补数写入成功。",
+                TargetTableName = "business_tasks_202604",
+                RequestedCount = 2,
+                FilteredEmptyCount = 0,
+                DeduplicatedCount = 0,
+                CandidateCount = 2,
+                InsertedCount = 2,
+                SkippedExistingCount = 0,
+                InsertedBarcodes = ["BC001", "BC002"],
+                SkippedBarcodes = []
+            }
+        };
         var controller = new BusinessTaskSeedController(stubService, NullLogger<BusinessTaskSeedController>.Instance);
 
         var actionResult = await controller.ManualSeedAsync(new BusinessTaskSeedRequest
@@ -79,6 +99,7 @@ public sealed class BusinessTaskSeedControllerTests
         Assert.Equal("模拟补数写入成功。", response.Message);
         Assert.NotNull(response.Data);
         Assert.Equal(2, response.Data.InsertedCount);
+        Assert.Equal(["BC001", "BC002"], response.Data.InsertedBarcodes);
     }
 
     /// <summary>
