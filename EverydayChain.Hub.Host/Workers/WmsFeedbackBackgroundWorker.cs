@@ -59,23 +59,23 @@ public sealed class WmsFeedbackBackgroundWorker(
                 timeoutCts.CancelAfter(TimeSpan.FromSeconds(SingleRunTimeoutSeconds));
                 var runToken = timeoutCts.Token;
                 var result = await wmsFeedbackService.ExecuteAsync(batchSize, runToken);
-                var skipped = result.PendingCount == 0;
+                var isSkipped = result.PendingCount == 0;
 
                 logger.LogInformation(
-                    "业务回传主后台任务执行完成。PendingCount={PendingCount}, SuccessCount={SuccessCount}, FailedCount={FailedCount}, Skipped={Skipped}",
+                    "业务回传主后台任务执行完成。PendingCount={PendingCount}, SuccessCount={SuccessCount}, FailedCount={FailedCount}, IsSkipped={IsSkipped}, FailureReason={FailureReason}",
                     result.PendingCount,
                     result.SuccessCount,
                     result.FailedCount,
-                    skipped);
+                    isSkipped,
+                    result.FailureReason ?? string.Empty);
             }
-            catch (OperationCanceledException) 
+            catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
             {
-                if (stoppingToken.IsCancellationRequested)
-                {
-                    return;
-                }
-
                 logger.LogError("业务回传主后台任务单轮执行超时（>{TimeoutSeconds}s），已中断本轮并等待下个周期。", SingleRunTimeoutSeconds);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
             }
             catch (Exception ex)
             {
