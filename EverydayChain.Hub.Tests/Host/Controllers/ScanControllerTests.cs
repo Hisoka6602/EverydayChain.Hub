@@ -39,7 +39,7 @@ public sealed class ScanControllerTests {
     public async Task UploadAsync_ShouldReturnBadRequest_WhenScanTimeKindIsNonLocal() {
         var controller = new ScanController(new StubScanIngressService());
         var request = new ScanUploadRequest {
-            Barcodes = ["BC001"],
+            Barcodes = ["Z130419305700070001"],
             DeviceCode = "DVC-01",
             ScanTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 13, 12, 0, 0), NonLocalKind)
         };
@@ -58,7 +58,7 @@ public sealed class ScanControllerTests {
         var controller = new ScanController(stubService);
 #pragma warning disable CS8625
         var request = new ScanUploadRequest {
-            Barcodes = ["BC001"],
+            Barcodes = ["Z130419305700070001"],
             DeviceCode = "DVC-01",
             TraceId = null,
             ScanTimeLocal = DateTime.Now
@@ -87,7 +87,7 @@ public sealed class ScanControllerTests {
         };
         var controller = new ScanController(stubService);
         var request = new ScanUploadRequest {
-            Barcodes = ["BC001"],
+            Barcodes = ["Z130419305700070001"],
             DeviceCode = "DVC-01",
             ScanTimeLocal = DateTime.Now
         };
@@ -110,7 +110,7 @@ public sealed class ScanControllerTests {
     public async Task UploadAsync_ShouldReturnOk_WhenRequestIsValid() {
         var controller = new ScanController(new StubScanIngressService());
         var request = new ScanUploadRequest {
-            Barcodes = ["BC001"],
+            Barcodes = ["Z130419305700070001"],
             DeviceCode = "DVC-01",
             ScanTimeLocal = DateTime.Now
         };
@@ -171,7 +171,7 @@ public sealed class ScanControllerTests {
         var controller = new ScanController(new StubScanIngressService());
         var fixedScanTime = DateTime.SpecifyKind(new DateTime(2026, 4, 14, 10, 0, 0), DateTimeKind.Local);
         var request = new ScanUploadRequest {
-            Barcodes = ["BC001", " "],
+            Barcodes = ["Z130419305700070001", " "],
             DeviceCode = "DVC-01",
             ScanTimeLocal = fixedScanTime
         };
@@ -192,7 +192,7 @@ public sealed class ScanControllerTests {
         var controller = new ScanController(new StubScanIngressService());
         var fixedScanTime = DateTime.SpecifyKind(new DateTime(2026, 4, 14, 10, 0, 0), DateTimeKind.Local);
         var request = new ScanUploadRequest {
-            Barcodes = Enumerable.Repeat("BC001", 101).ToList(),
+            Barcodes = Enumerable.Repeat("Z130419305700070001", 101).ToList(),
             DeviceCode = "DVC-01",
             ScanTimeLocal = fixedScanTime
         };
@@ -213,7 +213,7 @@ public sealed class ScanControllerTests {
         var stubService = new StubScanIngressService();
         var controller = new ScanController(stubService);
         var request = new ScanUploadRequest {
-            Barcodes = ["BC001", "BC002", "BC003"],
+            Barcodes = ["Z130419305700070001", "Z160419318300100001", "Z190419318300100001"],
             DeviceCode = "DVC-01",
             ScanTimeLocal = DateTime.Now,
             LengthMm = 100,
@@ -247,5 +247,125 @@ public sealed class ScanControllerTests {
         Assert.Equal(0, stubService.Requests[2].VolumeMm3);
         Assert.Equal(0, stubService.Requests[2].WeightGram);
         Assert.Equal(stubService.Requests[0].ScanTimeLocal, stubService.Requests[2].ScanTimeLocal);
+    }
+
+    /// <summary>
+    /// 单条 Z 条码且可解析时应允许通过。
+    /// </summary>
+    [Fact]
+    public async Task UploadAsync_ShouldSucceed_WhenSingleZBarcodeIsValid() {
+        var stubService = new StubScanIngressService();
+        var controller = new ScanController(stubService);
+        var request = new ScanUploadRequest {
+            Barcodes = ["Z130419305700070001"],
+            DeviceCode = "DVC-01",
+            ScanTimeLocal = DateTime.Now
+        };
+
+        var actionResult = await controller.UploadAsync(request, CancellationToken.None);
+        _ = Assert.IsType<OkObjectResult>(actionResult.Result);
+        Assert.Single(stubService.Requests);
+    }
+
+    /// <summary>
+    /// 多条同格口 Z 条码应允许通过。
+    /// </summary>
+    [Fact]
+    public async Task UploadAsync_ShouldSucceed_WhenMultipleZBarcodesShareSameChute() {
+        var stubService = new StubScanIngressService();
+        var controller = new ScanController(stubService);
+        var request = new ScanUploadRequest {
+            Barcodes = ["Z130419305700070001", "Z160419318300100001"],
+            DeviceCode = "DVC-01",
+            ScanTimeLocal = DateTime.Now
+        };
+
+        var actionResult = await controller.UploadAsync(request, CancellationToken.None);
+        _ = Assert.IsType<OkObjectResult>(actionResult.Result);
+        Assert.Equal(2, stubService.Requests.Count);
+    }
+
+    /// <summary>
+    /// 多条 Z 条码格口不一致时应直接返回 BadRequest。
+    /// </summary>
+    [Fact]
+    public async Task UploadAsync_ShouldReturnBadRequest_WhenZBarcodesContainMultipleChutes() {
+        var stubService = new StubScanIngressService();
+        var controller = new ScanController(stubService);
+        var request = new ScanUploadRequest {
+            Barcodes = ["Z130419305700070001", "Z560419318300100001"],
+            DeviceCode = "DVC-01",
+            ScanTimeLocal = DateTime.Now
+        };
+
+        var actionResult = await controller.UploadAsync(request, CancellationToken.None);
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+        var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(badRequestResult.Value);
+
+        Assert.False(response.IsSuccess);
+        Assert.Equal("扫描 barcodes 不能包含多个格口的条码。", response.Message);
+        Assert.Empty(stubService.Requests);
+    }
+
+    /// <summary>
+    /// 条码列表包含无法解析格口条码时应直接返回 BadRequest。
+    /// </summary>
+    [Fact]
+    public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodesContainUnresolvableChute() {
+        var stubService = new StubScanIngressService();
+        var controller = new ScanController(stubService);
+        var request = new ScanUploadRequest {
+            Barcodes = ["Z130419305700070001", "AB560419318300100001"],
+            DeviceCode = "DVC-01",
+            ScanTimeLocal = DateTime.Now
+        };
+
+        var actionResult = await controller.UploadAsync(request, CancellationToken.None);
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+        var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(badRequestResult.Value);
+
+        Assert.False(response.IsSuccess);
+        Assert.Equal("扫描 barcodes 内不能包含无法解析格口的条码。", response.Message);
+        Assert.Empty(stubService.Requests);
+    }
+
+    /// <summary>
+    /// 02 与 Z 混合且同格口时应允许通过。
+    /// </summary>
+    [Fact]
+    public async Task UploadAsync_ShouldSucceed_WhenMixed02AndZBarcodesShareSameChute() {
+        var stubService = new StubScanIngressService();
+        var controller = new ScanController(stubService);
+        var request = new ScanUploadRequest {
+            Barcodes = ["02123456", "Z130419305700070001"],
+            DeviceCode = "DVC-01",
+            ScanTimeLocal = DateTime.Now
+        };
+
+        var actionResult = await controller.UploadAsync(request, CancellationToken.None);
+        _ = Assert.IsType<OkObjectResult>(actionResult.Result);
+        Assert.Equal(2, stubService.Requests.Count);
+    }
+
+    /// <summary>
+    /// 02 与 Z 混合且格口不一致时应直接返回 BadRequest。
+    /// </summary>
+    [Fact]
+    public async Task UploadAsync_ShouldReturnBadRequest_WhenMixed02AndZBarcodesContainDifferentChutes() {
+        var stubService = new StubScanIngressService();
+        var controller = new ScanController(stubService);
+        var request = new ScanUploadRequest {
+            Barcodes = ["02123456", "Z560419318300100001"],
+            DeviceCode = "DVC-01",
+            ScanTimeLocal = DateTime.Now
+        };
+
+        var actionResult = await controller.UploadAsync(request, CancellationToken.None);
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+        var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(badRequestResult.Value);
+
+        Assert.False(response.IsSuccess);
+        Assert.Equal("扫描 barcodes 不能包含多个格口的条码。", response.Message);
+        Assert.Empty(stubService.Requests);
     }
 }

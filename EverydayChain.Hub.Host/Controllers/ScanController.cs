@@ -20,6 +20,16 @@ public sealed class ScanController : ControllerBase {
     private const string EmptyRequestBodyMessage = "扫描上传请求体不能为空。";
 
     /// <summary>
+    /// 批量条码包含无法解析格口时的错误消息。
+    /// </summary>
+    private const string UnresolvableChuteMessage = "扫描 barcodes 内不能包含无法解析格口的条码。";
+
+    /// <summary>
+    /// 批量条码包含多个格口时的错误消息。
+    /// </summary>
+    private const string MultipleChutesMessage = "扫描 barcodes 不能包含多个格口的条码。";
+
+    /// <summary>
     /// 多条码场景下非首条条码的尺寸与重量回写值。
     /// </summary>
     private const decimal MultiBarcodeFallbackMeasurementValue = 0M;
@@ -68,6 +78,10 @@ public sealed class ScanController : ControllerBase {
 
         if (!TryBuildBarcodes(request, out var barcodes, out var barcodeValidationMessage)) {
             return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail(barcodeValidationMessage));
+        }
+
+        if (!TryValidateBarcodeBatchChuteConsistency(barcodes, out var batchValidationMessage)) {
+            return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail(batchValidationMessage));
         }
 
         if (string.IsNullOrWhiteSpace(request.DeviceCode)) {
@@ -156,5 +170,78 @@ public sealed class ScanController : ControllerBase {
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// 校验批量条码是否全部可解析且格口一致。
+    /// </summary>
+    /// <param name="barcodes">标准化条码列表。</param>
+    /// <param name="validationMessage">校验失败消息。</param>
+    /// <returns>校验通过返回 true，否则返回 false。</returns>
+    private static bool TryValidateBarcodeBatchChuteConsistency(IReadOnlyList<string> barcodes, out string validationMessage) {
+        validationMessage = string.Empty;
+        string? firstChuteCode = null;
+        foreach (var barcode in barcodes) {
+            if (!TryExtractChuteCode(barcode, out var currentChuteCode)) {
+                validationMessage = UnresolvableChuteMessage;
+                return false;
+            }
+
+            if (firstChuteCode is null) {
+                firstChuteCode = currentChuteCode;
+                continue;
+            }
+
+            if (!string.Equals(firstChuteCode, currentChuteCode, StringComparison.Ordinal)) {
+                validationMessage = MultipleChutesMessage;
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 按固定条码规则提取格口编码。
+    /// </summary>
+    /// <param name="barcode">待提取条码。</param>
+    /// <param name="chuteCode">提取出的格口编码。</param>
+    /// <returns>提取成功返回 true，否则返回 false。</returns>
+    private static bool TryExtractChuteCode(string barcode, out string chuteCode) {
+        chuteCode = string.Empty;
+        if (string.IsNullOrWhiteSpace(barcode)) {
+            return false;
+        }
+
+        var normalizedBarcode = barcode.Trim().ToUpperInvariant();
+        if (normalizedBarcode.StartsWith("02", StringComparison.Ordinal)) {
+            if (normalizedBarcode.Length <= 2) {
+                return false;
+            }
+
+            var splitChuteCharacter = normalizedBarcode[2];
+            if (!char.IsAsciiDigit(splitChuteCharacter)) {
+                return false;
+            }
+
+            chuteCode = splitChuteCharacter.ToString();
+            return true;
+        }
+
+        if (normalizedBarcode.StartsWith('Z')) {
+            if (normalizedBarcode.Length <= 1) {
+                return false;
+            }
+
+            var fullCaseChuteCharacter = normalizedBarcode[1];
+            if (!char.IsAsciiDigit(fullCaseChuteCharacter)) {
+                return false;
+            }
+
+            chuteCode = fullCaseChuteCharacter.ToString();
+            return true;
+        }
+
+        return false;
     }
 }
