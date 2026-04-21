@@ -242,7 +242,6 @@
 │   ├── Abstractions/Persistence/IBusinessTaskRepository.cs
 │   ├── Abstractions/Persistence/IScanLogRepository.cs
 │   ├── Abstractions/Persistence/IDropLogRepository.cs
-│   ├── Abstractions/Infrastructure/IShardSchemaSynchronizer.cs
 │   ├── Abstractions/Sync/IOracleRemoteStatusWriter.cs
 │   ├── Abstractions/Sync/IOracleStatusDrivenSourceReader.cs
 │   ├── Abstractions/Sync/IBusinessTaskStatusConsumeService.cs
@@ -356,6 +355,7 @@
 │       ├── AutoMigrationService.cs
 │       ├── IShardTableProvisioner.cs
 │       ├── ShardTableProvisioner.cs
+│       ├── Sharding/IShardSchemaSynchronizer.cs
 │       ├── Sharding/ShardSchemaSynchronizer.cs
 │       ├── Sharding/ShardSchemaTemplateBuilder.cs
 │       ├── Sharding/Metadata/ShardTableSchemaTemplate.cs
@@ -645,7 +645,7 @@
 - `EverydayChain.Hub.Tests/Services/InMemoryScanLogRepository.cs`：扫描日志仓储内存替身。
 - `EverydayChain.Hub.Tests/Services/InMemoryDropLogRepository.cs`：落格日志仓储内存替身。
 - `Application/Abstractions/Sync/IOracleRemoteStatusWriter.cs` / `IOracleStatusDrivenSourceReader.cs`：定义 StatusDriven 模式中 Oracle 远端状态回写与 Oracle 状态驱动源读取的外部协作能力抽象，遵循 Application 层外部协作抽象放置规则。
-- `Application/Abstractions/Infrastructure/IShardSchemaSynchronizer.cs`：定义历史分表结构同步抽象，约束“按逻辑表同步”与“全量同步”两类入口，供启动迁移链路与后续治理任务统一复用。
+- `Infrastructure/Services/Sharding/IShardSchemaSynchronizer.cs`：定义历史分表结构同步抽象，约束“按逻辑表同步”与“全量同步”两类入口，供启动迁移链路与后续治理任务统一复用。
 - `Application/Models/RemoteStatusConsumeResult.cs`：定义 StatusDriven 模式读取/投影写入/回写统计模型。
 - `Application/Abstractions/Sync/IBusinessTaskStatusConsumeService.cs` + `Infrastructure/Sync/Services/BusinessTaskStatusConsumeService.cs`：定义并实现 WMS 两条 StatusDriven 的业务主表消费链路，串联“读取→投影→批量幂等 Upsert→可选回写”，并在固定第 1 页模式下加入无可投影/无可回写行 fail-fast 防死循环保护。
 - `Application/Abstractions/Services/IBusinessTaskProjectionService.cs` + `Application/Services/BusinessTaskProjectionService.cs` + `Application/Models/BusinessTaskProjection*.cs`：定义并实现业务任务投影契约与模型，统一执行字段校验、文本标准化与实体构造；强制 `TaskCode = BusinessKey` 且长度上限 64，避免入库超长。

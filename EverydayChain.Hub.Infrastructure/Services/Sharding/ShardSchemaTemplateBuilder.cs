@@ -34,7 +34,7 @@ internal static class ShardSchemaTemplateBuilder
             }
         }
 
-        return managedLogicalTables;
+        return managedLogicalTables.ToArray();
     }
 
     /// <summary>

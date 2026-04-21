@@ -32,7 +32,6 @@ using EverydayChain.Hub.Application.Abstractions.Integrations;
 using EverydayChain.Hub.Application.Recirculation.Abstractions;
 using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Queries;
-using EverydayChain.Hub.Application.Abstractions.Infrastructure;
 using EverydayChain.Hub.Infrastructure.Services.Sharding;
 
 namespace EverydayChain.Hub.Infrastructure.DependencyInjection;

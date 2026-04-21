@@ -1,4 +1,4 @@
-namespace EverydayChain.Hub.Application.Abstractions.Infrastructure;
+namespace EverydayChain.Hub.Infrastructure.Services.Sharding;
 
 /// <summary>
 /// 分表结构同步抽象，负责将逻辑表最新结构扩散到历史分表。
