@@ -1,7 +1,8 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 新增历史分表结构自动同步能力：新增 `IShardSchemaSynchronizer`、`ShardSchemaSynchronizer`、分表模板/物理结构/差异元数据模型与 `ShardSchemaTemplateBuilder`，启动链路改为“EF 主表迁移 → 启动期分表预建 → 历史分表结构同步”；同步器会基于 EF 当前模型自动枚举纳管逻辑表的历史分表，幂等补齐缺失列与缺失索引，并以中文日志隔离单分表失败，修复主表与分表结构漂移问题（含 `business_tasks[_]yyyyMM.WorkingArea` 自动追平）。
+- 收口第二轮分表结构自动同步边界：将 `IShardSchemaSynchronizer` 上移到 `EverydayChain.Hub.Application/Abstractions/Infrastructure`，Infrastructure 仅保留 `ShardSchemaSynchronizer` 实现；启动链路继续保持“EF 主表迁移 → 启动期分表预建 → 历史分表结构同步”分责，并在代码注释中明确仅自动补齐缺可空列、缺索引、带安全默认值的非空新增列，不会自动强补非空无默认值列、类型变更、危险可空性变更、删列、主键重建等高风险升级（含 `WorkingArea nvarchar(32) null` 历史分表自动补齐链路保持可用）。
+- 补齐分表结构同步严格门禁测试：新增“已对齐分表不重复生成 DDL”“等价索引不重复创建”“非空无默认值列跳过并告警”三类断言，锁定幂等行为与安全边界。
 - 单 PR 收口“回流口径统一 + 启动预热 + 热路径优化 + 索引强化”：`BusinessTaskRepository` 与查询测试替身已统一按 `ResolvedDockCode.Trim()` 可解析整数且大于 7 统计回流；`OnlyRecirculation` 筛选同步切换该口径；新增 `ApiWarmupHostedService + ApiWarmupService` 在启动后异步预热（EF 模型缓存、总看板、码头看板、波次查询与条码/任务号/业务键高频定位查询），预热失败仅告警不阻断启动；扫描/请求格口/落格链路减少重复标准化与重复解析；新增迁移 `20260420221000_AdjustBusinessTaskRecirculationAndHotPathIndexes`，补齐并收敛 `business_tasks` 高频索引。
 - 补齐 `WORKINGAREA` 投影链路：`BusinessTaskEntity/BusinessTaskProjectionRow/BusinessTaskStatusConsumeService/BusinessTaskRepository` 全链路新增 `WorkingArea` 字段映射与更新覆盖，`appsettings.json` 新增 `WorkingAreaColumn` 配置，并新增迁移 `20260420195621_AddBusinessTaskWorkingArea` 保证已部署库自动加列。
 - 新增波次专项查询能力：新增 `IWaveQueryService/WaveQueryService` 与 `WavesController`，提供 `POST /api/v1/waves/options`、`POST /api/v1/waves/summary`、`POST /api/v1/waves/zones` 三个接口，后端直接返回波次选项（含备注）、波次摘要、固定 5 组分区统计。
@@ -242,6 +243,7 @@
 │   ├── Abstractions/Persistence/IBusinessTaskRepository.cs
 │   ├── Abstractions/Persistence/IScanLogRepository.cs
 │   ├── Abstractions/Persistence/IDropLogRepository.cs
+│   ├── Abstractions/Infrastructure/IShardSchemaSynchronizer.cs
 │   ├── Abstractions/Sync/IOracleRemoteStatusWriter.cs
 │   ├── Abstractions/Sync/IOracleStatusDrivenSourceReader.cs
 │   ├── Abstractions/Sync/IBusinessTaskStatusConsumeService.cs
@@ -355,7 +357,6 @@
 │       ├── AutoMigrationService.cs
 │       ├── IShardTableProvisioner.cs
 │       ├── ShardTableProvisioner.cs
-│       ├── Sharding/IShardSchemaSynchronizer.cs
 │       ├── Sharding/ShardSchemaSynchronizer.cs
 │       ├── Sharding/ShardSchemaTemplateBuilder.cs
 │       ├── Sharding/Metadata/ShardTableSchemaTemplate.cs
@@ -645,7 +646,7 @@
 - `EverydayChain.Hub.Tests/Services/InMemoryScanLogRepository.cs`：扫描日志仓储内存替身。
 - `EverydayChain.Hub.Tests/Services/InMemoryDropLogRepository.cs`：落格日志仓储内存替身。
 - `Application/Abstractions/Sync/IOracleRemoteStatusWriter.cs` / `IOracleStatusDrivenSourceReader.cs`：定义 StatusDriven 模式中 Oracle 远端状态回写与 Oracle 状态驱动源读取的外部协作能力抽象，遵循 Application 层外部协作抽象放置规则。
-- `Infrastructure/Services/Sharding/IShardSchemaSynchronizer.cs`：定义历史分表结构同步抽象，约束“按逻辑表同步”与“全量同步”两类入口，供启动迁移链路与后续治理任务统一复用。
+- `Application/Abstractions/Infrastructure/IShardSchemaSynchronizer.cs`：定义历史分表结构同步抽象，约束“按逻辑表同步”与“全量同步”两类入口，并明确仅自动处理缺可空列、缺索引、带安全默认值的非空新增列；高风险结构升级仅告警不强补。
 - `Application/Models/RemoteStatusConsumeResult.cs`：定义 StatusDriven 模式读取/投影写入/回写统计模型。
 - `Application/Abstractions/Sync/IBusinessTaskStatusConsumeService.cs` + `Infrastructure/Sync/Services/BusinessTaskStatusConsumeService.cs`：定义并实现 WMS 两条 StatusDriven 的业务主表消费链路，串联“读取→投影→批量幂等 Upsert→可选回写”，并在固定第 1 页模式下加入无可投影/无可回写行 fail-fast 防死循环保护。
 - `Application/Abstractions/Services/IBusinessTaskProjectionService.cs` + `Application/Services/BusinessTaskProjectionService.cs` + `Application/Models/BusinessTaskProjection*.cs`：定义并实现业务任务投影契约与模型，统一执行字段校验、文本标准化与实体构造；强制 `TaskCode = BusinessKey` 且长度上限 64，避免入库超长。
@@ -661,8 +662,8 @@
 - `MonthShardSuffixResolver.cs`：按月份生成分表后缀（如 `_202603`）。
 - `IShardTableProvisioner.cs` + `ShardTableProvisioner.cs`：分表预建抽象与实现，仅负责新分表首次建表与索引创建，不再承担历史分表结构升级职责。
 - `Infrastructure/Services/Sharding/ShardSchemaTemplateBuilder.cs` + `Metadata/*`：基于 EF 当前模型构建逻辑表结构模板，并沉淀分表目标结构、物理结构、差异结果、列定义与索引定义元数据，供分表预建与历史分表同步复用。
-- `Infrastructure/Services/Sharding/ShardSchemaSynchronizer.cs`：历史分表结构同步实现，枚举纳管逻辑表的已存在分表，读取系统表元数据比对缺列/缺索引，生成幂等 DDL 并在危险动作隔离器下执行，同时输出中文审计日志并隔离单分表失败。
-- `AutoMigrationService.cs`：应用启动迁移入口，自动创建缺失数据库、识别并执行待迁移项，并在主表迁移后依次执行“启动期分表预建 → 历史分表结构同步”。
+- `Infrastructure/Services/Sharding/ShardSchemaSynchronizer.cs`：历史分表结构同步实现，枚举纳管逻辑表的已存在分表，读取系统表元数据比对缺列/缺索引，生成幂等 DDL 并在危险动作隔离器下执行，同时输出中文审计日志并隔离单分表失败；仅自动补齐安全差异，高风险变更只保留告警边界。
+- `AutoMigrationService.cs`：应用启动迁移入口，自动创建缺失数据库、识别并执行待迁移项，并在主表迁移后依次执行“启动期分表预建 → 历史分表结构同步”；其中 `ShardTableProvisioner` 仅负责新分表首次创建，`ShardSchemaSynchronizer` 仅负责历史分表结构追平。
 - `Host/Workers/AutoMigrationHostedService.cs`：后台任务入口，在应用启动阶段触发自动迁移与分表预置流程，依赖 `IAutoMigrationService` 与 `IRuntimeStorageGuard`（遵循后台任务入口归属 Host 层规则）。
 - `Host/Workers/ApiWarmupHostedService.cs`：启动预热后台任务，异步触发 EF 模型缓存预热与 `IApiWarmupService` 读路径预热，失败仅记录告警不阻断宿主可用性。
 - `SqlExecutionTuner.cs`：基于失败率和耗时进行批量窗口升降调谐；采样窗口大小与失败率阈值均来自 `AutoTuneOptions`。
@@ -743,7 +744,7 @@
 - `EverydayChain.Hub.Tests/Services/Sharding/RecordingShardSchemaSynchronizer.cs`：分表结构同步测试替身，记录全量同步调用次数，用于启动迁移链路顺序验证。
 - `EverydayChain.Hub.Tests/Services/Sharding/StubShardTableResolver.cs`：分表解析测试替身，按逻辑表返回可控物理分表集合，隔离真实数据库依赖。
 - `EverydayChain.Hub.Tests/Services/Sharding/ShardSchemaSynchronizerTests.cs`：分表结构同步器测试，覆盖模板解析、缺列补齐 SQL、缺索引补齐 SQL 与多逻辑表通用性。
-- `EverydayChain.Hub.Tests/Services/Sharding/ShardSchemaDiffTests.cs`：分表结构差异测试，覆盖重复执行幂等与“非空且无安全默认值列仅告警不自动补齐”安全策略。
+- `EverydayChain.Hub.Tests/Services/Sharding/ShardSchemaDiffTests.cs`：分表结构差异测试，覆盖“已对齐分表不生成 DDL”“等价索引不重复创建”与“非空且无安全默认值列仅告警不自动补齐”等严格门禁。
 - `EverydayChain.Hub.Tests/Services/HubDbContextTestFactory.cs`：HubDbContext 测试工厂，集中承载上下文构造逻辑，避免测试文件内多类定义。
 - `EverydayChain.Hub.Tests/Repositories/OracleSourceReaderTests.cs`：Oracle 连接串构建测试，覆盖空连接串、空库名、EZCONNECT（斜杠/SID）覆写与复杂描述符拦截分支。
 - `EverydayChain.Hub.Tests/Repositories/SyncStagingRepositoryTests.cs`：暂存仓储回归测试，覆盖暂存行字段大小写不敏感访问，防止业务键字段因列名大小写差异导致读取失败。

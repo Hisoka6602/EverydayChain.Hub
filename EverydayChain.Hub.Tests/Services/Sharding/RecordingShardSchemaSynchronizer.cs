@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Infrastructure.Services.Sharding;
+using EverydayChain.Hub.Application.Abstractions.Infrastructure;
 
 namespace EverydayChain.Hub.Tests.Services.Sharding;
 

@@ -1,4 +1,5 @@
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
+using EverydayChain.Hub.Application.Abstractions.Infrastructure;
 using EverydayChain.Hub.Infrastructure.Services;
 using EverydayChain.Hub.Tests.Services.Sharding;
 
