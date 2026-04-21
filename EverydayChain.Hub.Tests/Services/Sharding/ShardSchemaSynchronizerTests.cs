@@ -1,3 +1,6 @@
+using System.Data;
+using System.Data.Common;
+using System.Reflection;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Services.Sharding;
@@ -107,6 +110,77 @@ public class ShardSchemaSynchronizerTests
     }
 
     /// <summary>
+    /// 元数据读取应支持 byte 到 Int32 的安全转换。
+    /// </summary>
+    [Fact]
+    public void ReadInt32Value_ShouldSupportByteValue()
+    {
+        using var reader = CreateReader("ColumnId", typeof(byte), (byte)7);
+
+        var actual = InvokeReadInt32Value(reader, 0);
+
+        Assert.Equal(7, actual);
+    }
+
+    /// <summary>
+    /// 元数据读取应支持 Int16 到 Int32 的安全转换。
+    /// </summary>
+    [Fact]
+    public void ReadInt32Value_ShouldSupportInt16Value()
+    {
+        using var reader = CreateReader("ColumnId", typeof(short), (short)9);
+
+        var actual = InvokeReadInt32Value(reader, 0);
+
+        Assert.Equal(9, actual);
+    }
+
+    /// <summary>
+    /// 元数据读取应支持 Int32 直接读取。
+    /// </summary>
+    [Fact]
+    public void ReadInt32Value_ShouldSupportInt32Value()
+    {
+        using var reader = CreateReader("ColumnId", typeof(int), 11);
+
+        var actual = InvokeReadInt32Value(reader, 0);
+
+        Assert.Equal(11, actual);
+    }
+
+    /// <summary>
+    /// 元数据读取遇到 DBNull 时应抛出中文异常。
+    /// </summary>
+    [Fact]
+    public void ReadInt32Value_ShouldThrowChineseException_WhenValueIsDBNull()
+    {
+        using var reader = CreateReader("ColumnId", typeof(object), DBNull.Value);
+
+        var exception = Assert.Throws<TargetInvocationException>(() => InvokeReadInt32Value(reader, 0));
+
+        var actualException = Assert.IsType<InvalidOperationException>(exception.InnerException);
+        Assert.Contains("读取分表结构元数据失败", actualException.Message, StringComparison.Ordinal);
+        Assert.Contains("序号 0", actualException.Message, StringComparison.Ordinal);
+        Assert.Contains("字段 ColumnId", actualException.Message, StringComparison.Ordinal);
+        Assert.Contains("DBNull", actualException.Message, StringComparison.Ordinal);
+        Assert.Contains("Int32", actualException.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// 索引顺序字段底层为 byte 时不应再触发 Byte 到 Int32 转换异常。
+    /// </summary>
+    [Fact]
+    public void ReadPhysicalTableSchemaAsync_ShouldNotThrow_WhenKeyOrdinalUnderlyingTypeIsByte()
+    {
+        using var reader = CreateReader("KeyOrdinal", typeof(byte), (byte)1);
+
+        var exception = Record.Exception(() => InvokeReadInt32Value(reader, 0));
+
+        Assert.Null(exception);
+        Assert.Equal(1, InvokeReadInt32Value(reader, 0));
+    }
+
+    /// <summary>
     /// 创建分表结构同步器。
     /// </summary>
     /// <param name="managedLogicalTables">纳管逻辑表。</param>
@@ -157,5 +231,37 @@ public class ShardSchemaSynchronizerTests
                 index.IsUnique,
                 index.ColumnNames))
             .ToList();
+    }
+
+    /// <summary>
+    /// 调用私有 Int32 元数据读取方法。
+    /// </summary>
+    /// <param name="reader">数据读取器。</param>
+    /// <param name="ordinal">字段序号。</param>
+    /// <returns>转换结果。</returns>
+    private static int InvokeReadInt32Value(DbDataReader reader, int ordinal)
+    {
+        return (int)typeof(ShardSchemaSynchronizer)
+            .GetMethod("ReadInt32Value", BindingFlags.NonPublic | BindingFlags.Static)!
+            .Invoke(null, [reader, ordinal])!;
+    }
+
+    /// <summary>
+    /// 创建单列单行读取器。
+    /// </summary>
+    /// <param name="columnName">列名。</param>
+    /// <param name="columnType">列类型。</param>
+    /// <param name="value">列值。</param>
+    /// <returns>定位到首行的读取器。</returns>
+    private static DbDataReader CreateReader(string columnName, Type columnType, object value)
+    {
+        var dataTable = new DataTable();
+        dataTable.Columns.Add(columnName, columnType);
+        var row = dataTable.NewRow();
+        row[columnName] = value;
+        dataTable.Rows.Add(row);
+        var reader = dataTable.CreateDataReader();
+        reader.Read();
+        return reader;
     }
 }
