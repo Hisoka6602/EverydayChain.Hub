@@ -50,7 +50,14 @@ public class ShardSchemaDiffTests
     {
         var synchronizer = CreateSynchronizer();
         var template = synchronizer.ResolveTableTemplate(BusinessTaskLogicalTable);
-        var equivalentIndex = template.Indexes.First(index => string.Equals(index.DatabaseName, "IX_business_tasks_WorkingArea", StringComparison.Ordinal));
+        var equivalentIndexes = template.Indexes
+            .Where(index =>
+                !index.IsUnique
+                && index.ColumnNames.Count == 1
+                && string.Equals(index.ColumnNames[0], "WorkingArea", StringComparison.Ordinal))
+            .ToList();
+        var equivalentIndex = Assert.Single(equivalentIndexes);
+
         var physicalSchema = new ShardPhysicalTableSchema(
             template.Schema,
             "business_tasks_202604",
@@ -62,7 +69,9 @@ public class ShardSchemaDiffTests
 
         var diff = synchronizer.BuildDiff(template, physicalSchema);
 
-        Assert.DoesNotContain(diff.MissingIndexes, index => string.Equals(index.DatabaseName, equivalentIndex.DatabaseName, StringComparison.Ordinal));
+        Assert.DoesNotContain(diff.MissingIndexes, index =>
+            index.IsUnique == equivalentIndex.IsUnique
+            && index.ColumnNames.SequenceEqual(equivalentIndex.ColumnNames, StringComparer.Ordinal));
     }
 
     /// <summary>
