@@ -1,5 +1,6 @@
 using System.Data;
 using System.Globalization;
+using EverydayChain.Hub.Application.Abstractions.Infrastructure;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence;
@@ -15,6 +16,8 @@ namespace EverydayChain.Hub.Infrastructure.Services.Sharding;
 
 /// <summary>
 /// 历史分表结构同步器，负责将 EF 当前模型扩散到已存在分表。
+/// 该实现仅自动补齐缺失可空列、缺失索引与带安全默认值的非空新增列；
+/// 对于非空无默认值列、类型变更、危险可空性变更、删列、主键重建与其他破坏性升级只输出中文告警，不执行强制修复。
 /// </summary>
 public class ShardSchemaSynchronizer(
     IOptions<ShardingOptions> options,
@@ -145,6 +148,8 @@ public class ShardSchemaSynchronizer(
 
     /// <summary>
     /// 计算逻辑表模板与物理分表之间的结构差异。
+    /// 缺可空列、缺索引与带安全默认值的非空新增列会进入可执行集合；
+    /// 高风险差异仅记录告警并保持人工介入边界。
     /// </summary>
     /// <param name="template">逻辑表模板。</param>
     /// <param name="physicalSchema">物理分表结构。</param>

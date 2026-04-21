@@ -21,39 +21,55 @@ public class ShardSchemaDiffTests
     private const string TestConnectionString = "Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;";
 
     /// <summary>
-    /// 结构完全一致时不应重复生成 DDL。
-    /// </summary>
+     /// 结构完全一致时不应重复生成 DDL。
+     /// </summary>
     [Fact]
-    public void BuildDiff_ShouldBeIdempotent_WhenSchemaAlreadyAligned()
+    public void BuildSynchronizationSql_ShouldReturnEmpty_WhenPhysicalTableAlreadyAligned()
     {
         var synchronizer = CreateSynchronizer();
         var template = synchronizer.ResolveTableTemplate(BusinessTaskLogicalTable);
-        var physicalSchema = new ShardPhysicalTableSchema(
-            template.Schema,
-            "business_tasks_202604",
-            template.Columns,
-            template.PrimaryKeyColumns,
-            template.Indexes
-                .Select(index => new ShardIndexSchema(
-                    ShardSchemaTemplateBuilder.BuildPhysicalIndexName(template.LogicalTable, "business_tasks_202604", index.DatabaseName),
-                    index.IsUnique,
-                    index.ColumnNames))
-                .ToList());
+        const string physicalTableName = "business_tasks_202604";
+        var physicalSchema = BuildAlignedPhysicalSchema(template, physicalTableName);
 
         var diff = synchronizer.BuildDiff(template, physicalSchema);
-        var sql = synchronizer.BuildSynchronizationSql("business_tasks_202604", template, diff);
+        var sql = synchronizer.BuildSynchronizationSql(physicalTableName, template, diff);
 
         Assert.False(diff.HasChanges);
         Assert.Empty(diff.MissingColumns);
         Assert.Empty(diff.MissingIndexes);
         Assert.Empty(sql);
+        Assert.DoesNotContain("ALTER TABLE", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("CREATE INDEX", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
-    /// 非空且无安全默认值的缺失列应只告警不执行自动补齐。
+    /// 已存在等价索引时不应重复报告缺失索引。
     /// </summary>
     [Fact]
-    public void BuildDiff_ShouldWarnAndSkipUnsafeRequiredColumn()
+    public void BuildDiff_ShouldNotReportMissingIndex_WhenEquivalentIndexAlreadyExists()
+    {
+        var synchronizer = CreateSynchronizer();
+        var template = synchronizer.ResolveTableTemplate(BusinessTaskLogicalTable);
+        var equivalentIndex = template.Indexes.First(index => string.Equals(index.DatabaseName, "IX_business_tasks_WorkingArea", StringComparison.Ordinal));
+        var physicalSchema = new ShardPhysicalTableSchema(
+            template.Schema,
+            "business_tasks_202604",
+            template.Columns,
+            template.PrimaryKeyColumns,
+            [
+                new ShardIndexSchema("IX_business_tasks_202604_WorkingArea_CustomName", equivalentIndex.IsUnique, equivalentIndex.ColumnNames)
+            ]);
+
+        var diff = synchronizer.BuildDiff(template, physicalSchema);
+
+        Assert.DoesNotContain(diff.MissingIndexes, index => string.Equals(index.DatabaseName, equivalentIndex.DatabaseName, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+     /// 非空且无安全默认值的缺失列应只告警不执行自动补齐。
+     /// </summary>
+    [Fact]
+    public void BuildDiff_ShouldWarnAndSkip_WhenMissingNonNullableColumnHasNoSafeDefaultValue()
     {
         var synchronizer = CreateSynchronizer();
         var template = synchronizer.ResolveTableTemplate(BusinessTaskLogicalTable);
@@ -76,9 +92,32 @@ public class ShardSchemaDiffTests
                 .ToList());
 
         var diff = synchronizer.BuildDiff(customTemplate, physicalSchema);
+        var sql = synchronizer.BuildSynchronizationSql("business_tasks_202604", customTemplate, diff);
 
         Assert.DoesNotContain(diff.MissingColumns, column => string.Equals(column.ColumnName, "RequiredColumn", StringComparison.Ordinal));
         Assert.Contains(diff.Warnings, warning => warning.Contains("RequiredColumn", StringComparison.Ordinal));
+        Assert.DoesNotContain("ALTER TABLE [dbo].[business_tasks_202604] ADD [RequiredColumn] int NOT NULL", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 构建已对齐物理分表结构。
+    /// </summary>
+    /// <param name="template">逻辑表模板。</param>
+    /// <param name="physicalTableName">物理表名。</param>
+    /// <returns>已对齐的物理结构。</returns>
+    private static ShardPhysicalTableSchema BuildAlignedPhysicalSchema(ShardTableSchemaTemplate template, string physicalTableName)
+    {
+        return new ShardPhysicalTableSchema(
+            template.Schema,
+            physicalTableName,
+            template.Columns,
+            template.PrimaryKeyColumns,
+            template.Indexes
+                .Select(index => new ShardIndexSchema(
+                    ShardSchemaTemplateBuilder.BuildPhysicalIndexName(template.LogicalTable, physicalTableName, index.DatabaseName),
+                    index.IsUnique,
+                    index.ColumnNames))
+                .ToList());
     }
 
     /// <summary>

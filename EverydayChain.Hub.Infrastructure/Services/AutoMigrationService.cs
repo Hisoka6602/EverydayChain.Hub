@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using EverydayChain.Hub.Application.Abstractions.Infrastructure;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -13,7 +14,7 @@ using System.Data;
 namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// 自动迁移服务实现，在应用启动时执行 EF Core 基础迁移并预创建当前及未来分表。
+/// 自动迁移服务实现，在应用启动时执行 EF Core 基础迁移、启动期分表预建与历史分表结构同步。
 /// </summary>
 public class AutoMigrationService(
     IDbContextFactory<HubDbContext> dbContextFactory,
@@ -79,8 +80,8 @@ public class AutoMigrationService(
     }
 
     /// <summary>
-    /// 执行主表迁移后的分表治理步骤。
-    /// </summary>
+     /// 执行主表迁移后的分表治理步骤。
+     /// </summary>
     /// <param name="shardTableProvisioner">分表预建服务。</param>
     /// <param name="shardSchemaSynchronizer">分表结构同步服务。</param>
     /// <param name="logger">日志记录器。</param>
@@ -93,12 +94,12 @@ public class AutoMigrationService(
         IReadOnlyList<string> suffixes,
         CancellationToken cancellationToken)
     {
-        // 步骤1：先预建启动期分表，保证未来新分表在首次写入前已按最新模型创建。
+        // 步骤1：先预建启动期分表；该步骤仅负责新分表首次创建，不负责历史分表升级。
         logger.LogInformation("自动迁移: 开始预创建启动期分表。SuffixCount={SuffixCount}", suffixes.Count);
         await shardTableProvisioner.EnsureShardTablesAsync(suffixes, cancellationToken);
         logger.LogInformation("自动迁移: 启动期分表预创建已完成。SuffixCount={SuffixCount}", suffixes.Count);
 
-        // 步骤2：再同步历史分表结构，追平主表迁移后的结构差异。
+        // 步骤2：再同步历史分表结构；仅自动补齐缺可空列、缺索引与带安全默认值的非空新增列，高风险结构变更仅告警不强补。
         logger.LogInformation("自动迁移: 开始同步历史分表结构。");
         await shardSchemaSynchronizer.SynchronizeAllAsync(cancellationToken);
         logger.LogInformation("自动迁移: 历史分表结构同步已完成。");
