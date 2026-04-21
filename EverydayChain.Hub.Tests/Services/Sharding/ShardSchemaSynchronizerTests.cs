@@ -26,6 +26,10 @@ public class ShardSchemaSynchronizerTests
     /// <summary>测试连接字符串。</summary>
     private const string TestConnectionString = "Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;";
 
+    /// <summary>私有 Int32 元数据读取方法。</summary>
+    private static readonly MethodInfo ReadInt32ValueMethod = typeof(ShardSchemaSynchronizer)
+        .GetMethod("ReadInt32Value", BindingFlags.NonPublic | BindingFlags.Static)!;
+
     /// <summary>
     /// EF 模型模板应正确提取 WorkingArea 列与相关索引。
     /// </summary>
@@ -174,10 +178,11 @@ public class ShardSchemaSynchronizerTests
     {
         using var reader = CreateReader("KeyOrdinal", typeof(byte), (byte)1);
 
-        var exception = Record.Exception(() => InvokeReadInt32Value(reader, 0));
+        var actual = 0;
+        var exception = Record.Exception(() => actual = InvokeReadInt32Value(reader, 0));
 
         Assert.Null(exception);
-        Assert.Equal(1, InvokeReadInt32Value(reader, 0));
+        Assert.Equal(1, actual);
     }
 
     /// <summary>
@@ -241,9 +246,7 @@ public class ShardSchemaSynchronizerTests
     /// <returns>转换结果。</returns>
     private static int InvokeReadInt32Value(DbDataReader reader, int ordinal)
     {
-        return (int)typeof(ShardSchemaSynchronizer)
-            .GetMethod("ReadInt32Value", BindingFlags.NonPublic | BindingFlags.Static)!
-            .Invoke(null, [reader, ordinal])!;
+        return (int)ReadInt32ValueMethod.Invoke(null, [reader, ordinal])!;
     }
 
     /// <summary>
