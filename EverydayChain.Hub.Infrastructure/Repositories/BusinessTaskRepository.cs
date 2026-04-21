@@ -28,14 +28,11 @@ public class BusinessTaskRepository(
     private const string EmptyWaveCode = "未分波次";
     /// <summary>无码头占位文本。</summary>
     private const string EmptyDockCode = "未分配码头";
-    /// <summary>回流统计统一谓词：归并码头编码仅包含数字，且数值大于等于 8（单字符 8/9 或首位非零的多位数）。</summary>
+    /// <summary>回流统计统一谓词：归并码头编码可解析为整数且大于 7。</summary>
     private static readonly Expression<Func<BusinessTaskEntity, bool>> RecirculationByResolvedDockCodeExpression = task =>
         task.ResolvedDockCode != string.Empty
         && !EF.Functions.Like(task.ResolvedDockCode, "%[^0-9]%")
-        && (
-            EF.Functions.Like(task.ResolvedDockCode, "[1-9][0-9]%")
-            || EF.Functions.Like(task.ResolvedDockCode, "[8-9]")
-        );
+        && Convert.ToInt32(task.ResolvedDockCode) > 7;
 
     /// <summary>分表配置快照。</summary>
     private readonly ShardingOptions _shardingOptions = shardingOptions.Value;
@@ -317,9 +314,10 @@ public class BusinessTaskRepository(
         {
             using var scope = TableSuffixScope.Use(suffix);
             await using var db = await contextFactory.CreateDbContextAsync(ct);
-            var shardRows = await db.BusinessTasks
+            var filteredQuery = db.BusinessTasks
                 .AsNoTracking()
-                .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal)
+                .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal);
+            var shardRows = await filteredQuery
                 .GroupBy(x => x.NormalizedWaveCode ?? EmptyWaveCode)
                 .Select(group => new BusinessTaskWaveAggregateRow
                 {
@@ -331,18 +329,24 @@ public class BusinessTaskRepository(
                     SplitTotalCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split),
                     SplitUnsortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split && task.Status != BusinessTaskStatus.Dropped && task.Status != BusinessTaskStatus.FeedbackPending),
                     RecognitionCount = group.Count(task => task.ScannedAtLocal != null),
-                    RecirculatedCount = group.Count(task =>
-                        task.ResolvedDockCode != string.Empty
-                        && !EF.Functions.Like(task.ResolvedDockCode, "%[^0-9]%")
-                        && (
-                            EF.Functions.Like(task.ResolvedDockCode, "[1-9][0-9]%")
-                            || EF.Functions.Like(task.ResolvedDockCode, "[8-9]")
-                        )),
+                    RecirculatedCount = 0,
                     ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception),
                     TotalVolumeMm3 = group.Sum(task => task.VolumeMm3 ?? 0M),
                     TotalWeightGram = group.Sum(task => task.WeightGram ?? 0M)
                 })
                 .ToListAsync(ct);
+            var recirculatedCounts = await filteredQuery
+                .Where(RecirculationByResolvedDockCodeExpression)
+                .GroupBy(x => x.NormalizedWaveCode ?? EmptyWaveCode)
+                .Select(group => new { WaveCode = group.Key, Count = group.Count() })
+                .ToDictionaryAsync(row => row.WaveCode, row => row.Count, StringComparer.OrdinalIgnoreCase, ct);
+            foreach (var row in shardRows)
+            {
+                if (recirculatedCounts.TryGetValue(row.WaveCode, out var count))
+                {
+                    row.RecirculatedCount = count;
+                }
+            }
 
             MergeWaveAggregateRows(merged, shardRows);
         }
@@ -533,18 +537,18 @@ public class BusinessTaskRepository(
         {
             using var scope = TableSuffixScope.Use(suffix);
             await using var db = await contextFactory.CreateDbContextAsync(ct);
-            var query = db.BusinessTasks
+            var filteredQuery = db.BusinessTasks
                 .AsNoTracking()
                 .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal);
             if (!string.IsNullOrWhiteSpace(normalizedWaveCode))
             {
                 if (string.Equals(normalizedWaveCode, EmptyWaveCode, StringComparison.Ordinal))
                 {
-                    query = query.Where(x => x.NormalizedWaveCode == null);
+                    filteredQuery = filteredQuery.Where(x => x.NormalizedWaveCode == null);
                 }
                 else
                 {
-                    query = query.Where(x => x.NormalizedWaveCode == normalizedWaveCode);
+                    filteredQuery = filteredQuery.Where(x => x.NormalizedWaveCode == normalizedWaveCode);
                 }
             }
 
@@ -552,15 +556,15 @@ public class BusinessTaskRepository(
             {
                 if (string.Equals(normalizedDockCode, EmptyDockCode, StringComparison.Ordinal))
                 {
-                    query = query.Where(x => x.ResolvedDockCode == EmptyDockCode);
+                    filteredQuery = filteredQuery.Where(x => x.ResolvedDockCode == EmptyDockCode);
                 }
                 else
                 {
-                    query = query.Where(x => x.ResolvedDockCode == normalizedDockCode);
+                    filteredQuery = filteredQuery.Where(x => x.ResolvedDockCode == normalizedDockCode);
                 }
             }
 
-            var shardRows = await query
+            var shardRows = await filteredQuery
                 .GroupBy(x => x.ResolvedDockCode)
                 .Select(group => new BusinessTaskDockAggregateRow
                 {
@@ -573,16 +577,22 @@ public class BusinessTaskRepository(
                     FullCaseTotalCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase),
                     SplitSortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split && (task.Status == BusinessTaskStatus.Dropped || task.Status == BusinessTaskStatus.FeedbackPending)),
                     FullCaseSortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase && (task.Status == BusinessTaskStatus.Dropped || task.Status == BusinessTaskStatus.FeedbackPending)),
-                    RecirculatedCount = group.Count(task =>
-                        task.ResolvedDockCode != string.Empty
-                        && !EF.Functions.Like(task.ResolvedDockCode, "%[^0-9]%")
-                        && (
-                            EF.Functions.Like(task.ResolvedDockCode, "[1-9][0-9]%")
-                            || EF.Functions.Like(task.ResolvedDockCode, "[8-9]")
-                        )),
+                    RecirculatedCount = 0,
                     ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception)
                 })
                 .ToListAsync(ct);
+            var recirculatedCounts = await filteredQuery
+                .Where(RecirculationByResolvedDockCodeExpression)
+                .GroupBy(x => x.ResolvedDockCode)
+                .Select(group => new { DockCode = group.Key, Count = group.Count() })
+                .ToDictionaryAsync(row => row.DockCode, row => row.Count, StringComparer.OrdinalIgnoreCase, ct);
+            foreach (var row in shardRows)
+            {
+                if (recirculatedCounts.TryGetValue(row.DockCode, out var count))
+                {
+                    row.RecirculatedCount = count;
+                }
+            }
 
             MergeDockAggregateRows(merged, shardRows);
         }

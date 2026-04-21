@@ -177,4 +177,33 @@ public sealed class ChuteQueryServiceTests
         Assert.Equal("TASK-004", result.TaskCode);
         Assert.Equal("4", result.ChuteCode);
     }
+
+    /// <summary>
+    /// 任务已持久化目标格口时应直接返回，避免重复条码解析。
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_ShouldUsePersistedTargetChuteCode_WhenTargetChuteCodeExists()
+    {
+        var (service, repo) = CreateService();
+        await repo.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "TASK-006",
+            SourceTableCode = "WMS",
+            BusinessKey = "K6",
+            Barcode = "INVALID-BARCODE",
+            TargetChuteCode = " 6 ",
+            Status = BusinessTaskStatus.Scanned,
+            CreatedTimeLocal = DateTime.Now,
+            UpdatedTimeLocal = DateTime.Now
+        }, CancellationToken.None);
+
+        var result = await service.ExecuteAsync(new ChuteResolveApplicationRequest
+        {
+            TaskCode = "TASK-006"
+        }, CancellationToken.None);
+
+        Assert.True(result.IsResolved);
+        Assert.Equal("TASK-006", result.TaskCode);
+        Assert.Equal("6", result.ChuteCode);
+    }
 }

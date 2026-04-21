@@ -32,7 +32,7 @@ public sealed class ChuteQueryService : IChuteQueryService {
 
     /// <summary>
     /// 按任务编码或条码查询目标格口。
-    /// 步骤：1. 优先按任务编码查找；2. 任务编码为空时按条码查找；3. 校验任务状态；4. 校验条码非空；5. 解析条码中的格口并返回。
+    /// 步骤：1. 优先按任务编码查找；2. 任务编码为空时按条码查找；3. 校验任务状态；4. 优先返回已持久化目标格口；5. 校验条码非空；6. 解析条码中的格口并返回。
     /// </summary>
     /// <param name="request">请求参数。</param>
     /// <param name="cancellationToken">取消令牌。</param>
@@ -71,7 +71,20 @@ public sealed class ChuteQueryService : IChuteQueryService {
             };
         }
 
-        // 步骤 5：从任务条码中解析目标格口；解析失败时返回失败。
+        // 步骤 5：优先返回任务已持久化的目标格口，避免重复条码解析。
+        var normalizedTargetChuteCode = string.IsNullOrWhiteSpace(task.TargetChuteCode) ? null : task.TargetChuteCode.Trim();
+        if (normalizedTargetChuteCode is not null)
+        {
+            return new ChuteResolveApplicationResult
+            {
+                IsResolved = true,
+                TaskCode = task.TaskCode,
+                ChuteCode = normalizedTargetChuteCode,
+                Message = $"任务 [{task.TaskCode}] 目标格口已确认：{normalizedTargetChuteCode}。"
+            };
+        }
+
+        // 步骤 6：从任务条码中解析目标格口；解析失败时返回失败。
         if (string.IsNullOrWhiteSpace(task.Barcode)) {
             return new ChuteResolveApplicationResult {
                 IsResolved = false,

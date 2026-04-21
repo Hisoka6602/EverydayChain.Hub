@@ -1,7 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
-- 单 PR 收口“回流口径统一 + 启动预热 + 热路径优化 + 索引强化”：`BusinessTaskRepository` 与查询测试替身已统一按 `ResolvedDockCode.Trim()` 可解析整数且大于 7 统计回流；`OnlyRecirculation` 筛选同步切换该口径；`AutoMigrationHostedService` 增加启动后异步预热（总看板、码头看板、波次查询与条码/任务号/业务键高频定位查询），预热失败仅告警不阻断启动；扫描/请求格口/落格链路减少重复标准化；新增迁移 `20260420211433_20260420213000_StrengthenHotPathIndexesAndRecirculationFilter`，补齐 `business_tasks`、`scan_logs`、`drop_logs` 的高频时间范围与组合索引。
+- 单 PR 收口“回流口径统一 + 启动预热 + 热路径优化 + 索引强化”：`BusinessTaskRepository` 与查询测试替身已统一按 `ResolvedDockCode.Trim()` 可解析整数且大于 7 统计回流；`OnlyRecirculation` 筛选同步切换该口径；新增 `ApiWarmupHostedService + ApiWarmupService` 在启动后异步预热（EF 模型缓存、总看板、码头看板、波次查询与条码/任务号/业务键高频定位查询），预热失败仅告警不阻断启动；扫描/请求格口/落格链路减少重复标准化与重复解析；新增迁移 `20260420221000_AdjustBusinessTaskRecirculationAndHotPathIndexes`，补齐并收敛 `business_tasks` 高频索引。
 - 补齐 `WORKINGAREA` 投影链路：`BusinessTaskEntity/BusinessTaskProjectionRow/BusinessTaskStatusConsumeService/BusinessTaskRepository` 全链路新增 `WorkingArea` 字段映射与更新覆盖，`appsettings.json` 新增 `WorkingAreaColumn` 配置，并新增迁移 `20260420195621_AddBusinessTaskWorkingArea` 保证已部署库自动加列。
 - 新增波次专项查询能力：新增 `IWaveQueryService/WaveQueryService` 与 `WavesController`，提供 `POST /api/v1/waves/options`、`POST /api/v1/waves/summary`、`POST /api/v1/waves/zones` 三个接口，后端直接返回波次选项（含备注）、波次摘要、固定 5 组分区统计。
 - 固化新波次接口回流口径：统一按 `ResolvedDockCode`“可解析整数且大于 7”统计回流，拆零分区严格按 `WorkingArea=1~4` 映射，异常 `WorkingArea` 跳过并记录日志。
@@ -255,6 +255,7 @@
 │   ├── Abstractions/Services/IScanIngressService.cs
 │   ├── Abstractions/Services/IChuteQueryService.cs
 │   ├── Abstractions/Services/IDropFeedbackService.cs
+│   ├── Abstractions/Services/IApiWarmupService.cs
 │   ├── Abstractions/Services/IBusinessTaskProjectionService.cs
 │   ├── Abstractions/Services/IWmsFeedbackService.cs
 │   ├── Abstractions/Services/IFeedbackCompensationService.cs
@@ -282,6 +283,7 @@
 │   ├── Services/ScanIngressService.cs
 │   ├── Services/ChuteQueryService.cs
 │   ├── Services/DropFeedbackService.cs
+│   ├── Services/ApiWarmupService.cs
 │   ├── Queries/GlobalDashboardQueryService.cs
 │   ├── Queries/DockDashboardQueryService.cs
 │   ├── Queries/SortingReportQueryService.cs
@@ -388,6 +390,7 @@
 │   ├── Host/Controllers/StubBusinessTaskReadService.cs
 │   ├── Host/Middlewares/ApiFailureLoggingMiddlewareTests.cs
 │   ├── Host/Workers/AutoMigrationHostedServiceTests.cs
+│   ├── Host/Workers/ApiWarmupHostedServiceTests.cs
 │   ├── Host/Workers/TestAutoMigrationService.cs
 │   ├── Host/Workers/TestDatabaseException.cs
 │   ├── Host/Workers/TestRuntimeStorageGuard.cs
@@ -402,6 +405,7 @@
 │       ├── ServiceCollectionExtensionsTests.cs
 │       ├── BusinessTaskMaterializerTests.cs
 │       ├── BarcodeParserTests.cs
+│       ├── ApiWarmupServiceTests.cs
 │       ├── ScanIngressServiceTests.cs
 │       ├── ScanMatchServiceTests.cs
 │       ├── TaskExecutionServiceTests.cs
@@ -470,6 +474,7 @@
     ├── Workers/SyncBackgroundWorker.cs
     ├── Workers/RetentionBackgroundWorker.cs
     ├── Workers/AutoMigrationHostedService.cs
+    ├── Workers/ApiWarmupHostedService.cs
     ├── Workers/WmsFeedbackBackgroundWorker.cs
     ├── Workers/FeedbackCompensationBackgroundWorker.cs
     ├── Properties/launchSettings.json
@@ -556,6 +561,7 @@
 - `Application/Abstractions/Services/IScanIngressService.cs` + `Application/Services/ScanIngressService.cs`：扫描上传应用服务，协调条码解析、任务匹配与状态推进链路，输出标准化受理结果。
 - `Application/Abstractions/Services/IChuteQueryService.cs` + `Application/Services/ChuteQueryService.cs`：请求格口应用服务抽象与实现，按任务编码或条码查询业务任务，在任务已扫描或已落格前提下按条码规则解析并返回目标格口，覆盖状态校验与不支持条码异常分支。
 - `Application/Abstractions/Services/IDropFeedbackService.cs` + `Application/Services/DropFeedbackService.cs`：落格回传应用服务抽象与实现，支持双定位（TaskCode/Barcode）、参数冲突校验与状态机推进（成功→Dropped+FeedbackPending，失败→Exception），并支持已落格任务重复回传覆盖 `ActualChuteCode` 后刷新 `ResolvedDockCode`，落格成功/失败均写落格日志。
+- `Application/Abstractions/Services/IApiWarmupService.cs` + `Application/Services/ApiWarmupService.cs`：启动预热应用服务抽象与实现，统一执行总看板、码头看板、波次选项/摘要/分区与高频任务定位查询预热，单步骤失败仅记录并继续后续步骤。
 - `Application/Abstractions/Queries/IGlobalDashboardQueryService.cs` + `Application/Queries/GlobalDashboardQueryService.cs`：总看板查询服务抽象与实现，按时间区间汇总总量、整件/拆零分口径、识别率、回流数、异常数、体积重量与波次聚合数据。
 - `Application/Models/GlobalDashboardQueryRequest.cs` + `Application/Models/GlobalDashboardQueryResult.cs` + `Application/Models/WaveDashboardSummary.cs`：总看板应用层查询入参、统计结果与波次维度摘要模型。
 - `Application/Abstractions/Queries/IDockDashboardQueryService.cs` + `Application/Queries/DockDashboardQueryService.cs`：码头看板查询服务抽象与实现，支持默认当天查询、波次筛选、拆零/整件未分拣统计、分拣进度、已分拣总数与“仅 7 号码头显示异常数”规则。
@@ -641,6 +647,7 @@
 - `IShardTableProvisioner.cs` + `ShardTableProvisioner.cs`：在 SQL Server 中按需创建分表与索引（不存在才建）。
 - `AutoMigrationService.cs`：应用启动时自动建库、自动识别并执行待迁移项，同时仅预建后缀分表（Infrastructure 层实现）。
 - `Host/Workers/AutoMigrationHostedService.cs`：后台任务入口，在应用启动阶段触发自动迁移与分表预置流程，依赖 `IAutoMigrationService` 与 `IRuntimeStorageGuard`（遵循后台任务入口归属 Host 层规则）。
+- `Host/Workers/ApiWarmupHostedService.cs`：启动预热后台任务，异步触发 EF 模型缓存预热与 `IApiWarmupService` 读路径预热，失败仅记录告警不阻断宿主可用性。
 - `SqlExecutionTuner.cs`：基于失败率和耗时进行批量窗口升降调谐；采样窗口大小与失败率阈值均来自 `AutoTuneOptions`。
 - `DangerZoneExecutor.cs`：危险路径统一走隔离器（超时/重试/熔断），弹性参数来自 `DangerZoneOptions`。
 - `NonRetryableDangerZoneException.cs`：危险隔离器“不可重试异常”标记类型，用于识别配置类确定性失败并快速失败。
@@ -670,6 +677,7 @@
 - `20260416010041_AddSyncBatchShardTable.cs`：新增 `sync_batches` 基础表迁移，用于同步批次自动迁移基线与分片模板。
 - `20260416171508_AddSyncChangeDeletionLogShardTables.cs`：新增 `sync_change_logs` 与 `sync_deletion_logs` 基础表迁移，用于同步变更/删除日志自动迁移基线与分片模板。
 - `20260420195621_AddBusinessTaskWorkingArea.cs`：新增 `business_tasks.WorkingArea` 列迁移，保证拆零区域字段可持久化查询。
+- `20260420221000_AdjustBusinessTaskRecirculationAndHotPathIndexes.cs`：移除旧 `IsRecirculated` 统计索引，新增 `NormalizedBarcode+CreatedTimeLocal` 与 `CreatedTimeLocal+SourceType+Status+IsException+ResolvedDockCode` 组合索引，统一回流口径并降低高频查询成本。
 - `Properties/AssemblyInfo.cs`：为基础设施程序集声明 `InternalsVisibleTo("EverydayChain.Hub.Tests")`，支持测试项目直接验证 internal 成员。
 - `nlog.config`：NLog 日志配置，输出至控制台与三个滚动日志文件：通用日志（`hub-${shortdate}.log`，按日切割，单文件上限 10 MB，保留 30 天）；同步专属日志（`sync-${shortdate}.log`，仅收录同步链路相关组件日志）；API 失败专属日志（`api-failure-${shortdate}.log`，记录失败请求响应明细）。
 - `Program.cs`（Host）：Host 启动入口，现已支持 API + Worker 共存，启用 Controllers、Swagger（中文注释）、API 失败日志中间件并保留自动迁移与同步后台任务注册。
@@ -682,11 +690,13 @@
 - `WmsFeedbackBackgroundWorker.cs`：业务回传主后台任务，按 `WmsFeedback.PollingIntervalSeconds` 周期消费 `FeedbackStatus=Pending` 任务并调用 `IWmsFeedbackService.ExecuteAsync`，输出待处理/成功/失败/跳过统计并内置单轮超时保护。
 - `FeedbackCompensationBackgroundWorker.cs`：业务回传补偿后台任务，按 `FeedbackCompensationJob.PollingIntervalSeconds` 周期重试失败回传任务，支持批次上限控制并输出补偿统计日志。
 - `AutoMigrationHostedService.cs`：启动阶段自动迁移入口；当自动迁移阶段发生数据库异常时仅记录错误并降级跳过迁移，保持宿主继续运行，避免单库不可达导致整体进程崩溃。
+- `ApiWarmupHostedService.cs`：启动后预热入口，后台执行关键查询链路与仓储定位查询热身，预热异常仅记录日志并自动降级。
 - `EverydayChain.Hub.Tests/Host/Controllers/*Tests.cs`：PR-03 新增 Controller 基础行为测试，覆盖空参校验与标准成功响应路径。
 - `EverydayChain.Hub.Tests/Architecture/BusinessTaskSingleSourceArchitectureTests.cs`：架构防回退测试，校验 `HubDbContext` 与 `HubDbContextModelSnapshot` 不再包含本地 `IDX_PICKTOLIGHT_CARTON1` / `IDX_PICKTOWCS2` 映射，并校验 `appsettings.json` 中两条 WMS 状态驱动任务固定投影到 `business_tasks`。
-- `EverydayChain.Hub.Tests/Architecture/BusinessTaskIndexCoverageTests.cs`：业务主表索引覆盖门禁测试，校验 `SourceTableCode+BusinessKey` 唯一索引及 `NormalizedBarcode`、`NormalizedWaveCode`、`ResolvedDockCode`、`Status`、`FeedbackStatus`、`CreatedTimeLocal`、`UpdatedTimeLocal` 关键索引存在。
+- `EverydayChain.Hub.Tests/Architecture/BusinessTaskIndexCoverageTests.cs`：业务主表索引覆盖门禁测试，校验 `SourceTableCode+BusinessKey` 唯一索引及 `NormalizedBarcode`、`ResolvedDockCode`、`CreatedTimeLocal`、`UpdatedTimeLocal`、`NormalizedBarcode+CreatedTimeLocal`、`CreatedTimeLocal+SourceType+Status+IsException+ResolvedDockCode` 等关键索引存在。
 - `EverydayChain.Hub.Tests/Repositories/BusinessTaskStatusWriteBackConfigurationTests.cs`：状态回写配置门禁测试，校验 `CompletedStatusValue` 完全来自配置并保留 `PendingStatusValue=null` 的 `IS NULL` 语义映射。
 - `EverydayChain.Hub.Tests/Host/Workers/AutoMigrationHostedServiceTests.cs`：自动迁移托管服务容错测试，覆盖“自动迁移阶段异常降级继续启动”与“启动自检异常仍阻断启动”两条分支。
+- `EverydayChain.Hub.Tests/Host/Workers/ApiWarmupHostedServiceTests.cs`：启动预热托管服务测试，覆盖“预热异常不阻断启动”与“启动后异步触发预热”两条分支。
 - `EverydayChain.Hub.Tests/Host/Workers/TestAutoMigrationService.cs`：自动迁移服务测试替身，支持统计调用次数与注入异常。
 - `EverydayChain.Hub.Tests/Host/Workers/TestDatabaseException.cs`：数据库异常测试替身，统一用于自动迁移降级分支测试。
 - `EverydayChain.Hub.Tests/Host/Workers/TestRuntimeStorageGuard.cs`：运行期存储守护测试替身，支持统计启动自检调用次数与注入异常。
@@ -700,6 +710,7 @@
 - `EverydayChain.Hub.Tests/Services/ServiceCollectionExtensionsTests.cs`：逻辑表名构建测试，覆盖非法标识符与空启用集合异常场景。
 - `EverydayChain.Hub.Tests/Services/BusinessTaskMaterializerTests.cs`：业务任务物化服务测试，覆盖默认状态赋值、时间赋值与必填字段空白校验分支。
 - `EverydayChain.Hub.Tests/Services/BarcodeParserTests.cs`：条码解析服务测试，覆盖拆零、整件、不支持条码三类解析分支。
+- `EverydayChain.Hub.Tests/Services/ApiWarmupServiceTests.cs`：启动预热应用服务测试，覆盖单步骤异常隔离并继续执行后续预热步骤。
 - `EverydayChain.Hub.Tests/Services/ScanIngressServiceTests.cs`：扫描上传应用服务测试，覆盖无效条码失败语义、无匹配任务返回未命中、有效任务受理分支；含内存仓储替身 `InMemoryBusinessTaskRepository`。
 - `EverydayChain.Hub.Tests/Services/ScanMatchServiceTests.cs`：扫描匹配服务测试，覆盖空条码拒绝、无任务未命中、有任务匹配成功分支。
 - `EverydayChain.Hub.Tests/Services/TaskExecutionServiceTests.cs`：任务执行服务测试，覆盖无任务失败、已创建任务推进、已落格重复扫描（含落格/回传字段重置断言）、非法状态拒绝、持久化验证与扫描维度字段写入场景。
