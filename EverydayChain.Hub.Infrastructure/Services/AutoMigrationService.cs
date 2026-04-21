@@ -7,6 +7,7 @@ using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore.Storage;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
+using EverydayChain.Hub.Infrastructure.Services.Sharding;
 using System.Data;
 
 namespace EverydayChain.Hub.Infrastructure.Services;
@@ -18,6 +19,7 @@ public class AutoMigrationService(
     IDbContextFactory<HubDbContext> dbContextFactory,
     IShardSuffixResolver resolver,
     IShardTableProvisioner shardTableProvisioner,
+    IShardSchemaSynchronizer shardSchemaSynchronizer,
     IOptions<ShardingOptions> shardingOptions,
     IOptions<DangerZoneOptions> dangerZoneOptions,
     IDangerZoneExecutor dangerZoneExecutor,
@@ -55,10 +57,10 @@ public class AutoMigrationService(
             logger.LogInformation("自动迁移: 基础迁移已执行完成。");
         }, cancellationToken, _dangerZoneOptions.AutoMigrateTimeoutSeconds);
 
-        // 步骤2：解析当前及未来分表后缀，预创建分表结构。
+        // 步骤2：解析当前及未来分表后缀，并依次执行分表预建与历史分表结构同步。
         var localNow = DateTimeOffset.Now;
         var suffixes = BuildBootstrapSuffixes(resolver, localNow, _options.AutoCreateMonthsAhead);
-        await shardTableProvisioner.EnsureShardTablesAsync(suffixes, cancellationToken);
+        await ExecuteShardMaintenanceAsync(shardTableProvisioner, shardSchemaSynchronizer, logger, suffixes, cancellationToken);
     }
 
     /// <summary>
@@ -74,6 +76,32 @@ public class AutoMigrationService(
             .Where(suffix => !string.IsNullOrWhiteSpace(suffix))
             .Distinct(StringComparer.Ordinal)
             .ToList();
+    }
+
+    /// <summary>
+    /// 执行主表迁移后的分表治理步骤。
+    /// </summary>
+    /// <param name="shardTableProvisioner">分表预建服务。</param>
+    /// <param name="shardSchemaSynchronizer">分表结构同步服务。</param>
+    /// <param name="logger">日志记录器。</param>
+    /// <param name="suffixes">启动期预建后缀。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    internal static async Task ExecuteShardMaintenanceAsync(
+        IShardTableProvisioner shardTableProvisioner,
+        IShardSchemaSynchronizer shardSchemaSynchronizer,
+        ILogger logger,
+        IReadOnlyList<string> suffixes,
+        CancellationToken cancellationToken)
+    {
+        // 步骤1：先预建启动期分表，保证未来新分表在首次写入前已按最新模型创建。
+        logger.LogInformation("自动迁移: 开始预创建启动期分表。SuffixCount={SuffixCount}", suffixes.Count);
+        await shardTableProvisioner.EnsureShardTablesAsync(suffixes, cancellationToken);
+        logger.LogInformation("自动迁移: 启动期分表预创建已完成。SuffixCount={SuffixCount}", suffixes.Count);
+
+        // 步骤2：再同步历史分表结构，追平主表迁移后的结构差异。
+        logger.LogInformation("自动迁移: 开始同步历史分表结构。");
+        await shardSchemaSynchronizer.SynchronizeAllAsync(cancellationToken);
+        logger.LogInformation("自动迁移: 历史分表结构同步已完成。");
     }
 
     /// <summary>
