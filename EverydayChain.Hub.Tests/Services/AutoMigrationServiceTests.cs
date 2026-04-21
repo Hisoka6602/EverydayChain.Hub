@@ -88,4 +88,24 @@ public class AutoMigrationServiceTests
             message => Assert.Contains("开始同步历史分表结构", message, StringComparison.Ordinal),
             message => Assert.Contains("历史分表结构同步已完成", message, StringComparison.Ordinal));
     }
+
+    /// <summary>
+    /// 无启动后缀时仍应继续执行历史分表结构同步。
+    /// </summary>
+    [Fact]
+    public async Task ExecuteShardMaintenanceAsync_ShouldStillSynchronizeHistory_WhenSuffixesEmpty()
+    {
+        var provisioner = new RecordingShardTableProvisioner();
+        var synchronizer = new RecordingShardSchemaSynchronizer();
+
+        await AutoMigrationService.ExecuteShardMaintenanceAsync(
+            provisioner,
+            synchronizer,
+            new TestLogger<AutoMigrationService>(),
+            [],
+            CancellationToken.None);
+
+        Assert.Empty(provisioner.EnsuredSuffixes);
+        Assert.Equal(1, synchronizer.SynchronizeAllCallCount);
+    }
 }

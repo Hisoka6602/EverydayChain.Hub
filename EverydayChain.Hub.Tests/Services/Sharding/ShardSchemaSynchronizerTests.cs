@@ -20,6 +20,9 @@ public class ShardSchemaSynchronizerTests
     /// <summary>落格日志逻辑表名。</summary>
     private const string DropLogLogicalTable = "drop_logs";
 
+    /// <summary>测试连接字符串。</summary>
+    private const string TestConnectionString = "Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;";
+
     /// <summary>
     /// EF 模型模板应正确提取 WorkingArea 列与相关索引。
     /// </summary>
@@ -114,7 +117,7 @@ public class ShardSchemaSynchronizerTests
             Options.Create(new ShardingOptions
             {
                 Schema = "dbo",
-                ConnectionString = "Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;"
+                ConnectionString = TestConnectionString
             }),
             managedLogicalTables,
             CreateDbContextFactory(),
@@ -130,7 +133,7 @@ public class ShardSchemaSynchronizerTests
     private static IDbContextFactory<HubDbContext> CreateDbContextFactory()
     {
         var contextOptions = new DbContextOptionsBuilder<HubDbContext>()
-            .UseSqlServer("Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;")
+            .UseSqlServer(TestConnectionString)
             .Options;
         var shardingOptions = Options.Create(new ShardingOptions
         {

@@ -17,6 +17,9 @@ public class ShardSchemaDiffTests
     /// <summary>业务任务逻辑表名。</summary>
     private const string BusinessTaskLogicalTable = "business_tasks";
 
+    /// <summary>测试连接字符串。</summary>
+    private const string TestConnectionString = "Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;";
+
     /// <summary>
     /// 结构完全一致时不应重复生成 DDL。
     /// </summary>
@@ -88,7 +91,7 @@ public class ShardSchemaDiffTests
             Options.Create(new ShardingOptions
             {
                 Schema = "dbo",
-                ConnectionString = "Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;"
+                ConnectionString = TestConnectionString
             }),
             [BusinessTaskLogicalTable],
             CreateDbContextFactory(),
@@ -104,7 +107,7 @@ public class ShardSchemaDiffTests
     private static IDbContextFactory<HubDbContext> CreateDbContextFactory()
     {
         var contextOptions = new DbContextOptionsBuilder<HubDbContext>()
-            .UseSqlServer("Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;")
+            .UseSqlServer(TestConnectionString)
             .Options;
         var shardingOptions = Options.Create(new ShardingOptions
         {

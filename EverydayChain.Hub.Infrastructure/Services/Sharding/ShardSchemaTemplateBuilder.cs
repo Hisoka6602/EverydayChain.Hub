@@ -161,6 +161,6 @@ internal static class ShardSchemaTemplateBuilder
             return storeType;
         }
 
-        throw new InvalidOperationException($"分表模板解析失败：属性 {property.DeclaringType.DisplayName()}.{property.Name} 缺少可识别的 SQL 类型映射。");
+        throw new InvalidOperationException($"分表模板解析失败：属性 {property.DeclaringType.DisplayName()}.{property.Name} 缺少可识别的 SQL 类型映射。请检查该属性是否配置了 Column(TypeName=...) 或 Fluent API 类型映射。");
     }
 }

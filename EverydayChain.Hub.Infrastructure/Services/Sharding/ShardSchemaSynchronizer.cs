@@ -163,7 +163,7 @@ public class ShardSchemaSynchronizer(
             {
                 if (!expectedColumn.IsNullable && !CanAddSafely(expectedColumn))
                 {
-                    warnings.Add($"列 {expectedColumn.ColumnName} 为非空且缺少安全默认值，当前版本跳过自动补齐。");
+                    warnings.Add($"列 {expectedColumn.ColumnName} 为非空且缺少安全默认值，本次跳过自动补齐。");
                     continue;
                 }
 
@@ -294,7 +294,7 @@ public class ShardSchemaSynchronizer(
         await using var connection = new SqlConnection(_options.ConnectionString);
         await connection.OpenAsync(cancellationToken);
 
-        await using (var columnCommand = CreateMetadataCommand(connection, columnsSql, schema, physicalTableName))
+        await using var columnCommand = CreateMetadataCommand(connection, columnsSql, schema, physicalTableName);
         await using (var columnReader = await columnCommand.ExecuteReaderAsync(cancellationToken))
         {
             while (await columnReader.ReadAsync(cancellationToken))
@@ -316,10 +316,10 @@ public class ShardSchemaSynchronizer(
 
         if (columns.Count == 0)
         {
-            throw new InvalidOperationException($"未找到物理分表 {schema}.{physicalTableName}，无法执行结构同步。");
+            throw new InvalidOperationException($"未找到物理分表 {schema}.{physicalTableName}，无法执行结构同步。请检查该分表是否已被删除或当前 Schema 配置是否正确。");
         }
 
-        await using (var primaryKeyCommand = CreateMetadataCommand(connection, primaryKeySql, schema, physicalTableName))
+        await using var primaryKeyCommand = CreateMetadataCommand(connection, primaryKeySql, schema, physicalTableName);
         await using (var primaryKeyReader = await primaryKeyCommand.ExecuteReaderAsync(cancellationToken))
         {
             while (await primaryKeyReader.ReadAsync(cancellationToken))
@@ -328,7 +328,7 @@ public class ShardSchemaSynchronizer(
             }
         }
 
-        await using (var indexCommand = CreateMetadataCommand(connection, indexesSql, schema, physicalTableName))
+        await using var indexCommand = CreateMetadataCommand(connection, indexesSql, schema, physicalTableName);
         await using (var indexReader = await indexCommand.ExecuteReaderAsync(cancellationToken))
         {
             while (await indexReader.ReadAsync(cancellationToken))
@@ -417,9 +417,11 @@ public class ShardSchemaSynchronizer(
     private static string BuildAddColumnSql(string schema, string physicalTableName, ShardColumnSchema column)
     {
         var qualifiedTableLiteral = $"[{schema}].[{physicalTableName}]";
+        var qualifiedTableNameLiteral = EscapeSqlLiteral(qualifiedTableLiteral);
+        var columnNameLiteral = EscapeSqlLiteral(column.ColumnName);
         var definition = BuildAddColumnDefinition(column, physicalTableName);
         return $"""
-            IF COL_LENGTH(N'{qualifiedTableLiteral}', N'{column.ColumnName}') IS NULL
+            IF COL_LENGTH(N'{qualifiedTableNameLiteral}', N'{columnNameLiteral}') IS NULL
             BEGIN
                 ALTER TABLE {qualifiedTableLiteral} ADD {definition};
             END;
@@ -439,15 +441,18 @@ public class ShardSchemaSynchronizer(
         var uniqueSql = index.IsUnique ? "UNIQUE " : string.Empty;
         var columnsSql = string.Join(", ", index.ColumnNames.Select(QuoteIdentifier));
         var qualifiedTable = $"{QuoteIdentifier(template.Schema)}.{QuoteIdentifier(physicalTableName)}";
+        var schemaLiteral = EscapeSqlLiteral(template.Schema);
+        var tableLiteral = EscapeSqlLiteral(physicalTableName);
+        var indexLiteral = EscapeSqlLiteral(physicalIndexName);
         return $"""
             IF NOT EXISTS (
                 SELECT 1
                 FROM sys.indexes AS i
                 INNER JOIN sys.tables AS t ON t.object_id = i.object_id
                 INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
-                WHERE s.name = N'{template.Schema}'
-                  AND t.name = N'{physicalTableName}'
-                  AND i.name = N'{physicalIndexName}')
+                WHERE s.name = N'{schemaLiteral}'
+                  AND t.name = N'{tableLiteral}'
+                  AND i.name = N'{indexLiteral}')
             BEGIN
                 CREATE {uniqueSql}INDEX {QuoteIdentifier(physicalIndexName)} ON {qualifiedTable} ({columnsSql});
             END;
@@ -476,7 +481,7 @@ public class ShardSchemaSynchronizer(
         var defaultClause = BuildDefaultClause(column, physicalTableName);
         if (string.IsNullOrWhiteSpace(defaultClause))
         {
-            throw new InvalidOperationException($"列 {column.ColumnName} 为非空列且未配置安全默认值，无法自动补齐。");
+            throw new InvalidOperationException($"列 {column.ColumnName} 为非空列且未配置安全默认值，无法自动补齐。该列将被跳过，请先补充安全默认值或改为可空后重新同步。");
         }
 
         return definition + $" NOT NULL {defaultClause} WITH VALUES";
@@ -590,12 +595,22 @@ public class ShardSchemaSynchronizer(
             bool booleanValue => booleanValue ? "1" : "0",
             byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal => Convert.ToString(value, CultureInfo.InvariantCulture)!,
             Guid guid => $"'{guid:D}'",
-            DateTime dateTime => $"'{DateTime.SpecifyKind(dateTime, DateTimeKind.Local):yyyy-MM-dd HH:mm:ss.fffffff}'",
+            DateTime dateTime => $"'{dateTime:yyyy-MM-dd HH:mm:ss.fffffff}'",
             DateTimeOffset dateTimeOffset => $"'{dateTimeOffset.LocalDateTime:yyyy-MM-dd HH:mm:ss.fffffff}'",
             DateOnly dateOnly => $"'{dateOnly:yyyy-MM-dd}'",
             TimeOnly timeOnly => $"'{timeOnly:HH\\:mm\\:ss.fffffff}'",
             _ => throw new InvalidOperationException($"默认值类型 {value.GetType().FullName} 暂不支持自动格式化。")
         };
+    }
+
+    /// <summary>
+    /// 转义 SQL 字符串字面量。
+    /// </summary>
+    /// <param name="literal">原始文本。</param>
+    /// <returns>转义后的文本。</returns>
+    private static string EscapeSqlLiteral(string literal)
+    {
+        return literal.Replace("'", "''", StringComparison.Ordinal);
     }
 
     /// <summary>
