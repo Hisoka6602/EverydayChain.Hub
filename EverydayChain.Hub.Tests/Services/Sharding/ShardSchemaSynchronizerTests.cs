@@ -110,7 +110,7 @@ public class ShardSchemaSynchronizerTests
     }
 
     /// <summary>
-    /// 元数据读取应支持 byte 到 Int32 的安全转换。
+    /// 元数据读取应支持 byte 到 int 的安全转换。
     /// </summary>
     [Fact]
     public void ReadInt32Value_ShouldSupportByteValue()
@@ -123,7 +123,7 @@ public class ShardSchemaSynchronizerTests
     }
 
     /// <summary>
-    /// 元数据读取应支持 Int16 到 Int32 的安全转换。
+    /// 元数据读取应支持 short 到 int 的安全转换。
     /// </summary>
     [Fact]
     public void ReadInt32Value_ShouldSupportInt16Value()
@@ -136,7 +136,7 @@ public class ShardSchemaSynchronizerTests
     }
 
     /// <summary>
-    /// 元数据读取应支持 Int32 直接读取。
+    /// 元数据读取应支持 int 直接读取。
     /// </summary>
     [Fact]
     public void ReadInt32Value_ShouldSupportInt32Value()
