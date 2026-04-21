@@ -2,6 +2,7 @@ using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Host.Workers;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Tests.Services;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EverydayChain.Hub.Tests.Host.Workers;
@@ -52,6 +53,7 @@ public sealed class ApiWarmupHostedServiceTests
             apiWarmupService,
             dbContextFactory,
             shardSuffixResolver,
+            new TestHostApplicationLifetime(),
             NullLogger<ApiWarmupHostedService>.Instance);
     }
 
@@ -88,6 +90,28 @@ public sealed class ApiWarmupHostedServiceTests
         public Task WarmupAsync(CancellationToken cancellationToken)
         {
             throw new InvalidOperationException("测试桩：预热失败。");
+        }
+    }
+
+    /// <summary>
+    /// 宿主生命周期测试替身。
+    /// </summary>
+    private sealed class TestHostApplicationLifetime : IHostApplicationLifetime
+    {
+        /// <summary>启动令牌。</summary>
+        public CancellationToken ApplicationStarted => CancellationToken.None;
+
+        /// <summary>停止令牌。</summary>
+        public CancellationToken ApplicationStopping => CancellationToken.None;
+
+        /// <summary>停止完成令牌。</summary>
+        public CancellationToken ApplicationStopped => CancellationToken.None;
+
+        /// <summary>
+        /// 请求停止应用。
+        /// </summary>
+        public void StopApplication()
+        {
         }
     }
 }

@@ -168,8 +168,6 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     b.HasIndex("IsFeedbackReported");
 
-                    b.HasIndex("IsRecirculated");
-
                     b.HasIndex("NormalizedBarcode");
 
                     b.HasIndex("NormalizedWaveCode");
@@ -194,6 +192,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                     b.HasIndex("WorkingArea");
 
                     b.HasIndex("Barcode", "CreatedTimeLocal");
+
+                    b.HasIndex("NormalizedBarcode", "CreatedTimeLocal");
 
                     b.HasIndex("CreatedTimeLocal", "Id");
 
@@ -222,7 +222,7 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     b.HasIndex("NormalizedWaveCode", "SourceType", "WorkingArea");
 
-                    b.HasIndex("CreatedTimeLocal", "SourceType", "Status", "IsException", "IsRecirculated");
+                    b.HasIndex("CreatedTimeLocal", "SourceType", "Status", "IsException", "ResolvedDockCode");
 
                     b.ToTable("business_tasks", "dbo");
                 });

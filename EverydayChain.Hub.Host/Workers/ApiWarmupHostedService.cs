@@ -14,20 +14,29 @@ public sealed class ApiWarmupHostedService(
     IApiWarmupService apiWarmupService,
     IDbContextFactory<HubDbContext> dbContextFactory,
     IShardSuffixResolver shardSuffixResolver,
+    IHostApplicationLifetime hostApplicationLifetime,
     ILogger<ApiWarmupHostedService> logger) : IHostedService
 {
     /// <summary>启动预热总超时秒数。</summary>
     private const int WarmupTimeoutSeconds = 90;
+    /// <summary>预热取消源。</summary>
+    private readonly CancellationTokenSource _warmupCancellationTokenSource = new();
+    /// <summary>预热后台任务。</summary>
+    private Task? _warmupTask;
 
     /// <inheritdoc/>
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _ = Task.Run(async () =>
+        _warmupTask = Task.Run(async () =>
         {
             try
             {
                 using var warmupTimeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(WarmupTimeoutSeconds));
-                using var linkedWarmupCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, warmupTimeoutCts.Token);
+                using var linkedWarmupCts = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    hostApplicationLifetime.ApplicationStopping,
+                    _warmupCancellationTokenSource.Token,
+                    warmupTimeoutCts.Token);
                 await TryWarmupStepAsync("EF模型与分表上下文缓存", async () => await WarmupDbContextCacheAsync(linkedWarmupCts.Token), linkedWarmupCts.Token);
                 await TryWarmupStepAsync("查询链路预热", async () => await apiWarmupService.WarmupAsync(linkedWarmupCts.Token), linkedWarmupCts.Token);
             }
@@ -39,15 +48,19 @@ public sealed class ApiWarmupHostedService(
             {
                 logger.LogWarning(ex, "启动预热执行失败，已降级跳过，不影响主机可用性。");
             }
-        }, cancellationToken);
+        });
 
         return Task.CompletedTask;
     }
 
     /// <inheritdoc/>
-    public Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
-        return Task.CompletedTask;
+        _warmupCancellationTokenSource.Cancel();
+        if (_warmupTask is not null)
+        {
+            await _warmupTask.WaitAsync(cancellationToken);
+        }
     }
 
     /// <summary>
