@@ -1,6 +1,7 @@
 # EverydayChain.Hub
 
 ## 本次更新内容
+- 修复历史分表结构同步器读取 SQL Server 系统表元数据时的数值类型兼容问题：`ShardSchemaSynchronizer.ReadPhysicalTableSchemaAsync` 不再直接假设 `sys.columns`、`sys.index_columns`、`sys.indexes` 返回值恒为固定强类型，现统一通过安全转换 helper 兼容 `byte/short/int` 等底层数值类型并补齐中文异常提示；修复后历史分表结构同步器可继续完成物理分表结构读取、差异比对与后续缺列/缺索引自动补齐流程，这属于通用兼容性修复而非 `sorting_task_trace`、`sync_batches` 等单表特判补丁，`WorkingArea` 一类新增可空列也可正常进入后续自动补齐链路。
 - 收口第二轮分表结构自动同步边界：将 `IShardSchemaSynchronizer` 上移到 `EverydayChain.Hub.Application/Abstractions/Infrastructure`，Infrastructure 仅保留 `ShardSchemaSynchronizer` 实现；启动链路继续保持“EF 主表迁移 → 启动期分表预建 → 历史分表结构同步”分责，并在代码注释中明确仅自动补齐缺可空列、缺索引、带安全默认值的非空新增列，不会自动强补非空无默认值列、类型变更、危险可空性变更、删列、主键重建等高风险升级（含 `WorkingArea nvarchar(32) null` 历史分表自动补齐链路保持可用）。
 - 补齐分表结构同步严格门禁测试：新增“已对齐分表不重复生成 DDL”“等价索引不重复创建”“非空无默认值列跳过并告警”三类断言，锁定幂等行为与安全边界。
 - 单 PR 收口“回流口径统一 + 启动预热 + 热路径优化 + 索引强化”：`BusinessTaskRepository` 与查询测试替身已统一按 `ResolvedDockCode.Trim()` 可解析整数且大于 7 统计回流；`OnlyRecirculation` 筛选同步切换该口径；新增 `ApiWarmupHostedService + ApiWarmupService` 在启动后异步预热（EF 模型缓存、总看板、码头看板、波次查询与条码/任务号/业务键高频定位查询），预热失败仅告警不阻断启动；扫描/请求格口/落格链路减少重复标准化与重复解析；新增迁移 `20260420221000_AdjustBusinessTaskRecirculationAndHotPathIndexes`，补齐并收敛 `business_tasks` 高频索引。
@@ -77,6 +78,7 @@
 - 新增总看板契约与测试：`GlobalDashboardQueryRequest/Response`、`WaveDashboardSummaryResponse`、`GlobalDashboardControllerTests`、`GlobalDashboardQueryServiceTests`、`StubGlobalDashboardQueryService`。
 - 构建验证：`dotnet build EverydayChain.Hub.sln` 与 `dotnet test EverydayChain.Hub.sln --no-build` 均通过（0 Warning 0 Error，180/180 单元测试通过）。
 ## 后续可完善点
+- 继续补齐分表结构同步元数据兼容性回归测试：后续可在具备可控 SQL Server 测试环境时追加 `ReadPhysicalTableSchemaAsync` 真实数据库集成验证，覆盖更多系统字段底层类型组合与布尔元数据场景。
 - 继续扩充分表结构同步能力：补齐默认约束、列长度收敛、主键一致性修复与索引筛选条件告警，形成更完整的历史分表追平闭环。
 - 在联调环境完成回写门禁清单签收后，形成生产启用审批单并执行灰度验证。
 - 基于 `前端对接文档.md` 与 Swagger 导出结果建立自动一致性校验，防止后续接口漂移。
