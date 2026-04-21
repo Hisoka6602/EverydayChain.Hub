@@ -50,12 +50,7 @@ public class ShardSchemaDiffTests
     {
         var synchronizer = CreateSynchronizer();
         var template = synchronizer.ResolveTableTemplate(BusinessTaskLogicalTable);
-        var equivalentIndexes = template.Indexes
-            .Where(index =>
-                !index.IsUnique
-                && index.ColumnNames.Count == 1
-                && string.Equals(index.ColumnNames[0], "WorkingArea", StringComparison.Ordinal))
-            .ToList();
+        var equivalentIndexes = FindNonUniqueIndexesBySingleColumn(template.Indexes, "WorkingArea");
         var equivalentIndex = Assert.Single(equivalentIndexes);
 
         var physicalSchema = new ShardPhysicalTableSchema(
@@ -127,6 +122,22 @@ public class ShardSchemaDiffTests
                     index.IsUnique,
                     index.ColumnNames))
                 .ToList());
+    }
+
+    /// <summary>
+    /// 按单列名筛选非唯一索引。
+    /// </summary>
+    /// <param name="indexes">索引集合。</param>
+    /// <param name="columnName">列名。</param>
+    /// <returns>匹配的索引集合。</returns>
+    private static List<ShardIndexSchema> FindNonUniqueIndexesBySingleColumn(IEnumerable<ShardIndexSchema> indexes, string columnName)
+    {
+        return indexes
+            .Where(index =>
+                !index.IsUnique
+                && index.ColumnNames.Count == 1
+                && string.Equals(index.ColumnNames[0], columnName, StringComparison.Ordinal))
+            .ToList();
     }
 
     /// <summary>
