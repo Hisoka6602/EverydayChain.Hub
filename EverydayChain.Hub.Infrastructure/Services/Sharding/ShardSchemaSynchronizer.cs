@@ -1,4 +1,5 @@
 using System.Data;
+using System.Data.Common;
 using System.Globalization;
 using EverydayChain.Hub.Application.Abstractions.Infrastructure;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
@@ -307,14 +308,14 @@ public class ShardSchemaSynchronizer(
                     columnReader.GetString(1),
                     BuildStoreTypeSql(
                         columnReader.GetString(2),
-                        columnReader.GetInt16(3),
-                        columnReader.GetByte(4),
-                        columnReader.GetByte(5)),
-                    columnReader.GetBoolean(6),
-                    columnReader.GetBoolean(7),
+                        ReadInt16Value(columnReader, 3),
+                        ReadByteValue(columnReader, 4),
+                        ReadByteValue(columnReader, 5)),
+                    ReadBooleanValue(columnReader, 6),
+                    ReadBooleanValue(columnReader, 7),
                     null,
                     null,
-                    columnReader.GetInt32(0)));
+                    ReadInt32Value(columnReader, 0)));
             }
         }
 
@@ -339,8 +340,8 @@ public class ShardSchemaSynchronizer(
             {
                 indexRows.Add(new PhysicalIndexRow(
                     indexReader.GetString(0),
-                    indexReader.GetBoolean(1),
-                    indexReader.GetInt32(2),
+                    ReadBooleanValue(indexReader, 1),
+                    ReadInt32Value(indexReader, 2),
                     indexReader.GetString(3)));
             }
         }
@@ -552,6 +553,142 @@ public class ShardSchemaSynchronizer(
         command.Parameters.Add(new SqlParameter("@schemaName", SqlDbType.NVarChar, 128) { Value = schema });
         command.Parameters.Add(new SqlParameter("@tableName", SqlDbType.NVarChar, 128) { Value = tableName });
         return command;
+    }
+
+    /// <summary>
+    /// 读取 Int32 元数据值。
+    /// </summary>
+    /// <param name="reader">数据读取器。</param>
+    /// <param name="ordinal">字段序号。</param>
+    /// <returns>转换后的 Int32 值。</returns>
+    private static int ReadInt32Value(DbDataReader reader, int ordinal)
+    {
+        return ReadMetadataValue<int>(reader, ordinal, rawValue => Convert.ToInt32(rawValue, CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>
+    /// 读取 Int16 元数据值。
+    /// </summary>
+    /// <param name="reader">数据读取器。</param>
+    /// <param name="ordinal">字段序号。</param>
+    /// <returns>转换后的 Int16 值。</returns>
+    private static short ReadInt16Value(DbDataReader reader, int ordinal)
+    {
+        return ReadMetadataValue<short>(reader, ordinal, rawValue => Convert.ToInt16(rawValue, CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>
+    /// 读取 Byte 元数据值。
+    /// </summary>
+    /// <param name="reader">数据读取器。</param>
+    /// <param name="ordinal">字段序号。</param>
+    /// <returns>转换后的 Byte 值。</returns>
+    private static byte ReadByteValue(DbDataReader reader, int ordinal)
+    {
+        return ReadMetadataValue<byte>(reader, ordinal, rawValue => Convert.ToByte(rawValue, CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>
+    /// 读取 Boolean 元数据值。
+    /// </summary>
+    /// <param name="reader">数据读取器。</param>
+    /// <param name="ordinal">字段序号。</param>
+    /// <returns>转换后的 Boolean 值。</returns>
+    private static bool ReadBooleanValue(DbDataReader reader, int ordinal)
+    {
+        return ReadMetadataValue<bool>(reader, ordinal, rawValue =>
+        {
+            if (rawValue is bool booleanValue)
+            {
+                return booleanValue;
+            }
+
+            var numericValue = Convert.ToInt32(rawValue, CultureInfo.InvariantCulture);
+            return numericValue switch
+            {
+                0 => false,
+                1 => true,
+                _ => throw CreateMetadataConversionException(reader, ordinal, rawValue, typeof(bool).Name)
+            };
+        });
+    }
+
+    /// <summary>
+    /// 读取并转换元数据值。
+    /// </summary>
+    /// <param name="reader">数据读取器。</param>
+    /// <param name="ordinal">字段序号。</param>
+    /// <param name="converter">值转换委托。</param>
+    /// <typeparam name="T">目标类型。</typeparam>
+    /// <returns>转换后的值。</returns>
+    /// <exception cref="InvalidOperationException">当字段值为 DBNull 或转换失败时抛出。</exception>
+    private static T ReadMetadataValue<T>(DbDataReader reader, int ordinal, Func<object, T> converter)
+    {
+        var targetTypeName = typeof(T).Name;
+        var rawValue = ReadRequiredValue(reader, ordinal, targetTypeName);
+        try
+        {
+            return converter(rawValue);
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw CreateMetadataConversionException(reader, ordinal, rawValue, targetTypeName, ex);
+        }
+    }
+
+    /// <summary>
+    /// 读取非空元数据值。
+    /// </summary>
+    /// <param name="reader">数据读取器。</param>
+    /// <param name="ordinal">字段序号。</param>
+    /// <param name="targetTypeName">目标类型名称。</param>
+    /// <returns>原始字段值。</returns>
+    private static object ReadRequiredValue(DbDataReader reader, int ordinal, string targetTypeName)
+    {
+        var rawValue = reader.GetValue(ordinal);
+        if (rawValue is DBNull)
+        {
+            throw new InvalidOperationException(
+                $"读取分表结构元数据失败：{GetFieldDescription(reader, ordinal)} 的字段值为 DBNull，无法转换为 {targetTypeName}。");
+        }
+
+        return rawValue;
+    }
+
+    /// <summary>
+    /// 创建元数据转换异常。
+    /// </summary>
+    /// <param name="reader">数据读取器。</param>
+    /// <param name="ordinal">字段序号。</param>
+    /// <param name="rawValue">原始值。</param>
+    /// <param name="targetTypeName">目标类型名称。</param>
+    /// <param name="innerException">内部异常。</param>
+    /// <returns>转换异常。</returns>
+    private static InvalidOperationException CreateMetadataConversionException(
+        DbDataReader reader,
+        int ordinal,
+        object rawValue,
+        string targetTypeName,
+        Exception? innerException = null)
+    {
+        return new InvalidOperationException(
+            $"读取分表结构元数据失败：{GetFieldDescription(reader, ordinal)} 的字段值类型为 {rawValue.GetType().FullName}，无法转换为 {targetTypeName}。",
+            innerException);
+    }
+
+    /// <summary>
+    /// 获取字段描述文本。
+    /// </summary>
+    /// <param name="reader">数据读取器。</param>
+    /// <param name="ordinal">字段序号。</param>
+    /// <returns>字段描述文本。</returns>
+    private static string GetFieldDescription(DbDataReader reader, int ordinal)
+    {
+        return $"序号 {ordinal}（字段 {reader.GetName(ordinal)}）";
     }
 
     /// <summary>

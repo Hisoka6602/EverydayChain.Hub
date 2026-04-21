@@ -1,3 +1,6 @@
+using System.Data;
+using System.Data.Common;
+using System.Reflection;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Services.Sharding;
@@ -22,6 +25,18 @@ public class ShardSchemaSynchronizerTests
 
     /// <summary>测试连接字符串。</summary>
     private const string TestConnectionString = "Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;";
+
+    /// <summary>私有 Int32 元数据读取方法。</summary>
+    private static readonly MethodInfo ReadInt32ValueMethod = ResolvePrivateStaticMethod("ReadInt32Value");
+
+    /// <summary>私有 Int16 元数据读取方法。</summary>
+    private static readonly MethodInfo ReadInt16ValueMethod = ResolvePrivateStaticMethod("ReadInt16Value");
+
+    /// <summary>私有 Byte 元数据读取方法。</summary>
+    private static readonly MethodInfo ReadByteValueMethod = ResolvePrivateStaticMethod("ReadByteValue");
+
+    /// <summary>私有 Boolean 元数据读取方法。</summary>
+    private static readonly MethodInfo ReadBooleanValueMethod = ResolvePrivateStaticMethod("ReadBooleanValue");
 
     /// <summary>
     /// EF 模型模板应正确提取 WorkingArea 列与相关索引。
@@ -107,6 +122,166 @@ public class ShardSchemaSynchronizerTests
     }
 
     /// <summary>
+    /// 元数据读取应支持 byte 到 int 的安全转换。
+    /// </summary>
+    [Fact]
+    public void ReadInt32Value_ShouldSupportByteValue()
+    {
+        using var reader = CreateReader("ColumnId", typeof(byte), (byte)7);
+
+        var actual = InvokeReadInt32Value(reader, 0);
+
+        Assert.Equal(7, actual);
+    }
+
+    /// <summary>
+    /// 元数据读取应支持 short 到 int 的安全转换。
+    /// </summary>
+    [Fact]
+    public void ReadInt32Value_ShouldSupportInt16Value()
+    {
+        using var reader = CreateReader("ColumnId", typeof(short), (short)9);
+
+        var actual = InvokeReadInt32Value(reader, 0);
+
+        Assert.Equal(9, actual);
+    }
+
+    /// <summary>
+    /// 元数据读取应支持 int 直接读取。
+    /// </summary>
+    [Fact]
+    public void ReadInt32Value_ShouldSupportInt32Value()
+    {
+        using var reader = CreateReader("ColumnId", typeof(int), 11);
+
+        var actual = InvokeReadInt32Value(reader, 0);
+
+        Assert.Equal(11, actual);
+    }
+
+    /// <summary>
+    /// 元数据读取遇到 DBNull 时应抛出中文异常。
+    /// </summary>
+    [Fact]
+    public void ReadInt32Value_ShouldThrowChineseException_WhenValueIsDBNull()
+    {
+        using var reader = CreateReader("ColumnId", typeof(object), DBNull.Value);
+
+        var exception = Assert.Throws<TargetInvocationException>(() => InvokeReadInt32Value(reader, 0));
+
+        var actualException = Assert.IsType<InvalidOperationException>(exception.InnerException);
+        Assert.Contains("读取分表结构元数据失败", actualException.Message, StringComparison.Ordinal);
+        Assert.Contains("序号 0", actualException.Message, StringComparison.Ordinal);
+        Assert.Contains("字段 ColumnId", actualException.Message, StringComparison.Ordinal);
+        Assert.Contains("DBNull", actualException.Message, StringComparison.Ordinal);
+        Assert.Contains("Int32", actualException.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// 元数据读取应支持 byte 到 short 的安全转换。
+    /// </summary>
+    [Fact]
+    public void ReadInt16Value_ShouldSupportByteValue()
+    {
+        using var reader = CreateReader("MaxLength", typeof(byte), (byte)12);
+
+        var actual = InvokeReadInt16Value(reader, 0);
+
+        Assert.Equal(12, actual);
+    }
+
+    /// <summary>
+    /// 元数据读取应支持 int 到 byte 的安全转换。
+    /// </summary>
+    [Fact]
+    public void ReadByteValue_ShouldSupportInt32Value()
+    {
+        using var reader = CreateReader("NumericScale", typeof(int), 6);
+
+        var actual = InvokeReadByteValue(reader, 0);
+
+        Assert.Equal((byte)6, actual);
+    }
+
+    /// <summary>
+    /// 元数据读取应支持布尔值直接读取。
+    /// </summary>
+    [Fact]
+    public void ReadBooleanValue_ShouldSupportBooleanValue()
+    {
+        using var reader = CreateReader("IsNullable", typeof(bool), true);
+
+        var actual = InvokeReadBooleanValue(reader, 0);
+
+        Assert.True(actual);
+    }
+
+    /// <summary>
+    /// 元数据读取应支持 0 和 1 的数值布尔语义。
+    /// </summary>
+    [Fact]
+    public void ReadBooleanValue_ShouldSupportNumericBooleanValue()
+    {
+        using var trueReader = CreateReader("IsIdentity", typeof(byte), (byte)1);
+        using var falseReader = CreateReader("IsNullable", typeof(short), (short)0);
+
+        var trueValue = InvokeReadBooleanValue(trueReader, 0);
+        var falseValue = InvokeReadBooleanValue(falseReader, 0);
+
+        Assert.True(trueValue);
+        Assert.False(falseValue);
+    }
+
+    /// <summary>
+    /// 索引顺序字段底层为 byte 时不应再触发 Byte 到 Int32 转换异常。
+    /// </summary>
+    [Fact]
+    public void ReadInt32Value_ShouldNotThrow_WhenKeyOrdinalUnderlyingTypeIsByte()
+    {
+        using var reader = CreateReader("KeyOrdinal", typeof(byte), (byte)1);
+
+        var actual = 0;
+        var exception = Record.Exception(() => actual = InvokeReadInt32Value(reader, 0));
+
+        Assert.Null(exception);
+        Assert.Equal(1, actual);
+    }
+
+    /// <summary>
+    /// 元数据读取遇到 DBNull 时应抛出 Byte 中文异常。
+    /// </summary>
+    [Fact]
+    public void ReadByteValue_ShouldThrowChineseException_WhenValueIsDBNull()
+    {
+        using var reader = CreateReader("NumericPrecision", typeof(object), DBNull.Value);
+
+        var exception = Assert.Throws<TargetInvocationException>(() => InvokeReadByteValue(reader, 0));
+
+        var actualException = Assert.IsType<InvalidOperationException>(exception.InnerException);
+        Assert.Contains("读取分表结构元数据失败", actualException.Message, StringComparison.Ordinal);
+        Assert.Contains("字段 NumericPrecision", actualException.Message, StringComparison.Ordinal);
+        Assert.Contains("Byte", actualException.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// 元数据读取遇到非法布尔数值时应抛出中文异常。
+    /// </summary>
+    [Fact]
+    public void ReadBooleanValue_ShouldThrowChineseException_WhenNumericValueIsNotZeroOrOne()
+    {
+        using var reader = CreateReader("IsNullable", typeof(int), 2);
+
+        var exception = Assert.Throws<TargetInvocationException>(() => InvokeReadBooleanValue(reader, 0));
+
+        var actualException = Assert.IsType<InvalidOperationException>(exception.InnerException);
+        Assert.Contains("读取分表结构元数据失败", actualException.Message, StringComparison.Ordinal);
+        Assert.Contains("字段 IsNullable", actualException.Message, StringComparison.Ordinal);
+        Assert.Contains("System.Int32", actualException.Message, StringComparison.Ordinal);
+        Assert.Contains("Boolean", actualException.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// 创建分表结构同步器。
     /// </summary>
     /// <param name="managedLogicalTables">纳管逻辑表。</param>
@@ -157,5 +332,86 @@ public class ShardSchemaSynchronizerTests
                 index.IsUnique,
                 index.ColumnNames))
             .ToList();
+    }
+
+    /// <summary>
+    /// 解析私有静态方法。
+    /// </summary>
+    /// <param name="methodName">方法名称。</param>
+    /// <returns>方法信息。</returns>
+    /// <exception cref="InvalidOperationException">当目标方法不存在时抛出。</exception>
+    private static MethodInfo ResolvePrivateStaticMethod(string methodName)
+    {
+        var method = typeof(ShardSchemaSynchronizer).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static);
+        if (method is not null)
+        {
+            return method;
+        }
+
+        throw new InvalidOperationException(
+            $"未能在类型“{typeof(ShardSchemaSynchronizer).FullName}”上找到名为“{methodName}”的私有静态方法。该失败通常表示方法名、可见性或签名已发生变更，请同步更新测试代码。");
+    }
+
+    /// <summary>
+    /// 调用私有 Int32 元数据读取方法。
+    /// </summary>
+    /// <param name="reader">数据读取器。</param>
+    /// <param name="ordinal">字段序号。</param>
+    /// <returns>转换结果。</returns>
+    private static int InvokeReadInt32Value(DbDataReader reader, int ordinal)
+    {
+        return (int)ReadInt32ValueMethod.Invoke(null, [reader, ordinal])!;
+    }
+
+    /// <summary>
+    /// 调用私有 Int16 元数据读取方法。
+    /// </summary>
+    /// <param name="reader">数据读取器。</param>
+    /// <param name="ordinal">字段序号。</param>
+    /// <returns>转换结果。</returns>
+    private static short InvokeReadInt16Value(DbDataReader reader, int ordinal)
+    {
+        return (short)ReadInt16ValueMethod.Invoke(null, [reader, ordinal])!;
+    }
+
+    /// <summary>
+    /// 调用私有 Byte 元数据读取方法。
+    /// </summary>
+    /// <param name="reader">数据读取器。</param>
+    /// <param name="ordinal">字段序号。</param>
+    /// <returns>转换结果。</returns>
+    private static byte InvokeReadByteValue(DbDataReader reader, int ordinal)
+    {
+        return (byte)ReadByteValueMethod.Invoke(null, [reader, ordinal])!;
+    }
+
+    /// <summary>
+    /// 调用私有 Boolean 元数据读取方法。
+    /// </summary>
+    /// <param name="reader">数据读取器。</param>
+    /// <param name="ordinal">字段序号。</param>
+    /// <returns>转换结果。</returns>
+    private static bool InvokeReadBooleanValue(DbDataReader reader, int ordinal)
+    {
+        return (bool)ReadBooleanValueMethod.Invoke(null, [reader, ordinal])!;
+    }
+
+    /// <summary>
+    /// 创建单列单行读取器。
+    /// </summary>
+    /// <param name="columnName">列名。</param>
+    /// <param name="columnType">列类型。</param>
+    /// <param name="value">列值。</param>
+    /// <returns>定位到首行的读取器。</returns>
+    private static DbDataReader CreateReader(string columnName, Type columnType, object value)
+    {
+        var dataTable = new DataTable();
+        dataTable.Columns.Add(columnName, columnType);
+        var row = dataTable.NewRow();
+        row[columnName] = value;
+        dataTable.Rows.Add(row);
+        var reader = dataTable.CreateDataReader();
+        reader.Read();
+        return reader;
     }
 }
