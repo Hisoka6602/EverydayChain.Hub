@@ -563,15 +563,7 @@ public class ShardSchemaSynchronizer(
     /// <returns>转换后的 Int32 值。</returns>
     private static int ReadInt32Value(DbDataReader reader, int ordinal)
     {
-        var rawValue = ReadRequiredValue(reader, ordinal, "Int32");
-        try
-        {
-            return Convert.ToInt32(rawValue, CultureInfo.InvariantCulture);
-        }
-        catch (Exception ex)
-        {
-            throw CreateMetadataConversionException(reader, ordinal, rawValue, "Int32", ex);
-        }
+        return ReadMetadataValue<int>(reader, ordinal, rawValue => Convert.ToInt32(rawValue, CultureInfo.InvariantCulture));
     }
 
     /// <summary>
@@ -582,15 +574,7 @@ public class ShardSchemaSynchronizer(
     /// <returns>转换后的 Int16 值。</returns>
     private static short ReadInt16Value(DbDataReader reader, int ordinal)
     {
-        var rawValue = ReadRequiredValue(reader, ordinal, "Int16");
-        try
-        {
-            return Convert.ToInt16(rawValue, CultureInfo.InvariantCulture);
-        }
-        catch (Exception ex)
-        {
-            throw CreateMetadataConversionException(reader, ordinal, rawValue, "Int16", ex);
-        }
+        return ReadMetadataValue<short>(reader, ordinal, rawValue => Convert.ToInt16(rawValue, CultureInfo.InvariantCulture));
     }
 
     /// <summary>
@@ -601,15 +585,7 @@ public class ShardSchemaSynchronizer(
     /// <returns>转换后的 Byte 值。</returns>
     private static byte ReadByteValue(DbDataReader reader, int ordinal)
     {
-        var rawValue = ReadRequiredValue(reader, ordinal, "Byte");
-        try
-        {
-            return Convert.ToByte(rawValue, CultureInfo.InvariantCulture);
-        }
-        catch (Exception ex)
-        {
-            throw CreateMetadataConversionException(reader, ordinal, rawValue, "Byte", ex);
-        }
+        return ReadMetadataValue<byte>(reader, ordinal, rawValue => Convert.ToByte(rawValue, CultureInfo.InvariantCulture));
     }
 
     /// <summary>
@@ -620,8 +596,7 @@ public class ShardSchemaSynchronizer(
     /// <returns>转换后的 Boolean 值。</returns>
     private static bool ReadBooleanValue(DbDataReader reader, int ordinal)
     {
-        var rawValue = ReadRequiredValue(reader, ordinal, "Boolean");
-        try
+        return ReadMetadataValue<bool>(reader, ordinal, rawValue =>
         {
             if (rawValue is bool booleanValue)
             {
@@ -633,8 +608,26 @@ public class ShardSchemaSynchronizer(
             {
                 0 => false,
                 1 => true,
-                _ => throw CreateMetadataConversionException(reader, ordinal, rawValue, "Boolean")
+                _ => throw CreateMetadataConversionException(reader, ordinal, rawValue, typeof(bool).Name)
             };
+        });
+    }
+
+    /// <summary>
+    /// 读取并转换元数据值。
+    /// </summary>
+    /// <param name="reader">数据读取器。</param>
+    /// <param name="ordinal">字段序号。</param>
+    /// <param name="converter">值转换委托。</param>
+    /// <typeparam name="T">目标类型。</typeparam>
+    /// <returns>转换后的值。</returns>
+    private static T ReadMetadataValue<T>(DbDataReader reader, int ordinal, Func<object, T> converter)
+    {
+        var targetTypeName = typeof(T).Name;
+        var rawValue = ReadRequiredValue(reader, ordinal, targetTypeName);
+        try
+        {
+            return converter(rawValue);
         }
         catch (InvalidOperationException)
         {
@@ -642,7 +635,7 @@ public class ShardSchemaSynchronizer(
         }
         catch (Exception ex)
         {
-            throw CreateMetadataConversionException(reader, ordinal, rawValue, "Boolean", ex);
+            throw CreateMetadataConversionException(reader, ordinal, rawValue, targetTypeName, ex);
         }
     }
 
