@@ -621,6 +621,7 @@ public class ShardSchemaSynchronizer(
     /// <param name="converter">值转换委托。</param>
     /// <typeparam name="T">目标类型。</typeparam>
     /// <returns>转换后的值。</returns>
+    /// <exception cref="InvalidOperationException">当字段值为 DBNull 或转换失败时抛出。</exception>
     private static T ReadMetadataValue<T>(DbDataReader reader, int ordinal, Func<object, T> converter)
     {
         var targetTypeName = typeof(T).Name;
