@@ -1,5 +1,6 @@
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Infrastructure.Services;
+using EverydayChain.Hub.Tests.Services.Sharding;
 
 namespace EverydayChain.Hub.Tests.Services;
 
@@ -59,5 +60,32 @@ public class AutoMigrationServiceTests
             existingCoreTableCount);
 
         Assert.False(shouldMark);
+    }
+
+    /// <summary>
+    /// 启动迁移链路应先预建分表，再同步历史分表结构。
+    /// </summary>
+    [Fact]
+    public async Task ExecuteShardMaintenanceAsync_ShouldProvisionBeforeSynchronize()
+    {
+        var provisioner = new RecordingShardTableProvisioner();
+        var synchronizer = new RecordingShardSchemaSynchronizer();
+        var logger = new TestLogger<AutoMigrationService>();
+
+        await AutoMigrationService.ExecuteShardMaintenanceAsync(
+            provisioner,
+            synchronizer,
+            logger,
+            ["_202604", "_202605"],
+            CancellationToken.None);
+
+        Assert.Equal(["_202604", "_202605"], provisioner.EnsuredSuffixes);
+        Assert.Equal(1, synchronizer.SynchronizeAllCallCount);
+        Assert.Collection(
+            logger.Logs.Select(entry => entry.Message),
+            message => Assert.Contains("开始预创建启动期分表", message, StringComparison.Ordinal),
+            message => Assert.Contains("启动期分表预创建已完成", message, StringComparison.Ordinal),
+            message => Assert.Contains("开始同步历史分表结构", message, StringComparison.Ordinal),
+            message => Assert.Contains("历史分表结构同步已完成", message, StringComparison.Ordinal));
     }
 }

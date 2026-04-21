@@ -32,6 +32,8 @@ using EverydayChain.Hub.Application.Abstractions.Integrations;
 using EverydayChain.Hub.Application.Recirculation.Abstractions;
 using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Queries;
+using EverydayChain.Hub.Application.Abstractions.Infrastructure;
+using EverydayChain.Hub.Infrastructure.Services.Sharding;
 
 namespace EverydayChain.Hub.Infrastructure.DependencyInjection;
 
@@ -103,6 +105,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IReadOnlyList<string>>(managedLogicalTables);
         services.AddSingleton<IReadOnlyList<RetentionLogTableOptions>>(retentionJobOptions.LogTables);
         services.AddSingleton<IShardTableProvisioner, ShardTableProvisioner>();
+        services.AddSingleton<IShardSchemaSynchronizer, ShardSchemaSynchronizer>();
         services.AddScoped<IAutoMigrationService, AutoMigrationService>();
         services.AddSingleton<ISortingTaskTraceWriter, SortingTaskTraceWriter>();
         services.AddSingleton<ISyncTaskConfigRepository, SyncTaskConfigRepository>();

@@ -3,6 +3,7 @@ using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Infrastructure.DependencyInjection;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
+using EverydayChain.Hub.Application.Abstractions.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +30,7 @@ public class ServiceCollectionExtensionsTests
             .Build();
         var services = new ServiceCollection();
 
+        services.AddLogging();
         services.AddInfrastructure(configuration);
         using var provider = services.BuildServiceProvider();
         var dbContextFactory = provider.GetRequiredService<IDbContextFactory<HubDbContext>>();
@@ -48,6 +50,29 @@ public class ServiceCollectionExtensionsTests
 
         Assert.Equal("business_tasks_202604", firstTableName);
         Assert.Equal("business_tasks_202605", secondTableName);
+    }
+
+    /// <summary>
+    /// AddInfrastructure 应注册分表结构同步抽象。
+    /// </summary>
+    [Fact]
+    public void AddInfrastructure_ShouldRegisterShardSchemaSynchronizer()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Sharding:ConnectionString"] = "Server=mock;Database=mock;User Id=mock;Password=mock;Encrypt=false;TrustServerCertificate=true;"
+            })
+            .Build();
+        var services = new ServiceCollection();
+
+        services.AddLogging();
+        services.AddInfrastructure(configuration);
+        using var provider = services.BuildServiceProvider();
+
+        var synchronizer = provider.GetRequiredService<IShardSchemaSynchronizer>();
+
+        Assert.NotNull(synchronizer);
     }
 
     /// <summary>

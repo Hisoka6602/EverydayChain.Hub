@@ -1,18 +1,17 @@
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
+using EverydayChain.Hub.Infrastructure.Services.Sharding;
+using EverydayChain.Hub.Infrastructure.Services.Sharding.Metadata;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using EverydayChain.Hub.SharedKernel.Utilities;
 
 namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// 分表预置服务实现，在 SQL Server 中按需创建分表与索引。
+/// 分表预置服务实现，在 SQL Server 中按需首次创建新分表与索引。
 /// </summary>
 public class ShardTableProvisioner(
     IOptions<ShardingOptions> options,
@@ -23,14 +22,18 @@ public class ShardTableProvisioner(
 {
     /// <summary>分表预建 DDL 命令超时秒数（危险动作隔离器）。</summary>
     private const int ProvisionCommandTimeoutSeconds = 30;
+
     /// <summary>分表配置快照。</summary>
     private readonly ShardingOptions _options = options.Value;
+
     /// <summary>纳管逻辑表列表。</summary>
-    private readonly IReadOnlyList<string> _managedLogicalTables = ValidateManagedLogicalTables(managedLogicalTables);
+    private readonly IReadOnlyList<string> _managedLogicalTables = ShardSchemaTemplateBuilder.ValidateManagedLogicalTables(managedLogicalTables);
+
     /// <summary>分表预建并发上限。</summary>
     private readonly int _preProvisionMaxConcurrency = NormalizePreProvisionConcurrency(options.Value.PreProvisionMaxConcurrency);
+
     /// <summary>按逻辑表缓存的实体结构模板。</summary>
-    private readonly IReadOnlyDictionary<string, TableTemplate> _tableTemplates = BuildTableTemplates(dbContextFactory, managedLogicalTables);
+    private readonly IReadOnlyDictionary<string, ShardTableSchemaTemplate> _tableTemplates = ShardSchemaTemplateBuilder.BuildTableTemplates(dbContextFactory, managedLogicalTables);
 
     /// <inheritdoc/>
     public async Task EnsureShardTablesAsync(IEnumerable<string> suffixes, CancellationToken cancellationToken)
@@ -81,16 +84,17 @@ public class ShardTableProvisioner(
             var fullName = $"[{_options.Schema}].[{tableName}]";
             var template = ResolveTableTemplate(logicalTable);
 
-            // 生成幂等建表 DDL：按逻辑表对应实体模型创建字段与索引。
+            // 步骤1：基于当前 EF 模型快照生成建表 SQL。
             var sql = BuildCreateTableSql(template, tableName, fullName);
 
+            // 步骤2：执行幂等建表 DDL，仅负责首次建表，不处理历史分表升级。
             await using var connection = new SqlConnection(_options.ConnectionString);
             await connection.OpenAsync(token);
             await using var command = connection.CreateCommand();
             command.CommandText = sql;
             command.CommandTimeout = ProvisionCommandTimeoutSeconds;
             await command.ExecuteNonQueryAsync(token);
-            logger.LogInformation("分表自治: 已确认分表存在 {Table}", fullName);
+            logger.LogInformation("分表预建: 已确认新分表存在 {Table}。该服务仅负责首次建表，不负责历史分表结构升级。", fullName);
         },
         cancellationToken);
 
@@ -101,7 +105,7 @@ public class ShardTableProvisioner(
     /// <param name="tableName">目标表名。</param>
     /// <param name="fullName">Schema 全限定名。</param>
     /// <returns>建表 SQL。</returns>
-    internal string BuildCreateTableSql(TableTemplate template, string tableName, string fullName)
+    internal string BuildCreateTableSql(ShardTableSchemaTemplate template, string tableName, string fullName)
     {
         var columnDefinitions = string.Join(
             "," + Environment.NewLine,
@@ -127,89 +131,11 @@ END";
     }
 
     /// <summary>
-    /// 校验并冻结纳管逻辑表集合，防止运行时注入非法标识符。
-    /// </summary>
-    /// <param name="managedLogicalTables">待校验逻辑表集合。</param>
-    /// <returns>校验通过的只读逻辑表列表。</returns>
-    /// <exception cref="InvalidOperationException">存在空值或非法标识符时抛出。</exception>
-    private static IReadOnlyList<string> ValidateManagedLogicalTables(IReadOnlyList<string> managedLogicalTables)
-    {
-        ArgumentNullException.ThrowIfNull(managedLogicalTables);
-        if (managedLogicalTables.Count == 0)
-        {
-            throw new InvalidOperationException("分表配置无效：纳管逻辑表集合为空，无法执行分表预建。");
-        }
-
-        foreach (var logicalTable in managedLogicalTables)
-        {
-            if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(logicalTable))
-            {
-                throw new InvalidOperationException($"分表配置无效：逻辑表名 '{logicalTable}' 非法，仅允许字母、数字、下划线。");
-            }
-        }
-
-        return managedLogicalTables;
-    }
-
-    /// <summary>
-    /// 基于 EF 实体模型构建逻辑表模板缓存。
-    /// </summary>
-    /// <param name="dbContextFactory">DbContext 工厂。</param>
-    /// <param name="managedLogicalTables">纳管逻辑表集合。</param>
-    /// <returns>逻辑表模板字典。</returns>
-    internal static IReadOnlyDictionary<string, TableTemplate> BuildTableTemplates(
-        IDbContextFactory<HubDbContext> dbContextFactory,
-        IReadOnlyList<string> managedLogicalTables)
-    {
-        ArgumentNullException.ThrowIfNull(dbContextFactory);
-        var result = new Dictionary<string, TableTemplate>(StringComparer.OrdinalIgnoreCase);
-
-        using var _ = TableSuffixScope.Use(string.Empty);
-        using var dbContext = dbContextFactory.CreateDbContext();
-        var model = dbContext.Model;
-        foreach (var logicalTable in managedLogicalTables)
-        {
-            var entityType = model
-                .GetEntityTypes()
-                .FirstOrDefault(entity => string.Equals(entity.GetTableName(), logicalTable, StringComparison.OrdinalIgnoreCase));
-            if (entityType is null)
-            {
-                throw new InvalidOperationException($"分表配置无效：逻辑表名 '{logicalTable}' 未找到对应实体模型映射。");
-            }
-
-            var tableIdentifier = StoreObjectIdentifier.Table(entityType.GetTableName()!, entityType.GetSchema());
-            var columns = entityType
-                .GetProperties()
-                .Select(property => new ColumnTemplate(
-                    property.GetColumnName(tableIdentifier) ?? property.Name,
-                    ResolveStoreType(property),
-                    property.IsNullable,
-                    IsIdentity(property)))
-                .ToList();
-            var primaryKeyColumns = entityType.FindPrimaryKey()?.Properties
-                .Select(property => property.GetColumnName(tableIdentifier) ?? property.Name)
-                .ToList() ?? [];
-            var indexes = entityType
-                .GetIndexes()
-                .Select(index => new IndexTemplate(
-                    index.GetDatabaseName() ?? $"IX_{entityType.GetTableName()}_{string.Join("_", index.Properties.Select(property => property.Name))}",
-                    index.IsUnique,
-                    index.Properties.Select(property => property.GetColumnName(tableIdentifier) ?? property.Name).ToList()))
-                .Where(index => index.ColumnNames.Count > 0)
-                .ToList();
-
-            result[logicalTable] = new TableTemplate(logicalTable, columns, primaryKeyColumns, indexes);
-        }
-
-        return result;
-    }
-
-    /// <summary>
     /// 解析逻辑表对应的模板。
     /// </summary>
     /// <param name="logicalTable">逻辑表名。</param>
     /// <returns>实体结构模板。</returns>
-    internal TableTemplate ResolveTableTemplate(string logicalTable)
+    internal ShardTableSchemaTemplate ResolveTableTemplate(string logicalTable)
     {
         if (_tableTemplates.TryGetValue(logicalTable, out var template))
         {
@@ -220,27 +146,11 @@ END";
     }
 
     /// <summary>
-    /// 判断属性是否为自增列。
-    /// </summary>
-    /// <param name="property">实体属性元数据。</param>
-    /// <returns>若为自增列返回 true，否则返回 false。</returns>
-    private static bool IsIdentity(IProperty property)
-    {
-        if (property.ValueGenerated != ValueGenerated.OnAdd)
-        {
-            return false;
-        }
-
-        var underlyingType = Nullable.GetUnderlyingType(property.ClrType) ?? property.ClrType;
-        return underlyingType == typeof(int) || underlyingType == typeof(long);
-    }
-
-    /// <summary>
     /// 构建列定义 SQL 片段。
     /// </summary>
     /// <param name="column">列模板。</param>
     /// <returns>列定义 SQL。</returns>
-    private static string BuildColumnDefinition(ColumnTemplate column)
+    private static string BuildColumnDefinition(ShardColumnSchema column)
     {
         var identitySql = column.IsIdentity ? " IDENTITY(1,1)" : string.Empty;
         var nullabilitySql = column.IsNullable ? " NULL" : " NOT NULL";
@@ -277,35 +187,12 @@ END";
     /// <param name="tableName">表名。</param>
     /// <param name="fullName">Schema 全限定表名。</param>
     /// <returns>索引定义 SQL。</returns>
-    private static string BuildIndexSql(IndexTemplate index, string logicalTable, string tableName, string fullName)
+    private static string BuildIndexSql(ShardIndexSchema index, string logicalTable, string tableName, string fullName)
     {
         var uniqueSql = index.IsUnique ? "UNIQUE " : string.Empty;
-        var indexName = index.DatabaseName.Replace(logicalTable, tableName, StringComparison.OrdinalIgnoreCase);
+        var indexName = ShardSchemaTemplateBuilder.BuildPhysicalIndexName(logicalTable, tableName, index.DatabaseName);
         var columnsSql = string.Join(", ", index.ColumnNames.Select(column => $"[{column}]"));
         return $"    CREATE {uniqueSql}INDEX [{indexName}] ON {fullName}({columnsSql});";
-    }
-
-    /// <summary>
-    /// 解析属性对应的关系型存储类型。
-    /// </summary>
-    /// <param name="property">实体属性元数据。</param>
-    /// <returns>SQL Server 存储类型。</returns>
-    private static string ResolveStoreType(IProperty property)
-    {
-        var configuredStoreType = property.GetColumnType();
-        if (!string.IsNullOrWhiteSpace(configuredStoreType))
-        {
-            return configuredStoreType;
-        }
-
-        var relationalTypeMapping = property.GetRelationalTypeMapping();
-        var storeType = relationalTypeMapping?.StoreType;
-        if (!string.IsNullOrWhiteSpace(storeType))
-        {
-            return storeType;
-        }
-
-        throw new InvalidOperationException($"分表模板解析失败：属性 {property.DeclaringType.DisplayName()}.{property.Name} 缺少可识别的 SQL 类型映射。");
     }
 
     /// <summary>
@@ -339,35 +226,4 @@ END";
             semaphore.Release();
         }
     }
-
-    /// <summary>
-    /// 列模板。
-    /// </summary>
-    /// <param name="ColumnName">列名。</param>
-    /// <param name="StoreType">数据库类型。</param>
-    /// <param name="IsNullable">是否可空。</param>
-    /// <param name="IsIdentity">是否自增。</param>
-    internal readonly record struct ColumnTemplate(string ColumnName, string StoreType, bool IsNullable, bool IsIdentity);
-
-    /// <summary>
-    /// 索引模板。
-    /// </summary>
-    /// <param name="DatabaseName">索引名。</param>
-    /// <param name="IsUnique">是否唯一。</param>
-    /// <param name="ColumnNames">索引列集合。</param>
-    internal readonly record struct IndexTemplate(string DatabaseName, bool IsUnique, IReadOnlyList<string> ColumnNames);
-
-    /// <summary>
-    /// 逻辑表模板。
-    /// </summary>
-    /// <param name="LogicalTable">逻辑表名。</param>
-    /// <param name="Columns">列集合。</param>
-    /// <param name="PrimaryKeyColumns">主键列集合。</param>
-    /// <param name="Indexes">索引集合。</param>
-    internal readonly record struct TableTemplate(
-        string LogicalTable,
-        IReadOnlyList<ColumnTemplate> Columns,
-        IReadOnlyList<string> PrimaryKeyColumns,
-        IReadOnlyList<IndexTemplate> Indexes);
-
 }
