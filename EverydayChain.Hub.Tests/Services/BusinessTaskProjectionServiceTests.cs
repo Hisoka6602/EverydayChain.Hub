@@ -29,6 +29,11 @@ public class BusinessTaskProjectionServiceTests
                     WaveCode = "W1",
                     WaveRemark = "R1",
                     WorkingArea = "1",
+                    OrderId = "ORDER-001",
+                    StoreId = "STORE-001",
+                    StoreName = "Store Name",
+                    ProductCode = "SKU-001",
+                    PickLocation = "LOC-001",
                     ProjectedTimeLocal = new DateTime(2026, 4, 20, 10, 30, 0, DateTimeKind.Local)
                 }
             ]
@@ -42,6 +47,11 @@ public class BusinessTaskProjectionServiceTests
         Assert.Equal("CARTON001", entity.BusinessKey);
         Assert.Equal(BusinessTaskSourceType.Split, entity.SourceType);
         Assert.Equal("1", entity.WorkingArea);
+        Assert.Equal("ORDER-001", entity.OrderId);
+        Assert.Equal("STORE-001", entity.StoreId);
+        Assert.Equal("Store Name", entity.StoreName);
+        Assert.Equal("SKU-001", entity.ProductCode);
+        Assert.Equal("LOC-001", entity.PickLocation);
     }
 
     /// <summary>

@@ -1,6 +1,9 @@
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Domain.Aggregates.ScanLogAggregate;
 using EverydayChain.Hub.Domain.Enums;
+using Microsoft.Extensions.Logging;
 
 namespace EverydayChain.Hub.Application.Services;
 
@@ -17,15 +20,23 @@ public sealed class ScanIngressService : IScanIngressService {
     /// 任务执行服务。
     /// </summary>
     private readonly ITaskExecutionService _taskExecutionService;
+    private readonly IScanLogRepository _scanLogRepository;
+    private readonly ILogger<ScanIngressService> _logger;
 
     /// <summary>
     /// 初始化扫描上传应用服务。
     /// </summary>
     /// <param name="barcodeParser">条码解析服务。</param>
     /// <param name="taskExecutionService">任务执行服务。</param>
-    public ScanIngressService(IBarcodeParser barcodeParser, ITaskExecutionService taskExecutionService) {
+    public ScanIngressService(
+        IBarcodeParser barcodeParser,
+        ITaskExecutionService taskExecutionService,
+        IScanLogRepository scanLogRepository,
+        ILogger<ScanIngressService> logger) {
         _barcodeParser = barcodeParser;
         _taskExecutionService = taskExecutionService;
+        _scanLogRepository = scanLogRepository;
+        _logger = logger;
     }
 
     /// <summary>
@@ -39,6 +50,17 @@ public sealed class ScanIngressService : IScanIngressService {
         var parseResult = _barcodeParser.Parse(request.Barcode);
         var barcodeType = parseResult.BarcodeType.ToString();
         if (!parseResult.IsValid) {
+            await WriteScanLogSilentlyAsync(
+                request.Barcode,
+                request.DeviceCode,
+                false,
+                string.IsNullOrWhiteSpace(parseResult.FailureMessage)
+                    ? ConvertFailureReasonToCode(parseResult.FailureReason)
+                    : parseResult.FailureMessage,
+                request.TraceId,
+                request.ScanTimeLocal,
+                cancellationToken);
+
             return new ScanUploadApplicationResult {
                 IsAccepted = false,
                 TaskCode = string.Empty,
@@ -94,5 +116,37 @@ public sealed class ScanIngressService : IScanIngressService {
             BarcodeParseFailureReason.ParseError => nameof(BarcodeParseFailureReason.ParseError),
             _ => string.Empty
         };
+    }
+
+    private async Task WriteScanLogSilentlyAsync(
+        string barcode,
+        string? deviceCode,
+        bool isMatched,
+        string? failureReason,
+        string? traceId,
+        DateTime scanTimeLocal,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _scanLogRepository.SaveAsync(new ScanLogEntity
+            {
+                Barcode = string.IsNullOrWhiteSpace(barcode) ? string.Empty : barcode.Trim(),
+                DeviceCode = string.IsNullOrWhiteSpace(deviceCode) ? null : deviceCode.Trim(),
+                IsMatched = isMatched,
+                FailureReason = failureReason,
+                TraceId = string.IsNullOrWhiteSpace(traceId) ? null : traceId.Trim(),
+                ScanTimeLocal = scanTimeLocal,
+                CreatedTimeLocal = DateTime.Now
+            }, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Scan parse failure log write failed. BarcodeLength={BarcodeLength}", barcode?.Length ?? 0);
+        }
     }
 }

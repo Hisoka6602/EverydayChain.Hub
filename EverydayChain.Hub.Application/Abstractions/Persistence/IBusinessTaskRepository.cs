@@ -42,6 +42,8 @@ public interface IBusinessTaskRepository
     /// <returns>业务任务实体或 <c>null</c>。</returns>
     Task<BusinessTaskEntity?> FindByIdAsync(long id, CancellationToken ct);
 
+    Task<IReadOnlyDictionary<long, BusinessTaskEntity>> GetByIdsAsync(IReadOnlyCollection<long> ids, CancellationToken ct);
+
     /// <summary>
     /// 新增业务任务并持久化。
     /// </summary>
@@ -129,6 +131,8 @@ public interface IBusinessTaskRepository
     /// <returns>命中的业务任务列表。</returns>
     Task<IReadOnlyList<BusinessTaskEntity>> FindByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct);
 
+    Task<BusinessTaskEntity?> FindLatestScannedWithWaveByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct);
+
     /// <summary>
     /// 按创建时间区间聚合总看板所需的波次统计数据（左闭右开）。
     /// 聚合在仓储侧优先完成，应用层仅做最终口径拼装。
@@ -196,6 +200,12 @@ public interface IBusinessTaskRepository
         DateTime endTimeLocal,
         string? waveCode,
         string? dockCode,
+        CancellationToken ct);
+
+    Task<IReadOnlyList<BusinessTaskRecirculationAggregateRow>> AggregateRecirculationSummaryAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        string? chuteCode,
         CancellationToken ct);
 
     /// <summary>

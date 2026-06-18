@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkxi_an_wkr_dashboard=self.webpackChunkxi_an_wkr_dashboard||[]).push([[858],{92601:function(s,a,n){n.r(a),n.d(a,{default:function(){return d}});var u=n(86610),t=n(44194);function d(){var o=(0,u.useNavigate)();return(0,t.useEffect)(function(){o("/demo".concat(window.location.search))},[]),null}}}]);

@@ -56,6 +56,14 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
         return Task.FromResult(task);
     }
 
+    public Task<IReadOnlyDictionary<long, BusinessTaskEntity>> GetByIdsAsync(IReadOnlyCollection<long> ids, CancellationToken ct)
+    {
+        IReadOnlyDictionary<long, BusinessTaskEntity> result = _tasks
+            .Where(task => ids.Contains(task.Id))
+            .ToDictionary(task => task.Id);
+        return Task.FromResult(result);
+    }
+
     /// <inheritdoc/>
     public Task SaveAsync(BusinessTaskEntity entity, CancellationToken ct)
     {
@@ -83,6 +91,11 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
         existing.WaveCode = entity.WaveCode;
         existing.WaveRemark = entity.WaveRemark;
         existing.WorkingArea = entity.WorkingArea;
+        existing.OrderId = entity.OrderId;
+        existing.StoreId = entity.StoreId;
+        existing.StoreName = entity.StoreName;
+        existing.ProductCode = entity.ProductCode;
+        existing.PickLocation = entity.PickLocation;
         existing.UpdatedTimeLocal = entity.UpdatedTimeLocal;
         await UpdateAsync(existing, ct);
     }
@@ -192,6 +205,19 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     }
 
     /// <inheritdoc/>
+    public Task<BusinessTaskEntity?> FindLatestScannedWithWaveByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
+    {
+        var result = _tasks
+            .Where(task => task.CreatedTimeLocal >= startTimeLocal && task.CreatedTimeLocal < endTimeLocal)
+            .Where(task => task.ScannedAtLocal.HasValue && !string.IsNullOrWhiteSpace(task.WaveCode))
+            .OrderByDescending(task => task.ScannedAtLocal)
+            .ThenByDescending(task => task.UpdatedTimeLocal)
+            .ThenByDescending(task => task.Id)
+            .FirstOrDefault();
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
     public Task<IReadOnlyList<BusinessTaskWaveAggregateRow>> AggregateWaveDashboardAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
     {
         IReadOnlyList<BusinessTaskWaveAggregateRow> result = _tasks
@@ -210,7 +236,8 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
                 RecirculatedCount = group.Count(task => _queryPolicy.IsRecirculatedByResolvedDockCode(task.ResolvedDockCode)),
                 ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception),
                 TotalVolumeMm3 = group.Sum(task => task.VolumeMm3 ?? 0M),
-                TotalWeightGram = group.Sum(task => task.WeightGram ?? 0M)
+                TotalWeightGram = group.Sum(task => task.WeightGram ?? 0M),
+                EarliestCreatedTimeLocal = group.Min(task => task.CreatedTimeLocal)
             })
             .OrderBy(row => row.WaveCode, StringComparer.Ordinal)
             .ToList();
@@ -337,6 +364,39 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
                 ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception)
             })
             .OrderBy(row => row.DockCode, StringComparer.Ordinal)
+            .ToList();
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<BusinessTaskRecirculationAggregateRow>> AggregateRecirculationSummaryAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        string? chuteCode,
+        CancellationToken ct)
+    {
+        var query = _tasks
+            .Where(task => task.CreatedTimeLocal >= startTimeLocal && task.CreatedTimeLocal < endTimeLocal)
+            .Where(task => _queryPolicy.IsRecirculatedByResolvedDockCode(task.ResolvedDockCode));
+        if (!string.IsNullOrWhiteSpace(chuteCode))
+        {
+            query = query.Where(task => string.Equals(ResolveDockCode(task), chuteCode.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+
+        IReadOnlyList<BusinessTaskRecirculationAggregateRow> result = query
+            .GroupBy(task => new
+            {
+                ChuteCode = ResolveDockCode(task),
+                WaveCode = NormalizeWaveCode(task.WaveCode)
+            })
+            .Select(group => new BusinessTaskRecirculationAggregateRow
+            {
+                ChuteCode = group.Key.ChuteCode,
+                WaveCode = group.Key.WaveCode,
+                RecirculatedCount = group.Count()
+            })
+            .OrderBy(row => row.ChuteCode, StringComparer.Ordinal)
+            .ThenBy(row => row.WaveCode, StringComparer.Ordinal)
             .ToList();
         return Task.FromResult(result);
     }

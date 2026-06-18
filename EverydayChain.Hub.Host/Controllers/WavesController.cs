@@ -4,23 +4,52 @@ using EverydayChain.Hub.Host.Contracts.Responses;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using System.Text;
 
 namespace EverydayChain.Hub.Host.Controllers;
 
-/// <summary>
-/// 波次查询控制器，提供波次选项、波次摘要与波次分区明细查询能力。
-/// </summary>
 [ApiController]
 [Route("api/v1/waves")]
 public sealed class WavesController(IWaveQueryService waveQueryService) : QueryControllerBase
 {
-    /// <summary>
-    /// 查询时间区间内的波次选项。
-    /// </summary>
-    /// <param name="request">请求体查询请求。</param>
-    /// <param name="queryRequest">查询字符串请求。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>波次选项结果。</returns>
+    private static readonly UTF8Encoding Utf8EncodingWithBom = new(true);
+
+    [HttpPost("current")]
+    [ProducesResponseType(typeof(ApiResponse<CurrentWaveResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<CurrentWaveResponse>), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ApiResponse<CurrentWaveResponse>>> QueryCurrentAsync(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] CurrentWaveQueryRequest? request,
+        [FromQuery] CurrentWaveQueryRequest? queryRequest,
+        CancellationToken cancellationToken)
+    {
+        var resolvedRequest = ResolveRequest(request, queryRequest);
+        if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
+                resolvedRequest.StartTimeLocal,
+                resolvedRequest.EndTimeLocal,
+                out var normalizedStart,
+                out var normalizedEnd,
+                out var validationMessage))
+        {
+            return BadRequest(ApiResponse<CurrentWaveResponse>.Fail(validationMessage));
+        }
+
+        var result = await waveQueryService.QueryCurrentAsync(new EverydayChain.Hub.Application.Models.CurrentWaveQueryRequest
+        {
+            StartTimeLocal = normalizedStart,
+            EndTimeLocal = normalizedEnd
+        }, cancellationToken);
+        var response = new CurrentWaveResponse
+        {
+            StartTimeLocal = result.StartTimeLocal,
+            EndTimeLocal = result.EndTimeLocal,
+            WaveCode = result.WaveCode,
+            WaveRemark = result.WaveRemark,
+            Barcode = result.Barcode,
+            ScanTimeLocal = result.ScanTimeLocal
+        };
+        return Ok(ApiResponse<CurrentWaveResponse>.Success(response, "Current wave query succeeded."));
+    }
+
     [HttpPost("options")]
     [ProducesResponseType(typeof(ApiResponse<WaveOptionsResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<WaveOptionsResponse>), StatusCodes.Status400BadRequest)]
@@ -57,16 +86,9 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
                 })
                 .ToList()
         };
-        return Ok(ApiResponse<WaveOptionsResponse>.Success(response, "波次选项查询成功。"));
+        return Ok(ApiResponse<WaveOptionsResponse>.Success(response, "Wave options query succeeded."));
     }
 
-    /// <summary>
-    /// 查询单个波次摘要。
-    /// </summary>
-    /// <param name="request">请求体查询请求。</param>
-    /// <param name="queryRequest">查询字符串请求。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>波次摘要结果。</returns>
     [HttpPost("summary")]
     [ProducesResponseType(typeof(ApiResponse<WaveSummaryResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<WaveSummaryResponse>), StatusCodes.Status400BadRequest)]
@@ -88,7 +110,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
 
         if (string.IsNullOrWhiteSpace(resolvedRequest.WaveCode))
         {
-            return BadRequest(ApiResponse<WaveSummaryResponse>.Fail("WaveCode 不能为空白。"));
+            return BadRequest(ApiResponse<WaveSummaryResponse>.Fail("WaveCode cannot be empty."));
         }
 
         var result = await waveQueryService.QuerySummaryAsync(new EverydayChain.Hub.Application.Models.WaveSummaryQueryRequest
@@ -99,7 +121,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         }, cancellationToken);
         if (result is null)
         {
-            return BadRequest(ApiResponse<WaveSummaryResponse>.Fail($"未找到波次 [{resolvedRequest.WaveCode.Trim()}] 在指定时间范围内的数据。"));
+            return BadRequest(ApiResponse<WaveSummaryResponse>.Fail($"Wave [{resolvedRequest.WaveCode.Trim()}] was not found in the selected range."));
         }
 
         var response = new WaveSummaryResponse
@@ -112,16 +134,9 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
             RecirculatedCount = result.RecirculatedCount,
             ExceptionCount = result.ExceptionCount
         };
-        return Ok(ApiResponse<WaveSummaryResponse>.Success(response, "波次摘要查询成功。"));
+        return Ok(ApiResponse<WaveSummaryResponse>.Success(response, "Wave summary query succeeded."));
     }
 
-    /// <summary>
-    /// 查询单个波次分区明细。
-    /// </summary>
-    /// <param name="request">请求体查询请求。</param>
-    /// <param name="queryRequest">查询字符串请求。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>波次分区结果。</returns>
     [HttpPost("zones")]
     [ProducesResponseType(typeof(ApiResponse<WaveZoneResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<WaveZoneResponse>), StatusCodes.Status400BadRequest)]
@@ -143,7 +158,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
 
         if (string.IsNullOrWhiteSpace(resolvedRequest.WaveCode))
         {
-            return BadRequest(ApiResponse<WaveZoneResponse>.Fail("WaveCode 不能为空白。"));
+            return BadRequest(ApiResponse<WaveZoneResponse>.Fail("WaveCode cannot be empty."));
         }
 
         var result = await waveQueryService.QueryZonesAsync(new EverydayChain.Hub.Application.Models.WaveZoneQueryRequest
@@ -154,7 +169,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         }, cancellationToken);
         if (result is null)
         {
-            return BadRequest(ApiResponse<WaveZoneResponse>.Fail($"未找到波次 [{resolvedRequest.WaveCode.Trim()}] 在指定时间范围内的数据。"));
+            return BadRequest(ApiResponse<WaveZoneResponse>.Fail($"Wave [{resolvedRequest.WaveCode.Trim()}] was not found in the selected range."));
         }
 
         var response = new WaveZoneResponse
@@ -174,6 +189,122 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
                 })
                 .ToList()
         };
-        return Ok(ApiResponse<WaveZoneResponse>.Success(response, "波次分区明细查询成功。"));
+        return Ok(ApiResponse<WaveZoneResponse>.Success(response, "Wave zone query succeeded."));
+    }
+
+    [HttpPost("zones/export/csv")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> ExportZonesCsvAsync(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] WaveZoneQueryRequest? request,
+        [FromQuery] WaveZoneQueryRequest? queryRequest,
+        CancellationToken cancellationToken)
+    {
+        var resolvedRequest = ResolveRequest(request, queryRequest);
+        if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
+                resolvedRequest.StartTimeLocal,
+                resolvedRequest.EndTimeLocal,
+                out var normalizedStart,
+                out var normalizedEnd,
+                out var validationMessage))
+        {
+            return BadRequest(ApiResponse<object>.Fail(validationMessage));
+        }
+
+        if (string.IsNullOrWhiteSpace(resolvedRequest.WaveCode))
+        {
+            return BadRequest(ApiResponse<object>.Fail("WaveCode cannot be empty."));
+        }
+
+        var csvContent = await waveQueryService.ExportZonesCsvAsync(new EverydayChain.Hub.Application.Models.WaveZoneQueryRequest
+        {
+            StartTimeLocal = normalizedStart,
+            EndTimeLocal = normalizedEnd,
+            WaveCode = resolvedRequest.WaveCode.Trim()
+        }, cancellationToken);
+        var fileName = $"wave-zone-detail-{DateTimeOffset.Now.LocalDateTime:yyyyMMddHHmmss}.csv";
+        return File(BuildUtf8BomCsvBytes(csvContent), "text/csv; charset=utf-8", fileName);
+    }
+
+    [HttpPost("list")]
+    [ProducesResponseType(typeof(ApiResponse<WaveListResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<WaveListResponse>), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ApiResponse<WaveListResponse>>> QueryListAsync(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] WaveListQueryRequest? request,
+        [FromQuery] WaveListQueryRequest? queryRequest,
+        CancellationToken cancellationToken)
+    {
+        var resolvedRequest = ResolveRequest(request, queryRequest);
+        if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
+                resolvedRequest.StartTimeLocal,
+                resolvedRequest.EndTimeLocal,
+                out var normalizedStart,
+                out var normalizedEnd,
+                out var validationMessage))
+        {
+            return BadRequest(ApiResponse<WaveListResponse>.Fail(validationMessage));
+        }
+
+        var result = await waveQueryService.QueryListAsync(new EverydayChain.Hub.Application.Models.WaveListQueryRequest
+        {
+            StartTimeLocal = normalizedStart,
+            EndTimeLocal = normalizedEnd
+        }, cancellationToken);
+        var response = new WaveListResponse
+        {
+            StartTimeLocal = result.StartTimeLocal,
+            EndTimeLocal = result.EndTimeLocal,
+            Items = result.Items
+                .Select(item => new WaveListItemResponse
+                {
+                    WaveId = item.WaveCode,
+                    Remark = item.WaveRemark,
+                    PackageTotal = item.PackageTotal,
+                    SplitTotal = item.SplitTotal,
+                    FullTotal = item.FullCaseTotal,
+                    CreatedAt = item.CreatedTimeLocal,
+                    Status = item.Status
+                })
+                .ToList()
+        };
+        return Ok(ApiResponse<WaveListResponse>.Success(response, "Wave list query succeeded."));
+    }
+
+    [HttpPost("list/export/csv")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> ExportListCsvAsync(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] WaveListQueryRequest? request,
+        [FromQuery] WaveListQueryRequest? queryRequest,
+        CancellationToken cancellationToken)
+    {
+        var resolvedRequest = ResolveRequest(request, queryRequest);
+        if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
+                resolvedRequest.StartTimeLocal,
+                resolvedRequest.EndTimeLocal,
+                out var normalizedStart,
+                out var normalizedEnd,
+                out var validationMessage))
+        {
+            return BadRequest(ApiResponse<object>.Fail(validationMessage));
+        }
+
+        var csvContent = await waveQueryService.ExportListCsvAsync(new EverydayChain.Hub.Application.Models.WaveListQueryRequest
+        {
+            StartTimeLocal = normalizedStart,
+            EndTimeLocal = normalizedEnd
+        }, cancellationToken);
+        var fileName = $"wave-list-{DateTimeOffset.Now.LocalDateTime:yyyyMMddHHmmss}.csv";
+        return File(BuildUtf8BomCsvBytes(csvContent), "text/csv; charset=utf-8", fileName);
+    }
+
+    private static byte[] BuildUtf8BomCsvBytes(string csvContent)
+    {
+        var preamble = Utf8EncodingWithBom.GetPreamble();
+        var contentBytes = Utf8EncodingWithBom.GetBytes(csvContent);
+        var bytes = new byte[preamble.Length + contentBytes.Length];
+        Buffer.BlockCopy(preamble, 0, bytes, 0, preamble.Length);
+        Buffer.BlockCopy(contentBytes, 0, bytes, preamble.Length, contentBytes.Length);
+        return bytes;
     }
 }

@@ -168,6 +168,36 @@ public class SyncTaskConfigRepositoryTests
         Assert.Equal("WAVENO", definition.WaveCodeColumn);
         Assert.Equal("DESCR", definition.WaveRemarkColumn);
         Assert.Equal("WORKINGAREA", definition.WorkingAreaColumn);
+        Assert.Null(definition.OrderIdColumn);
+        Assert.Null(definition.StoreIdColumn);
+        Assert.Null(definition.StoreNameColumn);
+        Assert.Null(definition.ProductCodeColumn);
+        Assert.Null(definition.PickLocationColumn);
+    }
+
+    [Fact]
+    public async Task GetByTableCodeAsync_WhenExtendedProjectionColumnsConfigured_ShouldMapExtendedProjectionColumns()
+    {
+        var options = BuildOptions(table =>
+        {
+            table.SourceType = nameof(BusinessTaskSourceType.FullCase);
+            table.BusinessKeyColumn = "  SKUID  ";
+            table.OrderIdColumn = "  DOCNO  ";
+            table.StoreIdColumn = "  CONSIGNEEID  ";
+            table.StoreNameColumn = "  MENDIAN  ";
+            table.ProductCodeColumn = "  SKU  ";
+            table.PickLocationColumn = "  LOCATION  ";
+        });
+        var logger = new TestLogger<SyncTaskConfigRepository>();
+        var repository = new SyncTaskConfigRepository(Options.Create(options), logger);
+
+        var definition = await repository.GetByTableCodeAsync("T1", CancellationToken.None);
+
+        Assert.Equal("DOCNO", definition.OrderIdColumn);
+        Assert.Equal("CONSIGNEEID", definition.StoreIdColumn);
+        Assert.Equal("MENDIAN", definition.StoreNameColumn);
+        Assert.Equal("SKU", definition.ProductCodeColumn);
+        Assert.Equal("LOCATION", definition.PickLocationColumn);
     }
 
     /// <summary>

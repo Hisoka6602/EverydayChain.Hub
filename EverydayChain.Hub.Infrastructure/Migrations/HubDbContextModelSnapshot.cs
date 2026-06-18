@@ -86,6 +86,18 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
+                    b.Property<string>("OrderId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("PickLocation")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("ProductCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<string>("ResolvedDockCode")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -110,6 +122,14 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
+
+                    b.Property<string>("StoreId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("StoreName")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
 
                     b.Property<string>("TargetChuteCode")
                         .HasMaxLength(64)
@@ -193,8 +213,6 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     b.HasIndex("Barcode", "CreatedTimeLocal");
 
-                    b.HasIndex("NormalizedBarcode", "CreatedTimeLocal");
-
                     b.HasIndex("CreatedTimeLocal", "Id");
 
                     b.HasIndex("CreatedTimeLocal", "NormalizedWaveCode");
@@ -202,6 +220,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                     b.HasIndex("CreatedTimeLocal", "ResolvedDockCode");
 
                     b.HasIndex("FeedbackStatus", "CreatedTimeLocal");
+
+                    b.HasIndex("NormalizedBarcode", "CreatedTimeLocal");
 
                     b.HasIndex("NormalizedWaveCode", "CreatedTimeLocal");
 

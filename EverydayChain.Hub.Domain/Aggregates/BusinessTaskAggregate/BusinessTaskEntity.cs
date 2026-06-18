@@ -174,6 +174,36 @@ public class BusinessTaskEntity : IEntity<long>
     public string? WorkingArea { get; set; }
 
     /// <summary>
+    /// Upstream order identifier stored for downstream tracking and detail queries.
+    /// </summary>
+    [MaxLength(64)]
+    public string? OrderId { get; set; }
+
+    /// <summary>
+    /// Upstream store identifier stored for downstream tracking and detail queries.
+    /// </summary>
+    [MaxLength(64)]
+    public string? StoreId { get; set; }
+
+    /// <summary>
+    /// Upstream store display name stored for downstream tracking and detail queries.
+    /// </summary>
+    [MaxLength(300)]
+    public string? StoreName { get; set; }
+
+    /// <summary>
+    /// Upstream product code stored when the source table can provide it.
+    /// </summary>
+    [MaxLength(64)]
+    public string? ProductCode { get; set; }
+
+    /// <summary>
+    /// Upstream pick location stored when the source table can provide it.
+    /// </summary>
+    [MaxLength(64)]
+    public string? PickLocation { get; set; }
+
+    /// <summary>
     /// 是否已被标记为回流；由回流规则服务在扫描重试超限时置为 true。
     /// </summary>
     public bool IsRecirculated { get; set; }

@@ -27,6 +27,11 @@ public class BusinessTaskRepositoryProjectionUpsertTests
             WaveCode = "W1",
             WaveRemark = "R1",
             WorkingArea = "1",
+            OrderId = "ORDER-1",
+            StoreId = "STORE-1",
+            StoreName = "Store One",
+            ProductCode = "SKU-1",
+            PickLocation = "LOC-1",
             Status = BusinessTaskStatus.Created,
             CreatedTimeLocal = created,
             UpdatedTimeLocal = created
@@ -42,6 +47,11 @@ public class BusinessTaskRepositoryProjectionUpsertTests
             WaveCode = "W2",
             WaveRemark = "R2",
             WorkingArea = "2",
+            OrderId = "ORDER-2",
+            StoreId = "STORE-2",
+            StoreName = "Store Two",
+            ProductCode = "SKU-2",
+            PickLocation = "LOC-2",
             Status = BusinessTaskStatus.Created,
             CreatedTimeLocal = DateTime.Now,
             UpdatedTimeLocal = DateTime.Now
@@ -53,6 +63,11 @@ public class BusinessTaskRepositoryProjectionUpsertTests
         Assert.Equal("R2", found.WaveRemark);
         Assert.Equal("2", found.WorkingArea);
         Assert.Equal("BK-1", found.TaskCode);
+        Assert.Equal("ORDER-2", found.OrderId);
+        Assert.Equal("STORE-2", found.StoreId);
+        Assert.Equal("Store Two", found.StoreName);
+        Assert.Equal("SKU-2", found.ProductCode);
+        Assert.Equal("LOC-2", found.PickLocation);
     }
 
     /// <summary>

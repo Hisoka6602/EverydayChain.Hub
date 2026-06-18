@@ -14,11 +14,12 @@ public sealed class GlobalDashboardQueryServiceTests
     /// 构建测试服务。
     /// </summary>
     /// <returns>服务与仓储替身。</returns>
-    private static (GlobalDashboardQueryService Service, InMemoryBusinessTaskRepository Repository) CreateService()
+    private static (GlobalDashboardQueryService Service, InMemoryBusinessTaskRepository Repository, InMemoryScanLogRepository ScanLogRepository) CreateService()
     {
         var repository = new InMemoryBusinessTaskRepository();
-        var service = new GlobalDashboardQueryService(repository);
-        return (service, repository);
+        var scanLogRepository = new InMemoryScanLogRepository();
+        var service = new GlobalDashboardQueryService(repository, scanLogRepository);
+        return (service, repository, scanLogRepository);
     }
 
     /// <summary>
@@ -27,7 +28,7 @@ public sealed class GlobalDashboardQueryServiceTests
     [Fact]
     public async Task QueryAsync_ShouldReturnZeroResult_WhenNoTaskExists()
     {
-        var (service, _) = CreateService();
+        var (service, _, _) = CreateService();
         var result = await service.QueryAsync(new GlobalDashboardQueryRequest
         {
             StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 1, 0, 0, 0), DateTimeKind.Local),
@@ -46,7 +47,7 @@ public sealed class GlobalDashboardQueryServiceTests
     [Fact]
     public async Task QueryAsync_ShouldAggregateMetrics_WhenTasksExist()
     {
-        var (service, repository) = CreateService();
+        var (service, repository, scanLogRepository) = CreateService();
         var start = DateTime.SpecifyKind(new DateTime(2026, 4, 1, 0, 0, 0), DateTimeKind.Local);
         var end = DateTime.SpecifyKind(new DateTime(2026, 4, 2, 0, 0, 0), DateTimeKind.Local);
 
@@ -98,6 +99,31 @@ public sealed class GlobalDashboardQueryServiceTests
             WeightGram = 30M,
             CreatedTimeLocal = start.AddMinutes(3),
             UpdatedTimeLocal = start.AddMinutes(3)
+        }, CancellationToken.None);
+
+        await scanLogRepository.SaveAsync(new Domain.Aggregates.ScanLogAggregate.ScanLogEntity
+        {
+            Barcode = "BC-001",
+            IsMatched = true,
+            ScanTimeLocal = start.AddHours(1),
+            CreatedTimeLocal = start.AddHours(1)
+        }, CancellationToken.None);
+
+        await scanLogRepository.SaveAsync(new Domain.Aggregates.ScanLogAggregate.ScanLogEntity
+        {
+            Barcode = "BC-002",
+            IsMatched = false,
+            FailureReason = "not-matched",
+            ScanTimeLocal = start.AddHours(1).AddMinutes(10),
+            CreatedTimeLocal = start.AddHours(1).AddMinutes(10)
+        }, CancellationToken.None);
+
+        await scanLogRepository.SaveAsync(new Domain.Aggregates.ScanLogAggregate.ScanLogEntity
+        {
+            Barcode = "BC-003",
+            IsMatched = true,
+            ScanTimeLocal = start.AddHours(2),
+            CreatedTimeLocal = start.AddHours(2)
         }, CancellationToken.None);
 
         var result = await service.QueryAsync(new GlobalDashboardQueryRequest

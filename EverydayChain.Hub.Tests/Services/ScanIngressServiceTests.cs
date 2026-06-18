@@ -20,14 +20,14 @@ public sealed class ScanIngressServiceTests
     /// </summary>
     /// <param name="repository">业务任务仓储替身。</param>
     /// <returns>扫描上传服务实例。</returns>
-    private static ScanIngressService CreateService(IBusinessTaskRepository? repository = null)
+    private static (ScanIngressService Service, InMemoryScanLogRepository ScanLogRepository) CreateService(IBusinessTaskRepository? repository = null)
     {
         var barcodeParser = new BarcodeParser();
         var repo = repository ?? new InMemoryBusinessTaskRepository();
         var scanLogRepo = new InMemoryScanLogRepository();
         var matchService = new ScanMatchService(repo);
         var execService = new TaskExecutionService(matchService, repo, scanLogRepo, NullLogger<TaskExecutionService>.Instance);
-        return new ScanIngressService(barcodeParser, execService);
+        return (new ScanIngressService(barcodeParser, execService, scanLogRepo, NullLogger<ScanIngressService>.Instance), scanLogRepo);
     }
 
     /// <summary>
@@ -36,7 +36,7 @@ public sealed class ScanIngressServiceTests
     [Fact]
     public async Task ExecuteAsync_ShouldReturnInvalidBarcode_WhenBarcodeIsInvalid()
     {
-        var service = CreateService();
+        var (service, scanLogRepository) = CreateService();
         var request = new ScanUploadApplicationRequest
         {
             Barcode = " ",
@@ -49,6 +49,8 @@ public sealed class ScanIngressServiceTests
         Assert.False(result.IsAccepted);
         Assert.Equal("Unknown", result.BarcodeType);
         Assert.Equal("InvalidBarcode", result.FailureReason);
+        Assert.Single(scanLogRepository.Logs);
+        Assert.False(scanLogRepository.Logs[0].IsMatched);
     }
 
     /// <summary>
@@ -57,7 +59,7 @@ public sealed class ScanIngressServiceTests
     [Fact]
     public async Task ExecuteAsync_ShouldReturnNotMatched_WhenNoTaskFound()
     {
-        var service = CreateService();
+        var (service, _) = CreateService();
         var request = new ScanUploadApplicationRequest
         {
             Barcode = "021103013145",
@@ -90,7 +92,7 @@ public sealed class ScanIngressServiceTests
             UpdatedTimeLocal = DateTime.Now
         }, CancellationToken.None);
 
-        var service = CreateService(repo);
+        var (service, _) = CreateService(repo);
         var request = new ScanUploadApplicationRequest
         {
             Barcode = "021103013145",
@@ -124,7 +126,7 @@ public sealed class ScanIngressServiceTests
             UpdatedTimeLocal = DateTime.Now
         }, CancellationToken.None);
 
-        var service = CreateService(repo);
+        var (service, _) = CreateService(repo);
         var request = new ScanUploadApplicationRequest
         {
             Barcode = "Z130419305700070001",

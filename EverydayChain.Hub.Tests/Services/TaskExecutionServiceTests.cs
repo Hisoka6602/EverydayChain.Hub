@@ -15,13 +15,13 @@ public sealed class TaskExecutionServiceTests
     /// <summary>
     /// 构建测试用的 TaskExecutionService。
     /// </summary>
-    private static (TaskExecutionService Service, InMemoryBusinessTaskRepository Repository) CreateService()
+    private static (TaskExecutionService Service, InMemoryBusinessTaskRepository Repository, InMemoryScanLogRepository ScanLogRepository) CreateService()
     {
         var repo = new InMemoryBusinessTaskRepository();
         var scanLogRepo = new InMemoryScanLogRepository();
         var matchService = new ScanMatchService(repo);
         var execService = new TaskExecutionService(matchService, repo, scanLogRepo, NullLogger<TaskExecutionService>.Instance);
-        return (execService, repo);
+        return (execService, repo, scanLogRepo);
     }
 
     /// <summary>
@@ -30,7 +30,7 @@ public sealed class TaskExecutionServiceTests
     [Fact]
     public async Task MarkScannedAsync_ShouldFail_WhenNoTaskFound()
     {
-        var (service, _) = CreateService();
+        var (service, _, _) = CreateService();
         var request = new ScanUploadApplicationRequest
         {
             Barcode = "UNKNOWN",
@@ -50,7 +50,7 @@ public sealed class TaskExecutionServiceTests
     [Fact]
     public async Task MarkScannedAsync_ShouldSucceed_WhenTaskIsCreated()
     {
-        var (service, repo) = CreateService();
+        var (service, repo, _) = CreateService();
         await repo.SaveAsync(new BusinessTaskEntity
         {
             TaskCode = "TASK-001",
@@ -82,7 +82,7 @@ public sealed class TaskExecutionServiceTests
     [Fact]
     public async Task MarkScannedAsync_ShouldSucceed_WhenTaskIsDropped()
     {
-        var (service, repo) = CreateService();
+        var (service, repo, _) = CreateService();
         var droppedTime = new DateTime(2026, 4, 18, 9, 30, 0, DateTimeKind.Local);
         var feedbackTime = new DateTime(2026, 4, 18, 9, 45, 0, DateTimeKind.Local);
         var scanTime = new DateTime(2026, 4, 18, 10, 0, 0, DateTimeKind.Local);
@@ -134,7 +134,7 @@ public sealed class TaskExecutionServiceTests
     [Fact]
     public async Task MarkScannedAsync_ShouldPersistScannedStatus()
     {
-        var (service, repo) = CreateService();
+        var (service, repo, _) = CreateService();
         await repo.SaveAsync(new BusinessTaskEntity
         {
             TaskCode = "TASK-003",
@@ -179,7 +179,7 @@ public sealed class TaskExecutionServiceTests
     [Fact]
     public async Task MarkScannedAsync_ShouldOverwriteTargetChuteCode_WhenRequestHasTargetChuteCode()
     {
-        var (service, repo) = CreateService();
+        var (service, repo, _) = CreateService();
         await repo.SaveAsync(new BusinessTaskEntity
         {
             TaskCode = "TASK-004",
@@ -214,7 +214,7 @@ public sealed class TaskExecutionServiceTests
     [Fact]
     public async Task MarkScannedAsync_ShouldKeepTargetChuteCode_WhenRequestHasNoTargetChuteCode()
     {
-        var (service, repo) = CreateService();
+        var (service, repo, _) = CreateService();
         await repo.SaveAsync(new BusinessTaskEntity
         {
             TaskCode = "TASK-005",
@@ -249,7 +249,7 @@ public sealed class TaskExecutionServiceTests
     [Fact]
     public async Task MarkScannedAsync_ShouldNotUpdateTargetChuteCode_WhenTaskStateIsInvalid()
     {
-        var (service, repo) = CreateService();
+        var (service, repo, scanLogRepository) = CreateService();
         await repo.SaveAsync(new BusinessTaskEntity
         {
             TaskCode = "TASK-006",
@@ -275,5 +275,7 @@ public sealed class TaskExecutionServiceTests
         var updatedTask = await repo.FindByTaskCodeAsync("TASK-006", CancellationToken.None);
         Assert.NotNull(updatedTask);
         Assert.Equal("8", updatedTask!.TargetChuteCode);
+        Assert.Single(scanLogRepository.Logs);
+        Assert.True(scanLogRepository.Logs[0].IsMatched);
     }
 }

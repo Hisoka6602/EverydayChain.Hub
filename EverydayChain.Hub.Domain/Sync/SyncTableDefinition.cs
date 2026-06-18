@@ -117,4 +117,29 @@ public class SyncTableDefinition
     /// 工作区域列名（仅业务任务状态驱动投影链路使用）。
     /// </summary>
     public string? WorkingAreaColumn { get; set; }
+
+    /// <summary>
+    /// Remote order id column mapped into the local business task projection.
+    /// </summary>
+    public string? OrderIdColumn { get; set; }
+
+    /// <summary>
+    /// Remote store id column mapped into the local business task projection.
+    /// </summary>
+    public string? StoreIdColumn { get; set; }
+
+    /// <summary>
+    /// Remote store name column mapped into the local business task projection.
+    /// </summary>
+    public string? StoreNameColumn { get; set; }
+
+    /// <summary>
+    /// Remote product code column mapped into the local business task projection.
+    /// </summary>
+    public string? ProductCodeColumn { get; set; }
+
+    /// <summary>
+    /// Remote pick location column mapped into the local business task projection.
+    /// </summary>
+    public string? PickLocationColumn { get; set; }
 }

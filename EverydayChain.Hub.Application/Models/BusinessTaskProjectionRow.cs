@@ -43,6 +43,31 @@ public class BusinessTaskProjectionRow
     public string? WorkingArea { get; set; }
 
     /// <summary>
+    /// Upstream order identifier projected from the remote source row.
+    /// </summary>
+    public string? OrderId { get; set; }
+
+    /// <summary>
+    /// Upstream store identifier projected from the remote source row.
+    /// </summary>
+    public string? StoreId { get; set; }
+
+    /// <summary>
+    /// Upstream store display name projected from the remote source row.
+    /// </summary>
+    public string? StoreName { get; set; }
+
+    /// <summary>
+    /// Upstream product code projected from the remote source row.
+    /// </summary>
+    public string? ProductCode { get; set; }
+
+    /// <summary>
+    /// Upstream pick location projected from the remote source row.
+    /// </summary>
+    public string? PickLocation { get; set; }
+
+    /// <summary>
     /// 投影时间（本地时间）。
     /// </summary>
     public required DateTime ProjectedTimeLocal { get; set; }

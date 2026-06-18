@@ -57,6 +57,11 @@ public class BusinessTaskEntityTypeConfiguration : IEntityTypeConfiguration<Busi
         builder.Property(x => x.UpdatedTimeLocal).IsRequired();
         builder.Property(x => x.WaveRemark).HasMaxLength(128);
         builder.Property(x => x.WorkingArea).HasMaxLength(32);
+        builder.Property(x => x.OrderId).HasMaxLength(64);
+        builder.Property(x => x.StoreId).HasMaxLength(64);
+        builder.Property(x => x.StoreName).HasMaxLength(300);
+        builder.Property(x => x.ProductCode).HasMaxLength(64);
+        builder.Property(x => x.PickLocation).HasMaxLength(64);
         builder.Property(x => x.NormalizedWaveCode).HasMaxLength(64);
         builder.Property(x => x.IsException).IsRequired();
         builder.Property(x => x.IsFeedbackReported).IsRequired();

@@ -128,4 +128,29 @@ public class SyncTableOptions
     /// 工作区域列名（可填写范围：源端真实列名，仅允许字母、数字、下划线；留空表示不映射工作区域）。
     /// </summary>
     public string? WorkingAreaColumn { get; set; }
+
+    /// <summary>
+    /// Optional remote column name that provides the upstream order identifier.
+    /// </summary>
+    public string? OrderIdColumn { get; set; }
+
+    /// <summary>
+    /// Optional remote column name that provides the upstream store identifier.
+    /// </summary>
+    public string? StoreIdColumn { get; set; }
+
+    /// <summary>
+    /// Optional remote column name that provides the upstream store display name.
+    /// </summary>
+    public string? StoreNameColumn { get; set; }
+
+    /// <summary>
+    /// Optional remote column name that provides the upstream product code.
+    /// </summary>
+    public string? ProductCodeColumn { get; set; }
+
+    /// <summary>
+    /// Optional remote column name that provides the upstream picking location.
+    /// </summary>
+    public string? PickLocationColumn { get; set; }
 }

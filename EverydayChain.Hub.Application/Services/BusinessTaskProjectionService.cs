@@ -50,6 +50,11 @@ public class BusinessTaskProjectionService : IBusinessTaskProjectionService
         var waveCode = ValidateOptionalText(row.WaveCode, nameof(row.WaveCode), 64);
         var waveRemark = ValidateOptionalText(row.WaveRemark, nameof(row.WaveRemark), 128);
         var workingArea = ValidateOptionalText(row.WorkingArea, nameof(row.WorkingArea), 32);
+        var orderId = ValidateOptionalText(row.OrderId, nameof(row.OrderId), 64);
+        var storeId = ValidateOptionalText(row.StoreId, nameof(row.StoreId), 64);
+        var storeName = ValidateOptionalText(row.StoreName, nameof(row.StoreName), 300);
+        var productCode = ValidateOptionalText(row.ProductCode, nameof(row.ProductCode), 64);
+        var pickLocation = ValidateOptionalText(row.PickLocation, nameof(row.PickLocation), 64);
         var projectedTimeLocal = ValidateProjectedTimeLocal(row);
 
         var entity = new BusinessTaskEntity
@@ -62,6 +67,11 @@ public class BusinessTaskProjectionService : IBusinessTaskProjectionService
             WaveCode = waveCode,
             WaveRemark = waveRemark,
             WorkingArea = workingArea,
+            OrderId = orderId,
+            StoreId = storeId,
+            StoreName = storeName,
+            ProductCode = productCode,
+            PickLocation = pickLocation,
             Status = BusinessTaskStatus.Created,
             CreatedTimeLocal = projectedTimeLocal,
             UpdatedTimeLocal = projectedTimeLocal

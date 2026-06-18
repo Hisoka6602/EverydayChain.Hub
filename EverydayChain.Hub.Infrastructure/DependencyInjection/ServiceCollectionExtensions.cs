@@ -142,6 +142,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IGlobalDashboardQueryService>(sp =>
             new GlobalDashboardQueryService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<IScanLogRepository>(),
                 sp.GetRequiredService<IMemoryCache>(),
                 queryCacheOptions));
         services.AddSingleton<IDockDashboardQueryService>(sp =>
@@ -154,7 +155,10 @@ public static class ServiceCollectionExtensions {
                 sp.GetRequiredService<IBusinessTaskRepository>(),
                 sp.GetRequiredService<IMemoryCache>(),
                 queryCacheOptions));
+        services.AddSingleton<IBoxTrackingQueryService, BoxTrackingQueryService>();
         services.AddSingleton<IWaveQueryService, WaveQueryService>();
+        services.AddSingleton<IRecirculationQueryService, RecirculationQueryService>();
+        services.AddSingleton<IExportCatalogQueryService, ExportCatalogQueryService>();
         services.AddSingleton<IBusinessTaskReadService, BusinessTaskReadService>();
         services.AddSingleton<IDeletionExecutionService, DeletionExecutionService>();
         services.AddSingleton<IRetentionExecutionService, RetentionExecutionService>();

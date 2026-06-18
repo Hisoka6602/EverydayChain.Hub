@@ -5,14 +5,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EverydayChain.Hub.Tests.Services;
 
-/// <summary>
-/// API 启动预热服务测试。
-/// </summary>
 public sealed class ApiWarmupServiceTests
 {
-    /// <summary>
-    /// 任一步骤失败时应记录并继续执行后续步骤。
-    /// </summary>
     [Fact]
     public async Task WarmupAsync_ShouldContinue_WhenSingleStepThrows()
     {
@@ -35,29 +29,18 @@ public sealed class ApiWarmupServiceTests
         Assert.Equal(1, waveService.ZonesQueryCount);
     }
 
-    /// <summary>
-    /// 抛出异常的总看板查询服务替身。
-    /// </summary>
     private sealed class ThrowingGlobalDashboardQueryService : IGlobalDashboardQueryService
     {
-        /// <inheritdoc/>
         public Task<GlobalDashboardQueryResult> QueryAsync(GlobalDashboardQueryRequest request, CancellationToken cancellationToken)
         {
-            throw new InvalidOperationException("测试桩：总看板预热失败。");
+            throw new InvalidOperationException("Warmup failure.");
         }
     }
 
-    /// <summary>
-    /// 记录调用次数的码头看板查询服务替身。
-    /// </summary>
     private sealed class RecordingDockDashboardQueryService : IDockDashboardQueryService
     {
-        /// <summary>
-        /// 调用次数。
-        /// </summary>
         public int QueryCount { get; private set; }
 
-        /// <inheritdoc/>
         public Task<DockDashboardQueryResult> QueryAsync(DockDashboardQueryRequest request, CancellationToken cancellationToken)
         {
             QueryCount++;
@@ -65,45 +48,58 @@ public sealed class ApiWarmupServiceTests
         }
     }
 
-    /// <summary>
-    /// 记录调用次数的波次查询服务替身。
-    /// </summary>
     private sealed class RecordingWaveQueryService : IWaveQueryService
     {
-        /// <summary>
-        /// 波次选项调用次数。
-        /// </summary>
+        public int CurrentQueryCount { get; private set; }
+
         public int OptionsQueryCount { get; private set; }
 
-        /// <summary>
-        /// 波次摘要调用次数。
-        /// </summary>
         public int SummaryQueryCount { get; private set; }
 
-        /// <summary>
-        /// 波次分区调用次数。
-        /// </summary>
         public int ZonesQueryCount { get; private set; }
 
-        /// <inheritdoc/>
+        public int ListQueryCount { get; private set; }
+
+        public Task<CurrentWaveQueryResult> QueryCurrentAsync(CurrentWaveQueryRequest request, CancellationToken cancellationToken)
+        {
+            CurrentQueryCount++;
+            return Task.FromResult(new CurrentWaveQueryResult());
+        }
+
         public Task<WaveOptionsQueryResult> QueryOptionsAsync(WaveOptionsQueryRequest request, CancellationToken cancellationToken)
         {
             OptionsQueryCount++;
             return Task.FromResult(new WaveOptionsQueryResult());
         }
 
-        /// <inheritdoc/>
         public Task<WaveSummaryQueryResult?> QuerySummaryAsync(WaveSummaryQueryRequest request, CancellationToken cancellationToken)
         {
             SummaryQueryCount++;
             return Task.FromResult<WaveSummaryQueryResult?>(null);
         }
 
-        /// <inheritdoc/>
         public Task<WaveZoneQueryResult?> QueryZonesAsync(WaveZoneQueryRequest request, CancellationToken cancellationToken)
         {
             ZonesQueryCount++;
             return Task.FromResult<WaveZoneQueryResult?>(null);
+        }
+
+        public Task<string> ExportZonesCsvAsync(WaveZoneQueryRequest request, CancellationToken cancellationToken)
+        {
+            ZonesQueryCount++;
+            return Task.FromResult(string.Empty);
+        }
+
+        public Task<WaveListQueryResult> QueryListAsync(WaveListQueryRequest request, CancellationToken cancellationToken)
+        {
+            ListQueryCount++;
+            return Task.FromResult(new WaveListQueryResult());
+        }
+
+        public Task<string> ExportListCsvAsync(WaveListQueryRequest request, CancellationToken cancellationToken)
+        {
+            ListQueryCount++;
+            return Task.FromResult(string.Empty);
         }
     }
 }

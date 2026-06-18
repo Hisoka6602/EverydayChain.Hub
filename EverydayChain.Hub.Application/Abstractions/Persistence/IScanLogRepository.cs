@@ -1,3 +1,4 @@
+using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Aggregates.ScanLogAggregate;
 
 namespace EverydayChain.Hub.Application.Abstractions.Persistence;
@@ -13,4 +14,15 @@ public interface IScanLogRepository
     /// <param name="entity">扫描日志实体。</param>
     /// <param name="ct">取消令牌。</param>
     Task SaveAsync(ScanLogEntity entity, CancellationToken ct);
+
+    Task<ScanLogRecognitionAggregate> AggregateRecognitionAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct);
+
+    Task<(int TotalCount, IReadOnlyList<ScanLogEntity> Items)> QueryPageAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        string? barcode,
+        string? deviceCode,
+        int skip,
+        int take,
+        CancellationToken ct);
 }

@@ -64,4 +64,6 @@ public sealed class BusinessTaskWaveAggregateRow
     /// 总重量。
     /// </summary>
     public decimal TotalWeightGram { get; set; }
+
+    public DateTime EarliestCreatedTimeLocal { get; set; }
 }

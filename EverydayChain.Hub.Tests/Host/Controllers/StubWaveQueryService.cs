@@ -3,29 +3,28 @@ using EverydayChain.Hub.Application.Models;
 
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
-/// <summary>
-/// 波次查询服务替身。
-/// </summary>
 internal sealed class StubWaveQueryService : IWaveQueryService
 {
-    /// <summary>
-    /// 最近一次波次选项请求。
-    /// </summary>
+    public CurrentWaveQueryRequest? LastCurrentRequest { get; private set; }
+
     public WaveOptionsQueryRequest? LastOptionsRequest { get; private set; }
 
-    /// <summary>
-    /// 最近一次波次摘要请求。
-    /// </summary>
     public WaveSummaryQueryRequest? LastSummaryRequest { get; private set; }
 
-    /// <summary>
-    /// 最近一次波次分区请求。
-    /// </summary>
     public WaveZoneQueryRequest? LastZoneRequest { get; private set; }
 
-    /// <summary>
-    /// 固定波次选项结果。
-    /// </summary>
+    public WaveListQueryRequest? LastListRequest { get; private set; }
+
+    public CurrentWaveQueryResult CurrentResult { get; set; } = new()
+    {
+        StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local),
+        EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 21, 0, 0, 0), DateTimeKind.Local),
+        WaveCode = "W1",
+        WaveRemark = "Remark1",
+        Barcode = "BC-001",
+        ScanTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 8, 0, 0), DateTimeKind.Local)
+    };
+
     public WaveOptionsQueryResult OptionsResult { get; set; } = new()
     {
         StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local),
@@ -35,18 +34,15 @@ internal sealed class StubWaveQueryService : IWaveQueryService
             new WaveOptionItem
             {
                 WaveCode = "W1",
-                WaveRemark = "备注1"
+                WaveRemark = "Remark1"
             }
         ]
     };
 
-    /// <summary>
-    /// 固定波次摘要结果。
-    /// </summary>
     public WaveSummaryQueryResult? SummaryResult { get; set; } = new()
     {
         WaveCode = "W1",
-        WaveRemark = "备注1",
+        WaveRemark = "Remark1",
         TotalCount = 10,
         UnsortedCount = 2,
         SortedProgressPercent = 80M,
@@ -54,19 +50,16 @@ internal sealed class StubWaveQueryService : IWaveQueryService
         ExceptionCount = 1
     };
 
-    /// <summary>
-    /// 固定波次分区结果。
-    /// </summary>
     public WaveZoneQueryResult? ZoneResult { get; set; } = new()
     {
         WaveCode = "W1",
-        WaveRemark = "备注1",
+        WaveRemark = "Remark1",
         Zones =
         [
             new WaveZoneSummary
             {
                 ZoneCode = "SplitZone1",
-                ZoneName = "拆零1区",
+                ZoneName = "Split Zone 1",
                 TotalCount = 1,
                 UnsortedCount = 0,
                 SortedProgressPercent = 100M,
@@ -76,24 +69,64 @@ internal sealed class StubWaveQueryService : IWaveQueryService
         ]
     };
 
-    /// <inheritdoc/>
+    public WaveListQueryResult ListResult { get; set; } = new()
+    {
+        StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local),
+        EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 21, 0, 0, 0), DateTimeKind.Local),
+        Items =
+        [
+            new WaveListItem
+            {
+                WaveCode = "W1",
+                WaveRemark = "Remark1",
+                PackageTotal = 10,
+                SplitTotal = 6,
+                FullCaseTotal = 4,
+                CreatedTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 8, 0, 0), DateTimeKind.Local),
+                Status = "Sorting"
+            }
+        ]
+    };
+
+    public Task<CurrentWaveQueryResult> QueryCurrentAsync(CurrentWaveQueryRequest request, CancellationToken cancellationToken)
+    {
+        LastCurrentRequest = request;
+        return Task.FromResult(CurrentResult);
+    }
+
     public Task<WaveOptionsQueryResult> QueryOptionsAsync(WaveOptionsQueryRequest request, CancellationToken cancellationToken)
     {
         LastOptionsRequest = request;
         return Task.FromResult(OptionsResult);
     }
 
-    /// <inheritdoc/>
     public Task<WaveSummaryQueryResult?> QuerySummaryAsync(WaveSummaryQueryRequest request, CancellationToken cancellationToken)
     {
         LastSummaryRequest = request;
         return Task.FromResult(SummaryResult);
     }
 
-    /// <inheritdoc/>
     public Task<WaveZoneQueryResult?> QueryZonesAsync(WaveZoneQueryRequest request, CancellationToken cancellationToken)
     {
         LastZoneRequest = request;
         return Task.FromResult(ZoneResult);
+    }
+
+    public Task<WaveListQueryResult> QueryListAsync(WaveListQueryRequest request, CancellationToken cancellationToken)
+    {
+        LastListRequest = request;
+        return Task.FromResult(ListResult);
+    }
+
+    public Task<string> ExportZonesCsvAsync(WaveZoneQueryRequest request, CancellationToken cancellationToken)
+    {
+        LastZoneRequest = request;
+        return Task.FromResult("ZoneName,TotalCount,PendingCount,ProgressPercent,RecirculatedCount,ExceptionCount\r\nSplit Zone 1,1,0,100,0,0\r\n");
+    }
+
+    public Task<string> ExportListCsvAsync(WaveListQueryRequest request, CancellationToken cancellationToken)
+    {
+        LastListRequest = request;
+        return Task.FromResult("WaveId,Remark,PackageTotal,SplitTotal,FullTotal,CreatedAt,Status\r\nW1,Remark1,10,6,4,2026-04-20 08:00:00,Sorting\r\n");
     }
 }

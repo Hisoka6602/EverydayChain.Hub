@@ -19,6 +19,7 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
     /// 业务任务仓储。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
+    private readonly IScanLogRepository _scanLogRepository;
 
     /// <summary>
     /// 内存缓存。
@@ -34,8 +35,8 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
     /// 初始化总看板查询服务。
     /// </summary>
     /// <param name="businessTaskRepository">业务任务仓储。</param>
-    public GlobalDashboardQueryService(IBusinessTaskRepository businessTaskRepository)
-        : this(businessTaskRepository, new MemoryCache(new MemoryCacheOptions()), new QueryCacheOptions())
+    public GlobalDashboardQueryService(IBusinessTaskRepository businessTaskRepository, IScanLogRepository scanLogRepository)
+        : this(businessTaskRepository, scanLogRepository, new MemoryCache(new MemoryCacheOptions()), new QueryCacheOptions())
     {
     }
 
@@ -47,10 +48,12 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
     /// <param name="queryCacheOptions">缓存配置。</param>
     public GlobalDashboardQueryService(
         IBusinessTaskRepository businessTaskRepository,
+        IScanLogRepository scanLogRepository,
         IMemoryCache memoryCache,
         QueryCacheOptions queryCacheOptions)
     {
         _businessTaskRepository = businessTaskRepository;
+        _scanLogRepository = scanLogRepository;
         _memoryCache = memoryCache;
         _queryCacheOptions = queryCacheOptions;
     }
@@ -99,7 +102,7 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
         var fullCaseUnsortedCount = waveRows.Sum(row => row.FullCaseUnsortedCount);
         var splitTotalCount = waveRows.Sum(row => row.SplitTotalCount);
         var splitUnsortedCount = waveRows.Sum(row => row.SplitUnsortedCount);
-        var recognitionCount = waveRows.Sum(row => row.RecognitionCount);
+        var recognitionAggregate = await _scanLogRepository.AggregateRecognitionAsync(startTimeLocal, endTimeLocal, cancellationToken);
         var recirculatedCount = waveRows.Sum(row => row.RecirculatedCount);
         var exceptionCount = waveRows.Sum(row => row.ExceptionCount);
         var totalVolumeMm3 = waveRows.Sum(row => row.TotalVolumeMm3);
@@ -118,7 +121,7 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
             SplitTotalCount = splitTotalCount,
             SplitUnsortedCount = splitUnsortedCount,
             SplitSortedProgressPercent = CalculateProgressPercent(splitTotalCount, splitUnsortedCount),
-            RecognitionRatePercent = CalculateRatePercent(recognitionCount, totalCount),
+            RecognitionRatePercent = CalculateRatePercent(recognitionAggregate.MatchedScanCount, recognitionAggregate.TotalScanCount),
             RecirculatedCount = recirculatedCount,
             ExceptionCount = exceptionCount,
             TotalVolumeMm3 = totalVolumeMm3,

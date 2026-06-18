@@ -107,7 +107,7 @@ public sealed class TaskExecutionService : ITaskExecutionService
                 taskCode: task.TaskCode,
                 barcode: normalizedBarcode,
                 deviceCode: normalizedDeviceCode,
-                isMatched: false,
+                isMatched: true,
                 failureReason: reason,
                 traceId: normalizedTraceId,
                 scanTimeLocal: request.ScanTimeLocal,

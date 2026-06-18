@@ -27,6 +27,9 @@ public class BusinessTaskStatusConsumeServiceTests
                 ["WAVENO"] = "W1",
                 ["DESCR"] = "R1",
                 ["WORKINGAREA"] = "1",
+                ["DOCNO"] = "ORDER-1",
+                ["CONSIGNEEID"] = "STORE-1",
+                ["MENDIAN"] = "Store One",
                 ["ADDTIME"] = new DateTime(2032, 1, 1, 8, 0, 0, DateTimeKind.Local),
                 ["__RowId"] = "ROW-1"
             }
@@ -48,6 +51,11 @@ public class BusinessTaskStatusConsumeServiceTests
         Assert.Equal("W1", entity!.WaveCode);
         Assert.Equal("1", entity.WorkingArea);
         Assert.Equal(BusinessTaskSourceType.Split, entity.SourceType);
+        Assert.Equal("ORDER-1", entity.OrderId);
+        Assert.Equal("STORE-1", entity.StoreId);
+        Assert.Equal("Store One", entity.StoreName);
+        Assert.Null(entity.ProductCode);
+        Assert.Null(entity.PickLocation);
     }
 
     /// <summary>
@@ -63,6 +71,11 @@ public class BusinessTaskStatusConsumeServiceTests
                 ["SKUID"] = "SKU1",
                 ["WAVENO"] = "W2",
                 ["DESCR"] = "R2",
+                ["DOCNO"] = "ORDER-2",
+                ["CONSIGNEEID"] = "STORE-2",
+                ["MENDIAN"] = "Store Two",
+                ["SKU"] = "SKU-CODE-2",
+                ["LOCATION"] = "LOC-2",
                 ["ADDTIME"] = new DateTime(2032, 1, 2, 8, 0, 0, DateTimeKind.Local),
                 ["__RowId"] = "ROW-2"
             }
@@ -80,6 +93,13 @@ public class BusinessTaskStatusConsumeServiceTests
         Assert.Equal(1, result.AppendCount);
         Assert.Equal(0, result.WriteBackCount);
         Assert.Equal(0, writer.TotalWriteBackRows);
+        var entity = await repository.FindByTaskCodeAsync("SKU1", CancellationToken.None);
+        Assert.NotNull(entity);
+        Assert.Equal("ORDER-2", entity!.OrderId);
+        Assert.Equal("STORE-2", entity.StoreId);
+        Assert.Equal("Store Two", entity.StoreName);
+        Assert.Equal("SKU-CODE-2", entity.ProductCode);
+        Assert.Equal("LOC-2", entity.PickLocation);
     }
 
     /// <summary>
@@ -274,6 +294,9 @@ public class BusinessTaskStatusConsumeServiceTests
             WaveCodeColumn = "WAVENO",
             WaveRemarkColumn = "DESCR",
             WorkingAreaColumn = "WORKINGAREA",
+            OrderIdColumn = "DOCNO",
+            StoreIdColumn = "CONSIGNEEID",
+            StoreNameColumn = "MENDIAN",
             StatusConsumeProfile = new RemoteStatusConsumeProfile
             {
                 StatusColumnName = "TASKPROCESS",
@@ -307,6 +330,11 @@ public class BusinessTaskStatusConsumeServiceTests
             WaveCodeColumn = "WAVENO",
             WaveRemarkColumn = "DESCR",
             WorkingAreaColumn = "WORKINGAREA",
+            OrderIdColumn = "DOCNO",
+            StoreIdColumn = "CONSIGNEEID",
+            StoreNameColumn = "MENDIAN",
+            ProductCodeColumn = "SKU",
+            PickLocationColumn = "LOCATION",
             StatusConsumeProfile = new RemoteStatusConsumeProfile
             {
                 StatusColumnName = "TASKPROCESS",

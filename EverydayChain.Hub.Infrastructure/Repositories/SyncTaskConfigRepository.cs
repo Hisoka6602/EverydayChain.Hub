@@ -63,6 +63,11 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         var waveCodeColumn = NormalizeAndValidateOptionalIdentifier(table.WaveCodeColumn, table.TableCode, nameof(table.WaveCodeColumn));
         var waveRemarkColumn = NormalizeAndValidateOptionalIdentifier(table.WaveRemarkColumn, table.TableCode, nameof(table.WaveRemarkColumn));
         var workingAreaColumn = NormalizeAndValidateOptionalIdentifier(table.WorkingAreaColumn, table.TableCode, nameof(table.WorkingAreaColumn));
+        var orderIdColumn = NormalizeAndValidateOptionalIdentifier(table.OrderIdColumn, table.TableCode, nameof(table.OrderIdColumn));
+        var storeIdColumn = NormalizeAndValidateOptionalIdentifier(table.StoreIdColumn, table.TableCode, nameof(table.StoreIdColumn));
+        var storeNameColumn = NormalizeAndValidateOptionalIdentifier(table.StoreNameColumn, table.TableCode, nameof(table.StoreNameColumn));
+        var productCodeColumn = NormalizeAndValidateOptionalIdentifier(table.ProductCodeColumn, table.TableCode, nameof(table.ProductCodeColumn));
+        var pickLocationColumn = NormalizeAndValidateOptionalIdentifier(table.PickLocationColumn, table.TableCode, nameof(table.PickLocationColumn));
         return new SyncTableDefinition {
             TableCode = table.TableCode,
             Enabled = table.Enabled,
@@ -94,6 +99,11 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             WaveCodeColumn = waveCodeColumn,
             WaveRemarkColumn = waveRemarkColumn,
             WorkingAreaColumn = workingAreaColumn,
+            OrderIdColumn = orderIdColumn,
+            StoreIdColumn = storeIdColumn,
+            StoreNameColumn = storeNameColumn,
+            ProductCodeColumn = productCodeColumn,
+            PickLocationColumn = pickLocationColumn,
         };
     }
 

@@ -6,56 +6,21 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace EverydayChain.Hub.Application.Queries;
 
-/// <summary>
-/// 码头看板查询服务实现。
-/// </summary>
 public sealed class DockDashboardQueryService : IDockDashboardQueryService
 {
-    /// <summary>
-    /// 缓存键时间格式。
-    /// </summary>
     private const string CacheKeyDateTimeFormat = "yyyyMMddHHmmssfffffff";
-
-    /// <summary>
-    /// 缓存键空值占位文本。
-    /// </summary>
     private const string NullCacheValue = "(null)";
 
-    /// <summary>
-    /// 业务任务仓储。
-    /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
-
-    /// <summary>
-    /// 业务任务统计规则。
-    /// </summary>
     private readonly BusinessTaskQueryPolicy _queryPolicy = new();
-
-    /// <summary>
-    /// 内存缓存。
-    /// </summary>
     private readonly IMemoryCache _memoryCache;
-
-    /// <summary>
-    /// 查询缓存配置。
-    /// </summary>
     private readonly QueryCacheOptions _queryCacheOptions;
 
-    /// <summary>
-    /// 初始化码头看板查询服务。
-    /// </summary>
-    /// <param name="businessTaskRepository">业务任务仓储。</param>
     public DockDashboardQueryService(IBusinessTaskRepository businessTaskRepository)
         : this(businessTaskRepository, new MemoryCache(new MemoryCacheOptions()), new QueryCacheOptions())
     {
     }
 
-    /// <summary>
-    /// 初始化码头看板查询服务。
-    /// </summary>
-    /// <param name="businessTaskRepository">业务任务仓储。</param>
-    /// <param name="memoryCache">内存缓存。</param>
-    /// <param name="queryCacheOptions">缓存配置。</param>
     public DockDashboardQueryService(
         IBusinessTaskRepository businessTaskRepository,
         IMemoryCache memoryCache,
@@ -66,10 +31,8 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
         _queryCacheOptions = queryCacheOptions;
     }
 
-    /// <inheritdoc/>
     public async Task<DockDashboardQueryResult> QueryAsync(DockDashboardQueryRequest request, CancellationToken cancellationToken)
     {
-        // 步骤 1：校验时间区间，防止无效查询进入仓储层。
         if (request.EndTimeLocal <= request.StartTimeLocal)
         {
             return new DockDashboardQueryResult
@@ -79,48 +42,49 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
             };
         }
 
-        var selectedWaveCode = string.IsNullOrWhiteSpace(request.WaveCode) ? null : request.WaveCode.Trim();
-        var cacheKey = $"dock-dashboard:{request.StartTimeLocal.ToString(CacheKeyDateTimeFormat)}:{request.EndTimeLocal.ToString(CacheKeyDateTimeFormat)}:{selectedWaveCode ?? NullCacheValue}";
-        if (_queryCacheOptions.Enabled)
+        var selectedWaveCode = NormalizeOptionalText(request.WaveCode);
+        if (!_queryCacheOptions.Enabled || string.IsNullOrWhiteSpace(selectedWaveCode))
         {
-            var ttl = Math.Clamp(_queryCacheOptions.DockDashboardSeconds, 1, 60);
-            var cached = await _memoryCache.GetOrCreateAsync(cacheKey, async entry =>
-            {
-                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(ttl);
-                return await BuildResultAsync(request.StartTimeLocal, request.EndTimeLocal, selectedWaveCode, cancellationToken);
-            });
-            return cached ?? new DockDashboardQueryResult
-            {
-                StartTimeLocal = request.StartTimeLocal,
-                EndTimeLocal = request.EndTimeLocal
-            };
+            return await BuildResultAsync(request.StartTimeLocal, request.EndTimeLocal, selectedWaveCode, cancellationToken);
         }
 
-        return await BuildResultAsync(request.StartTimeLocal, request.EndTimeLocal, selectedWaveCode, cancellationToken);
+        var cacheKey = $"dock-dashboard:{request.StartTimeLocal.ToString(CacheKeyDateTimeFormat)}:{request.EndTimeLocal.ToString(CacheKeyDateTimeFormat)}:{selectedWaveCode ?? NullCacheValue}";
+        var ttl = Math.Clamp(_queryCacheOptions.DockDashboardSeconds, 1, 60);
+        var cached = await _memoryCache.GetOrCreateAsync(cacheKey, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(ttl);
+            return await BuildResultAsync(request.StartTimeLocal, request.EndTimeLocal, selectedWaveCode, cancellationToken);
+        });
+        return cached ?? new DockDashboardQueryResult
+        {
+            StartTimeLocal = request.StartTimeLocal,
+            EndTimeLocal = request.EndTimeLocal
+        };
     }
 
-    /// <summary>
-    /// 构建码头看板查询结果。
-    /// </summary>
-    /// <param name="startTimeLocal">开始时间。</param>
-    /// <param name="endTimeLocal">结束时间。</param>
-    /// <param name="selectedWaveCode">选中波次。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>码头看板结果。</returns>
     private async Task<DockDashboardQueryResult> BuildResultAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
         string? selectedWaveCode,
         CancellationToken cancellationToken)
     {
-        // 步骤 1：在仓储侧下推波次选项查询。
         var waveOptions = await _businessTaskRepository.ListWaveCodesByCreatedTimeRangeAsync(startTimeLocal, endTimeLocal, cancellationToken);
+        var effectiveSelectedWaveCode = selectedWaveCode;
+        if (string.IsNullOrWhiteSpace(effectiveSelectedWaveCode))
+        {
+            var latestTask = await _businessTaskRepository.FindLatestScannedWithWaveByCreatedTimeRangeAsync(startTimeLocal, endTimeLocal, cancellationToken);
+            var autoWaveCode = NormalizeOptionalText(latestTask?.WaveCode);
+            if (!string.IsNullOrWhiteSpace(autoWaveCode)
+                && waveOptions.Contains(autoWaveCode, StringComparer.OrdinalIgnoreCase))
+            {
+                effectiveSelectedWaveCode = autoWaveCode;
+            }
+        }
 
-        // 步骤 2：在仓储侧按可选波次聚合码头指标。
         var dockRows = await _businessTaskRepository.AggregateDockDashboardAsync(
             startTimeLocal,
             endTimeLocal,
-            selectedWaveCode,
+            effectiveSelectedWaveCode,
             null,
             cancellationToken);
         var summaries = dockRows
@@ -137,14 +101,18 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
             .OrderBy(summary => summary.DockCode, StringComparer.Ordinal)
             .ToList();
 
-        // 步骤 4：返回标准化看板结果。
         return new DockDashboardQueryResult
         {
             StartTimeLocal = startTimeLocal,
             EndTimeLocal = endTimeLocal,
-            SelectedWaveCode = selectedWaveCode,
+            SelectedWaveCode = effectiveSelectedWaveCode,
             WaveOptions = waveOptions,
             DockSummaries = summaries
         };
+    }
+
+    private static string? NormalizeOptionalText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }

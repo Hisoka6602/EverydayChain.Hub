@@ -5,14 +5,28 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
-/// <summary>
-/// 波次查询控制器测试。
-/// </summary>
 public sealed class WavesControllerTests
 {
-    /// <summary>
-    /// 波次选项接口应返回成功结果。
-    /// </summary>
+    [Fact]
+    public async Task QueryCurrentAsync_ShouldReturnOk_WhenRequestIsValid()
+    {
+        var stubService = new StubWaveQueryService();
+        var controller = new WavesController(stubService);
+        var request = new CurrentWaveQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 21, 0, 0, 0), DateTimeKind.Local)
+        };
+
+        var result = await controller.QueryCurrentAsync(request, null, CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<ApiResponse<CurrentWaveResponse>>(okResult.Value);
+
+        Assert.True(response.IsSuccess);
+        Assert.Equal("W1", response.Data!.WaveCode);
+        Assert.NotNull(stubService.LastCurrentRequest);
+    }
+
     [Fact]
     public async Task QueryOptionsAsync_ShouldReturnOk_WhenRequestIsValid()
     {
@@ -34,9 +48,6 @@ public sealed class WavesControllerTests
         Assert.Single(response.Data!.WaveOptions);
     }
 
-    /// <summary>
-    /// 波次摘要接口应在缺失波次号时返回失败。
-    /// </summary>
     [Fact]
     public async Task QuerySummaryAsync_ShouldReturnBadRequest_WhenWaveCodeIsEmpty()
     {
@@ -53,9 +64,6 @@ public sealed class WavesControllerTests
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
-    /// <summary>
-    /// 波次分区接口应返回固定分区结果。
-    /// </summary>
     [Fact]
     public async Task QueryZonesAsync_ShouldReturnOk_WhenRequestIsValid()
     {
@@ -63,43 +71,13 @@ public sealed class WavesControllerTests
         stubService.ZoneResult = new EverydayChain.Hub.Application.Models.WaveZoneQueryResult
         {
             WaveCode = "W1",
-            WaveRemark = "备注1",
+            WaveRemark = "Remark1",
             Zones =
             [
                 new EverydayChain.Hub.Application.Models.WaveZoneSummary
                 {
                     ZoneCode = "SplitZone1",
-                    ZoneName = "拆零1区",
-                    TotalCount = 0,
-                    UnsortedCount = 0,
-                    SortedProgressPercent = 0M,
-                    RecirculatedCount = 0,
-                    ExceptionCount = 0
-                },
-                new EverydayChain.Hub.Application.Models.WaveZoneSummary
-                {
-                    ZoneCode = "SplitZone2",
-                    ZoneName = "拆零2区",
-                    TotalCount = 0,
-                    UnsortedCount = 0,
-                    SortedProgressPercent = 0M,
-                    RecirculatedCount = 0,
-                    ExceptionCount = 0
-                },
-                new EverydayChain.Hub.Application.Models.WaveZoneSummary
-                {
-                    ZoneCode = "SplitZone3",
-                    ZoneName = "拆零3区",
-                    TotalCount = 0,
-                    UnsortedCount = 0,
-                    SortedProgressPercent = 0M,
-                    RecirculatedCount = 0,
-                    ExceptionCount = 0
-                },
-                new EverydayChain.Hub.Application.Models.WaveZoneSummary
-                {
-                    ZoneCode = "SplitZone4",
-                    ZoneName = "拆零4区",
+                    ZoneName = "Split Zone 1",
                     TotalCount = 0,
                     UnsortedCount = 0,
                     SortedProgressPercent = 0M,
@@ -109,7 +87,7 @@ public sealed class WavesControllerTests
                 new EverydayChain.Hub.Application.Models.WaveZoneSummary
                 {
                     ZoneCode = "FullCase",
-                    ZoneName = "整件数据",
+                    ZoneName = "Full Case",
                     TotalCount = 0,
                     UnsortedCount = 0,
                     SortedProgressPercent = 0M,
@@ -133,6 +111,49 @@ public sealed class WavesControllerTests
         Assert.True(response.IsSuccess);
         Assert.NotNull(stubService.LastZoneRequest);
         Assert.Equal("W1", stubService.LastZoneRequest!.WaveCode);
-        Assert.Equal(5, response.Data!.Zones.Count);
+        Assert.Equal(2, response.Data!.Zones.Count);
+    }
+
+    [Fact]
+    public async Task QueryListAsync_ShouldReturnOk_WhenRequestIsValid()
+    {
+        var stubService = new StubWaveQueryService();
+        var controller = new WavesController(stubService);
+        var request = new WaveListQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 21, 0, 0, 0), DateTimeKind.Local)
+        };
+
+        var result = await controller.QueryListAsync(request, null, CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<ApiResponse<WaveListResponse>>(okResult.Value);
+
+        Assert.True(response.IsSuccess);
+        Assert.Single(response.Data!.Items);
+        Assert.Equal("W1", response.Data.Items[0].WaveId);
+        Assert.Equal(10, response.Data.Items[0].PackageTotal);
+        Assert.Equal("Sorting", response.Data.Items[0].Status);
+        Assert.NotNull(stubService.LastListRequest);
+    }
+
+    [Fact]
+    public async Task ExportZonesCsvAsync_ShouldReturnFile_WhenRequestIsValid()
+    {
+        var stubService = new StubWaveQueryService();
+        var controller = new WavesController(stubService);
+        var request = new WaveZoneQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 21, 0, 0, 0), DateTimeKind.Local),
+            WaveCode = "W1"
+        };
+
+        var result = await controller.ExportZonesCsvAsync(request, null, CancellationToken.None);
+        var fileResult = Assert.IsType<FileContentResult>(result);
+
+        Assert.Equal("text/csv; charset=utf-8", fileResult.ContentType);
+        Assert.NotNull(stubService.LastZoneRequest);
+        Assert.Equal("W1", stubService.LastZoneRequest!.WaveCode);
     }
 }
