@@ -4,10 +4,11 @@
 
 namespace EverydayChain.Hub.Infrastructure.Migrations
 {
-    /// <inheritdoc />
+    /// <summary>
+    /// 定义当前类型。
+    /// </summary>
     public partial class AddBusinessTaskTraceFields : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
@@ -51,7 +52,6 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 nullable: true);
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
@@ -81,3 +81,4 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
         }
     }
 }
+

@@ -1,13 +1,13 @@
 ﻿namespace EverydayChain.Hub.Domain.Abstractions;
 
 /// <summary>
-/// 具有主键的实体基础接口。
+/// 定义当前类型。
 /// </summary>
-/// <typeparam name="TPrimaryKey">主键类型。</typeparam>
 public interface IEntity<TPrimaryKey>
 {
     /// <summary>
-    /// 实体唯一主键。
+    /// 获取或设置当前属性值。
     /// </summary>
     TPrimaryKey Id { get; set; }
 }
+

@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Services;
+﻿using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Host.Workers;
 
 /// <summary>
-/// API 启动预热后台任务。
+/// 定义当前类型。
 /// </summary>
 public sealed class ApiWarmupHostedService(
     IApiWarmupService apiWarmupService,
@@ -17,14 +17,24 @@ public sealed class ApiWarmupHostedService(
     IHostApplicationLifetime hostApplicationLifetime,
     ILogger<ApiWarmupHostedService> logger) : IHostedService
 {
-    /// <summary>启动预热总超时秒数。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int WarmupTimeoutSeconds = 90;
-    /// <summary>预热取消源。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly CancellationTokenSource _warmupCancellationTokenSource = new();
-    /// <summary>预热后台任务。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private Task? _warmupTask;
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 启动接口预热后台服务。
+    /// </summary>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>启动任务。</returns>
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _warmupTask = Task.Run(async () =>
@@ -53,7 +63,11 @@ public sealed class ApiWarmupHostedService(
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 停止接口预热后台服务。
+    /// </summary>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>停止任务。</returns>
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         _warmupCancellationTokenSource.Cancel();
@@ -63,21 +77,14 @@ public sealed class ApiWarmupHostedService(
         }
     }
 
-    /// <summary>
-    /// 预热 EF Core 模型缓存与分表上下文初始化。
-    /// </summary>
-    /// <param name="cancellationToken">取消令牌。</param>
     private async Task WarmupDbContextCacheAsync(CancellationToken cancellationToken)
     {
+        // 步骤：预热基础表上下文。
         await WarmupSingleDbContextAsync(string.Empty, cancellationToken);
+        // 步骤：预热当月分表上下文。
         await WarmupSingleDbContextAsync(shardSuffixResolver.ResolveLocal(DateTime.Now), cancellationToken);
     }
 
-    /// <summary>
-    /// 预热单个分片后缀对应的 DbContext 模型与只读查询编译缓存。
-    /// </summary>
-    /// <param name="suffix">分片后缀。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
     private async Task WarmupSingleDbContextAsync(string suffix, CancellationToken cancellationToken)
     {
         using var tableSuffixScope = TableSuffixScope.Use(suffix);
@@ -88,12 +95,6 @@ public sealed class ApiWarmupHostedService(
         _ = await dbContext.DropLogs.AsNoTracking().Select(x => x.Id).Take(1).ToListAsync(cancellationToken);
     }
 
-    /// <summary>
-    /// 执行单个预热步骤，失败时记录日志并继续后续步骤。
-    /// </summary>
-    /// <param name="stepName">步骤名称。</param>
-    /// <param name="action">步骤动作。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
     private async Task TryWarmupStepAsync(string stepName, Func<Task> action, CancellationToken cancellationToken)
     {
         try
@@ -111,3 +112,4 @@ public sealed class ApiWarmupHostedService(
         }
     }
 }
+

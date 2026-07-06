@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Host.Controllers;
+﻿using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using Microsoft.AspNetCore.Mvc;
@@ -6,14 +6,15 @@ using Microsoft.AspNetCore.Mvc;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 格口控制器基础行为测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class ChuteControllerTests {
     /// <summary>
-    /// 条码为空时应返回 BadRequest。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task ResolveAsync_ShouldReturnBadRequest_WhenBarcodeIsEmpty() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var controller = new ChuteController(new StubChuteQueryService());
         var request = new ChuteResolveRequest {
             Barcode = string.Empty,
@@ -26,10 +27,11 @@ public sealed class ChuteControllerTests {
     }
 
     /// <summary>
-    /// 有效请求时应返回 Ok。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task ResolveAsync_ShouldReturnOk_WhenRequestIsValid() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubChuteQueryService();
         var controller = new ChuteController(stubService);
         var request = new ChuteResolveRequest {
@@ -49,10 +51,11 @@ public sealed class ChuteControllerTests {
     }
 
     /// <summary>
-    /// 任务编码包含首尾空白时应规范化为去空白值。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task ResolveAsync_ShouldTrimTaskCode_WhenTaskCodeHasPadding() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubChuteQueryService();
         var controller = new ChuteController(stubService);
         var request = new ChuteResolveRequest {
@@ -67,10 +70,11 @@ public sealed class ChuteControllerTests {
     }
 
     /// <summary>
-    /// 任务编码全空白时应视为未提供并置为空字符串。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task ResolveAsync_ShouldUseEmptyTaskCode_WhenTaskCodeIsWhitespace() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubChuteQueryService();
         var controller = new ChuteController(stubService);
         var request = new ChuteResolveRequest {
@@ -84,3 +88,4 @@ public sealed class ChuteControllerTests {
         Assert.Equal(string.Empty, stubService.LastRequest!.TaskCode);
     }
 }
+

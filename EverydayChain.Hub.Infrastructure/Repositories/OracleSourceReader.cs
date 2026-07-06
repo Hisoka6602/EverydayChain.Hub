@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Oracle.ManagedDataAccess.Client;
@@ -11,39 +11,45 @@ using EverydayChain.Hub.Application.Abstractions.Persistence;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// Oracle 源端读取器实现（真实 Oracle 只读查询）。
-/// 通过项目统一安全执行器 <see cref="IDangerZoneExecutor"/> 提供指数退避重试、熔断与超时保护。
-/// 错误处理策略说明：
-///   - 参数/配置校验异常（<see cref="InvalidOperationException"/>、<see cref="ArgumentOutOfRangeException"/>）
-///     属于本地不可重试错误，在弹性管道外先行抛出，不消耗重试次数，快速失败。
-///   - Oracle 网络超时、连接失败等瞬态异常经由弹性管道自动重试，达到上限后触发熔断，保护下游资源。
+/// 定义当前类型。
 /// </summary>
 public class OracleSourceReader(
     IOptions<OracleOptions> oracleOptions,
     IDangerZoneExecutor dangerZoneExecutor,
     ILogger<OracleSourceReader> logger) : IOracleSourceReader {
 
-    /// <summary>默认分页上限。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int DefaultMaxPageSize = 5000;
 
-    /// <summary>默认命令超时秒数。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int DefaultCommandTimeoutSeconds = 60;
 
-    /// <summary>Oracle 配置快照。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
+    private const int MaxBusinessKeyBatchSize = 500;
+
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly OracleOptions _options = oracleOptions.Value;
 
-    /// <summary>生效连接字符串。</summary>
     private readonly string _effectiveConnectionString = BuildConnectionString(oracleOptions.Value);
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public async Task<SyncReadResult> ReadIncrementalPageAsync(SyncReadRequest request, CancellationToken ct) {
-        // 步骤1: 参数/配置校验为本地不可重试操作，在弹性管道外执行。
+        // 步骤：按既定流程执行当前方法逻辑。
         var sourceSchema = ResolveSourceSchema(request.SourceSchema);
         ValidateReadRequest(request, sourceSchema);
         var pageSize = ResolvePageSize(request.PageSize);
 
         try {
-            // 步骤2: 通过项目统一安全执行器包装实际 Oracle 查询，启用指数退避重试 + 熔断 + 超时。
             return await dangerZoneExecutor.ExecuteAsync(
                 $"OracleIncrementalRead:{request.TableCode}:P{request.PageNo}",
                 async token => {
@@ -102,20 +108,20 @@ public class OracleSourceReader(
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public async Task<IReadOnlySet<string>> ReadByKeysAsync(SyncKeyReadRequest request, CancellationToken ct) {
-        // 步骤1: 参数/配置校验为本地不可重试操作，在弹性管道外执行。
+        // 步骤：按既定流程执行当前方法逻辑。
         var sourceSchema = ResolveSourceSchema(request.SourceSchema);
         ValidateReadKeyRequest(request, sourceSchema);
         if (request.UniqueKeys.Count == 0) {
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
-        // 步骤1b: SQL 构建中含有本地 UniqueKeys 校验逻辑（全空时抛出），也在管道外执行以避免无效重试。
         var sql = BuildReadKeysSql(request, sourceSchema);
 
         try {
-            // 步骤2: 通过项目统一安全执行器包装实际 Oracle 查询，启用指数退避重试 + 熔断 + 超时。
             return await dangerZoneExecutor.ExecuteAsync(
                 $"OracleKeyRead:{request.TableCode}",
                 async token => {
@@ -166,13 +172,103 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 构建分页读取 SQL。
-    /// 前置条件：入参标识符已通过 <see cref="ValidateSafeIdentifier"/> 校验，禁止移除该前置校验。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">读取请求。</param>
-    /// <param name="sourceSchema">生效源端 Schema。</param>
-    /// <returns>SQL 文本。</returns>
+    public async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReadRowsByBusinessKeysAsync(
+        OracleBusinessKeyRowReadRequest request,
+        CancellationToken ct)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        var sourceSchema = ResolveSourceSchema(request.SourceSchema);
+        var readPlan = ValidateRowReadRequest(request, sourceSchema);
+        if (readPlan.BusinessKeys.Count == 0)
+        {
+            return Array.Empty<IReadOnlyDictionary<string, object?>>();
+        }
+
+        try
+        {
+            return await dangerZoneExecutor.ExecuteAsync(
+                $"OracleRowReadByBusinessKey:{request.TableCode}",
+                async token =>
+                {
+                    try
+                    {
+                        var rows = new List<IReadOnlyDictionary<string, object?>>();
+                        await using var connection = new OracleConnection(_effectiveConnectionString);
+                        await connection.OpenAsync(token);
+                        for (var offset = 0; offset < readPlan.BusinessKeys.Count; offset += MaxBusinessKeyBatchSize)
+                        {
+                            var batchKeys = readPlan.BusinessKeys
+                                .Skip(offset)
+                                .Take(MaxBusinessKeyBatchSize)
+                                .ToList();
+                            if (batchKeys.Count == 0)
+                            {
+                                continue;
+                            }
+
+                            var parameterNames = batchKeys
+                                .Select((_, index) => $"p_key{index}")
+                                .ToList();
+                            var sql = BuildReadRowsByBusinessKeysSql(
+                                sourceSchema,
+                                request.SourceTable,
+                                readPlan.Columns,
+                                request.BusinessKeyColumn,
+                                parameterNames);
+
+                            await using var command = connection.CreateCommand();
+                            command.BindByName = true;
+                            command.CommandTimeout = ResolveCommandTimeout();
+                            command.CommandText = sql;
+                            for (var index = 0; index < batchKeys.Count; index++)
+                            {
+                                command.Parameters.Add(parameterNames[index], OracleDbType.Varchar2, batchKeys[index], ParameterDirection.Input);
+                            }
+
+                            EnsureReadOnlyCommand(command);
+                            await using var reader = await command.ExecuteReaderAsync(token);
+                            while (await reader.ReadAsync(token))
+                            {
+                                var row = new Dictionary<string, object?>(reader.FieldCount, StringComparer.OrdinalIgnoreCase);
+                                for (var fieldIndex = 0; fieldIndex < reader.FieldCount; fieldIndex++)
+                                {
+                                    row[reader.GetName(fieldIndex)] = reader.IsDBNull(fieldIndex) ? null : reader.GetValue(fieldIndex);
+                                }
+
+                                rows.Add(row);
+                            }
+                        }
+
+                        return (IReadOnlyList<IReadOnlyDictionary<string, object?>>)rows;
+                    }
+                    catch (OracleException oracleException) when (IsNonRetryableOracleException(oracleException))
+                    {
+                        throw new NonRetryableDangerZoneException(
+                            $"Oracle row read by business key hit a non-retryable error (TableCode={request.TableCode}, SourceTable={request.SourceTable}, ErrorCode=ORA-{oracleException.Number}).",
+                            oracleException);
+                    }
+                },
+                ct);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(
+                exception,
+                "Oracle row read by business key failed after retries. TableCode={TableCode}, SourceSchema={SourceSchema}, SourceTable={SourceTable}",
+                request.TableCode,
+                ResolveSourceSchemaForLog(request.SourceSchema),
+                request.SourceTable);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     private static string BuildReadPageSql(SyncReadRequest request, string sourceSchema) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var orderColumns = new List<string> { $"t.{request.CursorColumn}" };
         foreach (var key in request.UniqueKeys) {
             if (!string.IsNullOrWhiteSpace(key)) {
@@ -181,7 +277,6 @@ public class OracleSourceReader(
         }
 
         if (orderColumns.Count == 1) {
-            // 当未配置 UniqueKeys 时, 使用 Oracle ROWID 作为分页稳定排序兜底列, 避免窗口内重复/漏读。
             orderColumns.Add("t.ROWID");
         }
 
@@ -201,14 +296,10 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 构建业务键读取 SQL。
-    /// 前置条件：入参标识符已通过 <see cref="ValidateSafeIdentifier"/> 校验，禁止移除该前置校验。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">业务键读取请求。</param>
-    /// <param name="sourceSchema">生效源端 Schema。</param>
-    /// <returns>SQL 文本。</returns>
-    /// <exception cref="InvalidOperationException">当唯一键列为空时抛出。</exception>
     private static string BuildReadKeysSql(SyncKeyReadRequest request, string sourceSchema) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var validUniqueKeys = request.UniqueKeys.Where(key => !string.IsNullOrWhiteSpace(key)).ToList();
         if (validUniqueKeys.Count == 0) {
             throw new InvalidOperationException($"表 {request.TableCode} 的 UniqueKeys 不能为空。");
@@ -224,13 +315,30 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 校验分页读取请求。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">读取请求。</param>
-    /// <param name="sourceSchema">生效源端 Schema。</param>
-    /// <exception cref="InvalidOperationException">当连接配置或标识符非法时抛出。</exception>
-    /// <exception cref="ArgumentOutOfRangeException">当分页参数小于等于 0 时抛出。</exception>
+    private static string BuildReadRowsByBusinessKeysSql(
+        string sourceSchema,
+        string sourceTable,
+        IReadOnlyList<string> columns,
+        string businessKeyColumn,
+        IReadOnlyList<string> parameterNames)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        var selectColumns = string.Join(", ", columns.Select(column => $"t.{column}"));
+        var parameterList = string.Join(", ", parameterNames.Select(name => $":{name}"));
+        return $"""
+                SELECT {selectColumns}
+                FROM {sourceSchema}.{sourceTable} t
+                WHERE t.{businessKeyColumn} IN ({parameterList})
+                """;
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     private void ValidateReadRequest(SyncReadRequest request, string sourceSchema) {
+        // 步骤：按既定流程执行当前方法逻辑。
         ValidateConnectionOptions();
         EnsureReadOnlyRequest(sourceSchema, request.SourceTable, request.CursorColumn, request.UniqueKeys);
         if (request.PageNo <= 0) {
@@ -243,23 +351,54 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 校验业务键读取请求。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">业务键读取请求。</param>
-    /// <param name="sourceSchema">生效源端 Schema。</param>
-    /// <exception cref="InvalidOperationException">当连接配置或标识符非法时抛出。</exception>
     private void ValidateReadKeyRequest(SyncKeyReadRequest request, string sourceSchema) {
+        // 步骤：按既定流程执行当前方法逻辑。
         ValidateConnectionOptions();
         EnsureReadOnlyRequest(sourceSchema, request.SourceTable, request.CursorColumn, request.UniqueKeys);
     }
 
+    private OracleRowReadPlan ValidateRowReadRequest(OracleBusinessKeyRowReadRequest request, string sourceSchema)
+    {
+        ValidateConnectionOptions();
+        ValidateSafeIdentifier(sourceSchema, nameof(sourceSchema));
+        ValidateSafeIdentifier(request.SourceTable, nameof(request.SourceTable));
+        ValidateSafeIdentifier(request.BusinessKeyColumn, nameof(request.BusinessKeyColumn));
+
+        var columns = request.RequestedColumns
+            .Where(column => !string.IsNullOrWhiteSpace(column))
+            .Select(column => column.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (columns.Count == 0)
+        {
+            throw new InvalidOperationException("RequestedColumns cannot be empty.");
+        }
+
+        if (!columns.Contains(request.BusinessKeyColumn, StringComparer.OrdinalIgnoreCase))
+        {
+            columns.Insert(0, request.BusinessKeyColumn);
+        }
+
+        foreach (var column in columns)
+        {
+            ValidateSafeIdentifier(column, nameof(request.RequestedColumns));
+        }
+
+        var businessKeys = request.BusinessKeys
+            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .Select(key => key.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return new OracleRowReadPlan(columns, businessKeys);
+    }
+
     /// <summary>
-    /// 解析源端 Schema。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="sourceSchema">请求 Schema。</param>
-    /// <returns>生效 Schema。</returns>
-    /// <exception cref="InvalidOperationException">当请求值为空时抛出。</exception>
     private string ResolveSourceSchema(string sourceSchema) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (!string.IsNullOrWhiteSpace(sourceSchema)) {
             return sourceSchema;
         }
@@ -268,31 +407,28 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 校验 Oracle 连接配置。
+    /// 执行当前方法。
     /// </summary>
-    /// <exception cref="InvalidOperationException">当连接字符串为空时抛出。</exception>
     private void ValidateConnectionOptions() {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (string.IsNullOrWhiteSpace(_effectiveConnectionString)) {
             throw new InvalidOperationException("Oracle.ConnectionString 不能为空。");
         }
     }
 
     /// <summary>
-    /// 构建生效连接字符串。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="options">Oracle 配置。</param>
-    /// <returns>生效连接字符串。</returns>
-    /// <exception cref="InvalidOperationException">当连接字符串为空或无法按库名重写 Data Source 时抛出。</exception>
     private static string BuildConnectionString(OracleOptions options) {
+        // 步骤：按既定流程执行当前方法逻辑。
         return OracleConnectionStringResolver.BuildEffectiveConnectionString(options);
     }
 
     /// <summary>
-    /// 解析分页大小。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="requestedPageSize">请求分页大小。</param>
-    /// <returns>生效分页大小。</returns>
     private int ResolvePageSize(int requestedPageSize) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var maxPageSize = _options.MaxPageSize > 0 ? _options.MaxPageSize : DefaultMaxPageSize;
         if (requestedPageSize <= maxPageSize) {
             return requestedPageSize;
@@ -306,28 +442,26 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 解析命令超时。
+    /// 执行当前方法。
     /// </summary>
-    /// <returns>命令超时秒数。</returns>
     private int ResolveCommandTimeout() {
+        // 步骤：按既定流程执行当前方法逻辑。
         return _options.CommandTimeoutSeconds > 0 ? _options.CommandTimeoutSeconds : DefaultCommandTimeoutSeconds;
     }
 
     /// <summary>
-    /// 判定 Oracle 异常是否属于不可重试配置类故障。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="exception">Oracle 异常。</param>
-    /// <returns>为 true 时应快速失败而非重试。</returns>
     private static bool IsNonRetryableOracleException(OracleException exception) {
+        // 步骤：按既定流程执行当前方法逻辑。
         return exception.Number is 12154 or 12514;
     }
 
     /// <summary>
-    /// 解析日志使用的源端 Schema。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="sourceSchema">请求 Schema。</param>
-    /// <returns>可用于日志的 Schema 文本。</returns>
     private string ResolveSourceSchemaForLog(string sourceSchema) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (!string.IsNullOrWhiteSpace(sourceSchema)) {
             return sourceSchema;
         }
@@ -336,11 +470,10 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 强制只读命令校验.
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="command">命令对象。</param>
-    /// <exception cref="InvalidOperationException">当命令不是 SELECT 且启用只读约束时抛出。</exception>
     private void EnsureReadOnlyCommand(OracleCommand command) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (!_options.ReadOnly) {
             return;
         }
@@ -352,18 +485,14 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 校验源端只读请求对象名，阻断 DDL/DML 注入风险。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="sourceSchema">源端 Schema。</param>
-    /// <param name="sourceTable">源端表名。</param>
-    /// <param name="cursorColumn">游标列名。</param>
-    /// <param name="uniqueKeys">唯一键集合。</param>
-    /// <exception cref="InvalidOperationException">当对象名包含危险字符时抛出。</exception>
     private static void EnsureReadOnlyRequest(
         string sourceSchema,
         string sourceTable,
         string cursorColumn,
         IReadOnlyList<string> uniqueKeys) {
+            // 步骤：按既定流程执行当前方法逻辑。
         ValidateSafeIdentifier(sourceSchema, nameof(sourceSchema));
         ValidateSafeIdentifier(sourceTable, nameof(sourceTable));
         ValidateSafeIdentifier(cursorColumn, nameof(cursorColumn));
@@ -378,12 +507,10 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 校验对象名仅包含安全字符。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="identifier">对象名。</param>
-    /// <param name="fieldName">字段名。</param>
-    /// <exception cref="InvalidOperationException">当对象名非法时抛出。</exception>
     private static void ValidateSafeIdentifier(string identifier, string fieldName) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (string.IsNullOrWhiteSpace(identifier)) {
             throw new InvalidOperationException($"{fieldName} 不能为空。");
         }
@@ -392,4 +519,13 @@ public class OracleSourceReader(
             throw new InvalidOperationException($"{fieldName} 包含非法字符，仅允许字母、数字、下划线。");
         }
     }
+
+    /// <summary>
+    /// 定义当前类型。
+    /// </summary>
+    private readonly record struct OracleRowReadPlan(
+        IReadOnlyList<string> Columns,
+        IReadOnlyList<string> BusinessKeys);
 }
+
+

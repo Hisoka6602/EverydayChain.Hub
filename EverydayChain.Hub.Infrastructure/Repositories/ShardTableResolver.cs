@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.RegularExpressions;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Options;
@@ -8,20 +8,21 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 分表解析仓储实现。
+/// 定义当前类型。
 /// </summary>
 public class ShardTableResolver(IOptions<ShardingOptions> shardingOptions) : IShardTableResolver
 {
-    /// <summary>分表解析查询超时秒数（危险动作隔离器）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int ResolveCommandTimeoutSeconds = 15;
-    /// <summary>安全标识符校验正则（仅允许字母、数字、下划线）。</summary>
     private static readonly Regex SqlIdentifierRegex = new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
-    /// <summary>分表月份解析正则。</summary>
     private static readonly Regex ShardMonthRegex = new(@"_(\d{6})$", RegexOptions.Compiled);
-    /// <summary>分表配置快照。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly ShardingOptions _options = shardingOptions.Value;
 
-    /// <inheritdoc/>
     public async Task<IReadOnlyList<string>> ListPhysicalTablesAsync(string logicalTableName, CancellationToken ct)
     {
         if (!IsSafeSqlIdentifier(logicalTableName))
@@ -54,7 +55,6 @@ public class ShardTableResolver(IOptions<ShardingOptions> shardingOptions) : ISh
         return tables;
     }
 
-    /// <inheritdoc/>
     public DateTime? TryParseShardMonth(string physicalTableName)
     {
         var match = ShardMonthRegex.Match(physicalTableName);
@@ -76,13 +76,9 @@ public class ShardTableResolver(IOptions<ShardingOptions> shardingOptions) : ISh
         return DateTime.SpecifyKind(parsedMonth, DateTimeKind.Local);
     }
 
-    /// <summary>
-    /// 判断标识符是否满足安全规则。
-    /// </summary>
-    /// <param name="identifier">待校验标识符。</param>
-    /// <returns>合法返回 <c>true</c>。</returns>
     private static bool IsSafeSqlIdentifier(string identifier)
     {
         return !string.IsNullOrWhiteSpace(identifier) && SqlIdentifierRegex.IsMatch(identifier);
     }
 }
+

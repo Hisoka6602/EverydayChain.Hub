@@ -1,22 +1,23 @@
-namespace EverydayChain.Hub.Application.Models;
+﻿namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 码头看板查询请求。
+/// 定义当前类型。
 /// </summary>
 public sealed class DockDashboardQueryRequest
 {
     /// <summary>
-    /// 查询开始时间（本地时间，包含）。
+    /// 获取或设置当前属性值。
     /// </summary>
     public DateTime StartTimeLocal { get; set; }
 
     /// <summary>
-    /// 查询结束时间（本地时间，不包含）。
+    /// 获取或设置当前属性值。
     /// </summary>
     public DateTime EndTimeLocal { get; set; }
 
     /// <summary>
-    /// 波次号筛选；为空表示不过滤。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string? WaveCode { get; set; }
 }
+

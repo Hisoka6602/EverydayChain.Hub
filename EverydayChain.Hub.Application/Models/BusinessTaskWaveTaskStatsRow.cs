@@ -1,54 +1,55 @@
-using EverydayChain.Hub.Domain.Enums;
+﻿using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 波次统计所需的业务任务最小字段投影行。
+/// 定义当前类型。
 /// </summary>
 public sealed class BusinessTaskWaveTaskStatsRow
 {
     /// <summary>
-    /// 任务编码。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string TaskCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 波次号。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string WaveCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 来源类型。
+    /// 获取或设置当前属性值。
     /// </summary>
     public BusinessTaskSourceType SourceType { get; set; }
 
     /// <summary>
-    /// 工作区域编码。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string? WorkingArea { get; set; }
 
     /// <summary>
-    /// 任务状态。
+    /// 获取或设置当前属性值。
     /// </summary>
     public BusinessTaskStatus Status { get; set; }
 
     /// <summary>
-    /// 归并码头编码。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string ResolvedDockCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 是否异常。
+    /// 获取或设置当前属性值。
     /// </summary>
     public bool IsException { get; set; }
 
     /// <summary>
-    /// 波次备注。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string? WaveRemark { get; set; }
 
     /// <summary>
-    /// 更新时间（本地时间）。
+    /// 获取或设置当前属性值。
     /// </summary>
     public DateTime UpdatedTimeLocal { get; set; }
 }
+

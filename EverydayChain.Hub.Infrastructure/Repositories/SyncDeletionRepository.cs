@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.SharedKernel.Utilities;
@@ -7,17 +7,22 @@ using EverydayChain.Hub.Domain.Sync;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 同步删除仓储基础实现（基于内存目标数据对比）。
+/// 定义当前类型。
 /// </summary>
 public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyncUpsertRepository upsertRepository) : ISyncDeletionRepository
 {
-    /// <summary>源端缺失证据描述。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string MissingSourceEvidenceMessage = "窗口内源端未检索到该业务键。";
-    /// <summary>删除差异比对默认分段大小。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int DefaultCompareSegmentSize = 20000;
-    /// <summary>删除差异比对默认并行度。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int DefaultCompareMaxParallelism = 1;
-    /// <inheritdoc/>
     public async Task<IReadOnlyList<SyncDeletionCandidate>> DetectDeletedKeysAsync(SyncDeletionDetectRequest request, CancellationToken ct)
     {
         var sourceKeys = await oracleSourceReader.ReadByKeysAsync(new SyncKeyReadRequest
@@ -37,7 +42,6 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
 
         if (maxParallelism <= 1)
         {
-            // 并行度为 1 时使用顺序循环，避免 ConcurrentBag / Parallel.ForAsync 的额外开销。
             for (var rowIndex = 0; rowIndex < targetRows.Count; rowIndex++)
             {
                 ct.ThrowIfCancellationRequested();
@@ -120,18 +124,11 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
             candidates.AddRange(candidateBag);
         }
 
-        // 统一按 BusinessKey 排序，保证无论并行度配置如何，输出顺序均一致稳定。
         candidates.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.BusinessKey, b.BusinessKey));
 
         return candidates;
     }
 
-    /// <summary>
-    /// 判断目标数据行是否在同步窗口内。
-    /// </summary>
-    /// <param name="row">目标状态行。</param>
-    /// <param name="window">同步窗口。</param>
-    /// <returns>在窗口内返回 <c>true</c>。</returns>
     private static bool IsRowWithinWindow(SyncTargetStateRow row, SyncWindow window)
     {
         if (!row.CursorLocal.HasValue)
@@ -153,7 +150,6 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
         return cursorLocal > window.WindowStartLocal && cursorLocal <= window.WindowEndLocal;
     }
 
-    /// <inheritdoc/>
     public Task<int> ApplyDeletionAsync(SyncDeletionApplyRequest request, CancellationToken ct)
     {
         if (request.BusinessKeys.Count == 0)
@@ -174,3 +170,4 @@ public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyn
         return upsertRepository.DeleteByBusinessKeysAsync(request.TableCode, request.BusinessKeys, request.DeletionPolicy, ct);
     }
 }
+

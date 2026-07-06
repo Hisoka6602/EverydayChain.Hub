@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Infrastructure.Persistence;
+﻿using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Infrastructure.Services.Sharding.Metadata;
 using EverydayChain.Hub.SharedKernel.Utilities;
@@ -8,16 +8,10 @@ using Microsoft.EntityFrameworkCore.Metadata;
 namespace EverydayChain.Hub.Infrastructure.Services.Sharding;
 
 /// <summary>
-/// 分表结构模板构建器。
+/// 定义当前类型。
 /// </summary>
 internal static class ShardSchemaTemplateBuilder
 {
-    /// <summary>
-    /// 校验并冻结纳管逻辑表集合，防止运行时注入非法标识符。
-    /// </summary>
-    /// <param name="managedLogicalTables">待校验逻辑表集合。</param>
-    /// <returns>校验通过的只读逻辑表列表。</returns>
-    /// <exception cref="InvalidOperationException">存在空值或非法标识符时抛出。</exception>
     internal static IReadOnlyList<string> ValidateManagedLogicalTables(IReadOnlyList<string> managedLogicalTables)
     {
         ArgumentNullException.ThrowIfNull(managedLogicalTables);
@@ -38,15 +32,13 @@ internal static class ShardSchemaTemplateBuilder
     }
 
     /// <summary>
-    /// 基于 EF 实体模型构建逻辑表模板缓存。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="dbContextFactory">DbContext 工厂。</param>
-    /// <param name="managedLogicalTables">纳管逻辑表集合。</param>
-    /// <returns>逻辑表模板字典。</returns>
     internal static IReadOnlyDictionary<string, ShardTableSchemaTemplate> BuildTableTemplates(
         IDbContextFactory<HubDbContext> dbContextFactory,
         IReadOnlyList<string> managedLogicalTables)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         ArgumentNullException.ThrowIfNull(dbContextFactory);
         var validatedLogicalTables = ValidateManagedLogicalTables(managedLogicalTables);
         var result = new Dictionary<string, ShardTableSchemaTemplate>(StringComparer.OrdinalIgnoreCase);
@@ -93,25 +85,11 @@ internal static class ShardSchemaTemplateBuilder
         return result;
     }
 
-    /// <summary>
-    /// 将逻辑索引名映射为物理分表索引名。
-    /// </summary>
-    /// <param name="logicalTable">逻辑表名。</param>
-    /// <param name="physicalTableName">物理表名。</param>
-    /// <param name="databaseName">逻辑索引名。</param>
-    /// <returns>物理索引名。</returns>
     internal static string BuildPhysicalIndexName(string logicalTable, string physicalTableName, string databaseName)
     {
         return databaseName.Replace(logicalTable, physicalTableName, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// 解析属性对应的分表列模板。
-    /// </summary>
-    /// <param name="property">实体属性元数据。</param>
-    /// <param name="tableIdentifier">表标识。</param>
-    /// <param name="ordinal">列顺序。</param>
-    /// <returns>列模板。</returns>
     private static ShardColumnSchema BuildColumn(IProperty property, StoreObjectIdentifier tableIdentifier, int ordinal)
     {
         return new ShardColumnSchema(
@@ -124,11 +102,6 @@ internal static class ShardSchemaTemplateBuilder
             ordinal);
     }
 
-    /// <summary>
-    /// 判断属性是否为自增列。
-    /// </summary>
-    /// <param name="property">实体属性元数据。</param>
-    /// <returns>若为自增列返回 true，否则返回 false。</returns>
     private static bool IsIdentity(IProperty property)
     {
         if (property.ValueGenerated != ValueGenerated.OnAdd)
@@ -140,12 +113,6 @@ internal static class ShardSchemaTemplateBuilder
         return underlyingType == typeof(int) || underlyingType == typeof(long);
     }
 
-    /// <summary>
-    /// 解析属性对应的关系型存储类型。
-    /// </summary>
-    /// <param name="property">实体属性元数据。</param>
-    /// <returns>SQL Server 存储类型。</returns>
-    /// <exception cref="InvalidOperationException">缺少可识别的映射时抛出。</exception>
     private static string ResolveStoreType(IProperty property)
     {
         var configuredStoreType = property.GetColumnType();
@@ -164,3 +131,4 @@ internal static class ShardSchemaTemplateBuilder
         throw new InvalidOperationException($"分表模板解析失败：属性 {property.DeclaringType.DisplayName()}.{property.Name} 缺少可识别的 SQL 类型映射。请检查该属性是否配置了 Column(TypeName=...) 或 Fluent API 类型映射。");
     }
 }
+

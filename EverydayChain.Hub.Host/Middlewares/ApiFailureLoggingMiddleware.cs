@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text;
 using EverydayChain.Hub.Host.Middlewares.Streams;
 using Newtonsoft.Json;
@@ -7,55 +7,53 @@ using Newtonsoft.Json.Linq;
 namespace EverydayChain.Hub.Host.Middlewares;
 
 /// <summary>
-/// 统一记录 API 失败请求与响应明细日志的中间件。
+/// 定义当前类型。
 /// </summary>
 public sealed class ApiFailureLoggingMiddleware {
     /// <summary>
-    /// 单次日志允许写入的请求/响应文本最大长度。
+    /// 存储当前字段值。
     /// </summary>
     private const int MaxLoggedPayloadLength = 16384;
 
     /// <summary>
-    /// UTF-8 单字符最大字节数。
+    /// 存储当前字段值。
     /// </summary>
     private const int Utf8WorstCaseBytesPerCharacter = 4;
 
     /// <summary>
-    /// 响应捕获字节上限（按 UTF-8 最坏情况预估）。
+    /// 存储当前字段值。
     /// </summary>
     private const int MaxCapturedResponseBytes = MaxLoggedPayloadLength * Utf8WorstCaseBytesPerCharacter;
 
     /// <summary>
-    /// 流读取缓冲区大小。
+    /// 存储当前字段值。
     /// </summary>
     private const int StreamReadBufferSize = 1024;
 
     /// <summary>
-    /// 下一个请求委托。
+    /// 存储当前字段值。
     /// </summary>
     private readonly RequestDelegate next;
 
     /// <summary>
-    /// 日志记录器。
+    /// 存储当前字段值。
     /// </summary>
     private readonly ILogger<ApiFailureLoggingMiddleware> logger;
 
     /// <summary>
-    /// 初始化 API 失败日志中间件。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="next">下一个请求委托。</param>
-    /// <param name="logger">日志记录器。</param>
     public ApiFailureLoggingMiddleware(RequestDelegate next, ILogger<ApiFailureLoggingMiddleware> logger) {
+        // 步骤：按既定流程执行当前方法逻辑。
         this.next = next;
         this.logger = logger;
     }
 
     /// <summary>
-    /// 执行请求处理并在失败场景记录详细日志。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="context">HTTP 上下文。</param>
-    /// <returns>异步任务。</returns>
     public async Task InvokeAsync(HttpContext context) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (!IsApiRequest(context.Request.Path)) {
             await next(context);
             return;
@@ -112,21 +110,18 @@ public sealed class ApiFailureLoggingMiddleware {
     }
 
     /// <summary>
-    /// 判断当前请求是否属于 API 端点。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="requestPath">请求路径。</param>
-    /// <returns>属于 API 端点返回 true，否则返回 false。</returns>
     private static bool IsApiRequest(PathString requestPath) {
+        // 步骤：按既定流程执行当前方法逻辑。
         return requestPath.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
-    /// 判断响应是否属于失败场景。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="statusCode">HTTP 状态码。</param>
-    /// <param name="responseBody">响应文本。</param>
-    /// <returns>失败场景返回 true，否则返回 false。</returns>
     private static bool ShouldLogFailure(int statusCode, string responseBody) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (statusCode >= StatusCodes.Status400BadRequest) {
             return true;
         }
@@ -135,11 +130,10 @@ public sealed class ApiFailureLoggingMiddleware {
     }
 
     /// <summary>
-    /// 从统一响应结构中识别业务失败标记。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="responseBody">响应文本。</param>
-    /// <returns>识别为业务失败返回 true，否则返回 false。</returns>
     private static bool ContainsBusinessFailureFlag(string responseBody) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (string.IsNullOrWhiteSpace(responseBody)) {
             return false;
         }
@@ -162,12 +156,10 @@ public sealed class ApiFailureLoggingMiddleware {
     }
 
     /// <summary>
-    /// 读取响应对象中的业务成功标记。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="root">响应对象根节点。</param>
-    /// <param name="isSuccess">业务成功标记。</param>
-    /// <returns>读取成功返回 true，否则返回 false。</returns>
     private static bool TryReadIsSuccessProperty(JObject root, out bool isSuccess) {
+        // 步骤：按既定流程执行当前方法逻辑。
         isSuccess = false;
         var value = root.GetValue("isSuccess", StringComparison.OrdinalIgnoreCase);
         if (value?.Type == JTokenType.Boolean) {
@@ -179,12 +171,10 @@ public sealed class ApiFailureLoggingMiddleware {
     }
 
     /// <summary>
-    /// 读取并保留请求体文本。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">HTTP 请求对象。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>请求体文本。</returns>
     private static async Task<string> ReadRequestBodyAsync(HttpRequest request, CancellationToken cancellationToken) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (request.ContentLength == 0 || request.Body == Stream.Null) {
             return string.Empty;
         }
@@ -200,13 +190,10 @@ public sealed class ApiFailureLoggingMiddleware {
     }
 
     /// <summary>
-    /// 从流中读取文本内容并执行长度截断。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="stream">目标流。</param>
-    /// <param name="maxCharacters">最大读取字符数。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>截断后的文本内容。</returns>
     private static async Task<string> ReadStreamAsync(Stream stream, int maxCharacters, CancellationToken cancellationToken) {
+        // 步骤：按既定流程执行当前方法逻辑。
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
         var buffer = new char[StreamReadBufferSize];
         var builder = new StringBuilder();
@@ -226,11 +213,10 @@ public sealed class ApiFailureLoggingMiddleware {
     }
 
     /// <summary>
-    /// 按固定上限截断日志载荷，避免单条日志过大。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="payload">原始载荷。</param>
-    /// <returns>截断后的载荷。</returns>
     private static string TruncatePayload(string payload) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (string.IsNullOrEmpty(payload) || payload.Length <= MaxLoggedPayloadLength) {
             return payload;
         }
@@ -239,11 +225,10 @@ public sealed class ApiFailureLoggingMiddleware {
     }
 
     /// <summary>
-    /// 规范化日志文本，避免换行注入影响日志结构。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="rawText">原始文本。</param>
-    /// <returns>规范化后的文本。</returns>
     private static string SanitizeForLog(string rawText) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (string.IsNullOrEmpty(rawText)) {
             return rawText;
         }
@@ -252,12 +237,10 @@ public sealed class ApiFailureLoggingMiddleware {
     }
 
     /// <summary>
-    /// 重置流位置。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="stream">目标流。</param>
-    /// <param name="position">目标位置。</param>
-    /// <returns>重置成功返回 true，否则返回 false。</returns>
     private static bool TryResetStreamPosition(Stream stream, long position) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (!stream.CanSeek) {
             return false;
         }
@@ -274,3 +257,4 @@ public sealed class ApiFailureLoggingMiddleware {
         }
     }
 }
+

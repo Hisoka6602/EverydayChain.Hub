@@ -1,21 +1,21 @@
-namespace EverydayChain.Hub.Infrastructure.Persistence.Sharding;
+﻿namespace EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 
 /// <summary>
-/// 按月份生成分表后缀的实现，后缀格式为 <c>_yyyyMM</c>，例如 <c>_202603</c>。
+/// 定义当前类型。
 /// </summary>
 public class MonthShardSuffixResolver : IShardSuffixResolver
 {
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public string Resolve(DateTimeOffset timestamp) => $"_{timestamp:yyyyMM}";
 
-    /// <inheritdoc/>
     public string ResolveLocal(DateTime localTime)
     {
         var normalizedLocalTime = localTime == DateTime.MinValue ? DateTime.Now : localTime;
         return Resolve(new DateTimeOffset(normalizedLocalTime));
     }
 
-    /// <inheritdoc/>
     public IReadOnlyList<string> ResolveBootstrapSuffixes(DateTimeOffset localNow, int monthsAhead)
     {
         var result = new List<string> { Resolve(localNow) };
@@ -27,3 +27,5 @@ public class MonthShardSuffixResolver : IShardSuffixResolver
         return result;
     }
 }
+
+

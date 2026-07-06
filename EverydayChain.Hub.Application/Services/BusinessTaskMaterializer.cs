@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Services;
+﻿using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
@@ -6,11 +6,10 @@ using EverydayChain.Hub.Domain.Enums;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 业务任务物化服务实现，仅负责字段映射、规范化与默认值填充。
+/// 定义当前类型。
 /// </summary>
 public class BusinessTaskMaterializer : IBusinessTaskMaterializer
 {
-    /// <inheritdoc />
     public BusinessTaskEntity Materialize(BusinessTaskMaterializeRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -40,14 +39,6 @@ public class BusinessTaskMaterializer : IBusinessTaskMaterializer
         return entity;
     }
 
-    /// <summary>
-    /// 校验物化业务时间，缺失时阻断写入。
-    /// </summary>
-    /// <param name="materializedTimeLocal">物化业务时间。</param>
-    /// <param name="taskCode">任务编码。</param>
-    /// <param name="sourceTableCode">来源表编码。</param>
-    /// <returns>校验通过的时间。</returns>
-    /// <exception cref="InvalidOperationException">缺失时抛出异常。</exception>
     private static DateTime ValidateMaterializedTimeLocal(DateTime materializedTimeLocal, string taskCode, string sourceTableCode)
     {
         if (materializedTimeLocal == default)
@@ -59,13 +50,6 @@ public class BusinessTaskMaterializer : IBusinessTaskMaterializer
         return materializedTimeLocal;
     }
 
-    /// <summary>
-    /// 校验必填文本并返回去空白后的值。
-    /// </summary>
-    /// <param name="value">输入值。</param>
-    /// <param name="fieldName">字段名称。</param>
-    /// <param name="maxLength">最大长度。</param>
-    /// <returns>去空白后的文本。</returns>
     private static string ValidateRequiredText(string value, string fieldName, int maxLength)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -82,13 +66,6 @@ public class BusinessTaskMaterializer : IBusinessTaskMaterializer
         return normalizedValue;
     }
 
-    /// <summary>
-    /// 校验可选文本并返回去空白后的值。
-    /// </summary>
-    /// <param name="value">输入值。</param>
-    /// <param name="fieldName">字段名称。</param>
-    /// <param name="maxLength">最大长度。</param>
-    /// <returns>去空白后的文本或空值。</returns>
     private static string? ValidateOptionalText(string? value, string fieldName, int maxLength)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -105,3 +82,4 @@ public class BusinessTaskMaterializer : IBusinessTaskMaterializer
         return normalizedValue;
     }
 }
+

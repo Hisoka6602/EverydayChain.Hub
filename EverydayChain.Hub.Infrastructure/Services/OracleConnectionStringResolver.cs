@@ -4,17 +4,15 @@ using EverydayChain.Hub.Domain.Options;
 namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// Oracle 连接串解析器，统一处理 Database/DatabaseMode 对 Data Source 的覆写逻辑。
+/// 定义当前类型。
 /// </summary>
 internal static class OracleConnectionStringResolver {
 
     /// <summary>
-    /// 构建生效连接字符串。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="options">Oracle 配置。</param>
-    /// <returns>生效连接字符串。</returns>
-    /// <exception cref="InvalidOperationException">当连接字符串为空或无法按库名重写 Data Source 时抛出。</exception>
     public static string BuildEffectiveConnectionString(OracleOptions options) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (string.IsNullOrWhiteSpace(options.ConnectionString)) {
             throw new InvalidOperationException("Oracle.ConnectionString 不能为空。");
         }
@@ -33,9 +31,10 @@ internal static class OracleConnectionStringResolver {
     }
 
     /// <summary>
-    /// 以 EZCONNECT 形式重写 Data Source 中的库名。
+    /// 执行当前方法。
     /// </summary>
     private static string OverrideOracleDatabase(string dataSource, string database, string databaseMode) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var trimmedDataSource = dataSource.Trim();
         var trimmedDatabase = database.Trim();
         var normalizedMode = NormalizeDatabaseMode(databaseMode);
@@ -62,14 +61,14 @@ internal static class OracleConnectionStringResolver {
             return $"{trimmedDataSource}:{trimmedDatabase}";
         }
 
-        // 兜底策略：按 EZCONNECT ServiceName 形式拼接，产出 主机[:端口]/库名。
         return $"{trimmedDataSource}/{trimmedDatabase}";
     }
 
     /// <summary>
-    /// 规范化库名模式文本。
+    /// 执行当前方法。
     /// </summary>
     private static string NormalizeDatabaseMode(string databaseMode) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var mode = string.IsNullOrWhiteSpace(databaseMode) ? "Auto" : databaseMode.Trim();
         if (mode.Equals("Auto", StringComparison.OrdinalIgnoreCase)) {
             return "Auto";
@@ -86,3 +85,4 @@ internal static class OracleConnectionStringResolver {
         throw new InvalidOperationException("Oracle.DatabaseMode 仅支持 Auto、ServiceName、Sid。");
     }
 }
+

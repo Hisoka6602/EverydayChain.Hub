@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Host.Controllers;
+﻿using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using Microsoft.AspNetCore.Mvc;
@@ -7,13 +7,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 业务任务模拟补数控制器测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class BusinessTaskSeedControllerTests
 {
-    /// <summary>
-    /// 空请求体应返回中文 400 错误。
-    /// </summary>
     [Fact]
     public async Task ManualSeedAsync_ShouldReturnBadRequest_WhenRequestBodyIsNull()
     {
@@ -27,9 +24,6 @@ public sealed class BusinessTaskSeedControllerTests
         Assert.Equal("模拟补数请求体不能为空。", response.Message);
     }
 
-    /// <summary>
-    /// 业务校验失败时应返回 400。
-    /// </summary>
     [Fact]
     public async Task ManualSeedAsync_ShouldReturnBadRequest_WhenServiceValidationFailed()
     {
@@ -62,9 +56,6 @@ public sealed class BusinessTaskSeedControllerTests
         Assert.NotNull(response.Data.SkippedBarcodes);
     }
 
-    /// <summary>
-    /// 成功请求应返回 200。
-    /// </summary>
     [Fact]
     public async Task ManualSeedAsync_ShouldReturnOk_WhenRequestIsValid()
     {
@@ -102,9 +93,6 @@ public sealed class BusinessTaskSeedControllerTests
         Assert.Equal(["BC001", "BC002"], response.Data.InsertedBarcodes);
     }
 
-    /// <summary>
-    /// 返回结构应保持 ApiResponse 包装。
-    /// </summary>
     [Fact]
     public async Task ManualSeedAsync_ShouldReturnApiResponseStructure()
     {
@@ -124,3 +112,4 @@ public sealed class BusinessTaskSeedControllerTests
         Assert.Single(stubService.LastCommand!.Barcodes);
     }
 }
+

@@ -1,17 +1,18 @@
-namespace EverydayChain.Hub.Application.Models;
+﻿namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 业务任务模拟补数命令。
+/// 定义当前类型。
 /// </summary>
 public sealed class BusinessTaskSeedCommand
 {
     /// <summary>
-    /// 目标物理表名。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string TargetTableName { get; set; } = string.Empty;
 
     /// <summary>
-    /// 待补数条码集合。
+    /// 获取或设置当前属性值。
     /// </summary>
     public IReadOnlyList<string> Barcodes { get; set; } = [];
 }
+

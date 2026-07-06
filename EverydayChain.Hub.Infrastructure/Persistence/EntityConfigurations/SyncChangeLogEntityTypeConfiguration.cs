@@ -1,32 +1,30 @@
-using EverydayChain.Hub.Domain.Aggregates.SyncChangeLogAggregate;
+﻿using EverydayChain.Hub.Domain.Aggregates.SyncChangeLogAggregate;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace EverydayChain.Hub.Infrastructure.Persistence.EntityConfigurations;
 
 /// <summary>
-/// 同步变更日志实体映射配置。
+/// 定义当前类型。
 /// </summary>
 public class SyncChangeLogEntityTypeConfiguration : IEntityTypeConfiguration<SyncChangeLogEntity>
 {
-    /// <summary>表名。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly string _tableName;
 
-    /// <summary>Schema。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly string _schema;
 
-    /// <summary>
-    /// 初始化同步变更日志实体映射配置。
-    /// </summary>
-    /// <param name="tableName">表名。</param>
-    /// <param name="schema">Schema。</param>
     public SyncChangeLogEntityTypeConfiguration(string tableName, string schema)
     {
         _tableName = tableName;
         _schema = schema;
     }
 
-    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<SyncChangeLogEntity> builder)
     {
         builder.ToTable(_tableName, _schema);
@@ -40,3 +38,4 @@ public class SyncChangeLogEntityTypeConfiguration : IEntityTypeConfiguration<Syn
         builder.HasIndex(x => new { x.TableCode, x.ChangedTimeLocal });
     }
 }
+

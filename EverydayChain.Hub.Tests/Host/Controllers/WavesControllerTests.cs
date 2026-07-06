@@ -1,10 +1,13 @@
-using EverydayChain.Hub.Host.Controllers;
+﻿using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
+/// <summary>
+/// 定义当前类型。
+/// </summary>
 public sealed class WavesControllerTests
 {
     [Fact]
@@ -133,8 +136,35 @@ public sealed class WavesControllerTests
         Assert.Single(response.Data!.Items);
         Assert.Equal("W1", response.Data.Items[0].WaveId);
         Assert.Equal(10, response.Data.Items[0].PackageTotal);
+        Assert.Equal(2, response.Data.Items[0].UnsortedCount);
+        Assert.Equal(60M, response.Data.Items[0].SplitRatioPercent);
+        Assert.Equal(3, response.Data.Items[0].RecirculatedCount);
         Assert.Equal("Sorting", response.Data.Items[0].Status);
         Assert.NotNull(stubService.LastListRequest);
+    }
+
+    [Fact]
+    public async Task QueryDetailsAsync_ShouldReturnOk_WhenRequestIsValid()
+    {
+        var stubService = new StubWaveQueryService();
+        var controller = new WavesController(stubService);
+        var request = new WaveDetailQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 21, 0, 0, 0), DateTimeKind.Local),
+            WaveCode = "W1"
+        };
+
+        var result = await controller.QueryDetailsAsync(request, null, CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<ApiResponse<WaveDetailResponse>>(okResult.Value);
+
+        Assert.True(response.IsSuccess);
+        Assert.Equal("W1", response.Data!.WaveCode);
+        Assert.Single(response.Data.Items);
+        Assert.Equal("ORDER-001", response.Data.Items[0].OrderId);
+        Assert.Equal("SKU-001", response.Data.Items[0].ProductCode);
+        Assert.NotNull(stubService.LastDetailRequest);
     }
 
     [Fact]
@@ -156,4 +186,43 @@ public sealed class WavesControllerTests
         Assert.NotNull(stubService.LastZoneRequest);
         Assert.Equal("W1", stubService.LastZoneRequest!.WaveCode);
     }
+
+    [Fact]
+    public async Task ExportDetailsCsvAsync_ShouldReturnFile_WhenRequestIsValid()
+    {
+        var stubService = new StubWaveQueryService();
+        var controller = new WavesController(stubService);
+        var request = new WaveDetailQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 21, 0, 0, 0), DateTimeKind.Local),
+            WaveCode = "W1"
+        };
+
+        var result = await controller.ExportDetailsCsvAsync(request, null, CancellationToken.None);
+        var fileResult = Assert.IsType<FileContentResult>(result);
+
+        Assert.Equal("text/csv; charset=utf-8", fileResult.ContentType);
+        Assert.NotNull(stubService.LastDetailRequest);
+        Assert.Equal("W1", stubService.LastDetailRequest!.WaveCode);
+    }
+
+    [Fact]
+    public async Task ExportListXlsxAsync_ShouldReturnFile_WhenRequestIsValid()
+    {
+        var stubService = new StubWaveQueryService();
+        var controller = new WavesController(stubService);
+        var request = new WaveListQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 21, 0, 0, 0), DateTimeKind.Local)
+        };
+
+        var result = await controller.ExportListXlsxAsync(request, null, CancellationToken.None);
+        var fileResult = Assert.IsType<FileContentResult>(result);
+
+        Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileResult.ContentType);
+        Assert.NotNull(stubService.LastListRequest);
+    }
 }
+

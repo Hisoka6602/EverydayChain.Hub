@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Queries;
+﻿using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using EverydayChain.Hub.SharedKernel.Utilities;
@@ -8,35 +8,29 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 业务任务查询控制器，提供业务任务、异常件与回流记录分页查询能力。
+/// 定义当前类型。
 /// </summary>
 [ApiController]
 [Route("api/v1/business-query")]
 public sealed class BusinessTaskQueryController : QueryControllerBase
 {
     /// <summary>
-    /// 业务任务查询服务。
+    /// 存储当前字段值。
     /// </summary>
     private readonly IBusinessTaskReadService _businessTaskReadService;
 
     /// <summary>
     /// 初始化业务任务查询控制器。
     /// </summary>
-    /// <param name="businessTaskReadService">业务任务查询服务。</param>
+    /// <param name="businessTaskReadService">业务任务读取服务。</param>
     public BusinessTaskQueryController(IBusinessTaskReadService businessTaskReadService)
     {
         _businessTaskReadService = businessTaskReadService;
     }
 
     /// <summary>
-    /// 查询业务任务。
-    /// 请求条件：时间范围必填且合法，分页参数需在允许范围内。
-    /// 返回语义：返回业务任务口径分页结果；参数非法返回 400。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">请求体查询请求。</param>
-    /// <param name="queryRequest">查询字符串请求。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>业务任务分页结果，包含总数、分页信息与任务明细列表。</returns>
     [HttpPost("tasks")]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status400BadRequest)]
@@ -45,6 +39,7 @@ public sealed class BusinessTaskQueryController : QueryControllerBase
         [FromQuery] BusinessTaskQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         return QueryCoreAsync(
             ResolveRequest(request, queryRequest),
             (payload, ct) => _businessTaskReadService.QueryTasksAsync(payload, ct),
@@ -53,14 +48,8 @@ public sealed class BusinessTaskQueryController : QueryControllerBase
     }
 
     /// <summary>
-    /// 查询异常件。
-    /// 请求条件：与业务任务查询一致。
-    /// 返回语义：仅返回异常件口径分页结果；参数非法返回 400。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">请求体查询请求。</param>
-    /// <param name="queryRequest">查询字符串请求。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>异常件分页结果，包含总数、分页信息与任务明细列表。</returns>
     [HttpPost("exceptions")]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status400BadRequest)]
@@ -69,6 +58,7 @@ public sealed class BusinessTaskQueryController : QueryControllerBase
         [FromQuery] BusinessTaskQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         return QueryCoreAsync(
             ResolveRequest(request, queryRequest),
             (payload, ct) => _businessTaskReadService.QueryExceptionsAsync(payload, ct),
@@ -77,14 +67,8 @@ public sealed class BusinessTaskQueryController : QueryControllerBase
     }
 
     /// <summary>
-    /// 查询回流记录。
-    /// 请求条件：与业务任务查询一致。
-    /// 返回语义：仅返回回流口径分页结果；参数非法返回 400。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">请求体查询请求。</param>
-    /// <param name="queryRequest">查询字符串请求。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>回流记录分页结果，包含总数、分页信息与任务明细列表。</returns>
     [HttpPost("recirculations")]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status400BadRequest)]
@@ -93,6 +77,7 @@ public sealed class BusinessTaskQueryController : QueryControllerBase
         [FromQuery] BusinessTaskQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         return QueryCoreAsync(
             ResolveRequest(request, queryRequest),
             (payload, ct) => _businessTaskReadService.QueryRecirculationsAsync(payload, ct),
@@ -101,19 +86,15 @@ public sealed class BusinessTaskQueryController : QueryControllerBase
     }
 
     /// <summary>
-    /// 查询主流程。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">查询请求。</param>
-    /// <param name="executor">查询执行器。</param>
-    /// <param name="successMessage">成功消息。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>查询结果。</returns>
     private async Task<ActionResult<ApiResponse<BusinessTaskQueryResponse>>> QueryCoreAsync(
         BusinessTaskQueryRequest request,
         Func<EverydayChain.Hub.Application.Models.BusinessTaskQueryRequest, CancellationToken, Task<EverydayChain.Hub.Application.Models.BusinessTaskQueryResult>> executor,
         string successMessage,
         CancellationToken cancellationToken)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (!TryValidateRequest(request, out var normalizedStart, out var normalizedEnd, out var validationResult))
         {
             return validationResult!;
@@ -156,7 +137,12 @@ public sealed class BusinessTaskQueryController : QueryControllerBase
                     DockCode = item.DockCode,
                     IsRecirculated = item.IsRecirculated,
                     IsException = item.IsException,
-                    CreatedTimeLocal = item.CreatedTimeLocal
+                    CreatedTimeLocal = item.CreatedTimeLocal,
+                    OrderId = item.OrderId,
+                    StoreId = item.StoreId,
+                    StoreName = item.StoreName,
+                    ProductCode = item.ProductCode,
+                    PickLocation = item.PickLocation
                 })
                 .ToList()
         };
@@ -165,19 +151,15 @@ public sealed class BusinessTaskQueryController : QueryControllerBase
     }
 
     /// <summary>
-    /// 校验查询请求。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">查询请求。</param>
-    /// <param name="normalizedStart">规范化后的开始时间。</param>
-    /// <param name="normalizedEnd">规范化后的结束时间。</param>
-    /// <param name="validationResult">校验失败结果。</param>
-    /// <returns>是否通过校验。</returns>
     private bool TryValidateRequest(
         BusinessTaskQueryRequest request,
         out DateTime normalizedStart,
         out DateTime normalizedEnd,
         out ActionResult<ApiResponse<BusinessTaskQueryResponse>>? validationResult)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         normalizedStart = default;
         normalizedEnd = default;
         validationResult = null;
@@ -215,3 +197,4 @@ public sealed class BusinessTaskQueryController : QueryControllerBase
         return true;
     }
 }
+

@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// API 启动预热服务实现。
+/// 定义当前类型。
 /// </summary>
 public sealed class ApiWarmupService(
     IGlobalDashboardQueryService globalDashboardQueryService,
@@ -16,18 +16,27 @@ public sealed class ApiWarmupService(
     IBusinessTaskRepository businessTaskRepository,
     ILogger<ApiWarmupService> logger) : IApiWarmupService
 {
-    /// <summary>波次查询预热占位波次编码。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string WarmupWaveCode = "WARMUP";
-    /// <summary>条码查询预热占位文本。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string WarmupBarcode = "WARMUP-BARCODE";
-    /// <summary>任务号查询预热占位文本。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string WarmupTaskCode = "WARMUP-TASK";
-    /// <summary>来源表查询预热占位文本。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string WarmupSourceTableCode = "WARMUP_SOURCE";
-    /// <summary>业务键查询预热占位文本。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string WarmupBusinessKey = "WARMUP_KEY";
 
-    /// <inheritdoc/>
     public async Task WarmupAsync(CancellationToken cancellationToken)
     {
         var now = DateTime.Now;
@@ -88,6 +97,9 @@ public sealed class ApiWarmupService(
             cancellationToken);
         await TryWarmupStepAsync(
             "高频仓储定位查询链路",
+            /// <summary>
+            /// 执行当前方法。
+            /// </summary>
             async () =>
             {
                 await businessTaskRepository.FindByBarcodeAsync(WarmupBarcode, cancellationToken);
@@ -98,12 +110,6 @@ public sealed class ApiWarmupService(
         logger.LogInformation("启动预热执行完成。");
     }
 
-    /// <summary>
-    /// 执行单个预热步骤，失败时记录日志并继续后续步骤。
-    /// </summary>
-    /// <param name="stepName">步骤名称。</param>
-    /// <param name="action">步骤动作。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
     private async Task TryWarmupStepAsync(string stepName, Func<Task> action, CancellationToken cancellationToken)
     {
         try
@@ -121,3 +127,4 @@ public sealed class ApiWarmupService(
         }
     }
 }
+

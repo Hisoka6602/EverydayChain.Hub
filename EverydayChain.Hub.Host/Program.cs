@@ -1,4 +1,4 @@
-using NLog.Extensions.Logging;
+﻿using NLog.Extensions.Logging;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using EverydayChain.Hub.Host.Workers;
@@ -12,13 +12,13 @@ using Microsoft.OpenApi.Models;
 using EverydayChain.Hub.Infrastructure.DependencyInjection;
 using EverydayChain.Hub.Host.Swagger;
 
-// 默认参数校验失败消息。
+// 存储默认的请求参数校验失败提示。
 const string DefaultValidationFailureMessage = "请求参数校验失败。";
 
-// 空请求体校验失败消息。
+// 存储空请求体校验失败提示。
 const string EmptyRequestBodyValidationMessage = "请求体不能为空，且请求头 Content-Type 必须为 application/json。";
 
-// 时间格式校验失败消息。
+// 存储本地时间格式校验失败提示。
 const string DateTimeFormatValidationMessage = "时间字段格式无效，请使用本地时间格式 yyyy-MM-dd HH:mm:ss 或 yyyy-MM-dd HH:mm:ss.fff，禁止使用 Z 或时区偏移。";
 
 var builder = WebApplication.CreateBuilder(args);
@@ -49,7 +49,6 @@ if (!swaggerSection.Exists())
 }
 builder.Logging.ClearProviders();
 builder.Logging.AddNLog();
-// 后台任务异常仅记录日志，不中止 Web 主机；避免同步链路瞬时故障放大为 API 全站不可用。
 builder.Services.Configure<HostOptions>(options =>
 {
     options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
@@ -65,6 +64,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddControllers()
     .AddNewtonsoftJson()
     .ConfigureApiBehaviorOptions(options => {
+    // 步骤：统一覆盖模型校验失败响应体。
     options.InvalidModelStateResponseFactory = context => {
         var firstError = DefaultValidationFailureMessage;
         foreach (var modelStateEntry in context.ModelState.Values) {
@@ -109,6 +109,7 @@ builder.Services.AddHostedService<SyncBackgroundWorker>();
 builder.Services.AddHostedService<RetentionBackgroundWorker>();
 builder.Services.AddHostedService<WmsFeedbackBackgroundWorker>();
 builder.Services.AddHostedService<FeedbackCompensationBackgroundWorker>();
+builder.Services.AddHostedService<DashboardSnapshotBackgroundWorker>();
 #if !DEBUG
 var isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
 var isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
@@ -155,14 +156,12 @@ try {
     app.Run();
 }
 finally {
-    // 确保应用退出时 NLog 将所有缓冲日志全部落盘后再释放资源。
     NLog.LogManager.Shutdown();
 }
 
-// 归一化 Swagger 路由前缀。
-// path: 配置路径。
-// 返回值：路由前缀；根路径返回空字符串。
+// 步骤：标准化 Swagger 路由前缀。
 static string NormalizeSwaggerRoutePrefix(string? path) {
+    // 步骤：按既定流程执行当前方法逻辑。
     if (string.IsNullOrWhiteSpace(path)) {
         return "swagger";
     }
@@ -175,10 +174,9 @@ static string NormalizeSwaggerRoutePrefix(string? path) {
     return trimmed.Trim('/').ToLowerInvariant();
 }
 
-// 归一化模型绑定错误消息，避免直接暴露底层序列化器实现细节。
-// rawMessage: 原始错误文本。
-// 返回值：可直接用于响应的统一错误文本。
+// 步骤：统一转换模型校验失败提示文案。
 static string NormalizeValidationMessage(string rawMessage) {
+    // 步骤：按既定流程执行当前方法逻辑。
     if (string.IsNullOrWhiteSpace(rawMessage)) {
         return DefaultValidationFailureMessage;
     }
@@ -202,3 +200,4 @@ static string NormalizeValidationMessage(string rawMessage) {
 
     return rawMessage;
 }
+

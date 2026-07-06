@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Repositories;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -8,13 +8,10 @@ using EverydayChain.Hub.Tests.Services;
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// OracleSourceReader 连接串构建逻辑测试。
+/// 定义当前类型。
 /// </summary>
 public class OracleSourceReaderTests
 {
-    /// <summary>
-    /// 连接串为空白时应抛出 InvalidOperationException（连接串不可为空，应快速失败）。
-    /// </summary>
     [Fact]
     public void BuildConnectionString_WhenConnectionStringIsBlank_ShouldThrow()
     {
@@ -29,9 +26,6 @@ public class OracleSourceReaderTests
         Assert.IsType<InvalidOperationException>(exception.InnerException);
     }
 
-    /// <summary>
-    /// 未配置库名时应保持连接串原样返回。
-    /// </summary>
     [Fact]
     public void BuildConnectionString_WhenDatabaseIsBlank_ShouldKeepOriginal()
     {
@@ -45,9 +39,6 @@ public class OracleSourceReaderTests
         Assert.Contains("Data Source=10.0.0.1:1521/OLD", result, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// EZCONNECT 斜杠格式应可覆写库名。
-    /// </summary>
     [Fact]
     public void BuildConnectionString_WhenDataSourceUsesSlash_ShouldOverrideDatabase()
     {
@@ -61,9 +52,6 @@ public class OracleSourceReaderTests
         Assert.Contains("Data Source=10.0.0.1:1521/NEWDB", result, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// EZCONNECT 冒号 SID 格式应可覆写库名。
-    /// </summary>
     [Fact]
     public void BuildConnectionString_WhenDataSourceUsesSidStyle_ShouldOverrideDatabase()
     {
@@ -77,9 +65,6 @@ public class OracleSourceReaderTests
         Assert.Contains("Data Source=10.0.0.1:1521:NEWDB", result, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// host:port 且显式 Sid 模式时应按 SID 语法拼接。
-    /// </summary>
     [Fact]
     public void BuildConnectionString_WhenDatabaseModeIsSid_ShouldUseSidStyle()
     {
@@ -94,9 +79,6 @@ public class OracleSourceReaderTests
         Assert.Contains("Data Source=10.0.0.1:1521:NEWDB", result, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// 非法 DatabaseMode 应抛出异常。
-    /// </summary>
     [Fact]
     public void BuildConnectionString_WhenDatabaseModeInvalid_ShouldThrow()
     {
@@ -112,9 +94,6 @@ public class OracleSourceReaderTests
         Assert.IsType<InvalidOperationException>(exception.InnerException);
     }
 
-    /// <summary>
-    /// 复杂描述符配置库名覆盖时应抛出异常。
-    /// </summary>
     [Fact]
     public void BuildConnectionString_WhenDataSourceIsDescriptor_ShouldThrow()
     {
@@ -129,9 +108,6 @@ public class OracleSourceReaderTests
         Assert.IsType<InvalidOperationException>(exception.InnerException);
     }
 
-    /// <summary>
-    /// SourceSchema 为空时应抛出配置异常（不再回退 Oracle.DefaultSchema）。
-    /// </summary>
     [Fact]
     public void ResolveSourceSchema_WhenSourceSchemaBlank_ShouldThrow()
     {
@@ -151,11 +127,6 @@ public class OracleSourceReaderTests
         Assert.IsType<InvalidOperationException>(exception.InnerException);
     }
 
-    /// <summary>
-    /// 通过反射调用私有静态连接串构建方法。
-    /// </summary>
-    /// <param name="options">Oracle 配置。</param>
-    /// <returns>构建后的连接串。</returns>
     private static string InvokeBuildConnectionString(OracleOptions options)
     {
         var method = typeof(OracleSourceReader).GetMethod("BuildConnectionString", BindingFlags.Static | BindingFlags.NonPublic);
@@ -165,3 +136,4 @@ public class OracleSourceReaderTests
         return (string)result;
     }
 }
+

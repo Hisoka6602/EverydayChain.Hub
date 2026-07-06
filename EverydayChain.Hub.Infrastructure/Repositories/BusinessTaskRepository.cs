@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
@@ -13,31 +13,59 @@ using System.Linq.Expressions;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 业务任务仓储 EF Core 实现，按月写入与查询 <c>business_tasks_{yyyyMM}</c> 分表。
+/// 定义当前类型。
 /// </summary>
 public class BusinessTaskRepository(
     IDbContextFactory<HubDbContext> contextFactory,
     IShardSuffixResolver shardSuffixResolver,
     IShardTableProvisioner shardTableProvisioner,
     IShardTableResolver shardTableResolver,
-    IOptions<ShardingOptions> shardingOptions) : IBusinessTaskRepository
+    IOptions<ShardingOptions> shardingOptions,
+    IOptions<DashboardSnapshotOptions> dashboardSnapshotOptions) : IBusinessTaskRepository
 {
-    /// <summary>业务任务逻辑表名。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string BusinessTaskLogicalTable = "business_tasks";
-    /// <summary>无波次占位文本。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string EmptyWaveCode = "未分波次";
-    /// <summary>无码头占位文本。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string EmptyDockCode = "未分配码头";
-    /// <summary>回流统计统一谓词：归并码头编码可解析为整数且大于 7。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     private static readonly Expression<Func<BusinessTaskEntity, bool>> RecirculationByResolvedDockCodeExpression = task =>
         task.ResolvedDockCode != string.Empty
         && !EF.Functions.Like(task.ResolvedDockCode, "%[^0-9]%")
         && Convert.ToInt32(task.ResolvedDockCode) > 7;
+    /// <summary>
+    /// 存储按创建时间升序比较业务任务的比较器。
+    /// </summary>
+    private static readonly IComparer<BusinessTaskEntity> CreatedTimeAscendingComparer = Comparer<BusinessTaskEntity>.Create((left, right) =>
+    {
+        // 步骤：先比较创建时间，再比较主键，保证排序稳定。
+        var createdTimeComparison = left.CreatedTimeLocal.CompareTo(right.CreatedTimeLocal);
+        if (createdTimeComparison != 0)
+        {
+            return createdTimeComparison;
+        }
 
-    /// <summary>分表配置快照。</summary>
+        return left.Id.CompareTo(right.Id);
+    });
+
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly ShardingOptions _shardingOptions = shardingOptions.Value;
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
+    private readonly DashboardSnapshotOptions _dashboardSnapshotOptions = dashboardSnapshotOptions.Value;
 
-    /// <inheritdoc/>
     public async Task<BusinessTaskEntity?> FindByBarcodeAsync(string barcode, CancellationToken ct)
     {
         var normalizedBarcode = NormalizeOptionalText(barcode);
@@ -51,7 +79,6 @@ public class BusinessTaskRepository(
             .OrderByDescending(x => x.CreatedTimeLocal), ct);
     }
 
-    /// <inheritdoc/>
     public async Task<BusinessTaskEntity?> FindByTaskCodeAsync(string taskCode, CancellationToken ct)
     {
         var normalizedTaskCode = NormalizeOptionalText(taskCode);
@@ -65,7 +92,6 @@ public class BusinessTaskRepository(
             .OrderByDescending(x => x.CreatedTimeLocal), ct);
     }
 
-    /// <inheritdoc/>
     public async Task<BusinessTaskEntity?> FindBySourceTableAndBusinessKeyAsync(string sourceTableCode, string businessKey, CancellationToken ct)
     {
         var normalizedSourceTableCode = NormalizeOptionalText(sourceTableCode);
@@ -80,7 +106,6 @@ public class BusinessTaskRepository(
             .OrderByDescending(x => x.CreatedTimeLocal), ct);
     }
 
-    /// <inheritdoc/>
     public async Task<BusinessTaskEntity?> FindByIdAsync(long id, CancellationToken ct)
     {
         return await FindFirstAcrossShardsAsync(query => query.Where(x => x.Id == id), ct);
@@ -117,7 +142,6 @@ public class BusinessTaskRepository(
         return result;
     }
 
-    /// <inheritdoc/>
     public async Task SaveAsync(BusinessTaskEntity entity, CancellationToken ct)
     {
         entity.RefreshQueryFields();
@@ -129,13 +153,14 @@ public class BusinessTaskRepository(
         await db.SaveChangesAsync(ct);
     }
 
-    /// <inheritdoc/>
     public async Task UpsertProjectionAsync(BusinessTaskEntity entity, CancellationToken ct)
     {
+        /// <summary>
+        /// 执行当前方法。
+        /// </summary>
         await UpsertProjectionBatchAsync([entity], ct);
     }
 
-    /// <inheritdoc/>
     public async Task<int> UpsertProjectionBatchAsync(IReadOnlyList<BusinessTaskEntity> entities, CancellationToken ct)
     {
         if (entities.Count == 0)
@@ -230,7 +255,6 @@ public class BusinessTaskRepository(
         return uniqueEntitiesByKey.Count;
     }
 
-    /// <inheritdoc/>
     public async Task UpdateAsync(BusinessTaskEntity entity, CancellationToken ct)
     {
         entity.RefreshQueryFields();
@@ -241,7 +265,61 @@ public class BusinessTaskRepository(
         await db.SaveChangesAsync(ct);
     }
 
-    /// <inheritdoc/>
+    public async Task<bool> TryMarkScannedAsync(long taskId, DateTime createdTimeLocal, BusinessTaskScanUpdateCommand command, CancellationToken ct)
+    {
+        var suffix = shardSuffixResolver.ResolveLocal(createdTimeLocal);
+        using var scope = TableSuffixScope.Use(suffix);
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var affectedRows = await db.BusinessTasks
+            .Where(task => task.Id == taskId)
+            .Where(task =>
+                task.Status == BusinessTaskStatus.Created
+                || task.Status == BusinessTaskStatus.Scanned
+                || task.Status == BusinessTaskStatus.Dropped)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(task => task.Status, BusinessTaskStatus.Scanned)
+                .SetProperty(task => task.ScannedAtLocal, command.ScanTimeLocal)
+                .SetProperty(task => task.DeviceCode, task => command.DeviceCode ?? task.DeviceCode)
+                .SetProperty(task => task.TraceId, task => command.TraceId ?? task.TraceId)
+                .SetProperty(task => task.Barcode, task => string.IsNullOrWhiteSpace(task.Barcode) ? command.Barcode : task.Barcode)
+                .SetProperty(task => task.LengthMm, task => command.LengthMm ?? task.LengthMm)
+                .SetProperty(task => task.WidthMm, task => command.WidthMm ?? task.WidthMm)
+                .SetProperty(task => task.HeightMm, task => command.HeightMm ?? task.HeightMm)
+                .SetProperty(task => task.VolumeMm3, task => command.VolumeMm3 ?? task.VolumeMm3)
+                .SetProperty(task => task.WeightGram, task => command.WeightGram ?? task.WeightGram)
+                .SetProperty(task => task.TargetChuteCode, task => command.TargetChuteCode ?? task.TargetChuteCode)
+                .SetProperty(task => task.ScanCount, task => task.ScanCount + 1)
+                .SetProperty(task => task.DroppedAtLocal, task => task.Status == BusinessTaskStatus.Dropped ? null : task.DroppedAtLocal)
+                .SetProperty(task => task.ActualChuteCode, task => task.Status == BusinessTaskStatus.Dropped ? null : task.ActualChuteCode)
+                .SetProperty(task => task.FeedbackStatus, task => task.Status == BusinessTaskStatus.Dropped ? BusinessTaskFeedbackStatus.NotRequired : task.FeedbackStatus)
+                .SetProperty(task => task.IsFeedbackReported, task => task.Status == BusinessTaskStatus.Dropped ? false : task.IsFeedbackReported)
+                .SetProperty(task => task.FeedbackTimeLocal, task => task.Status == BusinessTaskStatus.Dropped ? null : task.FeedbackTimeLocal)
+                .SetProperty(task => task.NormalizedBarcode, task => string.IsNullOrWhiteSpace(task.Barcode) ? command.Barcode : task.NormalizedBarcode)
+                .SetProperty(task => task.ResolvedDockCode, task =>
+                    !string.IsNullOrWhiteSpace(task.ActualChuteCode)
+                        ? task.ActualChuteCode!
+                        : (!string.IsNullOrWhiteSpace(command.TargetChuteCode)
+                            ? command.TargetChuteCode
+                            : (!string.IsNullOrWhiteSpace(task.TargetChuteCode) ? task.TargetChuteCode! : EmptyDockCode)))
+                .SetProperty(task => task.UpdatedTimeLocal, command.UpdatedTimeLocal),
+                ct);
+        return affectedRows > 0;
+    }
+
+    public async Task<bool> IncrementScanRetryAsync(long taskId, DateTime createdTimeLocal, DateTime updatedTimeLocal, CancellationToken ct)
+    {
+        var suffix = shardSuffixResolver.ResolveLocal(createdTimeLocal);
+        using var scope = TableSuffixScope.Use(suffix);
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var affectedRows = await db.BusinessTasks
+            .Where(task => task.Id == taskId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(task => task.ScanRetryCount, task => task.ScanRetryCount + 1)
+                .SetProperty(task => task.UpdatedTimeLocal, updatedTimeLocal),
+                ct);
+        return affectedRows > 0;
+    }
+
     public async Task<IReadOnlyList<BusinessTaskEntity>> FindPendingFeedbackAsync(int maxCount, CancellationToken ct)
     {
         return await QueryTopAcrossShardsAsync(query => query
@@ -249,7 +327,6 @@ public class BusinessTaskRepository(
             .OrderBy(x => x.CreatedTimeLocal), maxCount, ct);
     }
 
-    /// <inheritdoc/>
     public async Task<IReadOnlyList<BusinessTaskEntity>> FindFailedFeedbackAsync(int maxCount, CancellationToken ct)
     {
         return await QueryTopAcrossShardsAsync(query => query
@@ -257,7 +334,99 @@ public class BusinessTaskRepository(
             .OrderBy(x => x.CreatedTimeLocal), maxCount, ct);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    public async Task<IReadOnlyList<BusinessTaskEntity>> ClaimFeedbackBatchAsync(
+        BusinessTaskFeedbackStatus sourceStatus,
+        int maxCount,
+        DateTime claimedTimeLocal,
+        TimeSpan staleAfter,
+        CancellationToken ct)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        if (maxCount <= 0)
+        {
+            return [];
+        }
+
+        var staleCutoffLocal = claimedTimeLocal - staleAfter;
+        var candidates = await QueryTopAcrossShardsAsync(query => query
+            .Where(task =>
+                task.FeedbackStatus == sourceStatus
+                || (task.FeedbackStatus == BusinessTaskFeedbackStatus.Processing && task.UpdatedTimeLocal < staleCutoffLocal))
+            .OrderBy(task => task.CreatedTimeLocal), maxCount * 4, ct);
+        var claimed = new List<BusinessTaskEntity>(maxCount);
+        foreach (var candidate in candidates)
+        {
+            if (claimed.Count >= maxCount)
+            {
+                break;
+            }
+
+            if (await TryClaimFeedbackRowAsync(candidate.Id, candidate.CreatedTimeLocal, sourceStatus, staleCutoffLocal, claimedTimeLocal, ct))
+            {
+                candidate.FeedbackStatus = BusinessTaskFeedbackStatus.Processing;
+                candidate.UpdatedTimeLocal = claimedTimeLocal;
+                claimed.Add(candidate);
+            }
+        }
+
+        return claimed;
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    public async Task<BusinessTaskEntity?> ClaimFeedbackByTaskCodeAsync(
+        string taskCode,
+        DateTime claimedTimeLocal,
+        TimeSpan staleAfter,
+        CancellationToken ct)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        var candidate = await FindByTaskCodeAsync(taskCode, ct);
+        if (candidate is null)
+        {
+            return null;
+        }
+
+        var staleCutoffLocal = claimedTimeLocal - staleAfter;
+        if (!await TryClaimFeedbackRowAsync(candidate.Id, candidate.CreatedTimeLocal, BusinessTaskFeedbackStatus.Failed, staleCutoffLocal, claimedTimeLocal, ct))
+        {
+            return null;
+        }
+
+        candidate.FeedbackStatus = BusinessTaskFeedbackStatus.Processing;
+        candidate.UpdatedTimeLocal = claimedTimeLocal;
+        return candidate;
+    }
+
+    public async Task<int> CompleteClaimedFeedbackBatchAsync(IReadOnlyCollection<long> ids, DateTime completedTimeLocal, CancellationToken ct)
+    {
+        return await UpdateClaimedFeedbackBatchAsync(
+            ids,
+            completedTimeLocal,
+            BusinessTaskFeedbackStatus.Completed,
+            isFeedbackReported: true,
+            setFeedbackTime: true,
+            ct);
+    }
+
+    public async Task<int> FailClaimedFeedbackBatchAsync(IReadOnlyCollection<long> ids, DateTime failedTimeLocal, CancellationToken ct)
+    {
+        return await UpdateClaimedFeedbackBatchAsync(
+            ids,
+            failedTimeLocal,
+            BusinessTaskFeedbackStatus.Failed,
+            isFeedbackReported: false,
+            setFeedbackTime: false,
+            ct);
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public async Task<int> BulkMarkExceptionByWaveCodeAsync(
         string waveCode,
         BusinessTaskStatus targetStatus,
@@ -265,6 +434,7 @@ public class BusinessTaskRepository(
         DateTime updatedTimeLocal,
         CancellationToken ct)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var normalizedWaveCode = NormalizeOptionalText(waveCode);
         if (string.IsNullOrWhiteSpace(normalizedWaveCode))
         {
@@ -291,7 +461,6 @@ public class BusinessTaskRepository(
         return affectedRows;
     }
 
-    /// <inheritdoc/>
     public async Task<IReadOnlyList<BusinessTaskEntity>> FindByWaveCodeAsync(string waveCode, CancellationToken ct)
     {
         var normalizedWaveCode = NormalizeOptionalText(waveCode);
@@ -303,7 +472,6 @@ public class BusinessTaskRepository(
         return await QueryAcrossShardsAsync(query => query.Where(x => x.NormalizedWaveCode == normalizedWaveCode), ct);
     }
 
-    /// <inheritdoc/>
     public async Task<IReadOnlyList<BusinessTaskEntity>> FindActiveByBarcodeAsync(string barcode, CancellationToken ct)
     {
         var normalizedBarcode = NormalizeOptionalText(barcode);
@@ -318,7 +486,6 @@ public class BusinessTaskRepository(
                 && x.Status != BusinessTaskStatus.Exception), ct);
     }
 
-    /// <inheritdoc/>
     public async Task<IReadOnlyList<BusinessTaskEntity>> FindByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
     {
         if (endTimeLocal <= startTimeLocal)
@@ -331,12 +498,173 @@ public class BusinessTaskRepository(
             .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal), shardSuffixes, ct);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    public async Task<IReadOnlyList<BusinessTaskProjectionBackfillCandidate>> FindProjectionBackfillCandidatesAsync(
+        string sourceTableCode,
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        bool requireOrderId,
+        bool requireStoreId,
+        bool requireStoreName,
+        bool requireProductCode,
+        bool requirePickLocation,
+        int take,
+        CancellationToken ct)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        if (endTimeLocal <= startTimeLocal || take <= 0)
+        {
+            return Array.Empty<BusinessTaskProjectionBackfillCandidate>();
+        }
+
+        var normalizedSourceTableCode = NormalizeOptionalText(sourceTableCode);
+        if (string.IsNullOrWhiteSpace(normalizedSourceTableCode))
+        {
+            return Array.Empty<BusinessTaskProjectionBackfillCandidate>();
+        }
+
+        if (!requireOrderId && !requireStoreId && !requireStoreName && !requireProductCode && !requirePickLocation)
+        {
+            return Array.Empty<BusinessTaskProjectionBackfillCandidate>();
+        }
+
+        var suffixes = (await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct))
+            .OrderBy(suffix => suffix, StringComparer.Ordinal)
+            .ToList();
+        var candidates = new List<BusinessTaskProjectionBackfillCandidate>(take);
+        foreach (var suffix in suffixes)
+        {
+            var remainingTake = take - candidates.Count;
+            if (remainingTake <= 0)
+            {
+                break;
+            }
+
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            var shardRows = await db.BusinessTasks
+                .AsNoTracking()
+                .Where(task =>
+                    task.CreatedTimeLocal >= startTimeLocal
+                    && task.CreatedTimeLocal < endTimeLocal
+                    && task.SourceTableCode == normalizedSourceTableCode
+                    && task.BusinessKey != null
+                    && task.BusinessKey != string.Empty
+                    && ((requireOrderId && (task.OrderId == null || task.OrderId == string.Empty))
+                        || (requireStoreId && (task.StoreId == null || task.StoreId == string.Empty))
+                        || (requireStoreName && (task.StoreName == null || task.StoreName == string.Empty))
+                        || (requireProductCode && (task.ProductCode == null || task.ProductCode == string.Empty))
+                        || (requirePickLocation && (task.PickLocation == null || task.PickLocation == string.Empty))))
+                .OrderBy(task => task.CreatedTimeLocal)
+                .ThenBy(task => task.Id)
+                .Select(task => new BusinessTaskProjectionBackfillCandidate
+                {
+                    Id = task.Id,
+                    SourceTableCode = task.SourceTableCode,
+                    BusinessKey = task.BusinessKey,
+                    CreatedTimeLocal = task.CreatedTimeLocal
+                })
+                .Take(remainingTake)
+                .ToListAsync(ct);
+            candidates.AddRange(shardRows);
+        }
+
+        return candidates;
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    public async Task<BusinessTaskProjectionGapSummary> CountProjectionBackfillGapsAsync(
+        string sourceTableCode,
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        bool requireOrderId,
+        bool requireStoreId,
+        bool requireStoreName,
+        bool requireProductCode,
+        bool requirePickLocation,
+        CancellationToken ct)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        var summary = new BusinessTaskProjectionGapSummary
+        {
+            SourceTableCode = NormalizeOptionalText(sourceTableCode) ?? string.Empty
+        };
+        if (endTimeLocal <= startTimeLocal || string.IsNullOrWhiteSpace(summary.SourceTableCode))
+        {
+            return summary;
+        }
+
+        if (!requireOrderId && !requireStoreId && !requireStoreName && !requireProductCode && !requirePickLocation)
+        {
+            return summary;
+        }
+
+        var suffixes = (await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct))
+            .OrderBy(suffix => suffix, StringComparer.Ordinal)
+            .ToList();
+        foreach (var suffix in suffixes)
+        {
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            var baseQuery = db.BusinessTasks
+                .AsNoTracking()
+                .Where(task =>
+                    task.CreatedTimeLocal >= startTimeLocal
+                    && task.CreatedTimeLocal < endTimeLocal
+                    && task.SourceTableCode == summary.SourceTableCode
+                    && task.BusinessKey != null
+                    && task.BusinessKey != string.Empty);
+
+            if (requireOrderId)
+            {
+                summary.MissingOrderIdCount += await baseQuery.CountAsync(task => task.OrderId == null || task.OrderId == string.Empty, ct);
+            }
+
+            if (requireStoreId)
+            {
+                summary.MissingStoreIdCount += await baseQuery.CountAsync(task => task.StoreId == null || task.StoreId == string.Empty, ct);
+            }
+
+            if (requireStoreName)
+            {
+                summary.MissingStoreNameCount += await baseQuery.CountAsync(task => task.StoreName == null || task.StoreName == string.Empty, ct);
+            }
+
+            if (requireProductCode)
+            {
+                summary.MissingProductCodeCount += await baseQuery.CountAsync(task => task.ProductCode == null || task.ProductCode == string.Empty, ct);
+            }
+
+            if (requirePickLocation)
+            {
+                summary.MissingPickLocationCount += await baseQuery.CountAsync(task => task.PickLocation == null || task.PickLocation == string.Empty, ct);
+            }
+
+            summary.CandidateCount += await baseQuery.CountAsync(task =>
+                (requireOrderId && (task.OrderId == null || task.OrderId == string.Empty))
+                || (requireStoreId && (task.StoreId == null || task.StoreId == string.Empty))
+                || (requireStoreName && (task.StoreName == null || task.StoreName == string.Empty))
+                || (requireProductCode && (task.ProductCode == null || task.ProductCode == string.Empty))
+                || (requirePickLocation && (task.PickLocation == null || task.PickLocation == string.Empty)), ct);
+        }
+
+        return summary;
+    }
+
     public async Task<BusinessTaskEntity?> FindLatestScannedWithWaveByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
     {
         if (endTimeLocal <= startTimeLocal)
         {
             return null;
+        }
+
+        if (await IsAlignedSnapshotRangeCoveredAsync(DashboardSnapshotSource.CurrentWave, startTimeLocal, endTimeLocal, ct))
+        {
+            return await FindLatestScannedWithWaveFromSnapshotsAsync(startTimeLocal, endTimeLocal, ct);
         }
 
         var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct);
@@ -369,12 +697,16 @@ public class BusinessTaskRepository(
         return latestTask;
     }
 
-    /// <inheritdoc/>
     public async Task<IReadOnlyList<BusinessTaskWaveAggregateRow>> AggregateWaveDashboardAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
     {
         if (endTimeLocal <= startTimeLocal)
         {
             return Array.Empty<BusinessTaskWaveAggregateRow>();
+        }
+
+        if (await IsAlignedSnapshotRangeCoveredAsync(DashboardSnapshotSource.BusinessTask, startTimeLocal, endTimeLocal, ct))
+        {
+            return await AggregateWaveDashboardFromSnapshotsAsync(startTimeLocal, endTimeLocal, ct);
         }
 
         var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct);
@@ -426,12 +758,56 @@ public class BusinessTaskRepository(
             .ToList();
     }
 
-    /// <inheritdoc/>
+    public async Task<BusinessTaskFeedbackAggregate> AggregateFeedbackAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
+    {
+        if (endTimeLocal <= startTimeLocal)
+        {
+            return new BusinessTaskFeedbackAggregate();
+        }
+
+        if (await IsAlignedSnapshotRangeCoveredAsync(DashboardSnapshotSource.BusinessTask, startTimeLocal, endTimeLocal, ct))
+        {
+            return await AggregateFeedbackFromSnapshotsAsync(startTimeLocal, endTimeLocal, ct);
+        }
+
+        var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct);
+        var aggregate = new BusinessTaskFeedbackAggregate();
+        foreach (var suffix in suffixes)
+        {
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            var shardAggregate = await db.BusinessTasks
+                .AsNoTracking()
+                .Where(task => task.CreatedTimeLocal >= startTimeLocal && task.CreatedTimeLocal < endTimeLocal)
+                .GroupBy(_ => 1)
+                .Select(group => new BusinessTaskFeedbackAggregate
+                {
+                    RequiredFeedbackCount = group.Count(task => task.FeedbackStatus != BusinessTaskFeedbackStatus.NotRequired),
+                    CompletedFeedbackCount = group.Count(task => task.FeedbackStatus == BusinessTaskFeedbackStatus.Completed)
+                })
+                .FirstOrDefaultAsync(ct);
+            if (shardAggregate is null)
+            {
+                continue;
+            }
+
+            aggregate.RequiredFeedbackCount += shardAggregate.RequiredFeedbackCount;
+            aggregate.CompletedFeedbackCount += shardAggregate.CompletedFeedbackCount;
+        }
+
+        return aggregate;
+    }
+
     public async Task<IReadOnlyList<string>> ListWaveCodesByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
     {
         if (endTimeLocal <= startTimeLocal)
         {
             return Array.Empty<string>();
+        }
+
+        if (await IsAlignedSnapshotRangeCoveredAsync(DashboardSnapshotSource.BusinessTask, startTimeLocal, endTimeLocal, ct))
+        {
+            return await ListWaveCodesFromSnapshotsAsync(startTimeLocal, endTimeLocal, ct);
         }
 
         var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct);
@@ -457,12 +833,16 @@ public class BusinessTaskRepository(
             .ToList();
     }
 
-    /// <inheritdoc/>
     public async Task<IReadOnlyList<BusinessTaskWaveOptionRow>> ListWaveOptionsByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
     {
         if (endTimeLocal <= startTimeLocal)
         {
             return Array.Empty<BusinessTaskWaveOptionRow>();
+        }
+
+        if (await IsAlignedSnapshotRangeCoveredAsync(DashboardSnapshotSource.BusinessTask, startTimeLocal, endTimeLocal, ct))
+        {
+            return await ListWaveOptionsFromSnapshotsAsync(startTimeLocal, endTimeLocal, ct);
         }
 
         var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct);
@@ -513,7 +893,6 @@ public class BusinessTaskRepository(
             .ToList();
     }
 
-    /// <inheritdoc/>
     public async Task<IReadOnlyList<BusinessTaskEntity>> FindByWaveCodeAndCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, string waveCode, CancellationToken ct)
     {
         var normalizedWaveCode = NormalizeOptionalText(waveCode);
@@ -535,13 +914,16 @@ public class BusinessTaskRepository(
         }, suffixes, ct);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public async Task<IReadOnlyList<BusinessTaskWaveTaskStatsRow>> ListWaveTaskStatsByWaveCodeAndCreatedTimeRangeAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
         string waveCode,
         CancellationToken ct)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var normalizedWaveCode = NormalizeOptionalText(waveCode);
         if (endTimeLocal <= startTimeLocal || string.IsNullOrWhiteSpace(normalizedWaveCode))
         {
@@ -586,7 +968,9 @@ public class BusinessTaskRepository(
         return result;
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public async Task<IReadOnlyList<BusinessTaskDockAggregateRow>> AggregateDockDashboardAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
@@ -594,9 +978,15 @@ public class BusinessTaskRepository(
         string? dockCode,
         CancellationToken ct)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (endTimeLocal <= startTimeLocal)
         {
             return Array.Empty<BusinessTaskDockAggregateRow>();
+        }
+
+        if (await IsAlignedSnapshotRangeCoveredAsync(DashboardSnapshotSource.BusinessTask, startTimeLocal, endTimeLocal, ct))
+        {
+            return await AggregateDockDashboardFromSnapshotsAsync(startTimeLocal, endTimeLocal, waveCode, dockCode, ct);
         }
 
         var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct);
@@ -672,16 +1062,24 @@ public class BusinessTaskRepository(
             .ToList();
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public async Task<IReadOnlyList<BusinessTaskRecirculationAggregateRow>> AggregateRecirculationSummaryAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
         string? chuteCode,
         CancellationToken ct)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (endTimeLocal <= startTimeLocal)
         {
             return Array.Empty<BusinessTaskRecirculationAggregateRow>();
+        }
+
+        if (await IsAlignedSnapshotRangeCoveredAsync(DashboardSnapshotSource.BusinessTask, startTimeLocal, endTimeLocal, ct))
+        {
+            return await AggregateRecirculationSummaryFromSnapshotsAsync(startTimeLocal, endTimeLocal, chuteCode, ct);
         }
 
         var suffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct);
@@ -728,7 +1126,6 @@ public class BusinessTaskRepository(
             .ToList();
     }
 
-    /// <inheritdoc/>
     public async Task<int> CountByQueryConditionsAsync(BusinessTaskSearchFilter filter, CancellationToken ct)
     {
         if (filter.EndTimeLocal <= filter.StartTimeLocal)
@@ -749,24 +1146,30 @@ public class BusinessTaskRepository(
         return totalCount;
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public async Task<IReadOnlyList<BusinessTaskEntity>> QueryByQueryConditionsAsync(
         BusinessTaskSearchFilter filter,
         int skip,
         int take,
         CancellationToken ct)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var pageResult = await QueryPageWithTotalCountByConditionsAsync(filter, skip, take, ct);
         return pageResult.Items;
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public async Task<(int TotalCount, IReadOnlyList<BusinessTaskEntity> Items)> QueryPageWithTotalCountByConditionsAsync(
         BusinessTaskSearchFilter filter,
         int skip,
         int take,
         CancellationToken ct)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (filter.EndTimeLocal <= filter.StartTimeLocal || take <= 0)
         {
             return (0, Array.Empty<BusinessTaskEntity>());
@@ -815,7 +1218,9 @@ public class BusinessTaskRepository(
         return (totalCount, rows);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public async Task<IReadOnlyList<BusinessTaskEntity>> QueryByCursorConditionsAsync(
         BusinessTaskSearchFilter filter,
         DateTime? lastCreatedTimeLocal,
@@ -823,6 +1228,7 @@ public class BusinessTaskRepository(
         int take,
         CancellationToken ct)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (filter.EndTimeLocal <= filter.StartTimeLocal || take <= 0)
         {
             return Array.Empty<BusinessTaskEntity>();
@@ -863,15 +1269,13 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 在全部分片中查询首条记录。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="queryBuilder">查询构造函数。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>首条记录；不存在时返回空。</returns>
     private async Task<BusinessTaskEntity?> FindFirstAcrossShardsAsync(
         Func<IQueryable<BusinessTaskEntity>, IQueryable<BusinessTaskEntity>> queryBuilder,
         CancellationToken ct)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         foreach (var suffix in await ListShardSuffixesWithLegacyFallbackAsync(ct))
         {
             using var scope = TableSuffixScope.Use(suffix);
@@ -887,31 +1291,26 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 在全部分片中查询数据并按创建时间升序返回。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="queryBuilder">查询构造函数。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>聚合结果。</returns>
     private async Task<IReadOnlyList<BusinessTaskEntity>> QueryAcrossShardsAsync(
         Func<IQueryable<BusinessTaskEntity>, IQueryable<BusinessTaskEntity>> queryBuilder,
         CancellationToken ct)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var suffixes = await ListShardSuffixesWithLegacyFallbackAsync(ct);
         return await QueryAcrossSpecifiedShardsAsync(queryBuilder, suffixes, ct);
     }
 
     /// <summary>
-    /// 在指定分片集合中查询数据并按创建时间升序返回。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="queryBuilder">查询构造函数。</param>
-    /// <param name="shardSuffixes">需要查询的分片后缀集合。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>聚合结果。</returns>
     private async Task<IReadOnlyList<BusinessTaskEntity>> QueryAcrossSpecifiedShardsAsync(
         Func<IQueryable<BusinessTaskEntity>, IQueryable<BusinessTaskEntity>> queryBuilder,
         IReadOnlyList<string> shardSuffixes,
         CancellationToken ct)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (shardSuffixes.Count == 0)
         {
             return Array.Empty<BusinessTaskEntity>();
@@ -935,15 +1334,13 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 按查询过滤条件构建可组合查询。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="query">基础查询。</param>
-    /// <param name="filter">查询过滤条件。</param>
-    /// <returns>过滤后的查询。</returns>
     private static IQueryable<BusinessTaskEntity> BuildQueryBySearchFilter(
         IQueryable<BusinessTaskEntity> query,
         BusinessTaskSearchFilter filter)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var normalizedWaveCode = NormalizeOptionalText(filter.WaveCode);
         var normalizedBarcode = NormalizeOptionalText(filter.Barcode);
         var normalizedDockCode = NormalizeOptionalText(filter.DockCode);
@@ -992,25 +1389,18 @@ public class BusinessTaskRepository(
         return query;
     }
 
-    /// <summary>
-    /// 归一化可选文本，空白文本转为 null，其余文本执行 Trim。
-    /// </summary>
-    /// <param name="value">原始文本。</param>
-    /// <returns>归一化后的文本。</returns>
     private static string? NormalizeOptionalText(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
     /// <summary>
-    /// 波次选项候选值。
+    /// 定义当前类型。
     /// </summary>
-    /// <param name="waveRemark">波次备注。</param>
-    /// <param name="updatedTimeLocal">更新时间。</param>
     private readonly record struct WaveOptionCandidate(string? WaveRemark, DateTime UpdatedTimeLocal);
 
     /// <summary>
-    /// 分片内波次选项聚合行。
+    /// 定义当前类型。
     /// </summary>
     private readonly record struct ShardWaveOptionAggregateRow(
         string WaveCode,
@@ -1018,10 +1408,251 @@ public class BusinessTaskRepository(
         DateTime UpdatedTimeLocal);
 
     /// <summary>
-    /// 合并投影字段，避免覆盖运行态字段。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="target">已存在实体。</param>
-    /// <param name="incoming">新投影实体。</param>
+    private async Task<bool> IsAlignedSnapshotRangeCoveredAsync(
+        DashboardSnapshotSource source,
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        CancellationToken ct)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        if (!_dashboardSnapshotOptions.Enabled || !_dashboardSnapshotOptions.PreferSnapshotQueries)
+        {
+            return false;
+        }
+
+        if (!IsMinuteAligned(startTimeLocal) || !IsMinuteAligned(endTimeLocal))
+        {
+            return false;
+        }
+
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var state = await db.DashboardSnapshotStates
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == source, ct);
+        return state?.CoverageStartLocal <= startTimeLocal
+            && state.CoverageEndLocal >= endTimeLocal;
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    private async Task<IReadOnlyList<BusinessTaskWaveAggregateRow>> AggregateWaveDashboardFromSnapshotsAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        CancellationToken ct)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        return await db.DashboardTaskSnapshots
+            .AsNoTracking()
+            .Where(x => x.BucketStartLocal >= startTimeLocal && x.BucketStartLocal < endTimeLocal)
+            .GroupBy(x => x.WaveCode)
+            .Select(group => new BusinessTaskWaveAggregateRow
+            {
+                WaveCode = group.Key,
+                TotalCount = group.Sum(x => x.TotalCount),
+                UnsortedCount = group.Sum(x => x.Status != BusinessTaskStatus.Dropped && x.Status != BusinessTaskStatus.FeedbackPending ? x.TotalCount : 0),
+                FullCaseTotalCount = group.Sum(x => x.SourceType == BusinessTaskSourceType.FullCase ? x.TotalCount : 0),
+                FullCaseUnsortedCount = group.Sum(x => x.SourceType == BusinessTaskSourceType.FullCase && x.Status != BusinessTaskStatus.Dropped && x.Status != BusinessTaskStatus.FeedbackPending ? x.TotalCount : 0),
+                SplitTotalCount = group.Sum(x => x.SourceType == BusinessTaskSourceType.Split ? x.TotalCount : 0),
+                SplitUnsortedCount = group.Sum(x => x.SourceType == BusinessTaskSourceType.Split && x.Status != BusinessTaskStatus.Dropped && x.Status != BusinessTaskStatus.FeedbackPending ? x.TotalCount : 0),
+                RecognitionCount = group.Sum(x => x.ScannedCount),
+                RecirculatedCount = group.Sum(x => x.RecirculatedCount),
+                ExceptionCount = group.Sum(x => x.ExceptionCount),
+                TotalVolumeMm3 = group.Sum(x => x.TotalVolumeMm3),
+                TotalWeightGram = group.Sum(x => x.TotalWeightGram),
+                EarliestCreatedTimeLocal = group.Min(x => x.EarliestCreatedTimeLocal)
+            })
+            .OrderBy(x => x.WaveCode)
+            .ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    private async Task<BusinessTaskFeedbackAggregate> AggregateFeedbackFromSnapshotsAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        CancellationToken ct)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var aggregate = await db.DashboardTaskSnapshots
+            .AsNoTracking()
+            .Where(x => x.BucketStartLocal >= startTimeLocal && x.BucketStartLocal < endTimeLocal)
+            .GroupBy(_ => 1)
+            .Select(group => new BusinessTaskFeedbackAggregate
+            {
+                RequiredFeedbackCount = group.Sum(x => x.RequiredFeedbackCount),
+                CompletedFeedbackCount = group.Sum(x => x.CompletedFeedbackCount)
+            })
+            .FirstOrDefaultAsync(ct);
+        return aggregate ?? new BusinessTaskFeedbackAggregate();
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    private async Task<IReadOnlyList<string>> ListWaveCodesFromSnapshotsAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        CancellationToken ct)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        return await db.DashboardTaskSnapshots
+            .AsNoTracking()
+            .Where(x => x.BucketStartLocal >= startTimeLocal && x.BucketStartLocal < endTimeLocal)
+            .Select(x => x.WaveCode)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    private async Task<IReadOnlyList<BusinessTaskWaveOptionRow>> ListWaveOptionsFromSnapshotsAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        CancellationToken ct)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var rows = await db.DashboardTaskSnapshots
+            .AsNoTracking()
+            .Where(x => x.BucketStartLocal >= startTimeLocal && x.BucketStartLocal < endTimeLocal)
+            .GroupBy(x => new { x.WaveCode, x.WaveRemark })
+            .Select(group => new ShardWaveOptionAggregateRow(
+                group.Key.WaveCode,
+                group.Key.WaveRemark,
+                group.Max(x => x.LatestUpdatedTimeLocal)))
+            .ToListAsync(ct);
+
+        var options = new Dictionary<string, WaveOptionCandidate>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in rows)
+        {
+            var normalizedRemark = NormalizeOptionalText(row.WaveRemark);
+            if (!options.TryGetValue(row.WaveCode, out var existing))
+            {
+                options[row.WaveCode] = new WaveOptionCandidate(normalizedRemark, row.UpdatedTimeLocal);
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(normalizedRemark)
+                && (string.IsNullOrWhiteSpace(existing.WaveRemark) || row.UpdatedTimeLocal >= existing.UpdatedTimeLocal))
+            {
+                options[row.WaveCode] = new WaveOptionCandidate(normalizedRemark, row.UpdatedTimeLocal);
+            }
+        }
+
+        return options
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => new BusinessTaskWaveOptionRow
+            {
+                WaveCode = pair.Key,
+                WaveRemark = pair.Value.WaveRemark
+            })
+            .ToList();
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    private async Task<IReadOnlyList<BusinessTaskDockAggregateRow>> AggregateDockDashboardFromSnapshotsAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        string? waveCode,
+        string? dockCode,
+        CancellationToken ct)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        var normalizedWaveCode = NormalizeOptionalText(waveCode);
+        var normalizedDockCode = NormalizeOptionalText(dockCode);
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var query = db.DashboardTaskSnapshots
+            .AsNoTracking()
+            .Where(x => x.BucketStartLocal >= startTimeLocal && x.BucketStartLocal < endTimeLocal);
+        if (!string.IsNullOrWhiteSpace(normalizedWaveCode))
+        {
+            query = query.Where(x => x.WaveCode == normalizedWaveCode);
+        }
+
+        if (!string.IsNullOrWhiteSpace(normalizedDockCode))
+        {
+            query = query.Where(x => x.ResolvedDockCode == normalizedDockCode);
+        }
+
+        return await query
+            .GroupBy(x => x.ResolvedDockCode)
+            .Select(group => new BusinessTaskDockAggregateRow
+            {
+                DockCode = group.Key,
+                TotalCount = group.Sum(x => x.TotalCount),
+                SortedCount = group.Sum(x => x.Status == BusinessTaskStatus.Dropped || x.Status == BusinessTaskStatus.FeedbackPending ? x.TotalCount : 0),
+                SplitUnsortedCount = group.Sum(x => x.SourceType == BusinessTaskSourceType.Split && x.Status != BusinessTaskStatus.Dropped && x.Status != BusinessTaskStatus.FeedbackPending ? x.TotalCount : 0),
+                FullCaseUnsortedCount = group.Sum(x => x.SourceType == BusinessTaskSourceType.FullCase && x.Status != BusinessTaskStatus.Dropped && x.Status != BusinessTaskStatus.FeedbackPending ? x.TotalCount : 0),
+                SplitTotalCount = group.Sum(x => x.SourceType == BusinessTaskSourceType.Split ? x.TotalCount : 0),
+                FullCaseTotalCount = group.Sum(x => x.SourceType == BusinessTaskSourceType.FullCase ? x.TotalCount : 0),
+                SplitSortedCount = group.Sum(x => x.SourceType == BusinessTaskSourceType.Split && (x.Status == BusinessTaskStatus.Dropped || x.Status == BusinessTaskStatus.FeedbackPending) ? x.TotalCount : 0),
+                FullCaseSortedCount = group.Sum(x => x.SourceType == BusinessTaskSourceType.FullCase && (x.Status == BusinessTaskStatus.Dropped || x.Status == BusinessTaskStatus.FeedbackPending) ? x.TotalCount : 0),
+                RecirculatedCount = group.Sum(x => x.RecirculatedCount),
+                ExceptionCount = group.Sum(x => x.ExceptionCount)
+            })
+            .OrderBy(x => x.DockCode)
+            .ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    private async Task<IReadOnlyList<BusinessTaskRecirculationAggregateRow>> AggregateRecirculationSummaryFromSnapshotsAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        string? chuteCode,
+        CancellationToken ct)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        var normalizedChuteCode = NormalizeOptionalText(chuteCode);
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var query = db.DashboardTaskSnapshots
+            .AsNoTracking()
+            .Where(x => x.BucketStartLocal >= startTimeLocal && x.BucketStartLocal < endTimeLocal)
+            .Where(x => x.RecirculatedCount > 0);
+        if (!string.IsNullOrWhiteSpace(normalizedChuteCode))
+        {
+            query = query.Where(x => x.ResolvedDockCode == normalizedChuteCode);
+        }
+
+        return await query
+            .GroupBy(x => new { x.ResolvedDockCode, x.WaveCode })
+            .Select(group => new BusinessTaskRecirculationAggregateRow
+            {
+                ChuteCode = group.Key.ResolvedDockCode,
+                WaveCode = group.Key.WaveCode,
+                RecirculatedCount = group.Sum(x => x.RecirculatedCount)
+            })
+            .OrderBy(x => x.ChuteCode)
+            .ThenBy(x => x.WaveCode)
+            .ToListAsync(ct);
+    }
+
+    private static bool IsMinuteAligned(DateTime value)
+    {
+        return value.Second == 0
+            && value.Millisecond == 0
+            && value.Ticks % TimeSpan.TicksPerSecond == 0;
+    }
+
     private static void MergeProjectionFields(BusinessTaskEntity target, BusinessTaskEntity incoming)
     {
         if (target.Status == BusinessTaskStatus.Created && target.ScannedAtLocal is null && string.IsNullOrWhiteSpace(target.Barcode))
@@ -1041,19 +1672,15 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 加载投影幂等键在各分片中的已存在实体映射。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="keys">待匹配的投影幂等键。</param>
-    /// <param name="sourceTableCodes">来源表编码集合。</param>
-    /// <param name="businessKeys">业务键集合。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>已存在映射。</returns>
     private async Task<Dictionary<ProjectionKey, LoadedBusinessTask>> LoadProjectionExistingMapAsync(
         IEnumerable<ProjectionKey> keys,
         IReadOnlyList<string> sourceTableCodes,
         IReadOnlyList<string> businessKeys,
         CancellationToken ct)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var keySet = keys.ToHashSet();
         var existingByKey = new Dictionary<ProjectionKey, LoadedBusinessTask>();
         foreach (var suffix in await ListShardSuffixesWithLegacyFallbackAsync(ct))
@@ -1080,14 +1707,13 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 合并波次聚合行。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="target">聚合目标字典。</param>
-    /// <param name="rows">待合并行。</param>
     private static void MergeWaveAggregateRows(
         Dictionary<string, BusinessTaskWaveAggregateRow> target,
         IReadOnlyList<BusinessTaskWaveAggregateRow> rows)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         foreach (var row in rows)
         {
             if (!target.TryGetValue(row.WaveCode, out var merged))
@@ -1119,14 +1745,13 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 合并码头聚合行。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="target">聚合目标字典。</param>
-    /// <param name="rows">待合并行。</param>
     private static void MergeDockAggregateRows(
         Dictionary<string, BusinessTaskDockAggregateRow> target,
         IReadOnlyList<BusinessTaskDockAggregateRow> rows)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         foreach (var row in rows)
         {
             if (!target.TryGetValue(row.DockCode, out var merged))
@@ -1152,14 +1777,13 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 鍚堝苟鍥炴祦鑱氬悎琛屻€?
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="target">鑱氬悎鐩爣瀛楀吀銆?/param>
-    /// <param name="rows">寰呭悎骞惰銆?/param>
     private static void MergeRecirculationAggregateRows(
         Dictionary<string, BusinessTaskRecirculationAggregateRow> target,
         IReadOnlyList<BusinessTaskRecirculationAggregateRow> rows)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         foreach (var row in rows)
         {
             var key = $"{row.ChuteCode}||{row.WaveCode}";
@@ -1177,12 +1801,6 @@ public class BusinessTaskRepository(
         }
     }
 
-    /// <summary>
-    /// 姣旇緝涓や釜宸叉壂鎻忎换鍔＄殑鏂版棫銆?
-    /// </summary>
-    /// <param name="left">寰呮瘮杈冧换鍔?A銆?/param>
-    /// <param name="right">寰呮瘮杈冧换鍔?B銆?/param>
-    /// <returns>鑻?A 鏇存柊鍒欒繑鍥?true銆?/returns>
     private static bool IsLaterScannedTask(BusinessTaskEntity left, BusinessTaskEntity right)
     {
         var leftScanTime = left.ScannedAtLocal ?? DateTime.MinValue;
@@ -1200,33 +1818,69 @@ public class BusinessTaskRepository(
         return left.Id > right.Id;
     }
 
+    /// <summary>
+    /// 从当前波次快照表中读取最新已扫描波次。
+    /// </summary>
+    /// <param name="startTimeLocal">开始时间。</param>
+    /// <param name="endTimeLocal">结束时间。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>最新已扫描且带波次的任务投影。</returns>
+    private async Task<BusinessTaskEntity?> FindLatestScannedWithWaveFromSnapshotsAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        CancellationToken ct)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var snapshot = await db.DashboardCurrentWaveSnapshots
+            .AsNoTracking()
+            .Where(x => x.BucketStartLocal >= startTimeLocal && x.BucketStartLocal < endTimeLocal)
+            .OrderByDescending(x => x.ScannedAtLocal)
+            .ThenByDescending(x => x.BucketStartLocal)
+            .ThenByDescending(x => x.Id)
+            .FirstOrDefaultAsync(ct);
+        if (snapshot is null)
+        {
+            return null;
+        }
+
+        return new BusinessTaskEntity
+        {
+            WaveCode = snapshot.WaveCode,
+            WaveRemark = snapshot.WaveRemark,
+            Barcode = snapshot.Barcode,
+            ScannedAtLocal = snapshot.ScannedAtLocal,
+            CreatedTimeLocal = snapshot.BucketStartLocal,
+            UpdatedTimeLocal = snapshot.ScannedAtLocal
+        };
+    }
+
 
     /// <summary>
-    /// 在全部分片查询并截断返回数量。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="queryBuilder">查询构造函数。</param>
-    /// <param name="maxCount">最大返回行数。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>聚合后的前 N 行。</returns>
     private async Task<IReadOnlyList<BusinessTaskEntity>> QueryTopAcrossShardsAsync(
         Func<IQueryable<BusinessTaskEntity>, IQueryable<BusinessTaskEntity>> queryBuilder,
         int maxCount,
         CancellationToken ct)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
+        if (maxCount <= 0)
+        {
+            return [];
+        }
+
         var result = new List<BusinessTaskEntity>(maxCount);
         var suffixes = await ListShardSuffixesWithLegacyFallbackAsync(ct);
         if (suffixes.Contains(string.Empty, StringComparer.Ordinal))
         {
-            var remainingCount = maxCount - result.Count;
-            if (remainingCount > 0)
-            {
-                using var legacyScope = TableSuffixScope.Use(string.Empty);
-                await using var legacyDb = await contextFactory.CreateDbContextAsync(ct);
-                var legacyRows = await queryBuilder(legacyDb.BusinessTasks.AsNoTracking())
-                    .Take(remainingCount)
-                    .ToListAsync(ct);
-                result.AddRange(legacyRows);
-            }
+            using var legacyScope = TableSuffixScope.Use(string.Empty);
+            await using var legacyDb = await contextFactory.CreateDbContextAsync(ct);
+            var legacyRows = await queryBuilder(legacyDb.BusinessTasks.AsNoTracking())
+                .Take(maxCount)
+                .ToListAsync(ct);
+            result.AddRange(legacyRows);
         }
 
         for (var i = suffixes.Count - 1; i >= 0; i--)
@@ -1237,34 +1891,20 @@ public class BusinessTaskRepository(
                 continue;
             }
 
-            var remainingCount = maxCount - result.Count;
-            if (remainingCount <= 0)
-            {
-                break;
-            }
-
             using var scope = TableSuffixScope.Use(suffix);
             await using var db = await contextFactory.CreateDbContextAsync(ct);
             var shardRows = await queryBuilder(db.BusinessTasks.AsNoTracking())
-                .Take(remainingCount)
+                .Take(maxCount)
                 .ToListAsync(ct);
             result.AddRange(shardRows);
         }
 
         return result
-            .OrderBy(x => x.CreatedTimeLocal)
+            .OrderBy(x => x, CreatedTimeAscendingComparer)
             .Take(maxCount)
             .ToList();
     }
 
-    /// <summary>
-    /// 通过 Id 定位必须存在的业务任务所在分片。
-    /// </summary>
-    /// <param name="id">任务主键。</param>
-    /// <param name="createdTimeLocal">任务创建本地时间。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>命中的分片后缀与实体。</returns>
-    /// <exception cref="InvalidOperationException">任务不存在时抛出。</exception>
     private async Task<LoadedBusinessTask> GetRequiredByIdAsync(long id, DateTime createdTimeLocal, CancellationToken ct)
     {
         if (createdTimeLocal != DateTime.MinValue)
@@ -1290,12 +1930,73 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 在指定分片尝试按 Id 查询任务。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="id">任务主键。</param>
-    /// <param name="suffix">分片后缀。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>命中结果。</returns>
+    private async Task<bool> TryClaimFeedbackRowAsync(
+        long taskId,
+        DateTime createdTimeLocal,
+        BusinessTaskFeedbackStatus sourceStatus,
+        DateTime staleCutoffLocal,
+        DateTime claimedTimeLocal,
+        CancellationToken ct)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        var suffix = shardSuffixResolver.ResolveLocal(createdTimeLocal);
+        using var scope = TableSuffixScope.Use(suffix);
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var affectedRows = await db.BusinessTasks
+            .Where(task => task.Id == taskId)
+            .Where(task =>
+                task.FeedbackStatus == sourceStatus
+                || (task.FeedbackStatus == BusinessTaskFeedbackStatus.Processing && task.UpdatedTimeLocal < staleCutoffLocal))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(task => task.FeedbackStatus, BusinessTaskFeedbackStatus.Processing)
+                .SetProperty(task => task.UpdatedTimeLocal, claimedTimeLocal),
+                ct);
+        return affectedRows > 0;
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    private async Task<int> UpdateClaimedFeedbackBatchAsync(
+        IReadOnlyCollection<long> ids,
+        DateTime updatedTimeLocal,
+        BusinessTaskFeedbackStatus targetStatus,
+        bool isFeedbackReported,
+        bool setFeedbackTime,
+        CancellationToken ct)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        if (ids.Count == 0)
+        {
+            return 0;
+        }
+
+        var idSet = ids.Where(id => id > 0).Distinct().ToArray();
+        if (idSet.Length == 0)
+        {
+            return 0;
+        }
+
+        var affectedRows = 0;
+        foreach (var suffix in await ListShardSuffixesWithLegacyFallbackAsync(ct))
+        {
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            affectedRows += await db.BusinessTasks
+                .Where(task => idSet.Contains(task.Id) && task.FeedbackStatus == BusinessTaskFeedbackStatus.Processing)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(task => task.FeedbackStatus, targetStatus)
+                    .SetProperty(task => task.IsFeedbackReported, isFeedbackReported)
+                    .SetProperty(task => task.FeedbackTimeLocal, setFeedbackTime ? updatedTimeLocal : null)
+                    .SetProperty(task => task.UpdatedTimeLocal, updatedTimeLocal),
+                    ct);
+        }
+
+        return affectedRows;
+    }
+
     private async Task<LoadedBusinessTask?> TryFindByIdInSuffixAsync(long id, string suffix, CancellationToken ct)
     {
         using var scope = TableSuffixScope.Use(suffix);
@@ -1306,11 +2007,6 @@ public class BusinessTaskRepository(
         return entity is null ? null : new LoadedBusinessTask(suffix, entity);
     }
 
-    /// <summary>
-    /// 列出现有分片后缀，并附加空后缀用于兼容历史固定表。
-    /// </summary>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>分片后缀集合。</returns>
     private async Task<IReadOnlyList<string>> ListShardSuffixesWithLegacyFallbackAsync(CancellationToken ct)
     {
         var tables = await shardTableResolver.ListPhysicalTablesAsync(BusinessTaskLogicalTable, ct);
@@ -1322,7 +2018,6 @@ public class BusinessTaskRepository(
             .ToList();
         if (_shardingOptions.EnableLegacyBaseTableReadFallback)
         {
-            // 兼容历史固定表 business_tasks（无后缀），迁移窗口内保留读取能力。
             suffixes.Add(string.Empty);
         }
 
@@ -1330,17 +2025,14 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 根据创建时间范围计算需要命中的月份分片，并保留历史固定表兜底读取能力。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="startTimeLocal">开始时间（本地时间，含边界）。</param>
-    /// <param name="endTimeLocal">结束时间（本地时间，不含边界）。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>命中的分片后缀集合。</returns>
     private async Task<IReadOnlyList<string>> ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
         CancellationToken ct)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var availableSuffixes = await ListShardSuffixesWithLegacyFallbackAsync(ct);
         if (availableSuffixes.Count == 0)
         {
@@ -1358,7 +2050,6 @@ public class BusinessTaskRepository(
             currentMonth = currentMonth.AddMonths(1);
         }
 
-        // 容量预留：命中月份分片数量 + 可选历史固定表空后缀（用于兼容未分片的历史遗留数据）。
         var estimatedSuffixCount = targetSuffixes.Count + (_shardingOptions.EnableLegacyBaseTableReadFallback ? 1 : 0);
         var matchedSuffixes = new List<string>(estimatedSuffixCount);
         foreach (var suffix in availableSuffixes)
@@ -1379,32 +2070,20 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 业务任务分片查询结果。
+    /// 定义当前类型。
     /// </summary>
-    /// <param name="Suffix">分片后缀。</param>
-    /// <param name="Entity">任务实体。</param>
     private readonly record struct LoadedBusinessTask(string Suffix, BusinessTaskEntity Entity);
 
     /// <summary>
-    /// 投影更新目标。
+    /// 定义当前类型。
     /// </summary>
-    /// <param name="Id">目标实体主键。</param>
-    /// <param name="Incoming">投影输入实体。</param>
     private readonly record struct ProjectionUpdateTarget(long Id, BusinessTaskEntity Incoming);
 
     /// <summary>
-    /// 投影幂等键。
+    /// 定义当前类型。
     /// </summary>
-    /// <param name="SourceTableCode">来源表编码。</param>
-    /// <param name="BusinessKey">业务键。</param>
     private readonly record struct ProjectionKey(string SourceTableCode, string BusinessKey)
     {
-        /// <summary>
-        /// 创建投影幂等键。
-        /// </summary>
-        /// <param name="sourceTableCode">来源表编码。</param>
-        /// <param name="businessKey">业务键。</param>
-        /// <returns>投影幂等键；任一输入为空白时返回 null。</returns>
         public static ProjectionKey? Create(string sourceTableCode, string businessKey)
         {
             var normalizedSourceTableCode = NormalizeOptionalText(sourceTableCode);
@@ -1418,3 +2097,5 @@ public class BusinessTaskRepository(
         }
     }
 }
+
+

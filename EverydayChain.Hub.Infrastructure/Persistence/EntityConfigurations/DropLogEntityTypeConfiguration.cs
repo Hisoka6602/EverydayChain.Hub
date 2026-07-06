@@ -1,32 +1,30 @@
-using EverydayChain.Hub.Domain.Aggregates.DropLogAggregate;
+﻿using EverydayChain.Hub.Domain.Aggregates.DropLogAggregate;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace EverydayChain.Hub.Infrastructure.Persistence.EntityConfigurations;
 
 /// <summary>
-/// <see cref="DropLogEntity"/> EF Core 实体配置，映射到固定表 <c>drop_logs</c>。
+/// 定义当前类型。
 /// </summary>
 public class DropLogEntityTypeConfiguration : IEntityTypeConfiguration<DropLogEntity>
 {
-    /// <summary>物理表名（已含 Schema 信息由外部传入）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly string _tableName;
 
-    /// <summary>目标 Schema。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly string _schema;
 
-    /// <summary>
-    /// 初始化 DropLogEntityTypeConfiguration。
-    /// </summary>
-    /// <param name="tableName">物理表名。</param>
-    /// <param name="schema">目标 Schema。</param>
     public DropLogEntityTypeConfiguration(string tableName, string schema)
     {
         _tableName = tableName;
         _schema = schema;
     }
 
-    /// <inheritdoc/>
     public void Configure(EntityTypeBuilder<DropLogEntity> builder)
     {
         builder.ToTable(_tableName, _schema);
@@ -49,3 +47,4 @@ public class DropLogEntityTypeConfiguration : IEntityTypeConfiguration<DropLogEn
         builder.HasIndex(x => new { x.CreatedTimeLocal, x.TaskCode });
     }
 }
+

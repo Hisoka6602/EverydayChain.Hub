@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Domain.Enums;
+﻿using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Repositories;
 using EverydayChain.Hub.Tests.Services;
@@ -7,13 +7,10 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// SyncTaskConfigRepository 配置映射测试。
+/// 定义当前类型。
 /// </summary>
 public class SyncTaskConfigRepositoryTests
 {
-    /// <summary>
-    /// 未配置 SyncMode 时应默认映射为 KeyedMerge。
-    /// </summary>
     [Fact]
     public async Task GetByTableCodeAsync_WhenSyncModeIsBlank_ShouldDefaultToKeyedMerge()
     {
@@ -30,9 +27,6 @@ public class SyncTaskConfigRepositoryTests
         Assert.Null(definition.StatusConsumeProfile);
     }
 
-    /// <summary>
-    /// StatusDriven 模式下 PendingStatusValue 为 null 时应保持 null 语义。
-    /// </summary>
     [Fact]
     public async Task GetByTableCodeAsync_WhenStatusDrivenAndPendingNull_ShouldKeepNullPendingValue()
     {
@@ -57,9 +51,6 @@ public class SyncTaskConfigRepositoryTests
         Assert.Equal("TASKPROCESS", definition.StatusConsumeProfile.StatusColumnName);
     }
 
-    /// <summary>
-    /// StatusDriven 模式下 PendingStatusValue 应执行 Trim。
-    /// </summary>
     [Fact]
     public async Task GetByTableCodeAsync_WhenStatusDrivenAndPendingHasWhitespace_ShouldTrim()
     {
@@ -77,9 +68,6 @@ public class SyncTaskConfigRepositoryTests
         Assert.Equal("N", definition.StatusConsumeProfile!.PendingStatusValue);
     }
 
-    /// <summary>
-    /// StatusDriven 模式下 PendingStatusValue 去空白后为空时应报错。
-    /// </summary>
     [Fact]
     public async Task GetByTableCodeAsync_WhenStatusDrivenAndPendingBecomesBlank_ShouldThrow()
     {
@@ -97,9 +85,6 @@ public class SyncTaskConfigRepositoryTests
         Assert.Contains("PendingStatusValue", exception.Message);
     }
 
-    /// <summary>
-    /// StatusDriven 模式下关闭回写时应正常创建 Profile，ShouldWriteBackRemoteStatus 为 false。
-    /// </summary>
     [Fact]
     public async Task GetByTableCodeAsync_WhenStatusDrivenAndWriteBackDisabled_ShouldSucceedWithFalse()
     {
@@ -119,9 +104,6 @@ public class SyncTaskConfigRepositoryTests
         Assert.False(definition.StatusConsumeProfile!.ShouldWriteBackRemoteStatus);
     }
 
-    /// <summary>
-    /// StatusDriven 模式下配置回写审计列时应正确映射并执行 Trim。
-    /// </summary>
     [Fact]
     public async Task GetByTableCodeAsync_WhenStatusDrivenAndAuditColumnsConfigured_ShouldMapAuditColumns()
     {
@@ -142,9 +124,6 @@ public class SyncTaskConfigRepositoryTests
         Assert.Equal("FINISH_BATCH_ID", definition.StatusConsumeProfile.WriteBackBatchIdColumnName);
     }
 
-    /// <summary>
-    /// 业务任务投影列配置应正确映射并执行 Trim。
-    /// </summary>
     [Fact]
     public async Task GetByTableCodeAsync_WhenProjectionColumnsConfigured_ShouldMapProjectionColumns()
     {
@@ -200,11 +179,6 @@ public class SyncTaskConfigRepositoryTests
         Assert.Equal("LOCATION", definition.PickLocationColumn);
     }
 
-    /// <summary>
-    /// 构建默认测试配置。
-    /// </summary>
-    /// <param name="configureTable">表级配置回调。</param>
-    /// <returns>同步任务配置。</returns>
     private static SyncJobOptions BuildOptions(Action<SyncTableOptions>? configureTable = null)
     {
         var table = new SyncTableOptions
@@ -247,3 +221,4 @@ public class SyncTaskConfigRepositoryTests
         };
     }
 }
+

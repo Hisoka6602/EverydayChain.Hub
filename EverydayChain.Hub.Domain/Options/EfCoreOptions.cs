@@ -1,15 +1,18 @@
-namespace EverydayChain.Hub.Domain.Options;
+﻿namespace EverydayChain.Hub.Domain.Options;
 
 /// <summary>
-/// EF Core 运行时配置，从 <c>appsettings.json</c> 的 <c>EfCore</c> 节点绑定。
+/// 定义当前类型。
 /// </summary>
 public sealed class EfCoreOptions
 {
-    /// <summary>配置节名称。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     public const string SectionName = "EfCore";
 
     /// <summary>
-    /// SQL 命令超时秒数（可填写范围：1~600；默认 30）。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int CommandTimeoutSeconds { get; set; } = 30;
 }
+

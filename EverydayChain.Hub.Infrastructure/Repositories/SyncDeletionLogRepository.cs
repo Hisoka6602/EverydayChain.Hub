@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Aggregates.SyncDeletionLogAggregate;
 using EverydayChain.Hub.Domain.Sync;
 using EverydayChain.Hub.Infrastructure.Persistence;
@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 同步删除日志仓储 SQL Server 持久化实现（按月分片）。
+/// 定义当前类型。
 /// </summary>
 public class SyncDeletionLogRepository(
     IDbContextFactory<HubDbContext> dbContextFactory,
@@ -18,10 +18,11 @@ public class SyncDeletionLogRepository(
     IShardTableProvisioner shardTableProvisioner,
     ILogger<SyncDeletionLogRepository> logger) : ISyncDeletionLogRepository
 {
-    /// <summary>同步删除日志逻辑表名。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string SyncDeletionLogLogicalTable = "sync_deletion_logs";
 
-    /// <inheritdoc/>
     public async Task WriteDeletionsAsync(IReadOnlyList<SyncDeletionLog> logs, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -52,11 +53,6 @@ public class SyncDeletionLogRepository(
         }
     }
 
-    /// <summary>
-    /// 构建待持久化实体集合。
-    /// </summary>
-    /// <param name="logs">删除日志集合。</param>
-    /// <returns>按分片后缀标注的实体集合。</returns>
     private List<StagedDeletionLogEntity> BuildStagedEntities(IReadOnlyList<SyncDeletionLog> logs)
     {
         var stagedEntities = new List<StagedDeletionLogEntity>(logs.Count);
@@ -85,9 +81,9 @@ public class SyncDeletionLogRepository(
     }
 
     /// <summary>
-    /// 已分片的删除日志实体。
+    /// 定义当前类型。
     /// </summary>
-    /// <param name="Suffix">分片后缀。</param>
-    /// <param name="Entity">持久化实体。</param>
     private readonly record struct StagedDeletionLogEntity(string Suffix, SyncDeletionLogEntity Entity);
 }
+
+

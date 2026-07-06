@@ -1,17 +1,14 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 业务任务模拟补数应用服务测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class BusinessTaskSeedServiceTests
 {
-    /// <summary>
-    /// 空条码集合应失败。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldFail_WhenBarcodeCollectionIsEmpty()
     {
@@ -27,9 +24,6 @@ public sealed class BusinessTaskSeedServiceTests
         Assert.Equal("条码集合不能为空。", result.Message);
     }
 
-    /// <summary>
-    /// 全空白条码应失败。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldFail_WhenAllBarcodesAreWhitespace()
     {
@@ -45,9 +39,6 @@ public sealed class BusinessTaskSeedServiceTests
         Assert.Equal("条码清洗后为空，请至少提供一个有效条码。", result.Message);
     }
 
-    /// <summary>
-    /// 请求内重复条码应去重并统计。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldDeduplicate_WhenRequestContainsDuplicates()
     {
@@ -66,9 +57,6 @@ public sealed class BusinessTaskSeedServiceTests
         Assert.Equal(["BC001", "BC002"], repository.LastCommand!.Barcodes);
     }
 
-    /// <summary>
-    /// 去重后应保留首次出现顺序。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldKeepInputOrder_AfterDeduplication()
     {
@@ -86,9 +74,6 @@ public sealed class BusinessTaskSeedServiceTests
         Assert.Equal(["BC003", "BC001", "BC002"], repository.LastCommand!.Barcodes);
     }
 
-    /// <summary>
-    /// 仓储返回条码明细应原样透传。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldPassThroughBarcodeDetails_FromRepositoryResult()
     {
@@ -118,9 +103,6 @@ public sealed class BusinessTaskSeedServiceTests
         Assert.Equal(["BC002"], result.SkippedBarcodes);
     }
 
-    /// <summary>
-    /// 超出最大条码数量应失败。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldFail_WhenBarcodesExceedLimit()
     {
@@ -136,3 +118,4 @@ public sealed class BusinessTaskSeedServiceTests
         Assert.Equal("单次最多允许提交 5000 个条码。", result.Message);
     }
 }
+

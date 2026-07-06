@@ -1,16 +1,10 @@
 namespace EverydayChain.Hub.SharedKernel.Utilities;
 
 /// <summary>
-/// 运行期存储路径解析工具。
+/// 定义当前类型。
 /// </summary>
 public static class RuntimeStoragePathResolver
 {
-    /// <summary>
-    /// 将配置路径解析为绝对路径。
-    /// </summary>
-    /// <param name="configuredPath">配置路径。</param>
-    /// <param name="defaultRelativePath">默认相对路径。</param>
-    /// <returns>绝对路径。</returns>
     public static string ResolveAbsolutePath(string configuredPath, string defaultRelativePath)
     {
         if (string.IsNullOrWhiteSpace(configuredPath))

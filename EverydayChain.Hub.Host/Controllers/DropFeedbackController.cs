@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Host.Contracts.Requests;
@@ -8,36 +8,32 @@ using EverydayChain.Hub.SharedKernel.Utilities;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 落格回传控制器，负责接收分拣落格结果并回写业务任务状态。
+/// 定义当前类型。
 /// </summary>
 [ApiController]
 [Route("api/v1/drop-feedback")]
 public sealed class DropFeedbackController : ControllerBase {
     /// <summary>
-    /// 落格回传应用服务。
+    /// 存储当前字段值。
     /// </summary>
     private readonly IDropFeedbackService dropFeedbackService;
 
     /// <summary>
-    /// 初始化落格回传控制器。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="dropFeedbackService">落格回传应用服务。</param>
     public DropFeedbackController(IDropFeedbackService dropFeedbackService) {
+        // 步骤：按既定流程执行当前方法逻辑。
         this.dropFeedbackService = dropFeedbackService;
     }
 
     /// <summary>
-    /// 接收落格回传请求。
-    /// 请求条件：任务编码与条码至少一项，实际落格编码必填，落格时间必须为本地时间。
-    /// 返回语义：受理成功返回 200；关键字段缺失或时间非法返回 400。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">落格回传请求。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>落格回传处理结果，包含受理状态、任务编码与最新任务状态。</returns>
     [HttpPost("confirm")]
     [ProducesResponseType(typeof(ApiResponse<DropFeedbackResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<DropFeedbackResponse>), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ApiResponse<DropFeedbackResponse>>> ConfirmAsync([FromBody] DropFeedbackRequest request, CancellationToken cancellationToken) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (string.IsNullOrWhiteSpace(request.Barcode) && string.IsNullOrWhiteSpace(request.TaskCode)) {
             return BadRequest(ApiResponse<DropFeedbackResponse>.Fail("任务编码与条码不能同时为空，至少提供一项。"));
         }
@@ -69,3 +65,4 @@ public sealed class DropFeedbackController : ControllerBase {
         return Ok(ApiResponse<DropFeedbackResponse>.Success(response, applicationResult.Message));
     }
 }
+

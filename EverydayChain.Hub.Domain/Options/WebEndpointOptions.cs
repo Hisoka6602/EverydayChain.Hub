@@ -1,22 +1,23 @@
-namespace EverydayChain.Hub.Domain.Options;
+﻿namespace EverydayChain.Hub.Domain.Options;
 
 /// <summary>
-/// Web 监听地址配置。
+/// 定义当前类型。
 /// </summary>
 public sealed class WebEndpointOptions
 {
     /// <summary>
-    /// 配置节名称。
+    /// 存储当前字段值。
     /// </summary>
     public const string SectionName = "WebEndpoint";
 
     /// <summary>
-    /// Web 监听地址（可填写范围：合法 http/https URL；默认值：http://localhost:5188）。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string Url { get; set; } = "http://localhost:5188";
 
     /// <summary>
-    /// 请求超时秒数（可填写范围：1~600；默认值：30）。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int RequestTimeoutSeconds { get; set; } = 30;
 }
+

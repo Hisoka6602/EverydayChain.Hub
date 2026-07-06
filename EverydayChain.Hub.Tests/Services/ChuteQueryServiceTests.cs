@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Services;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
@@ -6,13 +6,10 @@ using EverydayChain.Hub.Domain.Enums;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 请求格口服务测试（接入真实仓储替身）。
+/// 定义当前类型。
 /// </summary>
 public sealed class ChuteQueryServiceTests
 {
-    /// <summary>
-    /// 构建测试用的 ChuteQueryService。
-    /// </summary>
     private static (ChuteQueryService Service, InMemoryBusinessTaskRepository Repository) CreateService()
     {
         var repo = new InMemoryBusinessTaskRepository();
@@ -20,9 +17,6 @@ public sealed class ChuteQueryServiceTests
         return (service, repo);
     }
 
-    /// <summary>
-    /// 任务不存在时应返回失败结果。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldFail_WhenTaskNotFound()
     {
@@ -39,9 +33,6 @@ public sealed class ChuteQueryServiceTests
         Assert.Empty(result.ChuteCode);
     }
 
-    /// <summary>
-    /// 任务状态不是已扫描时应返回失败结果。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldFail_WhenTaskIsNotScanned()
     {
@@ -66,9 +57,6 @@ public sealed class ChuteQueryServiceTests
         Assert.Contains("Created", result.Message);
     }
 
-    /// <summary>
-    /// 任务已扫描但条码未携带格口时应返回失败结果。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldFail_WhenBarcodeHasNoChuteInfo()
     {
@@ -92,9 +80,6 @@ public sealed class ChuteQueryServiceTests
         Assert.Contains("未携带受支持的目标格口信息", result.Message);
     }
 
-    /// <summary>
-    /// 任务已扫描且有目标格口时应返回成功结果。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldSucceed_WhenTaskIsScannedWithChute()
     {
@@ -119,9 +104,6 @@ public sealed class ChuteQueryServiceTests
         Assert.Equal("1", result.ChuteCode);
     }
 
-    /// <summary>
-    /// 任务已落格且条码可解析出格口时应支持重复请求并返回成功结果。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldSucceed_WhenTaskIsDroppedAndBarcodeCanResolveChute()
     {
@@ -147,9 +129,6 @@ public sealed class ChuteQueryServiceTests
         Assert.Equal("1", result.ChuteCode);
     }
 
-    /// <summary>
-    /// 按任务编码查找优先于条码查找。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldPreferTaskCodeOverBarcode()
     {
@@ -178,9 +157,6 @@ public sealed class ChuteQueryServiceTests
         Assert.Equal("4", result.ChuteCode);
     }
 
-    /// <summary>
-    /// 任务已持久化目标格口时应直接返回，避免重复条码解析。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldUsePersistedTargetChuteCode_WhenTargetChuteCodeExists()
     {
@@ -207,3 +183,4 @@ public sealed class ChuteQueryServiceTests
         Assert.Equal("6", result.ChuteCode);
     }
 }
+

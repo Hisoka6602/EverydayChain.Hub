@@ -1,42 +1,43 @@
-namespace EverydayChain.Hub.Application.Models;
+﻿namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 波次摘要查询结果。
+/// 定义当前类型。
 /// </summary>
 public sealed class WaveSummaryQueryResult
 {
     /// <summary>
-    /// 波次号。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string WaveCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 波次备注。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string? WaveRemark { get; set; }
 
     /// <summary>
-    /// 总件数。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int TotalCount { get; set; }
 
     /// <summary>
-    /// 未分拣件数。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int UnsortedCount { get; set; }
 
     /// <summary>
-    /// 分拣进度百分比。
+    /// 获取或设置当前属性值。
     /// </summary>
     public decimal SortedProgressPercent { get; set; }
 
     /// <summary>
-    /// 回流件数。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int RecirculatedCount { get; set; }
 
     /// <summary>
-    /// 异常件数。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int ExceptionCount { get; set; }
 }
+

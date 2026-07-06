@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
@@ -7,68 +7,124 @@ using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Application.Queries;
 
+/// <summary>
+/// 定义当前类型。
+/// </summary>
 public sealed class BoxTrackingQueryService(
     IScanLogRepository scanLogRepository,
     IBusinessTaskRepository businessTaskRepository) : IBoxTrackingQueryService
 {
+    /// <summary>
+    /// 存储业务任务查询策略。
+    /// </summary>
     private readonly BusinessTaskQueryPolicy _queryPolicy = new();
 
+    /// <summary>
+    /// 查询箱子追踪分页结果。
+    /// </summary>
+    /// <param name="request">查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>箱子追踪分页结果。</returns>
     public async Task<BoxTrackingQueryResult> QueryAsync(BoxTrackingQueryRequest request, CancellationToken cancellationToken)
     {
+        // 步骤：先规范分页参数，再根据筛选类型选择数据库分页或全量筛选路径。
+        var pageNumber = request.PageNumber < 1 ? 1 : request.PageNumber;
+        var pageSize = request.PageSize <= 0 ? 50 : request.PageSize;
         var result = new BoxTrackingQueryResult
         {
             StartTimeLocal = request.StartTimeLocal,
             EndTimeLocal = request.EndTimeLocal,
-            PageNumber = request.PageNumber < 1 ? 1 : request.PageNumber,
-            PageSize = request.PageSize <= 0 ? 50 : request.PageSize
+            PageNumber = pageNumber,
+            PageSize = pageSize
         };
         if (request.EndTimeLocal <= request.StartTimeLocal)
         {
             return result;
         }
 
-        var skip = (result.PageNumber - 1) * result.PageSize;
-        var page = await scanLogRepository.QueryPageAsync(
+        if (!HasTaskLevelFilters(request))
+        {
+            var skip = (pageNumber - 1) * pageSize;
+            var page = await scanLogRepository.QueryPageAsync(
+                request.StartTimeLocal,
+                request.EndTimeLocal,
+                request.BoxId,
+                request.Scanner,
+                skip,
+                pageSize,
+                cancellationToken);
+            var taskIds = page.Items
+                .Where(item => item.BusinessTaskId.HasValue)
+                .Select(item => item.BusinessTaskId!.Value)
+                .Distinct()
+                .ToArray();
+            var taskMap = await businessTaskRepository.GetByIdsAsync(taskIds, cancellationToken);
+            result.TotalCount = page.TotalCount;
+            result.Items = page.Items
+                .Select(log => MapItem(log, ResolveTask(log, taskMap)))
+                .Where(item => item is not null)
+                .Select(item => item!)
+                .ToList();
+            return result;
+        }
+
+        var items = await QueryAllAsync(request, cancellationToken);
+        var pageSkip = (pageNumber - 1) * pageSize;
+        result.TotalCount = items.Count;
+        result.Items = items.Skip(pageSkip).Take(pageSize).ToList();
+        return result;
+    }
+
+    /// <summary>
+    /// 查询满足条件的全部箱子追踪结果。
+    /// </summary>
+    /// <param name="request">查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>全部箱子追踪结果。</returns>
+    public async Task<IReadOnlyList<BoxTrackingItem>> QueryAllAsync(BoxTrackingQueryRequest request, CancellationToken cancellationToken)
+    {
+        // 步骤：先按扫描日志范围取数，再关联业务任务并执行任务级筛选。
+        if (request.EndTimeLocal <= request.StartTimeLocal)
+        {
+            return Array.Empty<BoxTrackingItem>();
+        }
+
+        var logs = await scanLogRepository.QueryRangeAsync(
             request.StartTimeLocal,
             request.EndTimeLocal,
             request.BoxId,
             request.Scanner,
-            skip,
-            result.PageSize,
             cancellationToken);
 
-        var taskIds = page.Items
+        var taskIds = logs
             .Where(item => item.BusinessTaskId.HasValue)
             .Select(item => item.BusinessTaskId!.Value)
             .Distinct()
             .ToArray();
         var taskMap = await businessTaskRepository.GetByIdsAsync(taskIds, cancellationToken);
+        var normalizedOrderId = NormalizeOptionalText(request.OrderId);
+        var normalizedStoreId = NormalizeOptionalText(request.StoreId);
+        var normalizedChuteCode = NormalizeOptionalText(request.ChuteCode);
 
-        var items = page.Items
-            .Select(log => MapItem(log, ResolveTask(log, taskMap), request.ChuteCode))
+        return logs
+            .Select(log => MapItem(log, ResolveTask(log, taskMap)))
             .Where(item => item is not null)
             .Select(item => item!)
+            .Where(item => normalizedOrderId is null || string.Equals(item.OrderId, normalizedOrderId, StringComparison.OrdinalIgnoreCase))
+            .Where(item => normalizedStoreId is null || string.Equals(item.StoreId, normalizedStoreId, StringComparison.OrdinalIgnoreCase))
+            .Where(item => normalizedChuteCode is null || string.Equals(item.Chute, normalizedChuteCode, StringComparison.OrdinalIgnoreCase))
             .ToList();
-
-        result.TotalCount = string.IsNullOrWhiteSpace(request.ChuteCode)
-            ? page.TotalCount
-            : items.Count + skip;
-        result.Items = items;
-        return result;
     }
 
-    private BoxTrackingItem? MapItem(
-        ScanLogEntity log,
-        BusinessTaskEntity? task,
-        string? requestedChuteCode)
+    /// <summary>
+    /// 将扫描日志和业务任务映射为箱子追踪项。
+    /// </summary>
+    /// <param name="log">扫描日志。</param>
+    /// <param name="task">业务任务。</param>
+    /// <returns>箱子追踪项。</returns>
+    private BoxTrackingItem MapItem(ScanLogEntity log, BusinessTaskEntity? task)
     {
         var chute = task is null ? null : ResolveChute(task);
-        if (!string.IsNullOrWhiteSpace(requestedChuteCode)
-            && !string.Equals(chute, requestedChuteCode.Trim(), StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
         return new BoxTrackingItem
         {
             BoxId = log.Barcode,
@@ -88,10 +144,27 @@ public sealed class BoxTrackingQueryService(
         };
     }
 
+    /// <summary>
+    /// 判断请求是否包含任务级筛选条件。
+    /// </summary>
+    /// <param name="request">查询条件。</param>
+    /// <returns>包含任务级筛选时返回真。</returns>
+    private static bool HasTaskLevelFilters(BoxTrackingQueryRequest request)
+    {
+        // 步骤：仅订单、门店、码头依赖业务任务字段，存在时必须走全量筛选路径。
+        return !string.IsNullOrWhiteSpace(request.OrderId)
+            || !string.IsNullOrWhiteSpace(request.StoreId)
+            || !string.IsNullOrWhiteSpace(request.ChuteCode);
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     private static BusinessTaskEntity? ResolveTask(
         ScanLogEntity log,
         IReadOnlyDictionary<long, BusinessTaskEntity> taskMap)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (!log.BusinessTaskId.HasValue)
         {
             return null;
@@ -115,6 +188,12 @@ public sealed class BoxTrackingQueryService(
         return string.IsNullOrWhiteSpace(task.ResolvedDockCode) ? null : task.ResolvedDockCode.Trim();
     }
 
+    /// <summary>
+    /// 解析箱子追踪状态。
+    /// </summary>
+    /// <param name="log">扫描日志。</param>
+    /// <param name="task">业务任务。</param>
+    /// <returns>状态文案。</returns>
     private string ResolveStatus(ScanLogEntity log, BusinessTaskEntity? task)
     {
         if (!log.IsMatched)
@@ -139,4 +218,15 @@ public sealed class BoxTrackingQueryService(
 
         return "Scanned";
     }
+
+    /// <summary>
+    /// 归一化可选文本。
+    /// </summary>
+    /// <param name="value">原始值。</param>
+    /// <returns>归一化后的值。</returns>
+    private static string? NormalizeOptionalText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
 }
+

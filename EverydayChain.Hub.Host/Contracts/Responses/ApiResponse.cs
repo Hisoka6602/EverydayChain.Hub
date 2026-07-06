@@ -1,36 +1,29 @@
-namespace EverydayChain.Hub.Host.Contracts.Responses;
+﻿namespace EverydayChain.Hub.Host.Contracts.Responses;
 
 /// <summary>
-/// 统一 API 返回包装。
+/// 定义当前类型。
 /// </summary>
-/// <typeparam name="T">业务数据类型。</typeparam>
 public sealed class ApiResponse<T> {
     /// <summary>
-    /// 接口处理是否成功。
-    /// true 表示业务处理完成且可消费 <see cref="Data"/>；
-    /// false 表示处理失败，失败原因见 <see cref="Message"/>。
+    /// 获取或设置当前属性值。
     /// </summary>
     public bool IsSuccess { get; set; }
 
     /// <summary>
-    /// 响应消息文本。
-    /// 成功时通常为业务成功提示；失败时为可读错误原因。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string Message { get; set; } = string.Empty;
 
     /// <summary>
-    /// 业务数据载荷。
-    /// 失败场景可能为 null；部分失败场景可能返回附带数据用于定位问题。
+    /// 获取或设置当前属性值。
     /// </summary>
     public T? Data { get; set; }
 
     /// <summary>
-    /// 生成成功响应。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="data">业务数据。</param>
-    /// <param name="message">响应消息。</param>
-    /// <returns>成功响应。</returns>
     public static ApiResponse<T> Success(T data, string message) {
+        // 步骤：按既定流程执行当前方法逻辑。
         return new ApiResponse<T> {
             IsSuccess = true,
             Message = message,
@@ -39,11 +32,10 @@ public sealed class ApiResponse<T> {
     }
 
     /// <summary>
-    /// 生成失败响应。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="message">失败消息。</param>
-    /// <returns>失败响应。</returns>
     public static ApiResponse<T> Fail(string message) {
+        // 步骤：按既定流程执行当前方法逻辑。
         return new ApiResponse<T> {
             IsSuccess = false,
             Message = message,
@@ -52,12 +44,10 @@ public sealed class ApiResponse<T> {
     }
 
     /// <summary>
-    /// 生成包含业务数据的失败响应。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="message">失败消息。</param>
-    /// <param name="data">失败附带数据。</param>
-    /// <returns>失败响应。</returns>
     public static ApiResponse<T> Fail(string message, T data) {
+        // 步骤：按既定流程执行当前方法逻辑。
         return new ApiResponse<T> {
             IsSuccess = false,
             Message = message,
@@ -65,3 +55,4 @@ public sealed class ApiResponse<T> {
         };
     }
 }
+

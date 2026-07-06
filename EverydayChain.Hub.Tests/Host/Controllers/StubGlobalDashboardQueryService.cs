@@ -1,21 +1,18 @@
-using EverydayChain.Hub.Application.Abstractions.Queries;
+﻿using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
 
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 总看板查询服务替身。
+/// 定义当前类型。
 /// </summary>
 internal sealed class StubGlobalDashboardQueryService : IGlobalDashboardQueryService
 {
     /// <summary>
-    /// 最近一次查询请求。
+    /// 获取或设置当前属性值。
     /// </summary>
     public GlobalDashboardQueryRequest? LastRequest { get; private set; }
 
-    /// <summary>
-    /// 固定返回结果。
-    /// </summary>
     public GlobalDashboardQueryResult Result { get; set; } = new()
     {
         TotalCount = 10,
@@ -41,10 +38,10 @@ internal sealed class StubGlobalDashboardQueryService : IGlobalDashboardQuerySer
         }]
     };
 
-    /// <inheritdoc/>
     public Task<GlobalDashboardQueryResult> QueryAsync(GlobalDashboardQueryRequest request, CancellationToken cancellationToken)
     {
         LastRequest = request;
         return Task.FromResult(Result);
     }
 }
+

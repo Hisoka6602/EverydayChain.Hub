@@ -1,64 +1,90 @@
-using EverydayChain.Hub.Domain.Enums;
+﻿using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 业务任务查询结果项。
+/// 定义当前类型。
 /// </summary>
 public sealed class BusinessTaskQueryItem
 {
     /// <summary>
-    /// 任务编码。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string TaskCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 条码。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string? Barcode { get; set; }
 
     /// <summary>
-    /// 波次号。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string? WaveCode { get; set; }
 
     /// <summary>
-    /// 来源类型。
+    /// 获取或设置当前属性值。
     /// </summary>
     public BusinessTaskSourceType SourceType { get; set; }
 
     /// <summary>
-    /// 任务状态。
+    /// 获取或设置当前属性值。
     /// </summary>
     public BusinessTaskStatus Status { get; set; }
 
     /// <summary>
-    /// 目标格口号。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string? TargetChuteCode { get; set; }
 
     /// <summary>
-    /// 实际格口号。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string? ActualChuteCode { get; set; }
 
     /// <summary>
-    /// 码头号。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string DockCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 是否回流。
+    /// 获取或设置当前属性值。
     /// </summary>
     public bool IsRecirculated { get; set; }
 
     /// <summary>
-    /// 是否异常。
+    /// 获取或设置当前属性值。
     /// </summary>
     public bool IsException { get; set; }
 
     /// <summary>
-    /// 创建时间（本地时间）。
+    /// 获取或设置当前属性值。
     /// </summary>
     public DateTime CreatedTimeLocal { get; set; }
+
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
+    public string? OrderId { get; set; }
+
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
+    public string? StoreId { get; set; }
+
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
+    public string? StoreName { get; set; }
+
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
+    public string? ProductCode { get; set; }
+
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
+    public string? PickLocation { get; set; }
 }
+

@@ -4,10 +4,11 @@
 
 namespace EverydayChain.Hub.Infrastructure.Migrations
 {
-    /// <inheritdoc />
+    /// <summary>
+    /// 定义当前类型。
+    /// </summary>
     public partial class _20260420213000_StrengthenHotPathIndexesAndRecirculationFilter : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateIndex(
@@ -101,7 +102,6 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 column: "WorkingArea");
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(
@@ -181,3 +181,4 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
         }
     }
 }
+

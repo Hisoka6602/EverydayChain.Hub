@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Abstractions.Sync;
@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Infrastructure.Sync.Services;
 
 /// <summary>
-/// 业务任务状态驱动消费服务实现。
+/// 定义当前类型。
 /// </summary>
 public class BusinessTaskStatusConsumeService(
     IOracleStatusDrivenSourceReader sourceReader,
@@ -19,14 +19,6 @@ public class BusinessTaskStatusConsumeService(
     IBusinessTaskRepository businessTaskRepository,
     ILogger<BusinessTaskStatusConsumeService> logger) : IBusinessTaskStatusConsumeService
 {
-    /// <summary>
-    /// 执行一轮状态驱动消费。
-    /// </summary>
-    /// <param name="definition">同步定义。</param>
-    /// <param name="batchId">批次号。</param>
-    /// <param name="window">时间窗口。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>消费结果。</returns>
     public async Task<RemoteStatusConsumeResult> ConsumeAsync(SyncTableDefinition definition, string batchId, SyncWindow window, CancellationToken ct)
     {
         if (definition.StatusConsumeProfile is null)
@@ -171,17 +163,14 @@ public class BusinessTaskStatusConsumeService(
     }
 
     /// <summary>
-    /// 构建单行投影模型。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="definition">同步定义。</param>
-    /// <param name="batchId">批次号。</param>
-    /// <param name="row">远端读取行。</param>
-    /// <returns>投影行；关键字段缺失时返回空值。</returns>
     private BusinessTaskProjectionRow? TryBuildProjectionRow(
         SyncTableDefinition definition,
         string batchId,
         IReadOnlyDictionary<string, object?> row)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (!TryReadNonEmptyString(row, definition.BusinessKeyColumn, out var businessKey))
         {
             logger.LogWarning(
@@ -220,19 +209,15 @@ public class BusinessTaskStatusConsumeService(
     }
 
     /// <summary>
-    /// 解析投影业务时间，仅允许使用远端业务时间。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="definition">同步定义。</param>
-    /// <param name="batchId">批次号。</param>
-    /// <param name="businessKey">业务键。</param>
-    /// <param name="row">远端读取行。</param>
-    /// <returns>已解析的投影业务时间（本地时间）。</returns>
     private DateTime ResolveProjectedTimeLocal(
         SyncTableDefinition definition,
         string batchId,
         string businessKey,
         IReadOnlyDictionary<string, object?> row)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (TryResolveProjectedTimeFromCursorColumn(definition, row, out var projectedTimeLocal, out var fallbackReason))
         {
             return projectedTimeLocal;
@@ -250,19 +235,15 @@ public class BusinessTaskStatusConsumeService(
     }
 
     /// <summary>
-    /// 从游标列尝试解析投影业务时间。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="definition">同步定义。</param>
-    /// <param name="row">远端读取行。</param>
-    /// <param name="projectedTimeLocal">解析结果。</param>
-    /// <param name="failureReason">失败原因。</param>
-    /// <returns>解析成功返回 true，否则返回 false。</returns>
     private static bool TryResolveProjectedTimeFromCursorColumn(
         SyncTableDefinition definition,
         IReadOnlyDictionary<string, object?> row,
         out DateTime projectedTimeLocal,
         out string failureReason)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         projectedTimeLocal = default;
         failureReason = string.Empty;
         if (string.IsNullOrWhiteSpace(definition.CursorColumn))
@@ -294,13 +275,6 @@ public class BusinessTaskStatusConsumeService(
         }
     }
 
-    /// <summary>
-    /// 尝试将源值转换为本地时间。
-    /// </summary>
-    /// <param name="rawValue">源值。</param>
-    /// <param name="localTime">转换后的本地时间。</param>
-    /// <param name="failureReason">失败原因。</param>
-    /// <returns>转换成功返回 true，否则返回 false。</returns>
     private static bool TryConvertToLocalDateTime(object rawValue, out DateTime localTime, out string failureReason)
     {
         localTime = default;
@@ -350,13 +324,6 @@ public class BusinessTaskStatusConsumeService(
         return false;
     }
 
-    /// <summary>
-    /// 规范化时间 Kind，确保后续按本地时间语义处理。
-    /// </summary>
-    /// <param name="time">原始时间。</param>
-    /// <param name="localTime">规范化后的本地时间。</param>
-    /// <param name="failureReason">失败原因。</param>
-    /// <returns>规范化成功返回 true，否则返回 false。</returns>
     private static bool TryNormalizeLocalDateTime(DateTime time, out DateTime localTime, out string failureReason)
     {
         if (time.Kind == DateTimeKind.Local)
@@ -378,13 +345,6 @@ public class BusinessTaskStatusConsumeService(
         return true;
     }
 
-    /// <summary>
-    /// 读取必填文本列。
-    /// </summary>
-    /// <param name="row">行数据。</param>
-    /// <param name="columnName">列名。</param>
-    /// <param name="value">读取结果。</param>
-    /// <returns>读取成功返回 true，否则返回 false。</returns>
     private static bool TryReadNonEmptyString(IReadOnlyDictionary<string, object?> row, string columnName, out string value)
     {
         value = string.Empty;
@@ -408,13 +368,6 @@ public class BusinessTaskStatusConsumeService(
         return true;
     }
 
-    /// <summary>
-    /// 读取可选文本列。
-    /// </summary>
-    /// <param name="row">行数据。</param>
-    /// <param name="columnName">列名。</param>
-    /// <param name="value">读取结果。</param>
-    /// <returns>读取成功返回 true，否则返回 false。</returns>
     private static bool TryReadOptionalString(IReadOnlyDictionary<string, object?> row, string? columnName, out string? value)
     {
         value = null;
@@ -433,3 +386,4 @@ public class BusinessTaskStatusConsumeService(
         return true;
     }
 }
+

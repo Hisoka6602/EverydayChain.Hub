@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
@@ -12,13 +12,10 @@ using EverydayChain.Hub.Infrastructure.Services;
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// SqlServerSyncUpsertRepository 合并行为测试。
+/// 定义当前类型。
 /// </summary>
 public class SqlServerSyncUpsertRepositoryTests
 {
-    /// <summary>
-    /// 新增行应计入插入统计。
-    /// </summary>
     [Fact]
     public async Task MergeFromStagingAsync_WhenNewRow_ShouldInsert()
     {
@@ -30,9 +27,6 @@ public class SqlServerSyncUpsertRepositoryTests
         Assert.Equal(0, result.SkipCount);
     }
 
-    /// <summary>
-    /// 摘要变化应计入更新统计。
-    /// </summary>
     [Fact]
     public async Task MergeFromStagingAsync_WhenDigestChanged_ShouldUpdate()
     {
@@ -45,9 +39,6 @@ public class SqlServerSyncUpsertRepositoryTests
         Assert.Equal(0, result.SkipCount);
     }
 
-    /// <summary>
-    /// 摘要一致应计入跳过统计。
-    /// </summary>
     [Fact]
     public async Task MergeFromStagingAsync_WhenDigestUnchanged_ShouldSkip()
     {
@@ -60,9 +51,6 @@ public class SqlServerSyncUpsertRepositoryTests
         Assert.Equal(1, result.SkipCount);
     }
 
-    /// <summary>
-    /// 批量混合变更应返回正确插入/更新/跳过统计。
-    /// </summary>
     [Fact]
     public async Task MergeFromStagingAsync_WhenBatchContainsInsertUpdateSkip_ShouldReturnExpectedCounts()
     {
@@ -81,9 +69,6 @@ public class SqlServerSyncUpsertRepositoryTests
         Assert.Equal(SyncChangeOperationType.Update, result.ChangedOperations["BK2"]);
     }
 
-    /// <summary>
-    /// 分片切换时应删除旧分片并写入新分片。
-    /// </summary>
     [Fact]
     public async Task MergeFromStagingAsync_WhenShardSwitched_ShouldDeleteOldShardAndWriteNewShard()
     {
@@ -99,9 +84,6 @@ public class SqlServerSyncUpsertRepositoryTests
         Assert.Equal(1, repository.ShardMigrationDeleteCount);
     }
 
-    /// <summary>
-    /// 未配置唯一键应抛异常。
-    /// </summary>
     [Fact]
     public async Task MergeFromStagingAsync_WhenUniqueKeysMissing_ShouldThrow()
     {
@@ -126,9 +108,6 @@ public class SqlServerSyncUpsertRepositoryTests
         Assert.Contains("UniqueKeys", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// 业务键构建应对时间字段使用稳定本地时间格式。
-    /// </summary>
     [Fact]
     public void BuildBusinessKey_WhenContainsDateTime_ShouldUseInvariantLocalFormat()
     {
@@ -143,9 +122,6 @@ public class SqlServerSyncUpsertRepositoryTests
         Assert.Equal("D001|2026-04-08 10:11:12.1234567", businessKey);
     }
 
-    /// <summary>
-    /// 时间业务键组件应可稳定回解析为本地时间。
-    /// </summary>
     [Fact]
     public void TryParseBusinessKeyDateTimeComponent_WhenValid_ShouldReturnLocalDateTime()
     {
@@ -158,9 +134,6 @@ public class SqlServerSyncUpsertRepositoryTests
         Assert.Equal(new DateTime(2026, 4, 8, 10, 11, 12, 123, DateTimeKind.Local).AddTicks(4567), localDateTime);
     }
 
-    /// <summary>
-    /// 状态分表名称应按 TableCode+月份生成独立表名，格式为 sync_target_state_{tableCode}_{yyyyMM}。
-    /// </summary>
     [Theory]
     [InlineData("WmsPickToWcs", "202604", "[dbo].[sync_target_state_WmsPickToWcs_202604]")]
     [InlineData("WmsSplitPickToLightCarton", "202512", "[dbo].[sync_target_state_WmsSplitPickToLightCarton_202512]")]
@@ -172,9 +145,6 @@ public class SqlServerSyncUpsertRepositoryTests
         Assert.Equal(expectedFullName, actualFullName);
     }
 
-    /// <summary>
-    /// 状态分表名称对含非法字符的 TableCode 应抛出异常。
-    /// </summary>
     [Fact]
     public void GetSyncStateTableFullName_WhenTableCodeContainsInvalidChar_ShouldThrow()
     {
@@ -183,9 +153,6 @@ public class SqlServerSyncUpsertRepositoryTests
         Assert.Throws<InvalidOperationException>(action);
     }
 
-    /// <summary>
-    /// 状态分表名称对含非法月份标记的输入应抛出异常。
-    /// </summary>
     [Theory]
     [InlineData("2026-04")]
     [InlineData("20260")]
@@ -201,9 +168,6 @@ public class SqlServerSyncUpsertRepositoryTests
         Assert.Throws<InvalidOperationException>(action);
     }
 
-    /// <summary>
-    /// 状态分表名称对空引用（null）月份标记输入应抛出异常。
-    /// </summary>
     [Fact]
     public void GetSyncStateTableFullName_WhenStateMonthTokenIsNull_ShouldThrow()
     {
@@ -212,10 +176,6 @@ public class SqlServerSyncUpsertRepositoryTests
         Assert.Throws<InvalidOperationException>(action);
     }
 
-    /// <summary>
-    /// 创建测试仓储。
-    /// </summary>
-    /// <returns>测试仓储。</returns>
     private static InMemorySqlServerSyncUpsertRepository CreateRepository()
     {
         var syncOptions = Options.Create(new SyncJobOptions
@@ -240,12 +200,6 @@ public class SqlServerSyncUpsertRepositoryTests
             NullLogger<SqlServerSyncUpsertRepository>.Instance);
     }
 
-    /// <summary>
-    /// 构建测试请求。
-    /// </summary>
-    /// <param name="businessKey">业务键。</param>
-    /// <param name="payload">摘要载荷。</param>
-    /// <returns>合并请求。</returns>
     private static SyncMergeRequest CreateRequest(string businessKey, string payload)
     {
         return new SyncMergeRequest
@@ -265,23 +219,11 @@ public class SqlServerSyncUpsertRepositoryTests
         };
     }
 
-    /// <summary>
-    /// 构建单行测试请求（指定游标时间）。
-    /// </summary>
-    /// <param name="businessKey">业务键。</param>
-    /// <param name="payload">摘要载荷。</param>
-    /// <param name="addTime">游标时间。</param>
-    /// <returns>合并请求。</returns>
     private static SyncMergeRequest CreateRequest(string businessKey, string payload, DateTime addTime)
     {
         return CreateRequest((businessKey, payload, addTime));
     }
 
-    /// <summary>
-    /// 构建多行测试请求。
-    /// </summary>
-    /// <param name="rows">业务行集合。</param>
-    /// <returns>合并请求。</returns>
     private static SyncMergeRequest CreateRequest(params (string BusinessKey, string Payload, DateTime AddTime)[] rows)
     {
         return new SyncMergeRequest
@@ -298,3 +240,4 @@ public class SqlServerSyncUpsertRepositoryTests
         };
     }
 }
+

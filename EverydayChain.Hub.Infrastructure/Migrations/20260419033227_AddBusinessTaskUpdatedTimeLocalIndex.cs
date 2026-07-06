@@ -4,10 +4,11 @@
 
 namespace EverydayChain.Hub.Infrastructure.Migrations
 {
-    /// <inheritdoc />
+    /// <summary>
+    /// 定义当前类型。
+    /// </summary>
     public partial class AddBusinessTaskUpdatedTimeLocalIndex : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateIndex(
@@ -17,7 +18,6 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 column: "UpdatedTimeLocal");
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(
@@ -27,3 +27,4 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
         }
     }
 }
+

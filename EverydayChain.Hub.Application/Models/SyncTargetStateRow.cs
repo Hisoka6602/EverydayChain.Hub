@@ -1,22 +1,33 @@
-namespace EverydayChain.Hub.Application.Models;
+﻿namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 目标端轻量幂等状态行。
+/// 定义当前类型。
 /// </summary>
 public sealed record class SyncTargetStateRow
 {
-    /// <summary>业务键。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public string BusinessKey { get; init; } = string.Empty;
 
-    /// <summary>行摘要。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public string RowDigest { get; init; } = string.Empty;
 
-    /// <summary>游标本地时间。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public DateTime? CursorLocal { get; init; }
 
-    /// <summary>是否软删除。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public bool IsSoftDeleted { get; init; }
 
-    /// <summary>软删除时间（本地）。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public DateTime? SoftDeletedTimeLocal { get; init; }
 }
+

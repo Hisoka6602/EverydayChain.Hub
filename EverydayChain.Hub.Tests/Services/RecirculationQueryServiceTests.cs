@@ -1,10 +1,13 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Queries;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Tests.Services;
 
+/// <summary>
+/// 定义当前类型。
+/// </summary>
 public sealed class RecirculationQueryServiceTests
 {
     [Fact]
@@ -67,3 +70,4 @@ public sealed class RecirculationQueryServiceTests
         Assert.Equal(2, result.Rows[0].RecirculatedCount);
     }
 }
+

@@ -1,29 +1,26 @@
-using EverydayChain.Hub.Application.WaveCleanup.Abstractions;
+﻿using EverydayChain.Hub.Application.WaveCleanup.Abstractions;
 
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 波次清理服务桩实现。
+/// 定义当前类型。
 /// </summary>
 internal sealed class StubWaveCleanupService : IWaveCleanupService {
     /// <summary>
-    /// 最近一次兼容入口清理入参。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string? LastCleanWaveCode { get; private set; }
 
     /// <summary>
-    /// 最近一次 dry-run 入参。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string? LastDryRunWaveCode { get; private set; }
 
     /// <summary>
-    /// 最近一次正式执行入参。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string? LastExecuteWaveCode { get; private set; }
 
-    /// <summary>
-    /// dry-run 结果。
-    /// </summary>
     public WaveCleanupResult DryRunResult { get; set; } = new() {
         IdentifiedCount = 3,
         CleanedCount = 0,
@@ -31,9 +28,6 @@ internal sealed class StubWaveCleanupService : IWaveCleanupService {
         Message = "DryRun 模式：识别到 3 个待清理任务，未执行实际变更。"
     };
 
-    /// <summary>
-    /// 正式执行结果。
-    /// </summary>
     public WaveCleanupResult ExecuteResult { get; set; } = new() {
         IdentifiedCount = 3,
         CleanedCount = 3,
@@ -41,21 +35,31 @@ internal sealed class StubWaveCleanupService : IWaveCleanupService {
         Message = "已清理 3/3 个非终态任务。"
     };
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public Task<WaveCleanupResult> CleanByWaveCodeAsync(string waveCode, CancellationToken ct) {
+        // 步骤：按既定流程执行当前方法逻辑。
         LastCleanWaveCode = waveCode;
         return Task.FromResult(ExecuteResult);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public Task<WaveCleanupResult> DryRunByWaveCodeAsync(string waveCode, CancellationToken ct) {
+        // 步骤：按既定流程执行当前方法逻辑。
         LastDryRunWaveCode = waveCode;
         return Task.FromResult(DryRunResult);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public Task<WaveCleanupResult> ExecuteByWaveCodeAsync(string waveCode, CancellationToken ct) {
+        // 步骤：按既定流程执行当前方法逻辑。
         LastExecuteWaveCode = waveCode;
         return Task.FromResult(ExecuteResult);
     }
 }
+

@@ -1,55 +1,53 @@
-using System.Globalization;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using EverydayChain.Hub.Domain.Sync;
+﻿using System.Globalization;
 using System.Text.RegularExpressions;
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.Domain.Sync;
 using EverydayChain.Hub.Domain.Sync.Models;
 using EverydayChain.Hub.SharedKernel.Utilities;
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 同步配置仓储实现。
+/// 定义当前类型。
 /// </summary>
-public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, ILogger<SyncTaskConfigRepository> logger) : ISyncTaskConfigRepository {
-
-    /// <summary>时间偏移或 UTC 标记检测正则。</summary>
+public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, ILogger<SyncTaskConfigRepository> logger) : ISyncTaskConfigRepository
+{
     private static readonly Regex UtcOrOffsetRegex = new(@"(?:Z|[+\-]\d{2}:\d{2}|[+\-]\d{4})\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    /// <summary>同步配置快照。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly SyncJobOptions _options = syncJobOptions.Value;
 
-    /// <inheritdoc/>
-    public Task<SyncTableDefinition> GetByTableCodeAsync(string tableCode, CancellationToken ct) {
+    public Task<SyncTableDefinition> GetByTableCodeAsync(string tableCode, CancellationToken ct)
+    {
         var table = _options.Tables.FirstOrDefault(x => string.Equals(x.TableCode, tableCode, StringComparison.OrdinalIgnoreCase));
-        if (table is null) {
-            throw new InvalidOperationException($"未找到同步表配置: {tableCode}");
+        if (table is null)
+        {
+            throw new InvalidOperationException($"Sync table configuration was not found: {tableCode}");
         }
 
         return Task.FromResult(MapDefinition(table));
     }
 
-    /// <inheritdoc/>
-    public Task<IReadOnlyList<SyncTableDefinition>> ListEnabledAsync(CancellationToken ct) {
+    public Task<IReadOnlyList<SyncTableDefinition>> ListEnabledAsync(CancellationToken ct)
+    {
         var definitions = _options.Tables.Where(x => x.Enabled).Select(MapDefinition).ToList();
         return Task.FromResult<IReadOnlyList<SyncTableDefinition>>(definitions);
     }
 
-    /// <inheritdoc/>
-    public Task<int> GetMaxParallelTablesAsync(CancellationToken ct) {
+    public Task<int> GetMaxParallelTablesAsync(CancellationToken ct)
+    {
         var maxParallelTables = _options.MaxParallelTables > 0 ? _options.MaxParallelTables : 1;
         return Task.FromResult(maxParallelTables);
     }
 
-    /// <summary>
-    /// 映射单表配置到领域定义。
-    /// </summary>
-    /// <param name="table">单表配置。</param>
-    /// <returns>领域定义。</returns>
-    private SyncTableDefinition MapDefinition(SyncTableOptions table) {
+    private SyncTableDefinition MapDefinition(SyncTableOptions table)
+    {
         var startTimeLocal = ParseLocalTime(table.StartTimeLocal, table.TableCode);
         ValidateExcludedColumns(table);
         var syncMode = ParseSyncMode(table.SyncMode, table.TableCode);
@@ -68,7 +66,9 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         var storeNameColumn = NormalizeAndValidateOptionalIdentifier(table.StoreNameColumn, table.TableCode, nameof(table.StoreNameColumn));
         var productCodeColumn = NormalizeAndValidateOptionalIdentifier(table.ProductCodeColumn, table.TableCode, nameof(table.ProductCodeColumn));
         var pickLocationColumn = NormalizeAndValidateOptionalIdentifier(table.PickLocationColumn, table.TableCode, nameof(table.PickLocationColumn));
-        return new SyncTableDefinition {
+
+        return new SyncTableDefinition
+        {
             TableCode = table.TableCode,
             Enabled = table.Enabled,
             SyncMode = syncMode,
@@ -107,53 +107,43 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         };
     }
 
-    /// <summary>
-    /// 解析来源类型配置。
-    /// </summary>
-    /// <param name="sourceTypeText">来源类型文本。</param>
-    /// <param name="tableCode">表编码。</param>
-    /// <returns>来源类型。</returns>
-    private static BusinessTaskSourceType ParseSourceType(string? sourceTypeText, string tableCode) {
-        if (string.IsNullOrWhiteSpace(sourceTypeText)) {
+    private static BusinessTaskSourceType ParseSourceType(string? sourceTypeText, string tableCode)
+    {
+        if (string.IsNullOrWhiteSpace(sourceTypeText))
+        {
             return BusinessTaskSourceType.Unknown;
         }
 
         var normalized = sourceTypeText.Trim();
-        if (!Enum.TryParse<BusinessTaskSourceType>(normalized, true, out var sourceType) || !Enum.IsDefined(sourceType)) {
-            throw new InvalidOperationException($"表 {tableCode} 的 SourceType 配置非法，仅支持 Split 或 FullCase。");
+        if (!Enum.TryParse<BusinessTaskSourceType>(normalized, true, out var sourceType) || !Enum.IsDefined(sourceType))
+        {
+            throw new InvalidOperationException($"Table {tableCode} has an invalid SourceType value. Only Split or FullCase are supported.");
         }
 
         return sourceType;
     }
 
-    /// <summary>
-    /// 解析同步模式配置。
-    /// </summary>
-    /// <param name="syncModeText">同步模式文本。</param>
-    /// <param name="tableCode">表编码。</param>
-    /// <returns>同步模式。</returns>
-    private static SyncMode ParseSyncMode(string? syncModeText, string tableCode) {
-        if (string.IsNullOrWhiteSpace(syncModeText)) {
+    private static SyncMode ParseSyncMode(string? syncModeText, string tableCode)
+    {
+        if (string.IsNullOrWhiteSpace(syncModeText))
+        {
             return SyncMode.KeyedMerge;
         }
 
         var normalized = syncModeText.Trim();
-        if (!Enum.TryParse<SyncMode>(normalized, true, out var mode) || !Enum.IsDefined(mode)) {
+        if (!Enum.TryParse<SyncMode>(normalized, true, out var mode) || !Enum.IsDefined(mode))
+        {
             throw new InvalidOperationException(
-                $"表 {tableCode} 的 SyncMode 配置非法，仅支持 {nameof(SyncMode.KeyedMerge)} 或 {nameof(SyncMode.StatusDriven)}。");
+                $"Table {tableCode} has an invalid SyncMode value. Only {nameof(SyncMode.KeyedMerge)} or {nameof(SyncMode.StatusDriven)} are supported.");
         }
 
         return mode;
     }
 
-    /// <summary>
-    /// 构建状态驱动消费配置。
-    /// </summary>
-    /// <param name="table">单表配置。</param>
-    /// <param name="syncMode">同步模式。</param>
-    /// <returns>状态消费配置；非 StatusDriven 模式返回 null。</returns>
-    private static RemoteStatusConsumeProfile? BuildStatusConsumeProfile(SyncTableOptions table, SyncMode syncMode) {
-        if (syncMode != SyncMode.StatusDriven) {
+    private static RemoteStatusConsumeProfile? BuildStatusConsumeProfile(SyncTableOptions table, SyncMode syncMode)
+    {
+        if (syncMode != SyncMode.StatusDriven)
+        {
             return null;
         }
 
@@ -164,11 +154,22 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         var writeBackCompletedTimeColumnName = NormalizeAndValidateOptionalIdentifier(table.WriteBackCompletedTimeColumnName, table.TableCode, nameof(table.WriteBackCompletedTimeColumnName));
         var writeBackBatchIdColumnName = NormalizeAndValidateOptionalIdentifier(table.WriteBackBatchIdColumnName, table.TableCode, nameof(table.WriteBackBatchIdColumnName));
 
-        var pendingStatusValue = string.IsNullOrWhiteSpace(table.PendingStatusValue)
-       ? null
-       : table.PendingStatusValue.Trim();
+        string? pendingStatusValue;
+        if (table.PendingStatusValue is null)
+        {
+            pendingStatusValue = null;
+        }
+        else
+        {
+            pendingStatusValue = table.PendingStatusValue.Trim();
+            if (pendingStatusValue.Length == 0)
+            {
+                throw new InvalidOperationException($"Table {table.TableCode} has an invalid PendingStatusValue. Use null or a non-empty value.");
+            }
+        }
 
-        return new RemoteStatusConsumeProfile {
+        return new RemoteStatusConsumeProfile
+        {
             StatusColumnName = statusColumnName,
             PendingStatusValue = pendingStatusValue,
             CompletedStatusValue = completedStatusValue,
@@ -179,15 +180,10 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         };
     }
 
-    /// <summary>
-    /// 规范化可选标识符并执行安全校验。
-    /// </summary>
-    /// <param name="identifierText">标识符文本。</param>
-    /// <param name="tableCode">表编码。</param>
-    /// <param name="fieldName">字段名。</param>
-    /// <returns>规范化后的标识符；空白返回 null。</returns>
-    private static string? NormalizeAndValidateOptionalIdentifier(string? identifierText, string tableCode, string fieldName) {
-        if (string.IsNullOrWhiteSpace(identifierText)) {
+    private static string? NormalizeAndValidateOptionalIdentifier(string? identifierText, string tableCode, string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(identifierText))
+        {
             return null;
         }
 
@@ -196,94 +192,87 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         return normalized;
     }
 
-    /// <summary>
-    /// 校验标识符安全性。
-    /// </summary>
-    /// <param name="identifier">标识符文本。</param>
-    /// <param name="tableCode">表编码。</param>
-    /// <param name="fieldName">字段名。</param>
-    private static void EnsureSafeIdentifier(string identifier, string tableCode, string fieldName) {
-        if (!identifier.All(ch => char.IsLetterOrDigit(ch) || ch == '_')) {
-            throw new InvalidOperationException($"表 {tableCode} 的 {fieldName} 包含非法字符，仅允许字母、数字、下划线。");
+    private static void EnsureSafeIdentifier(string identifier, string tableCode, string fieldName)
+    {
+        if (!identifier.All(ch => char.IsLetterOrDigit(ch) || ch == '_'))
+        {
+            throw new InvalidOperationException($"Table {tableCode} has an invalid {fieldName} value. Only letters, digits, and underscores are allowed.");
         }
     }
 
-    /// <summary>
-    /// 校验排除列关键约束。
-    /// </summary>
-    /// <param name="table">单表配置。</param>
-    /// <exception cref="InvalidOperationException">当排除列与关键控制列冲突时抛出。</exception>
-    private static void ValidateExcludedColumns(SyncTableOptions table) {
+    private static void ValidateExcludedColumns(SyncTableOptions table)
+    {
         var excludedColumns = SyncColumnFilter.NormalizeColumns(table.ExcludedColumns);
-        if (excludedColumns.Count == 0) {
+        if (excludedColumns.Count == 0)
+        {
             return;
         }
 
         var uniqueKeys = SyncColumnFilter.NormalizeColumns(table.UniqueKeys);
         var conflictsWithUniqueKeys = uniqueKeys.Intersect(excludedColumns, StringComparer.OrdinalIgnoreCase).ToList();
-        if (conflictsWithUniqueKeys.Count > 0) {
+        if (conflictsWithUniqueKeys.Count > 0)
+        {
             throw new InvalidOperationException(
-                $"表 {table.TableCode} 的 ExcludedColumns 与 UniqueKeys 冲突：{string.Join(", ", conflictsWithUniqueKeys)}。");
+                $"Table {table.TableCode} has ExcludedColumns that conflict with UniqueKeys: {string.Join(", ", conflictsWithUniqueKeys)}.");
         }
 
         var normalizedCursorColumn = SyncColumnFilter.NormalizeColumnName(table.CursorColumn);
-        if (!string.IsNullOrWhiteSpace(normalizedCursorColumn) && excludedColumns.Contains(normalizedCursorColumn)) {
-            throw new InvalidOperationException($"表 {table.TableCode} 的 ExcludedColumns 禁止包含 CursorColumn：{table.CursorColumn}。");
+        if (!string.IsNullOrWhiteSpace(normalizedCursorColumn) && excludedColumns.Contains(normalizedCursorColumn))
+        {
+            throw new InvalidOperationException($"Table {table.TableCode} cannot include CursorColumn in ExcludedColumns: {table.CursorColumn}.");
         }
 
         var conflictsWithSoftDeleteColumns = SyncColumnFilter.SoftDeleteColumns
             .Intersect(excludedColumns, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        if (conflictsWithSoftDeleteColumns.Count > 0) {
+        if (conflictsWithSoftDeleteColumns.Count > 0)
+        {
             throw new InvalidOperationException(
-                $"表 {table.TableCode} 的 ExcludedColumns 禁止包含软删除标记列：{string.Join(", ", conflictsWithSoftDeleteColumns)}。");
+                $"Table {table.TableCode} cannot exclude soft-delete marker columns: {string.Join(", ", conflictsWithSoftDeleteColumns)}.");
         }
     }
 
-    /// <summary>
-    /// 解析本地时间字符串。
-    /// </summary>
-    /// <param name="localTimeText">时间文本。</param>
-    /// <param name="tableCode">表编码。</param>
-    /// <returns>本地时间。</returns>
-    private DateTime ParseLocalTime(string localTimeText, string tableCode) {
-        if (string.IsNullOrWhiteSpace(localTimeText)) {
-            throw new InvalidOperationException($"表 {tableCode} 的 StartTimeLocal 不能为空。");
+    private DateTime ParseLocalTime(string localTimeText, string tableCode)
+    {
+        if (string.IsNullOrWhiteSpace(localTimeText))
+        {
+            throw new InvalidOperationException($"Table {tableCode} must define StartTimeLocal.");
         }
 
-        if (UtcOrOffsetRegex.IsMatch(localTimeText)) {
-            throw new InvalidOperationException($"表 {tableCode} 的 StartTimeLocal 仅允许本地时间字符串，禁止 Z 或 offset。");
+        if (UtcOrOffsetRegex.IsMatch(localTimeText))
+        {
+            throw new InvalidOperationException($"Table {tableCode} must use a local StartTimeLocal value without UTC or offset markers.");
         }
 
-        if (!DateTime.TryParse(localTimeText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var parsed)) {
-            throw new InvalidOperationException($"表 {tableCode} 的 StartTimeLocal 无法解析。");
+        if (!DateTime.TryParse(localTimeText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var parsed))
+        {
+            throw new InvalidOperationException($"Table {tableCode} has an invalid StartTimeLocal value.");
         }
 
         var localTime = DateTime.SpecifyKind(parsed, DateTimeKind.Local);
-        logger.LogInformation("加载同步配置成功。TableCode={TableCode}, StartTimeLocal={StartTimeLocal}", tableCode, localTime);
+        logger.LogInformation("Loaded sync table configuration. TableCode={TableCode}, StartTimeLocal={StartTimeLocal}", tableCode, localTime);
         return localTime;
     }
 
-    /// <summary>
-    /// 解析同步优先级配置。
-    /// </summary>
-    /// <param name="priorityText">优先级文本。</param>
-    /// <param name="tableCode">表编码。</param>
-    /// <returns>优先级枚举。</returns>
-    private static SyncTablePriority ParsePriority(string? priorityText, string tableCode) {
-        if (string.IsNullOrWhiteSpace(priorityText)) {
+    private static SyncTablePriority ParsePriority(string? priorityText, string tableCode)
+    {
+        if (string.IsNullOrWhiteSpace(priorityText))
+        {
             return SyncTablePriority.Low;
         }
 
         var normalized = priorityText.Trim();
-        if (normalized.Equals(nameof(SyncTablePriority.High), StringComparison.OrdinalIgnoreCase)) {
+        if (normalized.Equals(nameof(SyncTablePriority.High), StringComparison.OrdinalIgnoreCase))
+        {
             return SyncTablePriority.High;
         }
 
-        if (normalized.Equals(nameof(SyncTablePriority.Low), StringComparison.OrdinalIgnoreCase)) {
+        if (normalized.Equals(nameof(SyncTablePriority.Low), StringComparison.OrdinalIgnoreCase))
+        {
             return SyncTablePriority.Low;
         }
 
-        throw new InvalidOperationException($"表 {tableCode} 的 Priority 配置非法，仅支持 High 或 Low。");
+        throw new InvalidOperationException($"Table {tableCode} has an invalid Priority value. Only High or Low are supported.");
     }
 }
+

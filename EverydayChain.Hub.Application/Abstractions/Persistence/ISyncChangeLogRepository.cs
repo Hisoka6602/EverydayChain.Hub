@@ -1,16 +1,15 @@
-using EverydayChain.Hub.Domain.Sync;
+﻿using EverydayChain.Hub.Domain.Sync;
 
 namespace EverydayChain.Hub.Application.Abstractions.Persistence;
 
 /// <summary>
-/// 同步变更日志仓储接口。
+/// 定义当前类型。
 /// </summary>
 public interface ISyncChangeLogRepository
 {
     /// <summary>
-    /// 写入变更日志。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="changes">变更集合。</param>
-    /// <param name="ct">取消令牌。</param>
     Task WriteChangesAsync(IReadOnlyList<SyncChangeLog> changes, CancellationToken ct);
 }
+

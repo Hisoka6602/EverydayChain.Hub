@@ -1,17 +1,14 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Services;
 using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// BusinessTaskProjectionService 行为测试。
+/// 定义当前类型。
 /// </summary>
 public class BusinessTaskProjectionServiceTests
 {
-    /// <summary>
-    /// 投影应将 TaskCode 固定派生为 BusinessKey。
-    /// </summary>
     [Fact]
     public void Project_ShouldSetTaskCodeFromBusinessKey()
     {
@@ -54,9 +51,6 @@ public class BusinessTaskProjectionServiceTests
         Assert.Equal("LOC-001", entity.PickLocation);
     }
 
-    /// <summary>
-    /// 业务键超过 64 字符时应拒绝投影，避免 TaskCode 超长入库。
-    /// </summary>
     [Fact]
     public void Project_WhenBusinessKeyTooLong_ShouldThrow()
     {
@@ -81,9 +75,6 @@ public class BusinessTaskProjectionServiceTests
         Assert.Contains("BusinessKey", exception.Message, StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// 投影时间缺失时应阻断投影，避免错误分片写入。
-    /// </summary>
     [Fact]
     public void Project_WhenProjectedTimeLocalMissing_ShouldThrow()
     {
@@ -106,3 +97,4 @@ public class BusinessTaskProjectionServiceTests
         Assert.Contains("无法确定分表月份", exception.Message, StringComparison.Ordinal);
     }
 }
+

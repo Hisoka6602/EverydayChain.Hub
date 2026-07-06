@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Queries;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
@@ -6,14 +6,10 @@ using EverydayChain.Hub.Domain.Enums;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 总看板查询服务测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class GlobalDashboardQueryServiceTests
 {
-    /// <summary>
-    /// 构建测试服务。
-    /// </summary>
-    /// <returns>服务与仓储替身。</returns>
     private static (GlobalDashboardQueryService Service, InMemoryBusinessTaskRepository Repository, InMemoryScanLogRepository ScanLogRepository) CreateService()
     {
         var repository = new InMemoryBusinessTaskRepository();
@@ -22,9 +18,6 @@ public sealed class GlobalDashboardQueryServiceTests
         return (service, repository, scanLogRepository);
     }
 
-    /// <summary>
-    /// 空数据时应返回全零统计。
-    /// </summary>
     [Fact]
     public async Task QueryAsync_ShouldReturnZeroResult_WhenNoTaskExists()
     {
@@ -41,9 +34,6 @@ public sealed class GlobalDashboardQueryServiceTests
         Assert.Empty(result.WaveSummaries);
     }
 
-    /// <summary>
-    /// 存在任务时应正确聚合总看板指标。
-    /// </summary>
     [Fact]
     public async Task QueryAsync_ShouldAggregateMetrics_WhenTasksExist()
     {
@@ -151,3 +141,4 @@ public sealed class GlobalDashboardQueryServiceTests
         Assert.Contains(result.WaveSummaries, x => x.WaveCode == "未分波次" && x.TotalCount == 1 && x.UnsortedCount == 0);
     }
 }
+

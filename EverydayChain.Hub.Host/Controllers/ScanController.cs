@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
@@ -9,76 +9,68 @@ using EverydayChain.Hub.SharedKernel.Utilities;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 扫描上传控制器，负责接收设备扫码数据并触发任务受理流程。
+/// 定义当前类型。
 /// </summary>
 [ApiController]
 [Route("api/v1/scan")]
 public sealed class ScanController : ControllerBase {
     /// <summary>
-    /// 当请求体为空时返回的错误消息。
+    /// 存储当前字段值。
     /// </summary>
     private const string EmptyRequestBodyMessage = "扫描上传请求体不能为空。";
 
     /// <summary>
-    /// 批量条码包含无法解析格口时的错误消息。
+    /// 存储当前字段值。
     /// </summary>
     private const string UnresolvableChuteMessage = "扫描 barcodes 内不能包含无法解析格口的条码。";
 
     /// <summary>
-    /// 批量条码包含多个格口时的错误消息。
+    /// 存储当前字段值。
     /// </summary>
     private const string MultipleChutesMessage = "扫描 barcodes 不能包含多个格口的条码。";
 
     /// <summary>
-    /// 多条码场景下非首条条码的尺寸与重量回写值。
+    /// 存储当前字段值。
     /// </summary>
     private const decimal MultiBarcodeFallbackMeasurementValue = 0M;
 
     /// <summary>
-    /// 条码最大长度限制。
+    /// 存储当前字段值。
     /// </summary>
     private const int MaxBarcodeLength = 128;
 
     /// <summary>
-    /// 单次请求允许提交的最大条码数量。
+    /// 存储当前字段值。
     /// </summary>
     private const int MaxBarcodeCountPerRequest = 100;
 
     /// <summary>
-    /// 扫描上传应用服务。
+    /// 存储当前字段值。
     /// </summary>
     private readonly IScanIngressService scanIngressService;
 
     /// <summary>
-    /// 条码解析服务。
+    /// 存储当前字段值。
     /// </summary>
     private readonly IBarcodeParser barcodeParser;
 
     /// <summary>
-    /// 初始化扫描上传控制器。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="scanIngressService">扫描上传应用服务。</param>
-    /// <param name="barcodeParser">条码解析服务。</param>
     public ScanController(IScanIngressService scanIngressService, IBarcodeParser barcodeParser) {
+        // 步骤：按既定流程执行当前方法逻辑。
         this.scanIngressService = scanIngressService;
         this.barcodeParser = barcodeParser;
     }
 
     /// <summary>
-    /// 接收扫描上传请求并批量处理条码。
-    /// 绑定语义：允许空请求体进入方法体并返回统一错误消息。
-    /// 设计意图：通过 <see cref="EmptyBodyBehavior.Allow"/> 统一返回 <see cref="EmptyRequestBodyMessage"/>，
-    /// 避免框架默认模型绑定错误消息导致的接口响应语义不一致。
-    /// 请求条件：<see cref="ScanUploadRequest.DeviceCode"/> 与 <see cref="ScanUploadRequest.Barcodes"/> 必填。
-    /// 返回语义：全部条码受理成功返回 200；存在任意条码失败返回 400 且返回逐条处理结果。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">扫描上传请求。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>扫描受理结果集合，包含每个条码的受理状态、任务编码与失败语义码。</returns>
     [HttpPost("upload")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ScanUploadResponse>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ScanUploadResponse>>), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<ScanUploadResponse>>>> UploadAsync([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] ScanUploadRequest? request, CancellationToken cancellationToken) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (request is null) {
             return BadRequest(ApiResponse<IReadOnlyList<ScanUploadResponse>>.Fail(EmptyRequestBodyMessage));
         }
@@ -143,13 +135,10 @@ public sealed class ScanController : ControllerBase {
     }
 
     /// <summary>
-    /// 统一整理请求中的条码列表。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">扫描上传请求。</param>
-    /// <param name="normalizedBarcodes">整理后的条码列表。</param>
-    /// <param name="validationMessage">条码校验失败信息。</param>
-    /// <returns>条码是否通过校验。</returns>
     private static bool TryBuildBarcodes(ScanUploadRequest request, out List<string> normalizedBarcodes, out string validationMessage) {
+        // 步骤：按既定流程执行当前方法逻辑。
         validationMessage = string.Empty;
         normalizedBarcodes = [];
         var requestBarcodes = request.Barcodes ?? [];
@@ -182,12 +171,10 @@ public sealed class ScanController : ControllerBase {
     }
 
     /// <summary>
-    /// 校验批量条码是否全部可解析且格口一致。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="barcodes">标准化条码列表。</param>
-    /// <param name="validationMessage">校验失败消息。</param>
-    /// <returns>校验通过返回 true，否则返回 false。</returns>
     private bool TryValidateBarcodeBatchChuteConsistency(IReadOnlyList<string> barcodes, out string validationMessage) {
+        // 步骤：按既定流程执行当前方法逻辑。
         validationMessage = string.Empty;
         string? firstChuteCode = null;
         foreach (var barcode in barcodes) {
@@ -211,3 +198,4 @@ public sealed class ScanController : ControllerBase {
         return true;
     }
 }
+

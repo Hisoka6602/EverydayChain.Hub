@@ -1,27 +1,34 @@
-using EverydayChain.Hub.Application.Abstractions.Sync;
+﻿using EverydayChain.Hub.Application.Abstractions.Sync;
 using EverydayChain.Hub.Domain.Sync;
 using EverydayChain.Hub.Domain.Sync.Models;
 
 namespace EverydayChain.Hub.Tests.Sync.Fakes;
 
 /// <summary>
-/// Oracle 状态读取测试替身。
+/// 定义当前类型。
 /// </summary>
 public class FakeOracleStatusDrivenSourceReader : IOracleStatusDrivenSourceReader
 {
-    /// <summary>分页结果队列。</summary>
     public Queue<IReadOnlyList<IReadOnlyDictionary<string, object?>>> Pages { get; } = new();
 
-    /// <summary>请求页码记录。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public List<int> RequestedPageNos { get; } = [];
 
-    /// <summary>最近一次传入的同步窗口。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public SyncWindow LastWindow { get; private set; }
 
-    /// <summary>最近一次传入的状态消费配置。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public RemoteStatusConsumeProfile? LastProfile { get; private set; }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReadPendingPageAsync(
         SyncTableDefinition definition,
         RemoteStatusConsumeProfile profile,
@@ -31,6 +38,7 @@ public class FakeOracleStatusDrivenSourceReader : IOracleStatusDrivenSourceReade
         SyncWindow window,
         CancellationToken ct)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         RequestedPageNos.Add(pageNo);
         LastWindow = window;
         LastProfile = profile;
@@ -42,3 +50,4 @@ public class FakeOracleStatusDrivenSourceReader : IOracleStatusDrivenSourceReade
         return Task.FromResult(Pages.Dequeue());
     }
 }
+

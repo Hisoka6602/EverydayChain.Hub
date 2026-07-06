@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Any;
@@ -10,44 +10,47 @@ using System.Text.RegularExpressions;
 namespace EverydayChain.Hub.Host.Swagger;
 
 /// <summary>
-/// 业务任务模拟补数请求的目标表名下拉增强。
+/// 定义当前类型。
 /// </summary>
 public sealed class BusinessTaskSeedTableSchemaFilter : ISchemaFilter
 {
     /// <summary>
-    /// 业务任务分表名前缀。
+    /// 存储当前字段值。
     /// </summary>
     private const string BusinessTaskTablePrefix = "business_tasks";
 
     /// <summary>
-    /// 业务任务分表名匹配正则。
+    /// 存储业务任务物理表名匹配正则。
     /// </summary>
     private static readonly Regex BusinessTaskTableNameRegex = new("^business_tasks_(\\d{6})$", RegexOptions.Compiled);
 
     /// <summary>
-    /// 分表解析仓储。
+    /// 存储当前字段值。
     /// </summary>
     private readonly IShardTableResolver _shardTableResolver;
 
     /// <summary>
-    /// 日志记录器。
+    /// 存储当前字段值。
     /// </summary>
     private readonly ILogger<BusinessTaskSeedTableSchemaFilter> _logger;
 
     /// <summary>
-    /// 初始化业务任务模拟补数表名下拉增强。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="shardTableResolver">分表解析仓储。</param>
-    /// <param name="logger">日志记录器。</param>
     public BusinessTaskSeedTableSchemaFilter(
         IShardTableResolver shardTableResolver,
         ILogger<BusinessTaskSeedTableSchemaFilter> logger)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         _shardTableResolver = shardTableResolver;
         _logger = logger;
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 为业务任务模拟补数请求填充目标表下拉枚举。
+    /// </summary>
+    /// <param name="schema">当前架构对象。</param>
+    /// <param name="context">架构过滤上下文。</param>
     public void Apply(OpenApiSchema schema, SchemaFilterContext context)
     {
         if (context.Type != typeof(BusinessTaskSeedRequest))
@@ -95,11 +98,6 @@ public sealed class BusinessTaskSeedTableSchemaFilter : ISchemaFilter
         }
     }
 
-    /// <summary>
-    /// 判断表名是否为合法业务任务分表名。
-    /// </summary>
-    /// <param name="tableName">待校验表名。</param>
-    /// <returns>合法返回 true，否则返回 false。</returns>
     private static bool IsValidBusinessTaskTableName(string tableName)
     {
         if (string.IsNullOrWhiteSpace(tableName))
@@ -121,3 +119,4 @@ public sealed class BusinessTaskSeedTableSchemaFilter : ISchemaFilter
             out _);
     }
 }
+

@@ -1,27 +1,28 @@
-namespace EverydayChain.Hub.Application.Models;
+﻿namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 波次维度统计摘要。
+/// 定义当前类型。
 /// </summary>
 public sealed class WaveDashboardSummary
 {
     /// <summary>
-    /// 波次编码。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string WaveCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 波次总件数。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int TotalCount { get; set; }
 
     /// <summary>
-    /// 波次未分拣数量。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int UnsortedCount { get; set; }
 
     /// <summary>
-    /// 波次分拣进度（百分比）。
+    /// 获取或设置当前属性值。
     /// </summary>
     public decimal SortedProgressPercent { get; set; }
 }
+

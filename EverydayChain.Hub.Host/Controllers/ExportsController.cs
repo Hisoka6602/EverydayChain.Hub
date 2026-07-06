@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Queries;
+﻿using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using EverydayChain.Hub.SharedKernel.Utilities;
@@ -7,10 +7,16 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace EverydayChain.Hub.Host.Controllers;
 
+/// <summary>
+/// 定义当前类型。
+/// </summary>
 [ApiController]
 [Route("api/v1/exports")]
 public sealed class ExportsController(IExportCatalogQueryService exportCatalogQueryService) : QueryControllerBase
 {
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     [HttpPost("catalog")]
     [ProducesResponseType(typeof(ApiResponse<ExportCatalogResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<ExportCatalogResponse>), StatusCodes.Status400BadRequest)]
@@ -19,6 +25,7 @@ public sealed class ExportsController(IExportCatalogQueryService exportCatalogQu
         [FromQuery] ExportCatalogQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -56,3 +63,4 @@ public sealed class ExportsController(IExportCatalogQueryService exportCatalogQu
         return Ok(ApiResponse<ExportCatalogResponse>.Success(response, "Export catalog query succeeded."));
     }
 }
+

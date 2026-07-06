@@ -1,26 +1,31 @@
-using EverydayChain.Hub.Application.Abstractions.Services;
+﻿using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Domain.Options;
 using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Host.Workers;
 
 /// <summary>
-/// 业务回传补偿后台任务，按配置周期重试回传失败任务。
+/// 定义当前类型。
 /// </summary>
 public sealed class FeedbackCompensationBackgroundWorker(
     IFeedbackCompensationService feedbackCompensationService,
     IOptions<FeedbackCompensationJobOptions> compensationJobOptions,
     ILogger<FeedbackCompensationBackgroundWorker> logger) : BackgroundService
 {
-    /// <summary>单轮补偿执行超时秒数（危险动作隔离器）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int SingleRunTimeoutSeconds = 300;
-    /// <summary>补偿后台任务配置快照。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly FeedbackCompensationJobOptions _compensationJobOptions = compensationJobOptions.Value;
 
     /// <summary>
-    /// 后台循环入口。
+    /// 周期执行业务回传补偿任务。
     /// </summary>
-    /// <param name="stoppingToken">取消令牌。</param>
+    /// <param name="stoppingToken">停止令牌。</param>
+    /// <returns>后台执行任务。</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (!_compensationJobOptions.Enabled)
@@ -77,3 +82,4 @@ public sealed class FeedbackCompensationBackgroundWorker(
         }
     }
 }
+

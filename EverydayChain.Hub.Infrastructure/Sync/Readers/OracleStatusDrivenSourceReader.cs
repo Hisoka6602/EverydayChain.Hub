@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using EverydayChain.Hub.Domain.Sync;
@@ -12,24 +12,28 @@ using EverydayChain.Hub.Application.Abstractions.Sync;
 namespace EverydayChain.Hub.Infrastructure.Sync.Readers;
 
 /// <summary>
-/// Oracle 状态驱动读取器。
-/// 按状态列筛选待处理数据并返回包含 <c>__RowId</c> 的结果行。
+/// 定义当前类型。
 /// </summary>
 public class OracleStatusDrivenSourceReader(
     IOptions<OracleOptions> oracleOptions,
     IDangerZoneExecutor dangerZoneExecutor,
     ILogger<OracleStatusDrivenSourceReader> logger) : IOracleStatusDrivenSourceReader {
 
-    /// <summary>默认命令超时秒数。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int DefaultCommandTimeoutSeconds = 60;
 
-    /// <summary>Oracle 配置快照。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly OracleOptions _options = oracleOptions.Value;
 
-    /// <summary>生效连接字符串。</summary>
     private readonly string _effectiveConnectionString = BuildConnectionString(oracleOptions.Value);
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReadPendingPageAsync(
         SyncTableDefinition definition,
         RemoteStatusConsumeProfile profile,
@@ -38,6 +42,7 @@ public class OracleStatusDrivenSourceReader(
         IReadOnlySet<string> normalizedExcludedColumns,
         SyncWindow window,
         CancellationToken ct) {
+            // 步骤：按既定流程执行当前方法逻辑。
         EnsureSafeIdentifier(definition.SourceSchema, nameof(definition.SourceSchema));
         EnsureSafeIdentifier(definition.SourceTable, nameof(definition.SourceTable));
         EnsureSafeIdentifier(profile.StatusColumnName, nameof(profile.StatusColumnName));
@@ -60,6 +65,9 @@ public class OracleStatusDrivenSourceReader(
         var sql = BuildReadSql(definition, profile, hasCursorFilter);
         return await dangerZoneExecutor.ExecuteAsync(
             $"OracleStatusDrivenRead:{definition.TableCode}:P{pageNo}",
+            /// <summary>
+            /// 获取或设置当前属性值。
+            /// </summary>
             async token => {
                 await using var connection = new OracleConnection(_effectiveConnectionString);
                 await connection.OpenAsync(token);
@@ -111,18 +119,10 @@ public class OracleStatusDrivenSourceReader(
     }
 
     /// <summary>
-    /// 构建状态驱动读取 SQL。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="definition">同步表定义。</param>
-    /// <param name="profile">状态消费配置。</param>
-    /// <param name="hasCursorFilter">是否追加游标列时间范围过滤条件。</param>
-    /// <returns>参数化 SQL。</returns>
-    /// <remarks>
-    /// 当 <paramref name="hasCursorFilter"/> 为 true 时，<see cref="SyncTableDefinition.CursorColumn"/>
-    /// 已在调用方 <see cref="ReadPendingPageAsync"/> 中通过 <see cref="EnsureSafeIdentifier"/> 完成
-    /// 字母/数字/下划线安全校验，可安全直接嵌入 SQL 标识符位置。
-    /// </remarks>
     private static string BuildReadSql(SyncTableDefinition definition, RemoteStatusConsumeProfile profile, bool hasCursorFilter) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var statusPredicate = profile.PendingStatusValue is null
             ? $"{profile.StatusColumnName} IS NULL"
             : $"{profile.StatusColumnName} = :p_pendingStatus";
@@ -145,11 +145,10 @@ ORDER BY RN
     }
 
     /// <summary>
-    /// 解析分页大小。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="requestedPageSize">请求分页大小。</param>
-    /// <returns>生效分页大小。</returns>
     private int ResolvePageSize(int requestedPageSize) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var maxPageSize = _options.MaxPageSize > 0 ? _options.MaxPageSize : 5000;
         if (requestedPageSize <= maxPageSize) {
             return requestedPageSize;
@@ -160,18 +159,18 @@ ORDER BY RN
     }
 
     /// <summary>
-    /// 解析命令超时秒数。
+    /// 执行当前方法。
     /// </summary>
-    /// <returns>超时秒数。</returns>
     private int ResolveCommandTimeout() {
+        // 步骤：按既定流程执行当前方法逻辑。
         return _options.CommandTimeoutSeconds > 0 ? _options.CommandTimeoutSeconds : DefaultCommandTimeoutSeconds;
     }
 
     /// <summary>
-    /// 只读命令校验。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="command">命令对象。</param>
     private void EnsureReadOnlyCommand(OracleCommand command) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (!_options.ReadOnly) {
             return;
         }
@@ -183,22 +182,21 @@ ORDER BY RN
     }
 
     /// <summary>
-    /// 校验安全标识符。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="identifier">标识符。</param>
-    /// <param name="fieldName">字段名。</param>
     private static void EnsureSafeIdentifier(string identifier, string fieldName) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (string.IsNullOrWhiteSpace(identifier) || !identifier.All(ch => char.IsLetterOrDigit(ch) || ch == '_')) {
             throw new InvalidOperationException($"{fieldName} 包含非法字符，仅允许字母、数字、下划线。 ");
         }
     }
 
     /// <summary>
-    /// 构建生效连接串。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="options">Oracle 配置。</param>
-    /// <returns>连接串。</returns>
     private static string BuildConnectionString(OracleOptions options) {
+        // 步骤：按既定流程执行当前方法逻辑。
         return OracleConnectionStringResolver.BuildEffectiveConnectionString(options);
     }
 }
+

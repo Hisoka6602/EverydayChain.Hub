@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Queries;
+﻿using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Responses;
@@ -8,6 +8,9 @@ using AppExportCatalogQueryRequest = EverydayChain.Hub.Application.Models.Export
 
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
+/// <summary>
+/// 定义当前类型。
+/// </summary>
 public sealed class ExportsControllerTests
 {
     [Fact]
@@ -32,8 +35,14 @@ public sealed class ExportsControllerTests
         Assert.NotNull(stubService.LastRequest);
     }
 
+    /// <summary>
+    /// 定义当前类型。
+    /// </summary>
     private sealed class StubExportCatalogQueryService : IExportCatalogQueryService
     {
+        /// <summary>
+        /// 获取或设置当前属性值。
+        /// </summary>
         public AppExportCatalogQueryRequest? LastRequest { get; private set; }
 
         public Task<ExportCatalogQueryResult> QueryAsync(AppExportCatalogQueryRequest request, CancellationToken cancellationToken)
@@ -71,3 +80,4 @@ public sealed class ExportsControllerTests
         }
     }
 }
+

@@ -1,62 +1,63 @@
-namespace EverydayChain.Hub.Application.Models;
+﻿namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 业务任务码头聚合行。
+/// 定义当前类型。
 /// </summary>
 public sealed class BusinessTaskDockAggregateRow
 {
     /// <summary>
-    /// 码头编码。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string DockCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 任务总数。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int TotalCount { get; set; }
 
     /// <summary>
-    /// 已分拣数。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int SortedCount { get; set; }
 
     /// <summary>
-    /// 拆零未分拣数。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int SplitUnsortedCount { get; set; }
 
     /// <summary>
-    /// 整件未分拣数。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int FullCaseUnsortedCount { get; set; }
 
     /// <summary>
-    /// 拆零总数。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int SplitTotalCount { get; set; }
 
     /// <summary>
-    /// 整件总数。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int FullCaseTotalCount { get; set; }
 
     /// <summary>
-    /// 拆零已分拣数。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int SplitSortedCount { get; set; }
 
     /// <summary>
-    /// 整件已分拣数。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int FullCaseSortedCount { get; set; }
 
     /// <summary>
-    /// 回流数。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int RecirculatedCount { get; set; }
 
     /// <summary>
-    /// 异常数（未应用 7 号码头规则前的原始计数）。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int ExceptionCount { get; set; }
 }
+

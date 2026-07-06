@@ -1,39 +1,40 @@
-using EverydayChain.Hub.Domain.Enums;
+﻿using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 条码解析结果模型。
+/// 定义当前类型。
 /// </summary>
 public sealed class BarcodeParseResult
 {
     /// <summary>
-    /// 解析后的条码类型。
+    /// 获取或设置当前属性值。
     /// </summary>
     public BarcodeType BarcodeType { get; set; } = BarcodeType.Unknown;
 
     /// <summary>
-    /// 标准化条码值。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string NormalizedBarcode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 从条码中解析出的目标格口编码，解析失败时为空。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string TargetChuteCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 是否解析有效。
+    /// 获取或设置当前属性值。
     /// </summary>
     public bool IsValid { get; set; }
 
     /// <summary>
-    /// 失败语义，成功时为 None。
+    /// 获取或设置当前属性值。
     /// </summary>
     public BarcodeParseFailureReason FailureReason { get; set; } = BarcodeParseFailureReason.None;
 
     /// <summary>
-    /// 失败描述，成功时为空。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string FailureMessage { get; set; } = string.Empty;
 }
+

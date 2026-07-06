@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
 using Microsoft.Extensions.Logging;
@@ -6,39 +6,37 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 业务任务模拟补数应用服务实现。
+/// 定义当前类型。
 /// </summary>
 public sealed class BusinessTaskSeedService : IBusinessTaskSeedService
 {
     /// <summary>
-    /// 单次请求允许的最大条码数量。
+    /// 存储当前字段值。
     /// </summary>
     private const int MaxBarcodeCountPerRequest = 5000;
 
     /// <summary>
-    /// 模拟补数仓储。
+    /// 存储当前字段值。
     /// </summary>
     private readonly IBusinessTaskSeedRepository _businessTaskSeedRepository;
 
     /// <summary>
-    /// 日志记录器。
+    /// 存储当前字段值。
     /// </summary>
     private readonly ILogger<BusinessTaskSeedService> _logger;
 
     /// <summary>
-    /// 初始化业务任务模拟补数应用服务。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="businessTaskSeedRepository">模拟补数仓储。</param>
-    /// <param name="logger">日志记录器。</param>
     public BusinessTaskSeedService(
         IBusinessTaskSeedRepository businessTaskSeedRepository,
         ILogger<BusinessTaskSeedService> logger)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         _businessTaskSeedRepository = businessTaskSeedRepository;
         _logger = logger;
     }
 
-    /// <inheritdoc/>
     public async Task<BusinessTaskSeedResult> ExecuteAsync(BusinessTaskSeedCommand command, CancellationToken cancellationToken)
     {
         if (command is null)
@@ -115,11 +113,6 @@ public sealed class BusinessTaskSeedService : IBusinessTaskSeedService
         }
     }
 
-    /// <summary>
-    /// 日志安全归一化。
-    /// </summary>
-    /// <param name="value">原始文本。</param>
-    /// <returns>去除换行后的安全文本。</returns>
     private static string SanitizeForLog(string? value)
     {
         if (string.IsNullOrEmpty(value))
@@ -132,3 +125,4 @@ public sealed class BusinessTaskSeedService : IBusinessTaskSeedService
             .Replace("\n", string.Empty, StringComparison.Ordinal);
     }
 }
+

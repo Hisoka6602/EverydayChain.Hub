@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Domain.Enums;
@@ -9,19 +9,17 @@ using Newtonsoft.Json;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 删除执行服务实现。
+/// 定义当前类型。
 /// </summary>
 public class DeletionExecutionService(
     ISyncDeletionRepository deletionRepository,
     ILogger<DeletionExecutionService> logger) : IDeletionExecutionService
 {
-    /// <summary>快照序列化配置。</summary>
     private static readonly JsonSerializerSettings SnapshotSerializerSettings = new()
     {
         Formatting = Formatting.None,
     };
 
-    /// <inheritdoc/>
     public async Task<SyncDeletionExecutionResult> ExecuteDeletionAsync(SyncExecutionContext context, CancellationToken ct)
     {
         if (!context.Definition.DeletionEnabled || context.Definition.DeletionPolicy == DeletionPolicy.Disabled)
@@ -55,7 +53,6 @@ public class DeletionExecutionService(
             businessKeys.Add(candidate.BusinessKey);
         }
 
-        // 无候选删除项时直接返回，跳过后续 DangerZone 管道调用以避免无效开销。
         if (uniqueCandidates.Count == 0)
         {
             return new SyncDeletionExecutionResult();
@@ -72,7 +69,6 @@ public class DeletionExecutionService(
         var deletionLogs = new List<SyncDeletionLog>(uniqueCandidates.Count);
         var changeLogs = new List<SyncChangeLog>(uniqueCandidates.Count);
         var executed = !context.Definition.DeletionDryRun && context.Definition.DeletionPolicy != DeletionPolicy.Disabled;
-        // 仅在实际执行删除时才获取当前时间，dry-run 或禁用策略时跳过无意义的时间戳调用。
         var nowLocal = executed ? DateTime.Now : default;
         foreach (var candidate in uniqueCandidates)
         {
@@ -123,3 +119,4 @@ public class DeletionExecutionService(
         };
     }
 }
+

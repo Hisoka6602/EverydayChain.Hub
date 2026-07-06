@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Services;
+﻿using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
@@ -6,11 +6,10 @@ using EverydayChain.Hub.Domain.Enums;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 业务任务投影服务实现，仅负责投影字段校验、标准化与实体构建。
+/// 定义当前类型。
 /// </summary>
 public class BusinessTaskProjectionService : IBusinessTaskProjectionService
 {
-    /// <inheritdoc />
     public BusinessTaskProjectionResult Project(BusinessTaskProjectionRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -32,11 +31,6 @@ public class BusinessTaskProjectionService : IBusinessTaskProjectionService
         };
     }
 
-    /// <summary>
-    /// 根据投影行构建业务任务实体。
-    /// </summary>
-    /// <param name="row">投影行。</param>
-    /// <returns>业务任务实体。</returns>
     private static BusinessTaskEntity BuildEntity(BusinessTaskProjectionRow row)
     {
         var sourceTableCode = ValidateRequiredText(row.SourceTableCode, nameof(row.SourceTableCode), 64);
@@ -80,12 +74,6 @@ public class BusinessTaskProjectionService : IBusinessTaskProjectionService
         return entity;
     }
 
-    /// <summary>
-    /// 校验投影业务时间，缺失时阻断投影写入。
-    /// </summary>
-    /// <param name="row">投影行。</param>
-    /// <returns>校验通过的业务时间。</returns>
-    /// <exception cref="InvalidOperationException">缺失时抛出异常。</exception>
     private static DateTime ValidateProjectedTimeLocal(BusinessTaskProjectionRow row)
     {
         if (row.ProjectedTimeLocal == default)
@@ -97,13 +85,6 @@ public class BusinessTaskProjectionService : IBusinessTaskProjectionService
         return row.ProjectedTimeLocal;
     }
 
-    /// <summary>
-    /// 校验必填文本并返回去空白后的值。
-    /// </summary>
-    /// <param name="value">输入值。</param>
-    /// <param name="fieldName">字段名称。</param>
-    /// <param name="maxLength">最大长度。</param>
-    /// <returns>去空白后的文本。</returns>
     private static string ValidateRequiredText(string value, string fieldName, int maxLength)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -120,13 +101,6 @@ public class BusinessTaskProjectionService : IBusinessTaskProjectionService
         return normalizedValue;
     }
 
-    /// <summary>
-    /// 校验可选文本并返回去空白后的值。
-    /// </summary>
-    /// <param name="value">输入值。</param>
-    /// <param name="fieldName">字段名称。</param>
-    /// <param name="maxLength">最大长度。</param>
-    /// <returns>去空白后的文本或空值。</returns>
     private static string? ValidateOptionalText(string? value, string fieldName, int maxLength)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -143,3 +117,4 @@ public class BusinessTaskProjectionService : IBusinessTaskProjectionService
         return normalizedValue;
     }
 }
+

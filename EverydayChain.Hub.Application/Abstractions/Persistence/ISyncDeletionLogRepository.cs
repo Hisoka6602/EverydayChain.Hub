@@ -1,16 +1,15 @@
-using EverydayChain.Hub.Domain.Sync;
+﻿using EverydayChain.Hub.Domain.Sync;
 
 namespace EverydayChain.Hub.Application.Abstractions.Persistence;
 
 /// <summary>
-/// 同步删除日志仓储接口。
+/// 定义当前类型。
 /// </summary>
 public interface ISyncDeletionLogRepository
 {
     /// <summary>
-    /// 写入删除日志。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="logs">删除日志集合。</param>
-    /// <param name="ct">取消令牌。</param>
     Task WriteDeletionsAsync(IReadOnlyList<SyncDeletionLog> logs, CancellationToken ct);
 }
+

@@ -1,35 +1,42 @@
-using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
+﻿using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace EverydayChain.Hub.Infrastructure.Persistence.EntityConfigurations;
 
 /// <summary>
-/// <see cref="BusinessTaskEntity"/> 的 EF Core Fluent API 类型配置。
-/// 该表为非分片固定表，始终使用固定表名 <c>business_tasks</c>。
+/// 定义当前类型。
 /// </summary>
 public class BusinessTaskEntityTypeConfiguration : IEntityTypeConfiguration<BusinessTaskEntity>
 {
-    /// <summary>目标表名（固定，不含分片后缀）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly string _tableName;
 
-    /// <summary>目标 Schema 名称。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly string _schema;
 
     /// <summary>
-    /// 初始化配置实例。
+    /// 初始化业务任务实体映射配置。
     /// </summary>
-    /// <param name="tableName">完整表名，例如 <c>business_tasks</c>。</param>
-    /// <param name="schema">数据库 Schema，例如 <c>dbo</c>。</param>
+    /// <param name="tableName">表名。</param>
+    /// <param name="schema">架构名。</param>
     public BusinessTaskEntityTypeConfiguration(string tableName, string schema)
     {
         _tableName = tableName;
         _schema = schema;
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 配置业务任务实体映射。
+    /// </summary>
+    /// <param name="builder">实体构建器。</param>
     public void Configure(EntityTypeBuilder<BusinessTaskEntity> builder)
     {
+        // 步骤：配置字段约束，并为波次、码头、chute 和时间回退查询建立热点索引。
         builder.ToTable(_tableName, _schema);
         builder.HasKey(x => x.Id).IsClustered();
         builder.Property(x => x.Id).ValueGeneratedOnAdd();
@@ -95,7 +102,10 @@ public class BusinessTaskEntityTypeConfiguration : IEntityTypeConfiguration<Busi
         builder.HasIndex(x => new { x.NormalizedWaveCode, x.CreatedTimeLocal });
         builder.HasIndex(x => new { x.NormalizedWaveCode, x.UpdatedTimeLocal });
         builder.HasIndex(x => new { x.NormalizedWaveCode, x.SourceType, x.WorkingArea });
+        builder.HasIndex(x => new { x.TargetChuteCode, x.CreatedTimeLocal });
+        builder.HasIndex(x => new { x.ActualChuteCode, x.CreatedTimeLocal });
         builder.HasIndex(x => new { x.ResolvedDockCode, x.CreatedTimeLocal });
+        builder.HasIndex(x => new { x.CreatedTimeLocal, x.ScannedAtLocal, x.Id });
         builder.HasIndex(x => new { x.CreatedTimeLocal, x.Status, x.SourceType });
         builder.HasIndex(x => new { x.FeedbackStatus, x.CreatedTimeLocal });
         builder.HasIndex(x => new { x.FeedbackStatus, x.IsFeedbackReported, x.FeedbackTimeLocal });
@@ -103,3 +113,4 @@ public class BusinessTaskEntityTypeConfiguration : IEntityTypeConfiguration<Busi
         builder.HasIndex(x => new { x.CreatedTimeLocal, x.NormalizedWaveCode, x.ResolvedDockCode });
     }
 }
+

@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Domain.Options;
+﻿using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -6,13 +6,10 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// DangerZoneExecutor 取消语义测试。
+/// 定义当前类型。
 /// </summary>
 public class DangerZoneExecutorTests
 {
-    /// <summary>
-    /// 调用方主动取消时应输出告警日志而非未预期异常日志。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_WhenCallerCanceled_ShouldLogWarning()
     {
@@ -32,9 +29,6 @@ public class DangerZoneExecutorTests
             && log.Message.Contains("调用方取消请求", StringComparison.Ordinal));
     }
 
-    /// <summary>
-    /// 非调用方触发的取消异常仍应按未预期异常记录错误日志。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_WhenUnexpectedCanceled_ShouldLogError()
     {
@@ -51,3 +45,4 @@ public class DangerZoneExecutorTests
             && log.Message.Contains("未预期取消异常", StringComparison.Ordinal));
     }
 }
+

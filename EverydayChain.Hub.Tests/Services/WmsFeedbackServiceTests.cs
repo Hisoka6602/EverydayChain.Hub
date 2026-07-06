@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Integrations;
+﻿using EverydayChain.Hub.Application.Abstractions.Integrations;
 using EverydayChain.Hub.Application.Feedback.Services;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
@@ -11,13 +11,10 @@ using System.Reflection;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 业务回传服务单元测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class WmsFeedbackServiceTests
 {
-    /// <summary>
-    /// 构建测试用的 WmsFeedbackService，注入内存替身，默认 Enabled=true。
-    /// </summary>
     private static (WmsFeedbackService Service, InMemoryBusinessTaskRepository Repository, CapturingWmsOracleFeedbackGateway Writer) CreateService(bool enabled = true)
     {
         var repo = new InMemoryBusinessTaskRepository();
@@ -27,9 +24,6 @@ public sealed class WmsFeedbackServiceTests
         return (service, repo, writer);
     }
 
-    /// <summary>
-    /// 无待回传任务时应返回空结果且不调用写入器。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldReturnEmpty_WhenNoPendingTasks()
     {
@@ -44,9 +38,6 @@ public sealed class WmsFeedbackServiceTests
         Assert.Empty(writer.CapturedTasks);
     }
 
-    /// <summary>
-    /// 有待回传任务且写入成功时，任务应标记为已回传。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldMarkCompleted_WhenWriterSucceeds()
     {
@@ -78,9 +69,6 @@ public sealed class WmsFeedbackServiceTests
         Assert.NotNull(updated.FeedbackTimeLocal);
     }
 
-    /// <summary>
-    /// 写入器抛出异常时，所有任务应标记为回传失败。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldMarkFailed_WhenWriterThrows()
     {
@@ -112,9 +100,6 @@ public sealed class WmsFeedbackServiceTests
         Assert.Null(updated.FeedbackTimeLocal);
     }
 
-    /// <summary>
-    /// batchSize 参数应限制查询上限。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldRespectBatchSize()
     {
@@ -141,9 +126,6 @@ public sealed class WmsFeedbackServiceTests
         Assert.Equal(2, writer.CapturedTasks.Count);
     }
 
-    /// <summary>
-    /// 回传开关关闭时应直接返回空结果，不消费任何待回传任务。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldReturnEmpty_WhenDisabled()
     {
@@ -162,21 +144,16 @@ public sealed class WmsFeedbackServiceTests
 
         var result = await service.ExecuteAsync(100, CancellationToken.None);
 
-        // 开关关闭时应直接短路，不应查询或更新任何任务。
         Assert.Equal(0, result.PendingCount);
         Assert.Equal(0, result.SuccessCount);
         Assert.Equal(0, result.FailedCount);
         Assert.True(result.IsSuccess);
         Assert.Empty(writer.CapturedTasks);
 
-        // 任务状态应保持 Pending 不变（未被消费）。
         var task = await repo.FindByTaskCodeAsync("TASK-D01", CancellationToken.None);
         Assert.Equal(BusinessTaskFeedbackStatus.Pending, task!.FeedbackStatus);
     }
 
-    /// <summary>
-    /// Oracle 返回行数与任务数不一致时，应按整批失败处理。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldMarkFailed_WhenWrittenRowsMismatch()
     {
@@ -193,7 +170,6 @@ public sealed class WmsFeedbackServiceTests
             UpdatedTimeLocal = DateTime.Now
         }, CancellationToken.None);
 
-        // 模拟 Oracle 返回 0 行（行数与任务数不一致）。
         writer.ReturnCount = 0;
 
         var result = await service.ExecuteAsync(100, CancellationToken.None);
@@ -209,9 +185,6 @@ public sealed class WmsFeedbackServiceTests
         Assert.Null(updated.FeedbackTimeLocal);
     }
 
-    /// <summary>
-    /// 拆零任务回写成功时，应更新为已回传状态。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldCompleteSplitTask_WhenSplitTaskWritten()
     {
@@ -238,9 +211,6 @@ public sealed class WmsFeedbackServiceTests
         Assert.Contains(writer.CapturedTasks, task => task.SourceType == BusinessTaskSourceType.Split);
     }
 
-    /// <summary>
-    /// 整件任务回写成功时，应更新为已回传状态。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldCompleteFullCaseTask_WhenFullCaseTaskWritten()
     {
@@ -267,9 +237,6 @@ public sealed class WmsFeedbackServiceTests
         Assert.Contains(writer.CapturedTasks, task => task.SourceType == BusinessTaskSourceType.FullCase);
     }
 
-    /// <summary>
-    /// 验证回写网关按来源类型分流到拆零与整件目标表的行为。
-    /// </summary>
     [Fact]
     public void ResolveTargetBySourceType_ShouldRouteToConfiguredTables()
     {
@@ -287,9 +254,6 @@ public sealed class WmsFeedbackServiceTests
         Assert.Equal("FULLCASE_TASK_CODE", fullCaseTarget.BusinessKeyColumn);
     }
 
-    /// <summary>
-    /// 验证回写网关遇到非法来源类型时抛出中文异常且不回退默认目标表的行为。
-    /// </summary>
     [Fact]
     public void ResolveTargetBySourceType_ShouldThrowChineseException_WhenSourceTypeUnsupported()
     {
@@ -302,10 +266,6 @@ public sealed class WmsFeedbackServiceTests
         Assert.Contains("不支持的业务来源类型，无法确定 WMS 回写目标表。", innerException.Message, StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// 创建用于来源分流测试的回写网关实例。
-    /// </summary>
-    /// <returns>回写网关。</returns>
     private static OracleWmsFeedbackGateway CreateGatewayForSourceTypeRoutingTests()
     {
         var options = Options.Create(new WmsFeedbackOptions
@@ -331,10 +291,6 @@ public sealed class WmsFeedbackServiceTests
             NullLogger<OracleWmsFeedbackGateway>.Instance);
     }
 
-    /// <summary>
-    /// 通过反射获取来源分流私有方法句柄。
-    /// </summary>
-    /// <returns>方法句柄。</returns>
     private static MethodInfo GetResolveTargetBySourceTypeMethod()
     {
         return typeof(OracleWmsFeedbackGateway).GetMethod(
@@ -345,20 +301,25 @@ public sealed class WmsFeedbackServiceTests
 }
 
 /// <summary>
-/// 捕获写入请求的 WMS Oracle 网关测试替身。
+/// 定义当前类型。
 /// </summary>
 internal sealed class CapturingWmsOracleFeedbackGateway : IWmsOracleFeedbackGateway
 {
-    /// <summary>捕获到的任务列表。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public List<BusinessTaskEntity> CapturedTasks { get; } = [];
 
-    /// <summary>模拟网关抛出异常。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public bool ThrowOnWrite { get; set; }
 
-    /// <summary>网关返回的行数；默认与输入列表长度相同。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public int? ReturnCount { get; set; }
 
-    /// <inheritdoc/>
     public Task<int> WriteFeedbackAsync(IReadOnlyList<BusinessTaskEntity> tasks, CancellationToken ct)
     {
         CapturedTasks.AddRange(tasks);
@@ -371,3 +332,4 @@ internal sealed class CapturingWmsOracleFeedbackGateway : IWmsOracleFeedbackGate
         return Task.FromResult(ReturnCount ?? tasks.Count);
     }
 }
+

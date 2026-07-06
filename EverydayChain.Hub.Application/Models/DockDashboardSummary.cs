@@ -1,42 +1,43 @@
-namespace EverydayChain.Hub.Application.Models;
+﻿namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 码头看板汇总项。
+/// 定义当前类型。
 /// </summary>
 public sealed class DockDashboardSummary
 {
     /// <summary>
-    /// 码头号。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string DockCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 拆零未分拣数量。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int SplitUnsortedCount { get; set; }
 
     /// <summary>
-    /// 整件未分拣数量。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int FullCaseUnsortedCount { get; set; }
 
     /// <summary>
-    /// 回流数量。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int RecirculatedCount { get; set; }
 
     /// <summary>
-    /// 异常数量（仅 7 号码头显示）。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int ExceptionCount { get; set; }
 
     /// <summary>
-    /// 分拣进度百分比。
+    /// 获取或设置当前属性值。
     /// </summary>
     public decimal SortedProgressPercent { get; set; }
 
     /// <summary>
-    /// 已分拣总数。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int SortedCount { get; set; }
 }
+

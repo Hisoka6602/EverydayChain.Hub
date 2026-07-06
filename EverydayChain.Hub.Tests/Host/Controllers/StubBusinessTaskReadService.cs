@@ -1,22 +1,19 @@
-using EverydayChain.Hub.Application.Abstractions.Queries;
+﻿using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 业务任务查询服务替身。
+/// 定义当前类型。
 /// </summary>
 internal sealed class StubBusinessTaskReadService : IBusinessTaskReadService
 {
     /// <summary>
-    /// 最近一次查询请求。
+    /// 获取或设置当前属性值。
     /// </summary>
     public BusinessTaskQueryRequest? LastRequest { get; private set; }
 
-    /// <summary>
-    /// 固定查询结果。
-    /// </summary>
     public BusinessTaskQueryResult Result { get; set; } = new()
     {
         TotalCount = 1,
@@ -29,6 +26,11 @@ internal sealed class StubBusinessTaskReadService : IBusinessTaskReadService
         Items = [new BusinessTaskQueryItem
         {
             TaskCode = "T1",
+            OrderId = "ORDER-1",
+            StoreId = "STORE-1",
+            StoreName = "Store Name 1",
+            ProductCode = "SKU-1",
+            PickLocation = "A-01-01",
             SourceType = BusinessTaskSourceType.Split,
             Status = BusinessTaskStatus.Created,
             DockCode = "7",
@@ -36,24 +38,22 @@ internal sealed class StubBusinessTaskReadService : IBusinessTaskReadService
         }]
     };
 
-    /// <inheritdoc/>
     public Task<BusinessTaskQueryResult> QueryTasksAsync(BusinessTaskQueryRequest request, CancellationToken cancellationToken)
     {
         LastRequest = request;
         return Task.FromResult(Result);
     }
 
-    /// <inheritdoc/>
     public Task<BusinessTaskQueryResult> QueryExceptionsAsync(BusinessTaskQueryRequest request, CancellationToken cancellationToken)
     {
         LastRequest = request;
         return Task.FromResult(Result);
     }
 
-    /// <inheritdoc/>
     public Task<BusinessTaskQueryResult> QueryRecirculationsAsync(BusinessTaskQueryRequest request, CancellationToken cancellationToken)
     {
         LastRequest = request;
         return Task.FromResult(Result);
     }
 }
+

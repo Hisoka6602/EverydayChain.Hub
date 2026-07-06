@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Host.Controllers;
+﻿using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using EverydayChain.Hub.Application.Models;
@@ -8,28 +8,25 @@ using Microsoft.AspNetCore.Mvc;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 扫描控制器基础行为测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class ScanControllerTests {
-    /// <summary>
-    /// 非本地时间语义枚举值。
-    /// </summary>
     private const DateTimeKind NonLocalKind = (DateTimeKind)1;
 
     /// <summary>
-    /// 构建扫描控制器测试实例。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="stubService">扫描上传服务替身。</param>
-    /// <returns>扫描控制器。</returns>
     private static ScanController CreateController(StubScanIngressService stubService) {
+        // 步骤：按既定流程执行当前方法逻辑。
         return new ScanController(stubService, new BarcodeParser());
     }
 
     /// <summary>
-    /// 条码为空时应返回 BadRequest。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodeIsEmpty() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var controller = CreateController(new StubScanIngressService());
         var request = new ScanUploadRequest {
             Barcodes = [],
@@ -43,10 +40,11 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 扫描时间语义不是本地或未指定时应返回 BadRequest。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenScanTimeKindIsNonLocal() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var controller = CreateController(new StubScanIngressService());
         var request = new ScanUploadRequest {
             Barcodes = ["Z130419305700070001"],
@@ -60,10 +58,11 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// TraceId 为 null 时应回退为空字符串并避免空引用异常。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldFallbackEmptyTraceId_WhenTraceIdIsNull() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubScanIngressService();
         var controller = CreateController(stubService);
 #pragma warning disable CS8625
@@ -82,10 +81,11 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 解析失败时应返回可读失败消息并保留失败代码。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnReadableFailureMessage_WhenApplicationRejected() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubScanIngressService {
             Result = new ScanUploadApplicationResult {
                 IsAccepted = false,
@@ -114,10 +114,11 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 单条码场景下即使条码不可解析也应进入应用层并返回逐条结果。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnPerItemResult_WhenSingleBarcodeIsUnresolvable() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubScanIngressService {
             Result = new ScanUploadApplicationResult {
                 IsAccepted = false,
@@ -147,10 +148,11 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 有效请求时应返回 Ok。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnOk_WhenRequestIsValid() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var controller = CreateController(new StubScanIngressService());
         var request = new ScanUploadRequest {
             Barcodes = ["Z130419305700070001"],
@@ -171,10 +173,11 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 条码列表为 null 时应返回 BadRequest。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodesIsNull() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var controller = CreateController(new StubScanIngressService());
         var fixedScanTime = DateTime.SpecifyKind(new DateTime(2026, 4, 14, 10, 0, 0), DateTimeKind.Local);
         var request = new ScanUploadRequest {
@@ -192,10 +195,11 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 请求体为空时应返回统一错误消息。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenRequestIsNull() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var controller = CreateController(new StubScanIngressService());
 
         var actionResult = await controller.UploadAsync(null, CancellationToken.None);
@@ -207,10 +211,11 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 条码列表存在空白项时应直接返回 BadRequest。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodesContainsWhitespaceItem() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var controller = CreateController(new StubScanIngressService());
         var fixedScanTime = DateTime.SpecifyKind(new DateTime(2026, 4, 14, 10, 0, 0), DateTimeKind.Local);
         var request = new ScanUploadRequest {
@@ -228,10 +233,11 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 超出最大条码数量时应直接返回 BadRequest。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodesExceedLimit() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var controller = CreateController(new StubScanIngressService());
         var fixedScanTime = DateTime.SpecifyKind(new DateTime(2026, 4, 14, 10, 0, 0), DateTimeKind.Local);
         var request = new ScanUploadRequest {
@@ -249,10 +255,11 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 多条码请求时非首条条码应使用 0 作为尺寸与重量回写值。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldApplyZeroMeasurement_ForNonPrimaryBarcodes() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubScanIngressService();
         var controller = CreateController(stubService);
         var request = new ScanUploadRequest {
@@ -293,10 +300,11 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 单条 Z 条码且可解析时应允许通过。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldSucceed_WhenSingleZBarcodeIsValid() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubScanIngressService();
         var controller = CreateController(stubService);
         var request = new ScanUploadRequest {
@@ -311,10 +319,11 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 多条同格口 Z 条码应允许通过。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldSucceed_WhenMultipleZBarcodesShareSameChute() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubScanIngressService();
         var controller = CreateController(stubService);
         var request = new ScanUploadRequest {
@@ -329,10 +338,11 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 多条 Z 条码格口不一致时应直接返回 BadRequest。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenZBarcodesContainMultipleChutes() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubScanIngressService();
         var controller = CreateController(stubService);
         var request = new ScanUploadRequest {
@@ -351,10 +361,11 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 条码列表包含无法解析格口条码时应直接返回 BadRequest。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenBarcodesContainUnresolvableChute() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubScanIngressService();
         var controller = CreateController(stubService);
         var request = new ScanUploadRequest {
@@ -373,10 +384,11 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 02 与 Z 混合且同格口时应允许通过。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldSucceed_WhenMixed02AndZBarcodesShareSameChute() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubScanIngressService();
         var controller = CreateController(stubService);
         var request = new ScanUploadRequest {
@@ -391,10 +403,11 @@ public sealed class ScanControllerTests {
     }
 
     /// <summary>
-    /// 02 与 Z 混合且格口不一致时应直接返回 BadRequest。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task UploadAsync_ShouldReturnBadRequest_WhenMixed02AndZBarcodesContainDifferentChutes() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubScanIngressService();
         var controller = CreateController(stubService);
         var request = new ScanUploadRequest {
@@ -412,3 +425,4 @@ public sealed class ScanControllerTests {
         Assert.Empty(stubService.Requests);
     }
 }
+

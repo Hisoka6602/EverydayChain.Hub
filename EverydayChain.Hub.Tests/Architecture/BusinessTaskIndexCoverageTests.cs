@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
+﻿using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -7,13 +7,10 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Tests.Architecture;
 
 /// <summary>
-/// 业务任务索引覆盖门禁测试。
+/// 定义当前类型。
 /// </summary>
 public class BusinessTaskIndexCoverageTests
 {
-    /// <summary>
-    /// business_tasks 必须保留关键查询与幂等索引。
-    /// </summary>
     [Fact]
     public void BusinessTaskModel_ShouldContainRequiredIndexes()
     {
@@ -38,13 +35,12 @@ public class BusinessTaskIndexCoverageTests
         Assert.Contains(indexes, index => !index.IsUnique && index.Columns.SequenceEqual(["CreatedTimeLocal"]));
         Assert.Contains(indexes, index => !index.IsUnique && index.Columns.SequenceEqual(["UpdatedTimeLocal"]));
         Assert.Contains(indexes, index => !index.IsUnique && index.Columns.SequenceEqual(["NormalizedBarcode", "CreatedTimeLocal"]));
+        Assert.Contains(indexes, index => !index.IsUnique && index.Columns.SequenceEqual(["TargetChuteCode", "CreatedTimeLocal"]));
+        Assert.Contains(indexes, index => !index.IsUnique && index.Columns.SequenceEqual(["ActualChuteCode", "CreatedTimeLocal"]));
+        Assert.Contains(indexes, index => !index.IsUnique && index.Columns.SequenceEqual(["CreatedTimeLocal", "ScannedAtLocal", "Id"]));
         Assert.Contains(indexes, index => !index.IsUnique && index.Columns.SequenceEqual(["CreatedTimeLocal", "SourceType", "Status", "IsException", "ResolvedDockCode"]));
     }
 
-    /// <summary>
-    /// 创建测试用数据库上下文。
-    /// </summary>
-    /// <returns>数据库上下文实例。</returns>
     private static HubDbContext CreateDbContext()
     {
         var connectionString = Environment.GetEnvironmentVariable("HUB_TEST_SQLSERVER_CONNECTION_STRING")
@@ -59,3 +55,4 @@ public class BusinessTaskIndexCoverageTests
         return new HubDbContext(dbContextOptions, shardingOptions);
     }
 }
+

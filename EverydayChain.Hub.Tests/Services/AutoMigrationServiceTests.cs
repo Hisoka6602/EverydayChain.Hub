@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
+﻿using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Application.Abstractions.Infrastructure;
 using EverydayChain.Hub.Infrastructure.Services;
 using EverydayChain.Hub.Tests.Services.Sharding;
@@ -6,16 +6,15 @@ using EverydayChain.Hub.Tests.Services.Sharding;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// AutoMigrationService 分表后缀策略测试。
+/// 定义当前类型。
 /// </summary>
 public class AutoMigrationServiceTests
 {
-    /// <summary>重建迁移基线 Id。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string BaselineMigrationId = "20260418204107_RebuildHubBaselineV2";
 
-    /// <summary>
-    /// 启动预建后缀应过滤空后缀，仅保留分表后缀。
-    /// </summary>
     [Fact]
     public void BuildBootstrapSuffixes_ShouldFilterEmptySuffix()
     {
@@ -30,9 +29,6 @@ public class AutoMigrationServiceTests
         Assert.DoesNotContain(string.Empty, suffixes);
     }
 
-    /// <summary>
-    /// 存量库且仅存在重建基线迁移时应触发基线标记。
-    /// </summary>
     [Fact]
     public void ShouldMarkBaselineMigration_ShouldReturnTrue_WhenOnlyBaselineExistsAndCoreTablesExist()
     {
@@ -44,9 +40,6 @@ public class AutoMigrationServiceTests
         Assert.True(shouldMark);
     }
 
-    /// <summary>
-    /// 新库或已标记场景不应触发基线标记。
-    /// </summary>
     [Theory]
     [InlineData(0, false)]
     [InlineData(1, true)]
@@ -63,9 +56,6 @@ public class AutoMigrationServiceTests
         Assert.False(shouldMark);
     }
 
-    /// <summary>
-    /// 启动迁移链路应先预建分表，再同步历史分表结构。
-    /// </summary>
     [Fact]
     public async Task ExecuteShardMaintenanceAsync_ShouldProvisionBeforeSynchronize()
     {
@@ -90,9 +80,6 @@ public class AutoMigrationServiceTests
             message => Assert.Contains("历史分表结构同步已完成", message, StringComparison.Ordinal));
     }
 
-    /// <summary>
-    /// 无启动后缀时仍应继续执行历史分表结构同步。
-    /// </summary>
     [Fact]
     public async Task ExecuteShardMaintenanceAsync_ShouldStillSynchronizeHistory_WhenSuffixesEmpty()
     {
@@ -110,3 +97,4 @@ public class AutoMigrationServiceTests
         Assert.Equal(1, synchronizer.SynchronizeAllCallCount);
     }
 }
+

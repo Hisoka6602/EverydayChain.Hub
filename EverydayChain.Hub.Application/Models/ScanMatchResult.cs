@@ -1,24 +1,25 @@
-using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
+﻿using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 
 namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 扫描匹配结果模型。
+/// 定义当前类型。
 /// </summary>
 public sealed class ScanMatchResult
 {
     /// <summary>
-    /// 是否成功匹配到业务任务。
+    /// 获取或设置当前属性值。
     /// </summary>
     public bool IsMatched { get; set; }
 
     /// <summary>
-    /// 匹配到的业务任务实体；未匹配时为 <c>null</c>。
+    /// 获取或设置当前属性值。
     /// </summary>
     public BusinessTaskEntity? Task { get; set; }
 
     /// <summary>
-    /// 未匹配的失败原因；匹配成功时为空。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string FailureReason { get; set; } = string.Empty;
 }
+

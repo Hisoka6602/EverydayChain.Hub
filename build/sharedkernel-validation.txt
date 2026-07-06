@@ -1,0 +1,75 @@
+﻿powershell : Code convention validation failed for project 'EverydayChain.Hub.SharedKernel'.
+所在位置 行:2 字符: 1
++ powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\build\V ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Code convention....SharedKernel'.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Utilities\BoundedConcurrentQueueHelper.cs(20): Comments must use Chinese.
+Utilities\BoundedConcurrentQueueHelper.cs(17): Comments must use Chinese.
+Utilities\BoundedConcurrentQueueHelper.cs(13): Comments must use Chinese.
+Utilities\BoundedConcurrentQueueHelper.cs(10): Comments must use Chinese.
+Utilities\BoundedConcurrentQueueHelper.cs(7): Comments must use Chinese.
+Utilities\BoundedConcurrentQueueHelper.cs(5): Comments must use Chinese.
+Utilities\LocalDateTimeNormalizer.cs(9): Comments must use Chinese.
+Utilities\LocalDateTimeNormalizer.cs(7): Comments must use Chinese.
+Utilities\LocalDateTimeNormalizer.cs(5): Comments must use Chinese.
+Utilities\LocalDateTimeNormalizer.cs(3): Comments must use Chinese.
+Utilities\LocalDateTimeNormalizer.cs(15): Complex methods must contain step comments in Chinese.
+Utilities\LocalTimeRangeValidator.cs(63): Comments must use Chinese.
+Utilities\LocalTimeRangeValidator.cs(61): Comments must use Chinese.
+Utilities\LocalTimeRangeValidator.cs(10): Comments must use Chinese.
+Utilities\LocalTimeRangeValidator.cs(8): Comments must use Chinese.
+Utilities\LocalTimeRangeValidator.cs(5): Comments must use Chinese.
+Utilities\LocalTimeRangeValidator.cs(3): Comments must use Chinese.
+Utilities\LogicalTableNameNormalizer.cs(30): Comments must use Chinese.
+Utilities\LogicalTableNameNormalizer.cs(28): Comments must use Chinese.
+Utilities\LogicalTableNameNormalizer.cs(15): Comments must use Chinese.
+Utilities\LogicalTableNameNormalizer.cs(13): Comments must use Chinese.
+Utilities\LogicalTableNameNormalizer.cs(7): Comments must use Chinese.
+Utilities\LogicalTableNameNormalizer.cs(5): Comments must use Chinese.
+Utilities\LogicalTableNameNormalizer.cs(40): Comments must use Chinese.
+Utilities\LogicalTableNameNormalizer.cs(38): Comments must use Chinese.
+Utilities\LogicalTableNameNormalizer.cs(57): Methods must have Chinese comments above the declaration.
+Utilities\RuntimeStoragePathResolver.cs(10): Comments must use Chinese.
+Utilities\RuntimeStoragePathResolver.cs(8): Comments must use Chinese.
+Utilities\RuntimeStoragePathResolver.cs(5): Comments must use Chinese.
+Utilities\RuntimeStoragePathResolver.cs(3): Comments must use Chinese.
+Utilities\SimpleXlsxBuilder.cs(16): Comments must use Chinese.
+Utilities\SimpleXlsxBuilder.cs(15): Comments must use Chinese.
+Utilities\SimpleXlsxBuilder.cs(14): Comments must use Chinese.
+Utilities\SimpleXlsxBuilder.cs(13): Comments must use Chinese.
+Utilities\SimpleXlsxBuilder.cs(12): Comments must use Chinese.
+Utilities\SimpleXlsxBuilder.cs(9): Comments must use Chinese.
+Utilities\SimpleXlsxBuilder.cs(8): Comments must use Chinese.
+Utilities\SimpleXlsxBuilder.cs(7): Comments must use Chinese.
+Utilities\SimpleXlsxBuilder.cs(18): Comments must use Chinese.
+Utilities\SimpleXlsxBuilder.cs(17): Comments must use Chinese.
+Utilities\SyncBusinessKeyBuilder.cs(87): Comments must use Chinese.
+Utilities\SyncBusinessKeyBuilder.cs(85): Comments must use Chinese.
+Utilities\SyncBusinessKeyBuilder.cs(55): Comments must use Chinese.
+Utilities\SyncBusinessKeyBuilder.cs(53): Comments must use Chinese.
+Utilities\SyncBusinessKeyBuilder.cs(32): Comments must use Chinese.
+Utilities\SyncBusinessKeyBuilder.cs(30): Comments must use Chinese.
+Utilities\SyncBusinessKeyBuilder.cs(15): Comments must use Chinese.
+Utilities\SyncBusinessKeyBuilder.cs(13): Comments must use Chinese.
+Utilities\SyncBusinessKeyBuilder.cs(7): Comments must use Chinese.
+Utilities\SyncBusinessKeyBuilder.cs(5): Comments must use Chinese.
+Utilities\SyncColumnFilter.cs(71): Comments must use Chinese.
+Utilities\SyncColumnFilter.cs(69): Comments must use Chinese.
+Utilities\SyncColumnFilter.cs(56): Comments must use Chinese.
+Utilities\SyncColumnFilter.cs(54): Comments must use Chinese.
+Utilities\SyncColumnFilter.cs(29): Comments must use Chinese.
+Utilities\SyncColumnFilter.cs(27): Comments must use Chinese.
+Utilities\SyncColumnFilter.cs(20): Comments must use Chinese.
+Utilities\SyncColumnFilter.cs(18): Comments must use Chinese.
+Utilities\SyncColumnFilter.cs(15): Comments must use Chinese.
+Utilities\SyncColumnFilter.cs(13): Comments must use Chinese.
+Utilities\SyncColumnFilter.cs(10): Comments must use Chinese.
+Utilities\SyncColumnFilter.cs(8): Comments must use Chinese.
+Utilities\SyncColumnFilter.cs(5): Comments must use Chinese.
+Utilities\SyncColumnFilter.cs(3): Comments must use Chinese.
+Utilities\TaskCodeNormalizer.cs(9): Comments must use Chinese.
+Utilities\TaskCodeNormalizer.cs(7): Comments must use Chinese.
+Utilities\TaskCodeNormalizer.cs(5): Comments must use Chinese.
+Utilities\TaskCodeNormalizer.cs(3): Comments must use Chinese.

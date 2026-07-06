@@ -227,12 +227,18 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     b.HasIndex("NormalizedWaveCode", "UpdatedTimeLocal");
 
+                    b.HasIndex("TargetChuteCode", "CreatedTimeLocal");
+
+                    b.HasIndex("ActualChuteCode", "CreatedTimeLocal");
+
                     b.HasIndex("ResolvedDockCode", "CreatedTimeLocal");
 
                     b.HasIndex("SourceTableCode", "BusinessKey")
                         .IsUnique();
 
                     b.HasIndex("WaveCode", "CreatedTimeLocal");
+
+                    b.HasIndex("CreatedTimeLocal", "ScannedAtLocal", "Id");
 
                     b.HasIndex("CreatedTimeLocal", "NormalizedWaveCode", "ResolvedDockCode");
 
@@ -245,6 +251,205 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                     b.HasIndex("CreatedTimeLocal", "SourceType", "Status", "IsException", "ResolvedDockCode");
 
                     b.ToTable("business_tasks", "dbo");
+                });
+
+            modelBuilder.Entity("EverydayChain.Hub.Domain.Aggregates.DashboardSnapshotAggregate.DashboardScanSnapshotEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("BucketStartLocal")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("MatchedScanCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalScanCount")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"));
+
+                    b.HasIndex("BucketStartLocal")
+                        .IsUnique();
+
+                    b.ToTable("dashboard_scan_snapshots", "dbo");
+                });
+
+            modelBuilder.Entity("EverydayChain.Hub.Domain.Aggregates.DashboardSnapshotAggregate.DashboardCurrentWaveSnapshotEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Barcode")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime>("BucketStartLocal")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ScannedAtLocal")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("WaveCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("WaveRemark")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("Id");
+
+                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"));
+
+                    b.HasIndex("BucketStartLocal")
+                        .IsUnique();
+
+                    b.HasIndex("BucketStartLocal", "ScannedAtLocal");
+
+                    b.ToTable("dashboard_current_wave_snapshots", "dbo");
+                });
+
+            modelBuilder.Entity("EverydayChain.Hub.Domain.Aggregates.DashboardSnapshotAggregate.DashboardSnapshotStateEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedNever()
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CoverageEndLocal")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("CoverageStartLocal")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LastRefreshTimeLocal")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"));
+
+                    b.ToTable("dashboard_snapshot_states", "dbo");
+                });
+
+            modelBuilder.Entity("EverydayChain.Hub.Domain.Aggregates.DashboardSnapshotAggregate.DashboardTaskSnapshotEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("BucketStartLocal")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CompletedFeedbackCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("EarliestCreatedTimeLocal")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ExceptionCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("LatestUpdatedTimeLocal")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("RecirculatedCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RequiredFeedbackCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ResolvedDockCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("ScannedCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SourceType")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalCount")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalVolumeMm3")
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<decimal>("TotalWeightGram")
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<string>("WaveCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("WaveRemark")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("WorkingArea")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.HasKey("Id");
+
+                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"));
+
+                    b.HasIndex("BucketStartLocal");
+
+                    b.HasIndex("BucketStartLocal", "ResolvedDockCode");
+
+                    b.HasIndex("BucketStartLocal", "WaveCode");
+
+                    b.HasIndex("BucketStartLocal", "WaveCode", "ResolvedDockCode");
+
+                    b.HasIndex("BucketStartLocal", "WaveCode", "SourceType", "Status");
+
+                    b.HasIndex("BucketStartLocal", "WaveCode", "WorkingArea", "SourceType", "Status");
+
+                    b.ToTable("dashboard_task_snapshots", "dbo");
+                });
+
+            modelBuilder.Entity("EverydayChain.Hub.Domain.Aggregates.RuntimeLeaseAggregate.RuntimeLeaseEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime>("AcquiredTimeLocal")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAtLocal")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("OwnerId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"));
+
+                    b.HasIndex("ExpiresAtLocal");
+
+                    b.ToTable("runtime_leases", "dbo");
                 });
 
             modelBuilder.Entity("EverydayChain.Hub.Domain.Aggregates.DropLogAggregate.DropLogEntity", b =>
@@ -363,6 +568,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
 
                     b.HasIndex("CreatedTimeLocal");
 
+                    b.HasIndex("DeviceCode");
+
                     b.HasIndex("ScanTimeLocal");
 
                     b.HasIndex("TaskCode");
@@ -372,6 +579,10 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                     b.HasIndex("CreatedTimeLocal", "ScanTimeLocal");
 
                     b.HasIndex("CreatedTimeLocal", "TaskCode");
+
+                    b.HasIndex("DeviceCode", "ScanTimeLocal");
+
+                    b.HasIndex("ScanTimeLocal", "Id");
 
                     b.HasIndex("TaskCode", "ScanTimeLocal");
 

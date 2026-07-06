@@ -1,30 +1,68 @@
-namespace EverydayChain.Hub.Domain.Options;
+﻿namespace EverydayChain.Hub.Domain.Options;
 
 /// <summary>
-/// 查询缓存配置，从 <c>appsettings.json</c> 的 <c>QueryCache</c> 节点绑定。
+/// 定义当前类型。
 /// </summary>
 public sealed class QueryCacheOptions
 {
-    /// <summary>配置节名称。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     public const string SectionName = "QueryCache";
 
     /// <summary>
-    /// 是否启用查询缓存（可填写项：true、false；默认 true）。
+    /// 获取或设置当前属性值。
     /// </summary>
     public bool Enabled { get; set; } = true;
 
     /// <summary>
-    /// 总看板缓存秒数（可填写范围：1~60；默认 2）。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int GlobalDashboardSeconds { get; set; } = 2;
 
     /// <summary>
-    /// 码头看板缓存秒数（可填写范围：1~60；默认 2）。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int DockDashboardSeconds { get; set; } = 2;
 
     /// <summary>
-    /// 分拣报表缓存秒数（可填写范围：1~120；默认 10）。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int SortingReportSeconds { get; set; } = 10;
+
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
+    public int CurrentWaveSeconds { get; set; } = 1;
+
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
+    public int WaveOptionsSeconds { get; set; } = 5;
+
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
+    public int WaveListSeconds { get; set; } = 5;
+
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
+    public int WaveSummarySeconds { get; set; } = 5;
+
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
+    public int WaveZoneSeconds { get; set; } = 5;
+
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
+    public int WaveCleanupSeconds { get; set; } = 5;
+
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
+    public int RecirculationSummarySeconds { get; set; } = 5;
 }
+

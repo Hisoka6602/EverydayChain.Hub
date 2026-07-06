@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Host.Controllers;
+﻿using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using Microsoft.AspNetCore.Mvc;
@@ -6,15 +6,16 @@ using Microsoft.AspNetCore.Mvc;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 波次清理控制器基础行为测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class WaveCleanupControllerTests {
     /// <summary>
-    /// 波次号为空时 dry-run 应返回 BadRequest。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task DryRunAsync_ShouldReturnBadRequest_WhenWaveCodeIsEmpty() {
-        var controller = new WaveCleanupController(new StubWaveCleanupService());
+        // 步骤：按既定流程执行当前方法逻辑。
+        var controller = new WaveCleanupController(new StubWaveCleanupService(), new StubWaveQueryService());
         var request = new WaveCleanupRequest {
             WaveCode = string.Empty
         };
@@ -25,11 +26,12 @@ public sealed class WaveCleanupControllerTests {
     }
 
     /// <summary>
-    /// 波次号为空时正式执行应返回 BadRequest。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldReturnBadRequest_WhenWaveCodeIsEmpty() {
-        var controller = new WaveCleanupController(new StubWaveCleanupService());
+        // 步骤：按既定流程执行当前方法逻辑。
+        var controller = new WaveCleanupController(new StubWaveCleanupService(), new StubWaveQueryService());
         var request = new WaveCleanupRequest {
             WaveCode = "  "
         };
@@ -40,12 +42,13 @@ public sealed class WaveCleanupControllerTests {
     }
 
     /// <summary>
-    /// dry-run 请求有效时应返回 Ok 且 IsDryRun 为 true。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task DryRunAsync_ShouldReturnOk_WhenRequestIsValid() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubWaveCleanupService();
-        var controller = new WaveCleanupController(stubService);
+        var controller = new WaveCleanupController(stubService, new StubWaveQueryService());
         var request = new WaveCleanupRequest {
             WaveCode = " WAVE-001 "
         };
@@ -61,12 +64,13 @@ public sealed class WaveCleanupControllerTests {
     }
 
     /// <summary>
-    /// 正式执行请求有效时应返回 Ok 且 IsDryRun 为 false。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldReturnOk_WhenRequestIsValid() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubWaveCleanupService();
-        var controller = new WaveCleanupController(stubService);
+        var controller = new WaveCleanupController(stubService, new StubWaveQueryService());
         var request = new WaveCleanupRequest {
             WaveCode = "WAVE-002"
         };
@@ -80,4 +84,25 @@ public sealed class WaveCleanupControllerTests {
         Assert.False(response.Data.IsDryRun);
         Assert.Equal("WAVE-002", stubService.LastExecuteWaveCode);
     }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    [Fact]
+    public async Task QueryAsync_ShouldReturnOk_WhenWaveExists() {
+        // 步骤：按既定流程执行当前方法逻辑。
+        var controller = new WaveCleanupController(new StubWaveCleanupService(), new StubWaveQueryService());
+        var request = new WaveCleanupRequest {
+            WaveCode = "WAVE-001"
+        };
+
+        var actionResult = await controller.QueryAsync(request, CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+        var response = Assert.IsType<ApiResponse<WaveCleanupQueryResponse>>(okResult.Value);
+
+        Assert.True(response.IsSuccess);
+        Assert.Single(response.Data!.Items);
+        Assert.Equal("W1", response.Data.Items[0].WaveId);
+    }
 }
+

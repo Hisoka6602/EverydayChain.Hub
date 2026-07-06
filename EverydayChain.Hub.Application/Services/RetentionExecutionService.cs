@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.SharedKernel.Utilities;
@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 分表保留期执行服务实现。
+/// 定义当前类型。
 /// </summary>
 public class RetentionExecutionService(
     ISyncTaskConfigRepository taskConfigRepository,
@@ -16,10 +16,11 @@ public class RetentionExecutionService(
     IReadOnlyList<RetentionLogTableOptions> logRetentionTables,
     ILogger<RetentionExecutionService> logger) : IRetentionExecutionService
 {
-    /// <summary>日志表保留期配置快照。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly IReadOnlyList<RetentionLogTableOptions> _logRetentionTables = logRetentionTables;
 
-    /// <inheritdoc/>
     public async Task<string> ExecuteRetentionCleanupAsync(CancellationToken ct)
     {
         var nowLocal = DateTime.Now;
@@ -92,11 +93,6 @@ public class RetentionExecutionService(
         return summary;
     }
 
-    /// <summary>
-    /// 构建保留期执行目标集合（同步表 + 日志表）。
-    /// </summary>
-    /// <param name="enabledTables">已启用同步表定义。</param>
-    /// <returns>保留期执行目标集合。</returns>
     private List<RetentionTarget> BuildRetentionTargets(IReadOnlyList<Domain.Sync.SyncTableDefinition> enabledTables)
     {
         var targets = new List<RetentionTarget>();
@@ -148,13 +144,8 @@ public class RetentionExecutionService(
         return targets;
     }
     /// <summary>
-    /// 保留期执行目标。
+    /// 定义当前类型。
     /// </summary>
-    /// <param name="TargetCode">目标编码。</param>
-    /// <param name="LogicalTableName">逻辑表名。</param>
-    /// <param name="KeepMonths">保留月数。</param>
-    /// <param name="DryRun">是否 dry-run。</param>
-    /// <param name="AllowDrop">是否允许删除。</param>
     private readonly record struct RetentionTarget(
         string TargetCode,
         string LogicalTableName,
@@ -162,3 +153,5 @@ public class RetentionExecutionService(
         bool DryRun,
         bool AllowDrop);
 }
+
+

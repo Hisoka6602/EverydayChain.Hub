@@ -1,23 +1,22 @@
-using EverydayChain.Hub.Infrastructure.Services;
+﻿using EverydayChain.Hub.Infrastructure.Services;
 
 namespace EverydayChain.Hub.Tests.Host.Workers;
 
 /// <summary>
-/// 自动迁移服务测试桩。
+/// 定义当前类型。
 /// </summary>
 public sealed class TestAutoMigrationService : IAutoMigrationService
 {
     /// <summary>
-    /// 运行次数。
+    /// 获取或设置当前属性值。
     /// </summary>
     public int RunCount { get; private set; }
 
     /// <summary>
-    /// 运行时待抛出的异常；为空时表示正常完成。
+    /// 获取或设置当前属性值。
     /// </summary>
     public Exception? ExceptionToThrow { get; init; }
 
-    /// <inheritdoc />
     public Task RunAsync(CancellationToken cancellationToken)
     {
         RunCount++;
@@ -29,3 +28,4 @@ public sealed class TestAutoMigrationService : IAutoMigrationService
         return Task.CompletedTask;
     }
 }
+

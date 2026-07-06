@@ -1,21 +1,29 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Aggregates.ScanLogAggregate;
 
 namespace EverydayChain.Hub.Application.Abstractions.Persistence;
 
 /// <summary>
-/// 扫描日志仓储抽象，定义对 <see cref="ScanLogEntity"/> 的持久化写入契约。
+/// 定义当前类型。
 /// </summary>
 public interface IScanLogRepository
 {
     /// <summary>
-    /// 新增扫描日志并持久化。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="entity">扫描日志实体。</param>
-    /// <param name="ct">取消令牌。</param>
     Task SaveAsync(ScanLogEntity entity, CancellationToken ct);
 
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     Task<ScanLogRecognitionAggregate> AggregateRecognitionAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct);
+
+    Task<IReadOnlyList<ScanLogEntity>> QueryRangeAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        string? barcode,
+        string? deviceCode,
+        CancellationToken ct);
 
     Task<(int TotalCount, IReadOnlyList<ScanLogEntity> Items)> QueryPageAsync(
         DateTime startTimeLocal,
@@ -26,3 +34,4 @@ public interface IScanLogRepository
         int take,
         CancellationToken ct);
 }
+

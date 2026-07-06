@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Queries;
+﻿using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Requests;
@@ -9,6 +9,9 @@ using HostBoxTrackingQueryRequest = EverydayChain.Hub.Host.Contracts.Requests.Bo
 
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
+/// <summary>
+/// 定义当前类型。
+/// </summary>
 public sealed class BoxTrackingControllerTests
 {
     [Fact]
@@ -39,8 +42,14 @@ public sealed class BoxTrackingControllerTests
         Assert.Equal("BOX-001", stubService.LastRequest!.BoxId);
     }
 
+    /// <summary>
+    /// 定义当前类型。
+    /// </summary>
     private sealed class StubBoxTrackingQueryService : IBoxTrackingQueryService
     {
+        /// <summary>
+        /// 获取或设置当前属性值。
+        /// </summary>
         public AppBoxTrackingQueryRequest? LastRequest { get; private set; }
 
         public Task<BoxTrackingQueryResult> QueryAsync(AppBoxTrackingQueryRequest request, CancellationToken cancellationToken)
@@ -74,5 +83,30 @@ public sealed class BoxTrackingControllerTests
                 ]
             });
         }
+
+        public Task<IReadOnlyList<BoxTrackingItem>> QueryAllAsync(AppBoxTrackingQueryRequest request, CancellationToken cancellationToken)
+        {
+            LastRequest = request;
+            return Task.FromResult<IReadOnlyList<BoxTrackingItem>>(
+            [
+                new BoxTrackingItem
+                {
+                    BoxId = "BOX-001",
+                    TaskCode = "TASK-001",
+                    WaveCode = "WAVE-001",
+                    OrderId = "ORDER-001",
+                    StoreId = "STORE-001",
+                    StoreName = "Store One",
+                    ProductCode = "SKU-001",
+                    PickLocation = "LOC-001",
+                    Scanner = "SCN-01",
+                    ScannedAtLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 8, 0, 0), DateTimeKind.Local),
+                    Chute = "B-07",
+                    Status = "Scanned",
+                    IsMatched = true
+                }
+            ]);
+        }
     }
 }
+

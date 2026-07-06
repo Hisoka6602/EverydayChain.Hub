@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Queries;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
@@ -6,13 +6,10 @@ using EverydayChain.Hub.Domain.Enums;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 码头看板查询服务测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class DockDashboardQueryServiceTests
 {
-    /// <summary>
-    /// 查询结果应满足码头聚合与 7 号码头异常规则。
-    /// </summary>
     [Fact]
     public async Task QueryAsync_ShouldApplyDockAggregationAndDockSevenExceptionRule()
     {
@@ -118,3 +115,4 @@ public sealed class DockDashboardQueryServiceTests
         Assert.Equal("8", result.DockSummaries[0].DockCode);
     }
 }
+

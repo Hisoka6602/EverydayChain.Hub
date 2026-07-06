@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Services;
+﻿using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Services;
@@ -11,15 +11,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 扫描上传应用服务测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class ScanIngressServiceTests
 {
-    /// <summary>
-    /// 创建测试用的 ScanIngressService，注入内存替身依赖。
-    /// </summary>
-    /// <param name="repository">业务任务仓储替身。</param>
-    /// <returns>扫描上传服务实例。</returns>
     private static (ScanIngressService Service, InMemoryScanLogRepository ScanLogRepository) CreateService(IBusinessTaskRepository? repository = null)
     {
         var barcodeParser = new BarcodeParser();
@@ -30,9 +25,6 @@ public sealed class ScanIngressServiceTests
         return (new ScanIngressService(barcodeParser, execService, scanLogRepo, NullLogger<ScanIngressService>.Instance), scanLogRepo);
     }
 
-    /// <summary>
-    /// 无效条码应返回统一失败语义。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldReturnInvalidBarcode_WhenBarcodeIsInvalid()
     {
@@ -53,9 +45,6 @@ public sealed class ScanIngressServiceTests
         Assert.False(scanLogRepository.Logs[0].IsMatched);
     }
 
-    /// <summary>
-    /// 有效拆零条码但无匹配任务时应返回未命中结果。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldReturnNotMatched_WhenNoTaskFound()
     {
@@ -74,9 +63,6 @@ public sealed class ScanIngressServiceTests
         Assert.Equal("TaskNotMatchedOrInvalidState", result.FailureReason);
     }
 
-    /// <summary>
-    /// 有效拆零条码且有匹配任务时应返回受理结果与条码类型。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldAcceptRequest_WhenBarcodeIsSplitAndTaskExists()
     {
@@ -108,9 +94,6 @@ public sealed class ScanIngressServiceTests
         Assert.Equal("TASK-001", result.TaskCode);
     }
 
-    /// <summary>
-    /// 扫描成功时应将解析得到的目标格口编码写入任务实体。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldPersistTargetChuteCode_WhenBarcodeIsFullCaseAndTaskExists()
     {
@@ -142,3 +125,4 @@ public sealed class ScanIngressServiceTests
         Assert.Equal("1", updatedTask!.TargetChuteCode);
     }
 }
+

@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Domain.Aggregates.SortingTaskTraceAggregate;
+﻿using EverydayChain.Hub.Domain.Aggregates.SortingTaskTraceAggregate;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Infrastructure.Services;
@@ -8,13 +8,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// SortingTaskTraceWriter 行为测试。
+/// 定义当前类型。
 /// </summary>
 public class SortingTaskTraceWriterTests
 {
-    /// <summary>
-    /// 首次写入时应先触发分表兜底建表。
-    /// </summary>
     [Fact]
     public async Task WriteAsync_WithSingleTrace_ShouldEnsureShardBeforeContextFactory()
     {
@@ -40,9 +37,6 @@ public class SortingTaskTraceWriterTests
         Assert.Equal("_202604", provisioner.EnsuredSuffixes[0]);
     }
 
-    /// <summary>
-    /// 相同月份重复写入应仅首次触发幂等建表，后续走缓存不重复检查。
-    /// </summary>
     [Fact]
     public async Task WriteAsync_WithRepeatedMonthWrites_ShouldCacheAndInvokeEnsureOnlyOnce()
     {
@@ -70,9 +64,6 @@ public class SortingTaskTraceWriterTests
         Assert.Equal("_202604", provisioner.EnsuredSuffixes[0]);
     }
 
-    /// <summary>
-    /// 跨月份写入应分别触发各月份首次建表检查。
-    /// </summary>
     [Fact]
     public async Task WriteAsync_WithDifferentMonthWrites_ShouldInvokeEnsurePerSuffix()
     {
@@ -109,3 +100,4 @@ public class SortingTaskTraceWriterTests
         Assert.Contains("_202605", provisioner.EnsuredSuffixes);
     }
 }
+

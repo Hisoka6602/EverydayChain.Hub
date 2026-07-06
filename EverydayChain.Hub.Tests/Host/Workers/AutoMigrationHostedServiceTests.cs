@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Host.Workers;
+﻿using EverydayChain.Hub.Host.Workers;
 using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -6,13 +6,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Host.Workers;
 
 /// <summary>
-/// AutoMigrationHostedService 启动容错行为测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class AutoMigrationHostedServiceTests
 {
-    /// <summary>
-    /// 自动迁移阶段抛出异常时应降级继续启动，不抛出到宿主。
-    /// </summary>
     [Fact]
     public async Task StartAsync_ShouldNotThrow_WhenAutoMigrationStageThrows()
     {
@@ -34,9 +31,6 @@ public sealed class AutoMigrationHostedServiceTests
         Assert.Equal(1, migrationService.RunCount);
     }
 
-    /// <summary>
-    /// 启动自检阶段异常仍应中断启动，避免掩盖非数据库前置条件问题。
-    /// </summary>
     [Fact]
     public async Task StartAsync_ShouldThrow_WhenStartupHealthCheckThrows()
     {
@@ -57,9 +51,6 @@ public sealed class AutoMigrationHostedServiceTests
         Assert.Equal(0, migrationService.RunCount);
     }
 
-    /// <summary>
-    /// 自动迁移阶段抛出非数据库异常时仍应中断启动。
-    /// </summary>
     [Fact]
     public async Task StartAsync_ShouldThrow_WhenAutoMigrationStageThrowsNonDatabaseException()
     {
@@ -80,9 +71,6 @@ public sealed class AutoMigrationHostedServiceTests
         Assert.Equal(1, migrationService.RunCount);
     }
 
-    /// <summary>
-    /// 启动预热依赖缺失时应仅降级告警，不影响宿主启动与自动迁移主流程。
-    /// </summary>
     [Fact]
     public async Task StartAsync_ShouldNotThrow_WhenWarmupDependenciesMissing()
     {
@@ -101,11 +89,6 @@ public sealed class AutoMigrationHostedServiceTests
         Assert.Equal(1, migrationService.RunCount);
     }
 
-    /// <summary>
-    /// 构建测试用服务提供器。
-    /// </summary>
-    /// <param name="migrationService">自动迁移服务桩。</param>
-    /// <returns>服务提供器。</returns>
     private static ServiceProvider BuildServiceProvider(TestAutoMigrationService migrationService)
     {
         var services = new ServiceCollection();
@@ -114,3 +97,4 @@ public sealed class AutoMigrationHostedServiceTests
         return services.BuildServiceProvider();
     }
 }
+

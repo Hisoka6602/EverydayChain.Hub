@@ -1,17 +1,14 @@
-using EverydayChain.Hub.Application.ScanMatch.Services;
+﻿using EverydayChain.Hub.Application.ScanMatch.Services;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 扫描匹配服务单元测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class ScanMatchServiceTests
 {
-    /// <summary>
-    /// 条码为空白时应返回未匹配结果。
-    /// </summary>
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
@@ -27,9 +24,6 @@ public sealed class ScanMatchServiceTests
         Assert.NotEmpty(result.FailureReason);
     }
 
-    /// <summary>
-    /// 条码无对应任务时应返回未匹配结果。
-    /// </summary>
     [Fact]
     public async Task MatchByBarcodeAsync_ShouldReturnNotMatched_WhenNoTaskExists()
     {
@@ -43,9 +37,6 @@ public sealed class ScanMatchServiceTests
         Assert.Contains("UNKNOWN-BC", result.FailureReason);
     }
 
-    /// <summary>
-    /// 条码有对应任务时应返回匹配成功与任务实体。
-    /// </summary>
     [Fact]
     public async Task MatchByBarcodeAsync_ShouldReturnMatched_WhenTaskExists()
     {
@@ -71,3 +62,4 @@ public sealed class ScanMatchServiceTests
         Assert.Empty(result.FailureReason);
     }
 }
+

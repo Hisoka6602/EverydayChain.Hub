@@ -1,20 +1,20 @@
-using EverydayChain.Hub.Infrastructure.Repositories;
+﻿using EverydayChain.Hub.Infrastructure.Repositories;
 
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// SyncStagingRepository 行存储行为测试。
+/// 定义当前类型。
 /// </summary>
 public class SyncStagingRepositoryTests
 {
-    /// <summary>
-    /// 暂存写入后应保持行字段大小写不敏感访问能力。
-    /// </summary>
     [Fact]
     public async Task BulkInsertAsync_ShouldKeepCaseInsensitiveRowDictionary()
     {
         var repository = new SyncStagingRepository();
         var batchId = "batch-1";
+        /// <summary>
+        /// 存储当前字段值。
+        /// </summary>
         const int pageNo = 1;
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows =
         [
@@ -40,3 +40,4 @@ public class SyncStagingRepositoryTests
         Assert.Equal(new DateTime(2026, 4, 9, 10, 0, 0, DateTimeKind.Local), addTime);
     }
 }
+

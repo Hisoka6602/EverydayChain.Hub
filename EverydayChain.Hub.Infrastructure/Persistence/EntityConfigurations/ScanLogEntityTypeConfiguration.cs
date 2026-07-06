@@ -1,34 +1,42 @@
-using EverydayChain.Hub.Domain.Aggregates.ScanLogAggregate;
+﻿using EverydayChain.Hub.Domain.Aggregates.ScanLogAggregate;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace EverydayChain.Hub.Infrastructure.Persistence.EntityConfigurations;
 
 /// <summary>
-/// <see cref="ScanLogEntity"/> EF Core 实体配置，映射到固定表 <c>scan_logs</c>。
+/// 定义当前类型。
 /// </summary>
 public class ScanLogEntityTypeConfiguration : IEntityTypeConfiguration<ScanLogEntity>
 {
-    /// <summary>物理表名（已含 Schema 信息由外部传入）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly string _tableName;
 
-    /// <summary>目标 Schema。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly string _schema;
 
     /// <summary>
-    /// 初始化 ScanLogEntityTypeConfiguration。
+    /// 初始化扫描日志实体映射配置。
     /// </summary>
-    /// <param name="tableName">物理表名。</param>
-    /// <param name="schema">目标 Schema。</param>
+    /// <param name="tableName">表名。</param>
+    /// <param name="schema">架构名。</param>
     public ScanLogEntityTypeConfiguration(string tableName, string schema)
     {
         _tableName = tableName;
         _schema = schema;
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 配置扫描日志实体映射。
+    /// </summary>
+    /// <param name="builder">实体构建器。</param>
     public void Configure(EntityTypeBuilder<ScanLogEntity> builder)
     {
+        // 步骤：配置字段约束，并为按时间分页、条码筛选、设备筛选建立热点索引。
         builder.ToTable(_tableName, _schema);
         builder.HasKey(x => x.Id).IsClustered();
         builder.Property(x => x.Id).ValueGeneratedOnAdd();
@@ -39,12 +47,16 @@ public class ScanLogEntityTypeConfiguration : IEntityTypeConfiguration<ScanLogEn
         builder.Property(x => x.TraceId).HasMaxLength(64);
         builder.HasIndex(x => x.BusinessTaskId);
         builder.HasIndex(x => x.Barcode);
+        builder.HasIndex(x => x.DeviceCode);
         builder.HasIndex(x => x.TaskCode);
         builder.HasIndex(x => x.ScanTimeLocal);
         builder.HasIndex(x => x.CreatedTimeLocal);
         builder.HasIndex(x => new { x.Barcode, x.ScanTimeLocal });
+        builder.HasIndex(x => new { x.DeviceCode, x.ScanTimeLocal });
+        builder.HasIndex(x => new { x.ScanTimeLocal, x.Id });
         builder.HasIndex(x => new { x.TaskCode, x.ScanTimeLocal });
         builder.HasIndex(x => new { x.CreatedTimeLocal, x.ScanTimeLocal });
         builder.HasIndex(x => new { x.CreatedTimeLocal, x.TaskCode });
     }
 }
+

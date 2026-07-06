@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Services;
+﻿using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Host.Workers;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Tests.Services;
@@ -8,13 +8,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Host.Workers;
 
 /// <summary>
-/// API 启动预热托管服务测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class ApiWarmupHostedServiceTests
 {
-    /// <summary>
-    /// 预热服务抛出异常时不应影响宿主启动。
-    /// </summary>
     [Fact]
     public async Task StartAsync_ShouldNotThrow_WhenWarmupServiceThrows()
     {
@@ -23,9 +20,6 @@ public sealed class ApiWarmupHostedServiceTests
         await hostedService.StartAsync(CancellationToken.None);
     }
 
-    /// <summary>
-    /// 启动后应异步触发一次预热执行。
-    /// </summary>
     [Fact]
     public async Task StartAsync_ShouldInvokeWarmupService()
     {
@@ -39,11 +33,6 @@ public sealed class ApiWarmupHostedServiceTests
         Assert.Equal(1, warmupService.InvocationCount);
     }
 
-    /// <summary>
-    /// 创建测试用托管服务实例。
-    /// </summary>
-    /// <param name="apiWarmupService">预热服务。</param>
-    /// <returns>托管服务实例。</returns>
     private static ApiWarmupHostedService CreateHostedService(IApiWarmupService apiWarmupService)
     {
         var dbContextFactory = new ThrowingHubDbContextFactory();
@@ -58,21 +47,17 @@ public sealed class ApiWarmupHostedServiceTests
     }
 
     /// <summary>
-    /// 记录调用次数的预热服务替身。
+    /// 定义当前类型。
     /// </summary>
     private sealed class RecordingApiWarmupService : IApiWarmupService
     {
         /// <summary>
-        /// 调用计数。
+        /// 获取或设置当前属性值。
         /// </summary>
         public int InvocationCount { get; private set; }
 
-        /// <summary>
-        /// 调用完成通知。
-        /// </summary>
         public TaskCompletionSource<bool> InvocationCompletion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        /// <inheritdoc/>
         public Task WarmupAsync(CancellationToken cancellationToken)
         {
             InvocationCount++;
@@ -82,11 +67,10 @@ public sealed class ApiWarmupHostedServiceTests
     }
 
     /// <summary>
-    /// 抛出异常的预热服务替身。
+    /// 定义当前类型。
     /// </summary>
     private sealed class ThrowingApiWarmupService : IApiWarmupService
     {
-        /// <inheritdoc/>
         public Task WarmupAsync(CancellationToken cancellationToken)
         {
             throw new InvalidOperationException("测试桩：预热失败。");
@@ -94,24 +78,28 @@ public sealed class ApiWarmupHostedServiceTests
     }
 
     /// <summary>
-    /// 宿主生命周期测试替身。
+    /// 定义当前类型。
     /// </summary>
     private sealed class TestHostApplicationLifetime : IHostApplicationLifetime
     {
-        /// <summary>启动令牌。</summary>
+        /// <summary>
+        /// 获取或设置当前属性值。
+        /// </summary>
         public CancellationToken ApplicationStarted => CancellationToken.None;
 
-        /// <summary>停止令牌。</summary>
+        /// <summary>
+        /// 获取或设置当前属性值。
+        /// </summary>
         public CancellationToken ApplicationStopping => CancellationToken.None;
 
-        /// <summary>停止完成令牌。</summary>
+        /// <summary>
+        /// 获取或设置当前属性值。
+        /// </summary>
         public CancellationToken ApplicationStopped => CancellationToken.None;
 
-        /// <summary>
-        /// 请求停止应用。
-        /// </summary>
         public void StopApplication()
         {
         }
     }
 }
+

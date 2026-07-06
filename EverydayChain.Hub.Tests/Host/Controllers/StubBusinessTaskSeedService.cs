@@ -1,21 +1,18 @@
-using EverydayChain.Hub.Application.Abstractions.Services;
+﻿using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
 
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 业务任务模拟补数服务替身。
+/// 定义当前类型。
 /// </summary>
 internal sealed class StubBusinessTaskSeedService : IBusinessTaskSeedService
 {
     /// <summary>
-    /// 最近一次执行命令。
+    /// 获取或设置当前属性值。
     /// </summary>
     public BusinessTaskSeedCommand? LastCommand { get; private set; }
 
-    /// <summary>
-    /// 固定返回结果。
-    /// </summary>
     public BusinessTaskSeedResult Result { get; set; } = new()
     {
         IsSuccess = true,
@@ -29,10 +26,10 @@ internal sealed class StubBusinessTaskSeedService : IBusinessTaskSeedService
         SkippedExistingCount = 0
     };
 
-    /// <inheritdoc/>
     public Task<BusinessTaskSeedResult> ExecuteAsync(BusinessTaskSeedCommand command, CancellationToken cancellationToken)
     {
         LastCommand = command;
         return Task.FromResult(Result);
     }
 }
+

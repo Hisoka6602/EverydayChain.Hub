@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Domain.Options;
+﻿using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Services.Sharding;
 using EverydayChain.Hub.Infrastructure.Services.Sharding.Metadata;
@@ -10,24 +10,28 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Tests.Services.Sharding;
 
 /// <summary>
-/// 分表结构差异计算测试。
+/// 定义当前类型。
 /// </summary>
 public class ShardSchemaDiffTests
 {
-    /// <summary>业务任务逻辑表名。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string BusinessTaskLogicalTable = "business_tasks";
 
-    /// <summary>测试连接字符串。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string TestConnectionString = "Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;";
 
-    /// <summary>
-     /// 结构完全一致时不应重复生成 DDL。
-     /// </summary>
     [Fact]
     public void BuildSynchronizationSql_ShouldReturnEmpty_WhenPhysicalTableAlreadyAligned()
     {
         var synchronizer = CreateSynchronizer();
         var template = synchronizer.ResolveTableTemplate(BusinessTaskLogicalTable);
+        /// <summary>
+        /// 存储当前字段值。
+        /// </summary>
         const string physicalTableName = "business_tasks_202604";
         var physicalSchema = BuildAlignedPhysicalSchema(template, physicalTableName);
 
@@ -42,9 +46,6 @@ public class ShardSchemaDiffTests
         Assert.DoesNotContain("CREATE INDEX", sql, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// 已存在等价索引时不应重复报告缺失索引。
-    /// </summary>
     [Fact]
     public void BuildDiff_ShouldNotReportMissingIndex_WhenEquivalentIndexAlreadyExists()
     {
@@ -68,9 +69,6 @@ public class ShardSchemaDiffTests
             && index.ColumnNames.SequenceEqual(equivalentIndex.ColumnNames, StringComparer.Ordinal));
     }
 
-    /// <summary>
-     /// 非空且无安全默认值的缺失列应只告警不执行自动补齐。
-     /// </summary>
     [Fact]
     public void BuildDiff_ShouldWarnAndSkip_WhenMissingNonNullableColumnHasNoSafeDefaultValue()
     {
@@ -102,12 +100,6 @@ public class ShardSchemaDiffTests
         Assert.DoesNotContain("ALTER TABLE [dbo].[business_tasks_202604] ADD [RequiredColumn] int NOT NULL", sql, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// 构建已对齐物理分表结构。
-    /// </summary>
-    /// <param name="template">逻辑表模板。</param>
-    /// <param name="physicalTableName">物理表名。</param>
-    /// <returns>已对齐的物理结构。</returns>
     private static ShardPhysicalTableSchema BuildAlignedPhysicalSchema(ShardTableSchemaTemplate template, string physicalTableName)
     {
         return new ShardPhysicalTableSchema(
@@ -123,12 +115,6 @@ public class ShardSchemaDiffTests
                 .ToList());
     }
 
-    /// <summary>
-    /// 按单列名筛选非唯一索引。
-    /// </summary>
-    /// <param name="indexes">索引集合。</param>
-    /// <param name="columnName">列名。</param>
-    /// <returns>匹配的索引集合。</returns>
     private static IEnumerable<ShardIndexSchema> FindIndexesByColumn(IEnumerable<ShardIndexSchema> indexes, string columnName)
     {
         return indexes
@@ -138,10 +124,6 @@ public class ShardSchemaDiffTests
                 && string.Equals(index.ColumnNames[0], columnName, StringComparison.Ordinal));
     }
 
-    /// <summary>
-    /// 创建分表结构同步器。
-    /// </summary>
-    /// <returns>同步器实例。</returns>
     private static ShardSchemaSynchronizer CreateSynchronizer()
     {
         return new ShardSchemaSynchronizer(
@@ -157,10 +139,6 @@ public class ShardSchemaDiffTests
             NullLogger<ShardSchemaSynchronizer>.Instance);
     }
 
-    /// <summary>
-    /// 创建测试用 DbContext 工厂。
-    /// </summary>
-    /// <returns>HubDbContext 工厂实例。</returns>
     private static IDbContextFactory<HubDbContext> CreateDbContextFactory()
     {
         var contextOptions = new DbContextOptionsBuilder<HubDbContext>()
@@ -174,3 +152,4 @@ public class ShardSchemaDiffTests
         return new HubDbContextTestFactory(contextOptions, shardingOptions);
     }
 }
+

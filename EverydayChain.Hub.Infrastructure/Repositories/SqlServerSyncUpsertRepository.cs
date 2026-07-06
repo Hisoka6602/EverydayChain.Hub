@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Buffers;
 using System.Globalization;
 using System.Data;
@@ -19,7 +19,7 @@ using Newtonsoft.Json;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// SQL Server 落库版同步幂等合并仓储。
+/// 定义当前类型。
 /// </summary>
 public class SqlServerSyncUpsertRepository(
     IOptions<SyncJobOptions> syncJobOptions,
@@ -29,34 +29,47 @@ public class SqlServerSyncUpsertRepository(
     IDangerZoneExecutor dangerZoneExecutor,
     ILogger<SqlServerSyncUpsertRepository> logger) : ISyncUpsertRepository {
 
-    /// <summary>状态表名前缀（按 TableCode+月份分表，实际表名为 sync_target_state_{tableCode}_{yyyyMM}）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string SyncTargetStateTablePrefix = "sync_target_state";
 
-    /// <summary>状态表固定 Schema。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string SyncTargetStateSchema = "dbo";
 
-    /// <summary>状态表月份标记长度（yyyyMM）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int StateMonthTokenLength = 6;
 
-    /// <summary>临时表清理超时秒数。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int TempTableCleanupTimeoutSeconds = 5;
 
-    /// <summary>行摘要序列化配置（紧凑输出）。</summary>
     private static readonly JsonSerializerSettings DigestSerializerSettings = new() {
         Formatting = Formatting.None,
     };
 
-    /// <summary>同步配置快照。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly SyncJobOptions _syncJobOptions = syncJobOptions.Value;
 
-    /// <summary>分表配置快照。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly ShardingOptions _shardingOptions = shardingOptions.Value;
 
-    /// <summary>表配置缓存（按 TableCode 索引）。</summary>
     private readonly IReadOnlyDictionary<string, SyncTableOptions> _tableOptionsMap = BuildTableOptionsMap(syncJobOptions.Value);
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public Task<SyncMergeResult> MergeFromStagingAsync(SyncMergeRequest request, CancellationToken ct) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (request.UniqueKeys.Count == 0) {
             throw new InvalidOperationException($"同步表 {request.TableCode} 未配置 UniqueKeys，无法执行幂等合并。");
         }
@@ -67,16 +80,22 @@ public class SqlServerSyncUpsertRepository(
             ct);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public Task<IReadOnlyList<SyncTargetStateRow>> ListTargetStateRowsAsync(string tableCode, CancellationToken ct) {
+        // 步骤：按既定流程执行当前方法逻辑。
         return dangerZoneExecutor.ExecuteAsync(
             $"sqlserver-upsert-list-state-{tableCode}",
             token => ListTargetStateRowsCoreAsync(tableCode, token),
             ct);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public Task<int> DeleteByBusinessKeysAsync(string tableCode, IReadOnlyList<string> businessKeys, DeletionPolicy deletionPolicy, CancellationToken ct) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (businessKeys.Count == 0 || deletionPolicy == DeletionPolicy.Disabled) {
             return Task.FromResult(0);
         }
@@ -88,12 +107,10 @@ public class SqlServerSyncUpsertRepository(
     }
 
     /// <summary>
-    /// 执行合并核心逻辑（含真实落库与状态更新）。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">合并请求。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>合并结果。</returns>
     protected virtual async Task<SyncMergeResult> MergeCoreAsync(SyncMergeRequest request, CancellationToken ct) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (request.UniqueKeys.Count == 0) {
             throw new InvalidOperationException($"同步表 {request.TableCode} 未配置 UniqueKeys，无法执行幂等合并。");
         }
@@ -202,7 +219,6 @@ public class SqlServerSyncUpsertRepository(
         catch (Exception ex) {
             logger.LogError(ex, "SQL Server 幂等合并失败。TableCode={TableCode}", request.TableCode);
             try {
-                // 事务回滚属于一致性收敛动作；在超时或手动取消场景下，仍优先完成回滚以避免半提交状态。
                 await transaction.RollbackAsync(CancellationToken.None);
             }
             catch (Exception rollbackException) {
@@ -214,16 +230,17 @@ public class SqlServerSyncUpsertRepository(
     }
 
     /// <summary>
-    /// 列出目标状态核心逻辑。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="tableCode">表编码。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>状态集合。</returns>
     protected virtual async Task<IReadOnlyList<SyncTargetStateRow>> ListTargetStateRowsCoreAsync(string tableCode, CancellationToken ct) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stateMap = new Dictionary<string, (SyncTargetStateRow State, DateTime UpdatedTimeLocal)>(StringComparer.OrdinalIgnoreCase);
         await using var connection = new SqlConnection(_shardingOptions.ConnectionString);
         await connection.OpenAsync(ct);
         var stateMonthToken = ResolveStateMonthToken(DateTime.Now);
+        /// <summary>
+        /// 执行当前方法。
+        /// </summary>
         await EnsureSyncTargetStateTableExistsAsync(tableCode, stateMonthToken, connection, transaction: null, ct);
         var stateTables = await ListSyncStateTableFullNamesAsync(tableCode, connection, transaction: null, ct);
         foreach (var stateTable in stateTables) {
@@ -258,14 +275,10 @@ WHERE [TableCode]=@tableCode;";
     }
 
     /// <summary>
-    /// 按业务键删除核心逻辑。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="tableCode">表编码。</param>
-    /// <param name="businessKeys">业务键集合。</param>
-    /// <param name="deletionPolicy">删除策略。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>删除数量。</returns>
     protected virtual async Task<int> DeleteByBusinessKeysCoreAsync(string tableCode, IReadOnlyList<string> businessKeys, DeletionPolicy deletionPolicy, CancellationToken ct) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var tableOptions = ResolveTableOptions(tableCode);
         if (tableOptions.UniqueKeys.Count == 0) {
             throw new InvalidOperationException($"同步表 {tableCode} 未配置 UniqueKeys，无法执行删除。");
@@ -310,7 +323,6 @@ WHERE [TableCode]=@tableCode;";
         catch (Exception ex) {
             logger.LogError(ex, "SQL Server 目标端删除失败。TableCode={TableCode}, DeletionPolicy={DeletionPolicy}", tableCode, deletionPolicy);
             try {
-                // 事务回滚属于一致性收敛动作；在超时或手动取消场景下，仍优先完成回滚以避免半提交状态。
                 await transaction.RollbackAsync(CancellationToken.None);
             }
             catch (Exception rollbackException) {
@@ -322,12 +334,10 @@ WHERE [TableCode]=@tableCode;";
     }
 
     /// <summary>
-    /// 构建合并条目集合。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">合并请求。</param>
-    /// <param name="targetLogicalTable">目标逻辑表。</param>
-    /// <returns>合并条目列表。</returns>
     private List<MergeEntry> BuildMergeEntries(SyncMergeRequest request, string targetLogicalTable) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var entries = new List<MergeEntry>(request.Rows.Count);
         foreach (var row in request.Rows) {
             var filteredRow = SyncColumnFilter.FilterExcludedColumns(row, request.NormalizedExcludedColumns);
@@ -350,20 +360,15 @@ WHERE [TableCode]=@tableCode;";
     }
 
     /// <summary>
-    /// 读取状态映射。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="connection">数据库连接。</param>
-    /// <param name="transaction">事务对象。</param>
-    /// <param name="tableCode">表编码。</param>
-    /// <param name="businessKeys">已去重业务键集合（按首次出现顺序）。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>状态映射。</returns>
     private async Task<Dictionary<string, PersistedState>> LoadStateMapAsync(
         SqlConnection connection,
         SqlTransaction transaction,
         string tableCode,
         IReadOnlyList<string> businessKeys,
         CancellationToken ct) {
+            // 步骤：按既定流程执行当前方法逻辑。
         var stateMap = new Dictionary<string, PersistedState>(StringComparer.OrdinalIgnoreCase);
         if (businessKeys.Count == 0) {
             return stateMap;
@@ -371,7 +376,9 @@ WHERE [TableCode]=@tableCode;";
 
         var latestStateMap = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
         var stateTables = await ListSyncStateTableFullNamesAsync(tableCode, connection, transaction, ct);
-        // SQL Server 单条语句参数上限为 2100；本查询除业务键参数外还包含 tableCode 参数，因此分块上限取 900。
+        /// <summary>
+        /// 存储当前字段值。
+        /// </summary>
         const int chunkSize = 900;
         foreach (var stateTable in stateTables) {
             for (var index = 0; index < businessKeys.Count; index += chunkSize) {
@@ -419,19 +426,10 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 确保指定表编码+月份对应的幂等状态分表存在。
+    /// 执行当前方法。
     /// </summary>
-    /// <remarks>
-    /// 每个 TableCode+月份对应独立的状态表（sync_target_state_{tableCode}_{yyyyMM}），避免长期无人值守导致单表膨胀。
-    /// 线上若存在“迁移历史被重置 / 部分迁移缺失”场景，状态表可能未被创建。
-    /// 此处进行幂等兜底，避免同步任务因 208 异常中断。
-    /// </remarks>
-    /// <param name="tableCode">同步表编码，用于确定状态分表名称。</param>
-    /// <param name="stateMonthToken">状态分表月份标记（yyyyMM）。</param>
-    /// <param name="connection">数据库连接。</param>
-    /// <param name="transaction">事务对象（可空）。</param>
-    /// <param name="ct">取消令牌。</param>
     private async Task EnsureSyncTargetStateTableExistsAsync(string tableCode, string stateMonthToken, SqlConnection connection, SqlTransaction? transaction, CancellationToken ct) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var fullName = GetSyncStateTableFullName(tableCode, stateMonthToken);
         var tableNameRaw = $"{SyncTargetStateTablePrefix}_{tableCode}_{stateMonthToken}";
         var pkName = EscapeIdentifier(BuildStateTableObjectName("PK", tableNameRaw));
@@ -461,22 +459,16 @@ END;";
     }
 
     /// <summary>
-    /// 获取集合式合并批次大小（按配置值钳制到 1~5000）。
+    /// 执行当前方法。
     /// </summary>
-    /// <returns>批次大小。</returns>
     private int GetBatchMergeSize() {
+        // 步骤：按既定流程执行当前方法逻辑。
         return Math.Clamp(_syncJobOptions.BatchMergeSize, 1, 5000);
     }
 
     /// <summary>
-    /// 执行目标表集合式 MERGE 批处理。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="connection">数据库连接。</param>
-    /// <param name="transaction">事务对象。</param>
-    /// <param name="uniqueKeys">唯一键集合。</param>
-    /// <param name="entries">变更条目集合。</param>
-    /// <param name="batchMergeSize">批次大小。</param>
-    /// <param name="ct">取消令牌。</param>
     private async Task ExecuteTargetMergeBatchesAsync(
         SqlConnection connection,
         SqlTransaction transaction,
@@ -484,6 +476,7 @@ END;";
         IReadOnlyList<MergeEntry> entries,
         int batchMergeSize,
         CancellationToken ct) {
+            // 步骤：按既定流程执行当前方法逻辑。
         if (entries.Count == 0) {
             return;
         }
@@ -506,19 +499,15 @@ END;";
     }
 
     /// <summary>
-    /// 执行单个目标分组的集合式 MERGE。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="connection">数据库连接。</param>
-    /// <param name="transaction">事务对象。</param>
-    /// <param name="uniqueKeys">唯一键集合。</param>
-    /// <param name="entries">批次条目集合。</param>
-    /// <param name="ct">取消令牌。</param>
     private async Task ExecuteTargetMergeBatchAsync(
         SqlConnection connection,
         SqlTransaction transaction,
         IReadOnlyList<string> uniqueKeys,
         IReadOnlyList<MergeEntry> entries,
         CancellationToken ct) {
+            // 步骤：按既定流程执行当前方法逻辑。
         if (entries.Count == 0) {
             return;
         }
@@ -595,14 +584,8 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行跨分片迁移时的旧分片批量删除。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="connection">数据库连接。</param>
-    /// <param name="transaction">事务对象。</param>
-    /// <param name="uniqueKeys">唯一键集合。</param>
-    /// <param name="entries">删除条目集合。</param>
-    /// <param name="batchMergeSize">批次大小。</param>
-    /// <param name="ct">取消令牌。</param>
     private async Task ExecuteShardDeleteBatchesAsync(
         SqlConnection connection,
         SqlTransaction transaction,
@@ -610,6 +593,7 @@ WHEN NOT MATCHED THEN
         IReadOnlyList<ShardDeleteEntry> entries,
         int batchMergeSize,
         CancellationToken ct) {
+            // 步骤：按既定流程执行当前方法逻辑。
         if (entries.Count == 0) {
             return;
         }
@@ -636,19 +620,15 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行单个分片批次删除。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="connection">数据库连接。</param>
-    /// <param name="transaction">事务对象。</param>
-    /// <param name="uniqueKeys">唯一键集合。</param>
-    /// <param name="entries">删除条目集合。</param>
-    /// <param name="ct">取消令牌。</param>
     private async Task ExecuteShardDeleteBatchAsync(
         SqlConnection connection,
         SqlTransaction transaction,
         IReadOnlyList<string> uniqueKeys,
         IReadOnlyList<ShardDeleteEntry> entries,
         CancellationToken ct) {
+            // 步骤：按既定流程执行当前方法逻辑。
         if (entries.Count == 0) {
             return;
         }
@@ -712,14 +692,8 @@ INNER JOIN {tempTableName} AS source
     }
 
     /// <summary>
-    /// 批量合并状态表。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="connection">数据库连接。</param>
-    /// <param name="transaction">事务对象。</param>
-    /// <param name="tableCode">表编码。</param>
-    /// <param name="entries">变更条目集合。</param>
-    /// <param name="batchMergeSize">批次大小。</param>
-    /// <param name="ct">取消令牌。</param>
     private async Task UpsertStatesBatchAsync(
         SqlConnection connection,
         SqlTransaction transaction,
@@ -728,6 +702,7 @@ INNER JOIN {tempTableName} AS source
         IReadOnlyList<MergeEntry> entries,
         int batchMergeSize,
         CancellationToken ct) {
+            // 步骤：按既定流程执行当前方法逻辑。
         if (entries.Count == 0) {
             return;
         }
@@ -815,12 +790,10 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 推断合并条目列的数据类型。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="entries">合并条目集合。</param>
-    /// <param name="column">列名。</param>
-    /// <returns>推断类型。</returns>
     private static Type ResolveEntryColumnType(IReadOnlyList<MergeEntry> entries, string column) {
+        // 步骤：按既定流程执行当前方法逻辑。
         foreach (var entry in entries) {
             if (!entry.Row.TryGetValue(column, out var rawValue) || rawValue is null) {
                 continue;
@@ -836,12 +809,10 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 推断业务键列的数据类型。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="parsedRows">解析后的业务键行。</param>
-    /// <param name="column">列名。</param>
-    /// <returns>推断类型。</returns>
     private static Type ResolveBusinessKeyColumnType(IReadOnlyList<IReadOnlyDictionary<string, object?>> parsedRows, string column) {
+        // 步骤：按既定流程执行当前方法逻辑。
         foreach (var parsedRow in parsedRows) {
             if (!parsedRow.TryGetValue(column, out var rawValue) || rawValue is null) {
                 continue;
@@ -857,12 +828,10 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 删除临时表。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="connection">数据库连接。</param>
-    /// <param name="transaction">事务对象。</param>
-    /// <param name="tempTableName">临时表名。</param>
     private async Task DropTempTableAsync(SqlConnection connection, SqlTransaction transaction, string tempTableName) {
+        // 步骤：按既定流程执行当前方法逻辑。
         using var tempTableCleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(TempTableCleanupTimeoutSeconds));
         try {
             await using var dropCommand = connection.CreateCommand();
@@ -876,11 +845,10 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 构建列签名文本。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="columns">列集合。</param>
-    /// <returns>列签名。</returns>
     private static string BuildColumnSignature(IEnumerable<string> columns) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var ordered = columns
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(column => column, StringComparer.OrdinalIgnoreCase)
@@ -889,15 +857,13 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 跟踪业务键最后一条变更条目（用于集合式批处理去重）。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="latestChangedEntries">业务键到最后条目的映射。</param>
-    /// <param name="changedBusinessKeysInOrder">业务键首次出现顺序。</param>
-    /// <param name="entry">当前变更条目。</param>
     private static void TrackLatestChangedEntry(
         IDictionary<string, MergeEntry> latestChangedEntries,
         IList<string> changedBusinessKeysInOrder,
         MergeEntry entry) {
+            // 步骤：按既定流程执行当前方法逻辑。
         if (!latestChangedEntries.ContainsKey(entry.BusinessKey)) {
             changedBusinessKeysInOrder.Add(entry.BusinessKey);
         }
@@ -906,14 +872,12 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 构建按首次出现顺序排序的去重变更条目集合。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="changedBusinessKeysInOrder">业务键首次出现顺序。</param>
-    /// <param name="latestChangedEntries">业务键到最后条目的映射。</param>
-    /// <returns>去重后的变更条目集合。</returns>
     private static IReadOnlyList<MergeEntry> BuildOrderedChangedEntries(
         IReadOnlyList<string> changedBusinessKeysInOrder,
         IReadOnlyDictionary<string, MergeEntry> latestChangedEntries) {
+            // 步骤：按既定流程执行当前方法逻辑。
         if (changedBusinessKeysInOrder.Count == 0) {
             return Array.Empty<MergeEntry>();
         }
@@ -928,14 +892,12 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 根据初始状态与最终条目构建跨分片删除集合。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="changedEntries">最终去重变更条目集合。</param>
-    /// <param name="initialStates">初始状态映射。</param>
-    /// <returns>删除条目集合。</returns>
     private static IReadOnlyList<ShardDeleteEntry> BuildShardSwitchDeletes(
         IReadOnlyList<MergeEntry> changedEntries,
         IReadOnlyDictionary<string, PersistedState> initialStates) {
+            // 步骤：按既定流程执行当前方法逻辑。
         if (changedEntries.Count == 0 || initialStates.Count == 0) {
             return Array.Empty<ShardDeleteEntry>();
         }
@@ -960,14 +922,10 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 基于索引创建批次数组，避免热路径重复枚举。
+    /// 执行当前方法。
     /// </summary>
-    /// <typeparam name="T">条目类型。</typeparam>
-    /// <param name="source">源集合。</param>
-    /// <param name="startIndex">起始索引。</param>
-    /// <param name="length">批次长度。</param>
-    /// <returns>批次数组。</returns>
     private static T[] CreateBatch<T>(IReadOnlyList<T> source, int startIndex, int length) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var batch = new T[length];
         for (var offset = 0; offset < length; offset++) {
             batch[offset] = source[startIndex + offset];
@@ -977,16 +935,8 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行目标表 UPSERT。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="connection">数据库连接。</param>
-    /// <param name="transaction">事务对象。</param>
-    /// <param name="targetLogicalTable">目标逻辑表。</param>
-    /// <param name="shardSuffix">分表后缀。</param>
-    /// <param name="row">数据行。</param>
-    /// <param name="uniqueKeys">唯一键集合。</param>
-    /// <param name="uniqueKeySet">由 <paramref name="uniqueKeys"/> 预构建的查找缓存，用于热路径 O(1) 判断更新列。</param>
-    /// <param name="ct">取消令牌。</param>
     private async Task UpsertTargetRowAsync(
         SqlConnection connection,
         SqlTransaction transaction,
@@ -996,6 +946,7 @@ WHEN NOT MATCHED THEN
         IReadOnlyList<string> uniqueKeys,
         IReadOnlySet<string> uniqueKeySet,
         CancellationToken ct) {
+            // 步骤：按既定流程执行当前方法逻辑。
         var fullTableName = BuildTargetTableFullName(targetLogicalTable, shardSuffix);
         var orderedColumns = row.Keys
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -1034,15 +985,8 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 删除目标物理行（按业务键拆解唯一键）。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="connection">数据库连接。</param>
-    /// <param name="transaction">事务对象。</param>
-    /// <param name="targetLogicalTable">目标逻辑表。</param>
-    /// <param name="shardSuffix">分表后缀。</param>
-    /// <param name="uniqueKeys">唯一键列集合。</param>
-    /// <param name="businessKey">业务键文本。</param>
-    /// <param name="ct">取消令牌。</param>
     private async Task DeleteTargetRowByBusinessKeyAsync(
         SqlConnection connection,
         SqlTransaction transaction,
@@ -1051,6 +995,7 @@ WHEN NOT MATCHED THEN
         IReadOnlyList<string> uniqueKeys,
         string businessKey,
         CancellationToken ct) {
+            // 步骤：按既定流程执行当前方法逻辑。
         EnsureIdentifiersSafe(uniqueKeys);
         var keyValues = ParseBusinessKey(uniqueKeys, businessKey);
         var fullTableName = BuildTargetTableFullName(targetLogicalTable, shardSuffix);
@@ -1069,13 +1014,8 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 插入或更新状态行。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="connection">数据库连接。</param>
-    /// <param name="transaction">事务对象。</param>
-    /// <param name="tableCode">表编码。</param>
-    /// <param name="entry">合并条目。</param>
-    /// <param name="ct">取消令牌。</param>
     private async Task UpsertStateAsync(
         SqlConnection connection,
         SqlTransaction transaction,
@@ -1083,6 +1023,7 @@ WHEN NOT MATCHED THEN
         string stateMonthToken,
         MergeEntry entry,
         CancellationToken ct) {
+            // 步骤：按既定流程执行当前方法逻辑。
         var nowLocal = DateTime.Now;
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
@@ -1124,21 +1065,16 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 软删除状态行。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="connection">数据库连接。</param>
-    /// <param name="transaction">事务对象。</param>
-    /// <param name="tableCode">表编码。</param>
-    /// <param name="businessKey">业务键。</param>
-    /// <param name="ct">取消令牌。</param>
     private async Task MarkSoftDeletedStateAsync(
         SqlConnection connection,
         SqlTransaction transaction,
         string tableCode,
         string businessKey,
         CancellationToken ct) {
+            // 步骤：按既定流程执行当前方法逻辑。
         var stateTables = await ListSyncStateTableFullNamesAsync(tableCode, connection, transaction, ct);
-        // 统一捕获当前本地时间，确保 SoftDeletedTimeLocal 与 UpdatedTimeLocal 严格同时刻，避免两次调用产生时间倒置。
         var nowLocal = DateTime.Now;
         foreach (var stateTable in stateTables) {
             await using var command = connection.CreateCommand();
@@ -1159,19 +1095,15 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 删除状态行。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="connection">数据库连接。</param>
-    /// <param name="transaction">事务对象。</param>
-    /// <param name="tableCode">表编码。</param>
-    /// <param name="businessKey">业务键。</param>
-    /// <param name="ct">取消令牌。</param>
     private async Task DeleteStateAsync(
         SqlConnection connection,
         SqlTransaction transaction,
         string tableCode,
         string businessKey,
         CancellationToken ct) {
+            // 步骤：按既定流程执行当前方法逻辑。
         var stateTables = await ListSyncStateTableFullNamesAsync(tableCode, connection, transaction, ct);
         foreach (var stateTable in stateTables) {
             await using var command = connection.CreateCommand();
@@ -1184,11 +1116,10 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 解析目标表配置。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="tableCode">表编码。</param>
-    /// <returns>表配置。</returns>
     private SyncTableOptions ResolveTableOptions(string tableCode) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (_tableOptionsMap.TryGetValue(tableCode, out var tableOptions)) {
             return tableOptions;
         }
@@ -1197,12 +1128,10 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 解析目标逻辑表名。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="tableCode">表编码。</param>
-    /// <param name="tableOptions">表配置。</param>
-    /// <returns>目标逻辑表。</returns>
     private static string ResolveTargetLogicalTable(string tableCode, SyncTableOptions tableOptions) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var targetLogicalTable = LogicalTableNameNormalizer.NormalizeOrNull(tableOptions.TargetLogicalTable)
             ?? throw new InvalidOperationException($"同步表 {tableCode} 未配置 TargetLogicalTable。");
         if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(targetLogicalTable)) {
@@ -1213,11 +1142,10 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 构建表配置映射。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="options">同步配置。</param>
-    /// <returns>映射字典。</returns>
     private static IReadOnlyDictionary<string, SyncTableOptions> BuildTableOptionsMap(SyncJobOptions options) {
+        // 步骤：按既定流程执行当前方法逻辑。
         return (options.Tables ?? [])
             .Where(table => !string.IsNullOrWhiteSpace(table.TableCode))
             .GroupBy(table => table.TableCode, StringComparer.OrdinalIgnoreCase)
@@ -1225,15 +1153,10 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 提取并去重业务键集合（保持输入顺序）。
+    /// 执行当前方法。
     /// </summary>
-    /// <remarks>
-    /// 该方法用于在批次开始阶段完成一次性去重，避免在分块查询状态时重复执行 LINQ 链式分配与遍历。
-    /// 保持输入顺序可保证分块参数顺序稳定，便于问题排查与性能观测结果对齐。
-    /// </remarks>
-    /// <param name="entries">合并条目。</param>
-    /// <returns>去重后的业务键数组。</returns>
     private static IReadOnlyList<string> GetDistinctBusinessKeys(IReadOnlyList<MergeEntry> entries) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var result = new List<string>(entries.Count);
         foreach (var entry in entries) {
@@ -1246,11 +1169,10 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 提取并去重业务键集合（保持输入顺序）。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="businessKeys">业务键集合。</param>
-    /// <returns>去重后的业务键数组。</returns>
     private static IReadOnlyList<string> GetDistinctBusinessKeys(IReadOnlyList<string> businessKeys) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var result = new List<string>(businessKeys.Count);
         foreach (var businessKey in businessKeys) {
@@ -1267,12 +1189,10 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 构建状态分表全限定名（按 TableCode+月份分表，表名格式为 sync_target_state_{tableCode}_{yyyyMM}）。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="tableCode">同步表编码。</param>
-    /// <param name="stateMonthToken">状态分表月份标记（yyyyMM）。</param>
-    /// <returns>全限定表名。</returns>
     internal static string GetSyncStateTableFullName(string tableCode, string stateMonthToken) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(tableCode)) {
             throw new InvalidOperationException("检测到非法 TableCode 标识符，仅允许字母、数字、下划线。");
         }
@@ -1286,28 +1206,23 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 解析状态分表月份标记（yyyyMM）。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="localTime">本地时间。</param>
-    /// <returns>月份标记。</returns>
     private static string ResolveStateMonthToken(DateTime localTime) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var ensuredLocalTime = EnsureLocalDateTime(localTime, "状态分表时间");
         return ensuredLocalTime.ToString("yyyyMM", CultureInfo.InvariantCulture);
     }
 
     /// <summary>
-    /// 查询指定表编码已有的状态分表全限定名集合（按表名降序，最新月份优先）。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="tableCode">同步表编码。</param>
-    /// <param name="connection">数据库连接。</param>
-    /// <param name="transaction">事务对象（可空）。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>状态分表集合。</returns>
     private static async Task<IReadOnlyList<string>> ListSyncStateTableFullNamesAsync(
         string tableCode,
         SqlConnection connection,
         SqlTransaction? transaction,
         CancellationToken ct) {
+            // 步骤：按既定流程执行当前方法逻辑。
         if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(tableCode)) {
             throw new InvalidOperationException("检测到非法 TableCode 标识符，仅允许字母、数字、下划线。");
         }
@@ -1346,11 +1261,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 校验状态分表月份标记合法性（yyyyMM）。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="stateMonthToken">月份标记。</param>
-    /// <returns>合法返回 true；否则 false。</returns>
     private static bool IsValidStateMonthToken(string stateMonthToken) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (string.IsNullOrWhiteSpace(stateMonthToken) || stateMonthToken.Length != StateMonthTokenLength) {
             return false;
         }
@@ -1370,11 +1284,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 转义 LIKE 模式特殊字符。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="value">原始文本。</param>
-    /// <returns>转义后文本。</returns>
     private static string EscapeLikePattern(string value) {
+        // 步骤：按既定流程执行当前方法逻辑。
         return value
             .Replace(@"\", @"\\", StringComparison.Ordinal)
             .Replace("%", @"\%", StringComparison.Ordinal)
@@ -1383,13 +1296,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 构建状态表对象名（超长时使用哈希收敛至 SQL Server 标识符长度上限内）。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="prefix">对象名前缀。</param>
-    /// <param name="tableNameRaw">状态表原始表名。</param>
-    /// <param name="tail">可选后缀。</param>
-    /// <returns>对象名。</returns>
     private static string BuildStateTableObjectName(string prefix, string tableNameRaw, string? tail = null) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var candidate = string.IsNullOrWhiteSpace(tail)
             ? $"{prefix}_{tableNameRaw}"
             : $"{prefix}_{tableNameRaw}_{tail}";
@@ -1404,22 +1314,19 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 构建目标物理分表全限定名。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="targetLogicalTable">目标逻辑表。</param>
-    /// <param name="shardSuffix">分表后缀。</param>
-    /// <returns>全限定表名。</returns>
     private string BuildTargetTableFullName(string targetLogicalTable, string shardSuffix) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var physicalTable = $"{targetLogicalTable}{shardSuffix}";
         return $"[{EscapeIdentifier(_shardingOptions.Schema)}].[{EscapeIdentifier(physicalTable)}]";
     }
 
     /// <summary>
-    /// 解析分表后缀。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="cursorLocal">游标时间。</param>
-    /// <returns>后缀文本。</returns>
     private string ResolveShardSuffix(DateTime? cursorLocal) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var nowLocal = DateTimeOffset.Now;
         var bootstrapSuffixes = AutoMigrationService.BuildBootstrapSuffixes(shardSuffixResolver, nowLocal, _shardingOptions.AutoCreateMonthsAhead);
         var effectiveCursorLocal = cursorLocal ?? nowLocal.LocalDateTime;
@@ -1429,17 +1336,14 @@ ORDER BY t.[name] DESC;";
             return cursorSuffix;
         }
 
-        // 分表归档策略按“当前已预建窗口”收敛；超出窗口的历史数据回灌到当前分表，避免写入不存在的历史分表。
         return bootstrapSuffixes[0];
     }
 
     /// <summary>
-    /// 解析业务键值映射。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="uniqueKeys">唯一键集合。</param>
-    /// <param name="businessKey">业务键文本。</param>
-    /// <returns>键值映射。</returns>
     private static IReadOnlyDictionary<string, object?> ParseBusinessKey(IReadOnlyList<string> uniqueKeys, string businessKey) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var values = businessKey.Split('|');
         if (values.Length != uniqueKeys.Count) {
             throw new InvalidOperationException($"业务键与 UniqueKeys 数量不匹配。BusinessKey={businessKey}, UniqueKeys={string.Join(",", uniqueKeys)}");
@@ -1462,11 +1366,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 判断唯一键列名是否为时间语义。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="uniqueKeyName">唯一键列名。</param>
-    /// <returns>时间语义返回 <c>true</c>。</returns>
     private static bool IsTemporalUniqueKeyName(string uniqueKeyName) {
+        // 步骤：按既定流程执行当前方法逻辑。
         return uniqueKeyName.EndsWith("TIME", StringComparison.OrdinalIgnoreCase)
                || uniqueKeyName.EndsWith("_TIME", StringComparison.OrdinalIgnoreCase)
                || uniqueKeyName.EndsWith("DATE", StringComparison.OrdinalIgnoreCase)
@@ -1474,11 +1377,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 校验唯一键列是否都存在于行数据。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="uniqueKeys">唯一键集合。</param>
-    /// <param name="row">行数据。</param>
     private static void EnsureUniqueKeysPresent(IReadOnlyList<string> uniqueKeys, IReadOnlyDictionary<string, object?> row) {
+        // 步骤：按既定流程执行当前方法逻辑。
         foreach (var uniqueKey in uniqueKeys) {
             if (!row.ContainsKey(uniqueKey)) {
                 throw new InvalidOperationException($"行数据缺少唯一键列：{uniqueKey}");
@@ -1487,10 +1389,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 校验标识符集合安全性。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="identifiers">标识符集合。</param>
     private static void EnsureIdentifiersSafe(IEnumerable<string> identifiers) {
+        // 步骤：按既定流程执行当前方法逻辑。
         foreach (var identifier in identifiers) {
             if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(identifier)) {
                 throw new InvalidOperationException($"检测到非法 SQL 标识符：{identifier}");
@@ -1499,11 +1401,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 转义 SQL 标识符中的闭括号。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="identifier">原始标识符。</param>
-    /// <returns>转义结果。</returns>
     private static string EscapeIdentifier(string identifier) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(identifier)) {
             throw new InvalidOperationException($"检测到非法 SQL 标识符：{identifier}");
         }
@@ -1512,13 +1413,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 判断状态是否一致。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="persistedState">已持久化状态。</param>
-    /// <param name="newState">新状态。</param>
-    /// <param name="newShardSuffix">新后缀。</param>
-    /// <returns>一致返回 <c>true</c>。</returns>
     private static bool IsPersistedStateEqual(PersistedState persistedState, SyncTargetStateRow newState, string newShardSuffix) {
+        // 步骤：按既定流程执行当前方法逻辑。
         return string.Equals(persistedState.RowDigest, newState.RowDigest, StringComparison.Ordinal)
                && Nullable.Equals(persistedState.CursorLocal, newState.CursorLocal)
                && persistedState.IsSoftDeleted == newState.IsSoftDeleted
@@ -1527,11 +1425,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 更新最大成功游标。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="result">合并结果。</param>
-    /// <param name="cursorLocal">游标时间。</param>
     private static void UpdateLastCursor(SyncMergeResult result, DateTime? cursorLocal) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (!cursorLocal.HasValue) {
             return;
         }
@@ -1542,16 +1439,13 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 构建目标端轻量幂等状态行。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="businessKey">业务键。</param>
-    /// <param name="row">原始业务行。</param>
-    /// <param name="cursorColumn">游标列。</param>
-    /// <returns>轻量状态行。</returns>
     private static SyncTargetStateRow BuildTargetStateRow(
         string businessKey,
         IReadOnlyDictionary<string, object?> row,
         string cursorColumn) {
+            // 步骤：按既定流程执行当前方法逻辑。
         return new SyncTargetStateRow {
             BusinessKey = businessKey,
             RowDigest = ComputeRowDigestHash(row),
@@ -1562,11 +1456,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 计算行摘要哈希（SHA256 十六进制文本）。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="row">业务行。</param>
-    /// <returns>摘要文本。</returns>
     private static string ComputeRowDigestHash(IReadOnlyDictionary<string, object?> row) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var sortedKeys = row.Keys.ToArray();
         Array.Sort(sortedKeys, StringComparer.OrdinalIgnoreCase);
         using var incrementalHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -1581,11 +1474,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 将字符串按“长度前缀 + UTF-8 内容”追加到增量哈希，避免分隔符冲突。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="incrementalHash">增量哈希实例。</param>
-    /// <param name="value">待追加字符串。</param>
     private static void AppendLengthPrefixedUtf8(IncrementalHash incrementalHash, string value) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var byteCount = Encoding.UTF8.GetByteCount(value);
         Span<byte> lengthPrefix = stackalloc byte[sizeof(int)];
         BinaryPrimitives.WriteInt32LittleEndian(lengthPrefix, byteCount);
@@ -1601,11 +1493,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 将归一化值转换为稳定文本。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="value">归一化值。</param>
-    /// <returns>稳定文本。</returns>
     private static string ConvertDigestValueToStableText(object? value) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (value is null) {
             return "null";
         }
@@ -1626,11 +1517,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 归一化摘要计算值。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="value">原始值。</param>
-    /// <returns>归一化值。</returns>
     private static object? NormalizeDigestValue(object? value) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (value is DateTime dateTime) {
             return EnsureLocalDateTime(dateTime, dateTime.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture))
                 .ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture);
@@ -1640,11 +1530,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 转换数据库参数值。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="value">原始值。</param>
-    /// <returns>参数值。</returns>
     private static object ConvertToDbValue(object? value) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (value is null) {
             return DBNull.Value;
         }
@@ -1661,12 +1550,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 尝试提取游标本地时间。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="row">业务行。</param>
-    /// <param name="cursorColumn">游标列名。</param>
-    /// <returns>游标本地时间。</returns>
     private static DateTime? TryGetCursorLocal(IReadOnlyDictionary<string, object?> row, string cursorColumn) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (string.IsNullOrWhiteSpace(cursorColumn)) {
             return null;
         }
@@ -1697,22 +1584,20 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 判断业务行是否为软删除。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="row">业务行。</param>
-    /// <returns>软删除返回 <c>true</c>。</returns>
     private static bool IsSoftDeleted(IReadOnlyDictionary<string, object?> row) {
+        // 步骤：按既定流程执行当前方法逻辑。
         return row.TryGetValue(SyncColumnFilter.SoftDeleteFlagColumn, out var flagValue)
                && flagValue is bool flag
                && flag;
     }
 
     /// <summary>
-    /// 尝试提取软删除本地时间。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="row">业务行。</param>
-    /// <returns>软删除时间。</returns>
     private static DateTime? TryGetSoftDeletedTimeLocal(IReadOnlyDictionary<string, object?> row) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (!row.TryGetValue(SyncColumnFilter.SoftDeleteTimeColumn, out var timeValue) || timeValue is null) {
             return null;
         }
@@ -1739,12 +1624,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 确保时间值满足本地时间语义。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="value">时间值。</param>
-    /// <param name="originalText">原始文本。</param>
-    /// <returns>本地语义时间值。</returns>
     private static DateTime EnsureLocalDateTime(DateTime value, string? originalText) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (value.Kind == DateTimeKind.Unspecified) {
             return DateTime.SpecifyKind(value, DateTimeKind.Local);
         }
@@ -1757,11 +1640,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 判断时间文本是否包含 Z 或 offset 信息。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="value">时间文本。</param>
-    /// <returns>包含则返回 <c>true</c>。</returns>
     private static bool ContainsOffsetOrZulu(string value) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (value.EndsWith("Z", StringComparison.Ordinal)) {
             return true;
         }
@@ -1805,13 +1687,8 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 合并条目。
+    /// 定义当前类型。
     /// </summary>
-    /// <param name="BusinessKey">业务键。</param>
-    /// <param name="TargetLogicalTable">目标逻辑表。</param>
-    /// <param name="ShardSuffix">分表后缀。</param>
-    /// <param name="Row">行数据。</param>
-    /// <param name="State">状态行。</param>
     private readonly record struct MergeEntry(
         string BusinessKey,
         string TargetLogicalTable,
@@ -1820,15 +1697,8 @@ ORDER BY t.[name] DESC;";
         SyncTargetStateRow State);
 
     /// <summary>
-    /// 持久化状态快照。
+    /// 定义当前类型。
     /// </summary>
-    /// <param name="BusinessKey">业务键。</param>
-    /// <param name="RowDigest">行摘要。</param>
-    /// <param name="CursorLocal">游标时间。</param>
-    /// <param name="IsSoftDeleted">软删除标记。</param>
-    /// <param name="SoftDeletedTimeLocal">软删除时间。</param>
-    /// <param name="ShardSuffix">分表后缀。</param>
-    /// <param name="TargetLogicalTable">目标逻辑表。</param>
     private readonly record struct PersistedState(
         string BusinessKey,
         string RowDigest,
@@ -1839,33 +1709,27 @@ ORDER BY t.[name] DESC;";
         string TargetLogicalTable);
 
     /// <summary>
-    /// 目标分组键（按表、后缀、列签名分组）。
+    /// 定义当前类型。
     /// </summary>
-    /// <param name="TargetLogicalTable">目标逻辑表。</param>
-    /// <param name="ShardSuffix">分表后缀。</param>
-    /// <param name="ColumnSignature">列签名。</param>
     private readonly record struct TargetMergeGroupKey(
         string TargetLogicalTable,
         string ShardSuffix,
         string ColumnSignature);
 
     /// <summary>
-    /// 目标分片分组键（按表、后缀分组）。
+    /// 定义当前类型。
     /// </summary>
-    /// <param name="TargetLogicalTable">目标逻辑表。</param>
-    /// <param name="ShardSuffix">分表后缀。</param>
     private readonly record struct TargetShardGroupKey(
         string TargetLogicalTable,
         string ShardSuffix);
 
     /// <summary>
-    /// 分片迁移删除条目。
+    /// 定义当前类型。
     /// </summary>
-    /// <param name="TargetLogicalTable">目标逻辑表。</param>
-    /// <param name="ShardSuffix">旧分表后缀。</param>
-    /// <param name="BusinessKey">业务键。</param>
     private readonly record struct ShardDeleteEntry(
         string TargetLogicalTable,
         string ShardSuffix,
         string BusinessKey);
 }
+
+

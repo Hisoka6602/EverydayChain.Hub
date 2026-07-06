@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Aggregates.SyncBatchAggregate;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Sync;
@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 同步批次仓储 SQL Server 持久化实现（按月分片）。
+/// 定义当前类型。
 /// </summary>
 public class SyncBatchRepository(
     IDbContextFactory<HubDbContext> dbContextFactory,
@@ -20,10 +20,11 @@ public class SyncBatchRepository(
     IShardTableResolver shardTableResolver,
     ILogger<SyncBatchRepository> logger) : ISyncBatchRepository
 {
-    /// <summary>同步批次逻辑表名。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string SyncBatchLogicalTable = "sync_batches";
 
-    /// <inheritdoc/>
     public async Task CreateBatchAsync(SyncBatch batch, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -49,7 +50,6 @@ public class SyncBatchRepository(
         }
     }
 
-    /// <inheritdoc/>
     public async Task MarkInProgressAsync(string batchId, DateTime startedTimeLocal, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -75,7 +75,6 @@ public class SyncBatchRepository(
         }
     }
 
-    /// <inheritdoc/>
     public async Task CompleteBatchAsync(SyncBatchResult result, DateTime completedTimeLocal, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -102,7 +101,6 @@ public class SyncBatchRepository(
         }
     }
 
-    /// <inheritdoc/>
     public async Task FailBatchAsync(string batchId, string errorMessage, DateTime failedTimeLocal, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -124,7 +122,6 @@ public class SyncBatchRepository(
         }
     }
 
-    /// <inheritdoc/>
     public async Task<string?> GetLatestFailedBatchIdAsync(string tableCode, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -165,10 +162,49 @@ public class SyncBatchRepository(
         }
     }
 
-    /// <summary>
-    /// 校验创建批次入参。
-    /// </summary>
-    /// <param name="batch">批次对象。</param>
+    public async Task<IReadOnlyList<SyncBatch>> ListLatestByTableCodesAsync(IReadOnlyCollection<string> tableCodes, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (tableCodes.Count == 0)
+        {
+            return Array.Empty<SyncBatch>();
+        }
+
+        var normalizedTableCodes = tableCodes
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Select(code => code.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (normalizedTableCodes.Length == 0)
+        {
+            return Array.Empty<SyncBatch>();
+        }
+
+        var latestByTableCode = new Dictionary<string, SyncBatch>(StringComparer.OrdinalIgnoreCase);
+        foreach (var suffix in await ListExistingShardSuffixesAsync(ct))
+        {
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+            var shardRows = await dbContext.SyncBatches
+                .AsNoTracking()
+                .Where(batch => normalizedTableCodes.Contains(batch.TableCode))
+                .ToListAsync(ct);
+            foreach (var entity in shardRows)
+            {
+                var candidate = MapToDomain(entity);
+                if (!latestByTableCode.TryGetValue(candidate.TableCode, out var existing)
+                    || ResolveReferenceTime(candidate) > ResolveReferenceTime(existing))
+                {
+                    latestByTableCode[candidate.TableCode] = candidate;
+                }
+            }
+        }
+
+        return latestByTableCode.Values
+            .OrderBy(batch => batch.TableCode, StringComparer.Ordinal)
+            .ToList();
+    }
+
     private static void ValidateBatchForCreate(SyncBatch batch)
     {
         if (string.IsNullOrWhiteSpace(batch.BatchId))
@@ -182,12 +218,6 @@ public class SyncBatchRepository(
         }
     }
 
-    /// <summary>
-    /// 获取必须存在的批次。
-    /// </summary>
-    /// <param name="batchId">批次编号。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>分片批次加载结果。</returns>
     private async Task<LoadedBatchEntity> GetRequiredBatchFromShardsAsync(string batchId, CancellationToken ct)
     {
         var loaded = await TryGetBatchFromExistingShardsAsync(batchId, ct);
@@ -199,12 +229,6 @@ public class SyncBatchRepository(
         throw new InvalidOperationException($"未找到批次：{batchId}");
     }
 
-    /// <summary>
-    /// 尝试从现有分片中加载批次。
-    /// </summary>
-    /// <param name="batchId">批次编号。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>加载结果。</returns>
     private async Task<LoadedBatchEntity?> TryGetBatchFromExistingShardsAsync(string batchId, CancellationToken ct)
     {
         var suffixes = await ListExistingShardSuffixesAsync(ct);
@@ -224,11 +248,6 @@ public class SyncBatchRepository(
         return null;
     }
 
-    /// <summary>
-    /// 列出已存在同步批次分片后缀。
-    /// </summary>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>后缀列表（倒序）。</returns>
     private async Task<IReadOnlyList<string>> ListExistingShardSuffixesAsync(CancellationToken ct)
     {
         var tables = await shardTableResolver.ListPhysicalTablesAsync(SyncBatchLogicalTable, ct);
@@ -240,22 +259,11 @@ public class SyncBatchRepository(
             .ToList();
     }
 
-    /// <summary>
-    /// 解析批次分表后缀。
-    /// </summary>
-    /// <param name="timeLocal">本地时间。</param>
-    /// <returns>分表后缀。</returns>
     private string ResolveBatchSuffix(DateTime timeLocal)
     {
         return shardSuffixResolver.ResolveLocal(timeLocal);
     }
 
-    /// <summary>
-    /// 将领域批次模型映射为持久化实体。
-    /// </summary>
-    /// <param name="batch">领域批次对象。</param>
-    /// <param name="status">目标状态。</param>
-    /// <returns>持久化实体。</returns>
     private static SyncBatchEntity MapToEntity(SyncBatch batch, SyncBatchStatus status)
     {
         return new SyncBatchEntity
@@ -277,10 +285,38 @@ public class SyncBatchRepository(
         };
     }
 
+    private static SyncBatch MapToDomain(SyncBatchEntity entity)
+    {
+        return new SyncBatch
+        {
+            BatchId = entity.BatchId,
+            ParentBatchId = entity.ParentBatchId,
+            TableCode = entity.TableCode,
+            WindowStartLocal = entity.WindowStartLocal,
+            WindowEndLocal = entity.WindowEndLocal,
+            ReadCount = entity.ReadCount,
+            InsertCount = entity.InsertCount,
+            UpdateCount = entity.UpdateCount,
+            DeleteCount = entity.DeleteCount,
+            SkipCount = entity.SkipCount,
+            Status = entity.Status,
+            StartedTimeLocal = entity.StartedTimeLocal,
+            CompletedTimeLocal = entity.CompletedTimeLocal,
+            ErrorMessage = entity.ErrorMessage
+        };
+    }
+
+    private static DateTime ResolveReferenceTime(SyncBatch batch)
+    {
+        return batch.CompletedTimeLocal
+            ?? batch.StartedTimeLocal
+            ?? batch.WindowEndLocal;
+    }
+
     /// <summary>
-    /// 分片批次加载结果。
+    /// 定义当前类型。
     /// </summary>
-    /// <param name="Suffix">分片后缀。</param>
-    /// <param name="Entity">批次实体。</param>
     private readonly record struct LoadedBatchEntity(string Suffix, SyncBatchEntity Entity);
 }
+
+

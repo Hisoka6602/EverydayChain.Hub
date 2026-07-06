@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using EverydayChain.Hub.Host.Middlewares;
 using EverydayChain.Hub.Tests.Services;
 using Microsoft.AspNetCore.Http;
@@ -7,14 +7,15 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Tests.Host.Middlewares;
 
 /// <summary>
-/// API 失败日志中间件测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class ApiFailureLoggingMiddlewareTests {
     /// <summary>
-    /// 非 2xx 响应应记录失败日志。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task InvokeAsync_ShouldLogError_WhenStatusCodeIsBadRequest() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var logger = new TestLogger<ApiFailureLoggingMiddleware>();
         var middleware = new ApiFailureLoggingMiddleware(async context => {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -31,10 +32,11 @@ public sealed class ApiFailureLoggingMiddlewareTests {
     }
 
     /// <summary>
-    /// HTTP 成功但业务失败时应记录失败日志。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task InvokeAsync_ShouldLogError_WhenBusinessResponseIsFailure() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var logger = new TestLogger<ApiFailureLoggingMiddleware>();
         var middleware = new ApiFailureLoggingMiddleware(async context => {
             context.Response.StatusCode = StatusCodes.Status200OK;
@@ -48,10 +50,11 @@ public sealed class ApiFailureLoggingMiddlewareTests {
     }
 
     /// <summary>
-    /// HTTP 与业务同时成功时不应记录失败日志。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task InvokeAsync_ShouldNotLogError_WhenResponseIsSuccessful() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var logger = new TestLogger<ApiFailureLoggingMiddleware>();
         var middleware = new ApiFailureLoggingMiddleware(async context => {
             context.Response.StatusCode = StatusCodes.Status200OK;
@@ -65,10 +68,11 @@ public sealed class ApiFailureLoggingMiddlewareTests {
     }
 
     /// <summary>
-    /// 请求处理抛出异常时应记录异常日志并继续抛出。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task InvokeAsync_ShouldLogExceptionAndRethrow_WhenRequestDelegateThrows() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var logger = new TestLogger<ApiFailureLoggingMiddleware>();
         var middleware = new ApiFailureLoggingMiddleware(_ => throw new InvalidOperationException("boom"), logger);
         var context = CreateContext("/api/v1/test", """{"waveCode":"WAVE-001"}""");
@@ -80,10 +84,11 @@ public sealed class ApiFailureLoggingMiddlewareTests {
     }
 
     /// <summary>
-    /// ContentLength 为空时仍应读取并记录请求体。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task InvokeAsync_ShouldLogRequestBody_WhenContentLengthIsNull() {
+        // 步骤：按既定流程执行当前方法逻辑。
         var logger = new TestLogger<ApiFailureLoggingMiddleware>();
         var middleware = new ApiFailureLoggingMiddleware(async context => {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -97,13 +102,10 @@ public sealed class ApiFailureLoggingMiddlewareTests {
     }
 
     /// <summary>
-    /// 构造用于中间件执行的 HttpContext。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="path">请求路径。</param>
-    /// <param name="requestBody">请求体。</param>
-    /// <param name="contentLength">请求体长度。</param>
-    /// <returns>HTTP 上下文。</returns>
     private static DefaultHttpContext CreateContext(string path, string requestBody, long? contentLength = null) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var context = new DefaultHttpContext();
         context.TraceIdentifier = "TRACE-UNITTEST";
         context.Request.Method = HttpMethods.Post;
@@ -118,13 +120,13 @@ public sealed class ApiFailureLoggingMiddlewareTests {
     }
 
     /// <summary>
-    /// 读取响应流文本。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="responseBody">响应流。</param>
-    /// <returns>响应文本。</returns>
     private static async Task<string> ReadResponseBodyAsync(Stream responseBody) {
+        // 步骤：按既定流程执行当前方法逻辑。
         responseBody.Position = 0;
         using var reader = new StreamReader(responseBody, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
         return await reader.ReadToEndAsync();
     }
 }
+

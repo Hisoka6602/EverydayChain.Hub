@@ -1,18 +1,14 @@
 namespace EverydayChain.Hub.SharedKernel.Utilities;
 
 /// <summary>
-/// 本地时间规范化工具。
+/// 定义当前类型。
 /// </summary>
 public static class LocalDateTimeNormalizer {
     /// <summary>
-    /// 尝试将输入时间规范化为本地时间语义。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="candidateTime">候选时间。</param>
-    /// <param name="invalidKindMessage">当输入不是本地或未指定语义时返回的错误消息。</param>
-    /// <param name="normalizedTime">规范化后的时间。</param>
-    /// <param name="validationMessage">校验失败消息。</param>
-    /// <returns>校验是否通过。</returns>
     public static bool TryNormalize(DateTime candidateTime, string invalidKindMessage, out DateTime normalizedTime, out string validationMessage) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (candidateTime.Kind != DateTimeKind.Local && candidateTime.Kind != DateTimeKind.Unspecified) {
             normalizedTime = default;
             validationMessage = invalidKindMessage;

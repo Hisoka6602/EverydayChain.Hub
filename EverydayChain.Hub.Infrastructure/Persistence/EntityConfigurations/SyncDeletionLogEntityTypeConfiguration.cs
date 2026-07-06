@@ -1,32 +1,30 @@
-using EverydayChain.Hub.Domain.Aggregates.SyncDeletionLogAggregate;
+﻿using EverydayChain.Hub.Domain.Aggregates.SyncDeletionLogAggregate;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace EverydayChain.Hub.Infrastructure.Persistence.EntityConfigurations;
 
 /// <summary>
-/// 同步删除日志实体映射配置。
+/// 定义当前类型。
 /// </summary>
 public class SyncDeletionLogEntityTypeConfiguration : IEntityTypeConfiguration<SyncDeletionLogEntity>
 {
-    /// <summary>表名。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly string _tableName;
 
-    /// <summary>Schema。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly string _schema;
 
-    /// <summary>
-    /// 初始化同步删除日志实体映射配置。
-    /// </summary>
-    /// <param name="tableName">表名。</param>
-    /// <param name="schema">Schema。</param>
     public SyncDeletionLogEntityTypeConfiguration(string tableName, string schema)
     {
         _tableName = tableName;
         _schema = schema;
     }
 
-    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<SyncDeletionLogEntity> builder)
     {
         builder.ToTable(_tableName, _schema);
@@ -41,3 +39,4 @@ public class SyncDeletionLogEntityTypeConfiguration : IEntityTypeConfiguration<S
         builder.HasIndex(x => new { x.TableCode, x.DeletedTimeLocal });
     }
 }
+

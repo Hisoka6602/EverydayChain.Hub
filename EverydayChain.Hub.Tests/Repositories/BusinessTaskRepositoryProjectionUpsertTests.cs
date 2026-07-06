@@ -1,17 +1,14 @@
-using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
+﻿using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Tests.Services;
 
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// 业务任务投影幂等 Upsert 测试。
+/// 定义当前类型。
 /// </summary>
 public class BusinessTaskRepositoryProjectionUpsertTests
 {
-    /// <summary>
-    /// 相同来源表与业务键重复投影时应执行幂等更新，不新增重复数据。
-    /// </summary>
     [Fact]
     public async Task UpsertProjectionAsync_WhenSameSourceAndBusinessKey_ShouldBeIdempotent()
     {
@@ -70,9 +67,6 @@ public class BusinessTaskRepositoryProjectionUpsertTests
         Assert.Equal("LOC-2", found.PickLocation);
     }
 
-    /// <summary>
-    /// 已进入运行态时重复投影不得覆盖运行态字段。
-    /// </summary>
     [Fact]
     public async Task UpsertProjectionAsync_WhenEntityInRuntimeState_ShouldNotOverwriteRuntimeFields()
     {
@@ -112,3 +106,4 @@ public class BusinessTaskRepositoryProjectionUpsertTests
         Assert.Equal("A01", found.TargetChuteCode);
     }
 }
+

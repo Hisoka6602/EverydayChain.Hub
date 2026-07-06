@@ -1,7 +1,6 @@
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
-using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Aggregates.ScanLogAggregate;
 using EverydayChain.Hub.Domain.Enums;
 using Microsoft.Extensions.Logging;
@@ -9,56 +8,43 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Application.TaskExecution.Services;
 
 /// <summary>
-/// 任务执行服务实现，负责推进业务任务状态并持久化。
+/// 定义当前类型。
 /// </summary>
 public sealed class TaskExecutionService : ITaskExecutionService
 {
     /// <summary>
-    /// 扫描匹配服务。
+    /// 存储当前字段值。
     /// </summary>
     private readonly IScanMatchService _scanMatchService;
-
     /// <summary>
-    /// 业务任务仓储。
+    /// 存储当前字段值。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
-
     /// <summary>
-    /// 扫描日志仓储。
+    /// 存储当前字段值。
     /// </summary>
     private readonly IScanLogRepository _scanLogRepository;
-
     /// <summary>
-    /// 日志记录器。
+    /// 存储当前字段值。
     /// </summary>
     private readonly ILogger<TaskExecutionService> _logger;
 
     /// <summary>
-    /// 初始化任务执行服务。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="scanMatchService">扫描匹配服务。</param>
-    /// <param name="businessTaskRepository">业务任务仓储。</param>
-    /// <param name="scanLogRepository">扫描日志仓储。</param>
-    /// <param name="logger">日志记录器。</param>
     public TaskExecutionService(
         IScanMatchService scanMatchService,
         IBusinessTaskRepository businessTaskRepository,
         IScanLogRepository scanLogRepository,
         ILogger<TaskExecutionService> logger)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         _scanMatchService = scanMatchService;
         _businessTaskRepository = businessTaskRepository;
         _scanLogRepository = scanLogRepository;
         _logger = logger;
     }
 
-    /// <summary>
-    /// 将业务任务标记为已扫描，推进状态为 <see cref="BusinessTaskStatus.Scanned"/>。
-    /// 步骤：1. 按条码匹配任务；2. 检查当前状态是否允许推进；3. 更新状态与扫描信息；4. 持久化；5. 写扫描日志。
-    /// </summary>
-    /// <param name="request">扫描上传请求，包含条码、设备编码等信息。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>任务执行结果。</returns>
     public async Task<TaskExecutionResult> MarkScannedAsync(ScanUploadApplicationRequest request, CancellationToken ct)
     {
         var normalizedBarcode = string.IsNullOrWhiteSpace(request.Barcode) ? string.Empty : request.Barcode.Trim();
@@ -66,11 +52,9 @@ public sealed class TaskExecutionService : ITaskExecutionService
         var normalizedTraceId = string.IsNullOrWhiteSpace(request.TraceId) ? null : request.TraceId.Trim();
         var normalizedTargetChuteCode = string.IsNullOrWhiteSpace(request.TargetChuteCode) ? null : request.TargetChuteCode.Trim();
 
-        // 步骤 1：按条码匹配任务。
         var matchResult = await _scanMatchService.MatchByBarcodeAsync(normalizedBarcode, ct);
-        if (!matchResult.IsMatched || matchResult.Task == null)
+        if (!matchResult.IsMatched || matchResult.Task is null)
         {
-            // 匹配失败：写扫描失败日志后返回。
             await WriteScanLogSilentlyAsync(
                 businessTaskId: null,
                 taskCode: null,
@@ -80,7 +64,7 @@ public sealed class TaskExecutionService : ITaskExecutionService
                 failureReason: matchResult.FailureReason,
                 traceId: normalizedTraceId,
                 scanTimeLocal: request.ScanTimeLocal,
-                ct: ct);
+                ct);
 
             return new TaskExecutionResult
             {
@@ -90,18 +74,11 @@ public sealed class TaskExecutionService : ITaskExecutionService
         }
 
         var task = matchResult.Task;
-
-        // 步骤 2：检查当前状态是否允许推进到已扫描。
         if (!IsAllowedScanTransitionSourceStatus(task.Status))
         {
-            var reason = $"任务当前状态 [{task.Status}] 不允许推进到已扫描。";
-            var now = DateTime.Now;
-
-            // 状态校验失败时递增扫描重试次数，为回流规则提供判定依据。
-            task.ScanRetryCount++;
-            task.UpdatedTimeLocal = now;
-            await _businessTaskRepository.UpdateAsync(task, ct);
-
+            var nowLocal = DateTime.Now;
+            await _businessTaskRepository.IncrementScanRetryAsync(task.Id, task.CreatedTimeLocal, nowLocal, ct);
+            var reason = $"Task status [{task.Status}] does not allow a scan transition.";
             await WriteScanLogSilentlyAsync(
                 businessTaskId: task.Id,
                 taskCode: task.TaskCode,
@@ -111,8 +88,7 @@ public sealed class TaskExecutionService : ITaskExecutionService
                 failureReason: reason,
                 traceId: normalizedTraceId,
                 scanTimeLocal: request.ScanTimeLocal,
-                ct: ct);
-
+                ct);
             return new TaskExecutionResult
             {
                 IsSuccess = false,
@@ -123,33 +99,56 @@ public sealed class TaskExecutionService : ITaskExecutionService
             };
         }
 
-        // 步骤 3：更新状态与扫描信息。
-        if (task.Status == BusinessTaskStatus.Dropped)
+        var now = DateTime.Now;
+        var updated = await _businessTaskRepository.TryMarkScannedAsync(
+            task.Id,
+            task.CreatedTimeLocal,
+            new BusinessTaskScanUpdateCommand
+            {
+                Barcode = normalizedBarcode,
+                DeviceCode = normalizedDeviceCode,
+                TraceId = normalizedTraceId,
+                TargetChuteCode = normalizedTargetChuteCode,
+                ScanTimeLocal = request.ScanTimeLocal,
+                UpdatedTimeLocal = now,
+                LengthMm = request.LengthMm,
+                WidthMm = request.WidthMm,
+                HeightMm = request.HeightMm,
+                VolumeMm3 = request.VolumeMm3,
+                WeightGram = request.WeightGram
+            },
+            ct);
+
+        if (!updated)
         {
-            ResetDropAndFeedbackFieldsForRescan(task);
+            var currentTask = await _businessTaskRepository.FindByIdAsync(task.Id, ct);
+            if (currentTask is not null)
+            {
+                await _businessTaskRepository.IncrementScanRetryAsync(currentTask.Id, currentTask.CreatedTimeLocal, now, ct);
+            }
+
+            var currentStatus = currentTask?.Status.ToString() ?? task.Status.ToString();
+            var reason = $"Task status [{currentStatus}] does not allow a scan transition.";
+            await WriteScanLogSilentlyAsync(
+                businessTaskId: task.Id,
+                taskCode: task.TaskCode,
+                barcode: normalizedBarcode,
+                deviceCode: normalizedDeviceCode,
+                isMatched: true,
+                failureReason: reason,
+                traceId: normalizedTraceId,
+                scanTimeLocal: request.ScanTimeLocal,
+                ct);
+            return new TaskExecutionResult
+            {
+                IsSuccess = false,
+                TaskId = task.Id,
+                TaskCode = task.TaskCode,
+                TaskStatus = currentStatus,
+                FailureReason = reason
+            };
         }
 
-        task.Status = BusinessTaskStatus.Scanned;
-        task.ScannedAtLocal = request.ScanTimeLocal;
-        task.DeviceCode = normalizedDeviceCode ?? task.DeviceCode;
-        task.TraceId = normalizedTraceId ?? task.TraceId;
-        task.Barcode = string.IsNullOrWhiteSpace(task.Barcode) ? normalizedBarcode : task.Barcode;
-        // 扫描维度字段采用“请求优先、缺省保留旧值”策略，避免空值覆盖历史有效测量数据。
-        task.LengthMm = request.LengthMm ?? task.LengthMm;
-        task.WidthMm = request.WidthMm ?? task.WidthMm;
-        task.HeightMm = request.HeightMm ?? task.HeightMm;
-        task.VolumeMm3 = request.VolumeMm3 ?? task.VolumeMm3;
-        task.WeightGram = request.WeightGram ?? task.WeightGram;
-        // 请求提供格口编码时覆盖旧值，否则保留任务现有值。
-        task.TargetChuteCode = normalizedTargetChuteCode ?? task.TargetChuteCode;
-        task.ScanCount++;
-        task.UpdatedTimeLocal = DateTime.Now;
-        task.RefreshQueryFields();
-
-        // 步骤 4：持久化。
-        await _businessTaskRepository.UpdateAsync(task, ct);
-
-        // 步骤 5：写扫描成功日志。
         await WriteScanLogSilentlyAsync(
             businessTaskId: task.Id,
             taskCode: task.TaskCode,
@@ -159,22 +158,17 @@ public sealed class TaskExecutionService : ITaskExecutionService
             failureReason: null,
             traceId: normalizedTraceId,
             scanTimeLocal: request.ScanTimeLocal,
-            ct: ct);
+            ct);
 
         return new TaskExecutionResult
         {
             IsSuccess = true,
             TaskId = task.Id,
             TaskCode = task.TaskCode,
-            TaskStatus = task.Status.ToString()
+            TaskStatus = BusinessTaskStatus.Scanned.ToString()
         };
     }
 
-    /// <summary>
-    /// 判断指定任务状态是否允许推进到已扫描状态。
-    /// </summary>
-    /// <param name="status">待判断的任务状态。</param>
-    /// <returns>允许推进返回 true，否则返回 false。</returns>
     private static bool IsAllowedScanTransitionSourceStatus(BusinessTaskStatus status)
     {
         return status is BusinessTaskStatus.Created
@@ -183,20 +177,7 @@ public sealed class TaskExecutionService : ITaskExecutionService
     }
 
     /// <summary>
-    /// 已落格任务重复扫描时重置落格与回传语义字段，避免状态与字段不一致。
-    /// </summary>
-    /// <param name="task">业务任务实体。</param>
-    private static void ResetDropAndFeedbackFieldsForRescan(BusinessTaskEntity task)
-    {
-        task.DroppedAtLocal = null;
-        task.ActualChuteCode = null;
-        task.FeedbackStatus = BusinessTaskFeedbackStatus.NotRequired;
-        task.IsFeedbackReported = false;
-        task.FeedbackTimeLocal = null;
-    }
-
-    /// <summary>
-    /// 静默写入扫描日志，异常时仅记录日志不影响主流程。
+    /// 执行当前方法。
     /// </summary>
     private async Task WriteScanLogSilentlyAsync(
         long? businessTaskId,
@@ -209,6 +190,7 @@ public sealed class TaskExecutionService : ITaskExecutionService
         DateTime scanTimeLocal,
         CancellationToken ct)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         try
         {
             var log = new ScanLogEntity
@@ -231,7 +213,8 @@ public sealed class TaskExecutionService : ITaskExecutionService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "扫描日志写入失败，不影响主流程。BarcodeLength={BarcodeLength}", barcode?.Length ?? 0);
+            _logger.LogError(ex, "Scan log write failed without affecting the main scan flow. BarcodeLength={BarcodeLength}", barcode?.Length ?? 0);
         }
     }
 }
+

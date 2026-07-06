@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Aggregates.ScanLogAggregate;
@@ -8,31 +8,36 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 扫描上传应用服务实现，协调条码解析、任务匹配与状态推进链路。
+/// 定义当前类型。
 /// </summary>
 public sealed class ScanIngressService : IScanIngressService {
     /// <summary>
-    /// 条码解析服务。
+    /// 存储当前字段值。
     /// </summary>
     private readonly IBarcodeParser _barcodeParser;
 
     /// <summary>
-    /// 任务执行服务。
+    /// 存储当前字段值。
     /// </summary>
     private readonly ITaskExecutionService _taskExecutionService;
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly IScanLogRepository _scanLogRepository;
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly ILogger<ScanIngressService> _logger;
 
     /// <summary>
-    /// 初始化扫描上传应用服务。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="barcodeParser">条码解析服务。</param>
-    /// <param name="taskExecutionService">任务执行服务。</param>
     public ScanIngressService(
         IBarcodeParser barcodeParser,
         ITaskExecutionService taskExecutionService,
         IScanLogRepository scanLogRepository,
         ILogger<ScanIngressService> logger) {
+            // 步骤：按既定流程执行当前方法逻辑。
         _barcodeParser = barcodeParser;
         _taskExecutionService = taskExecutionService;
         _scanLogRepository = scanLogRepository;
@@ -40,13 +45,10 @@ public sealed class ScanIngressService : IScanIngressService {
     }
 
     /// <summary>
-    /// 处理扫描上传请求：解析条码、匹配任务、推进状态并返回标准化结果。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">扫描上传请求。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>处理结果。</returns>
     public async Task<ScanUploadApplicationResult> ExecuteAsync(ScanUploadApplicationRequest request, CancellationToken cancellationToken) {
-        // 步骤 1：解析条码。
+        // 步骤：按既定流程执行当前方法逻辑。
         var parseResult = _barcodeParser.Parse(request.Barcode);
         var barcodeType = parseResult.BarcodeType.ToString();
         if (!parseResult.IsValid) {
@@ -70,7 +72,6 @@ public sealed class ScanIngressService : IScanIngressService {
             };
         }
 
-        // 步骤 2：构造任务执行请求并推进任务状态。
         var executionRequest = new ScanUploadApplicationRequest {
             Barcode = request.Barcode,
             DeviceCode = request.DeviceCode,
@@ -105,11 +106,10 @@ public sealed class ScanIngressService : IScanIngressService {
     }
 
     /// <summary>
-    /// 将失败语义枚举转换为统一失败代码。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="failureReason">失败语义枚举。</param>
-    /// <returns>失败代码字符串。</returns>
     private static string ConvertFailureReasonToCode(BarcodeParseFailureReason failureReason) {
+        // 步骤：按既定流程执行当前方法逻辑。
         return failureReason switch {
             BarcodeParseFailureReason.InvalidBarcode => nameof(BarcodeParseFailureReason.InvalidBarcode),
             BarcodeParseFailureReason.UnsupportedBarcodeType => nameof(BarcodeParseFailureReason.UnsupportedBarcodeType),
@@ -118,6 +118,9 @@ public sealed class ScanIngressService : IScanIngressService {
         };
     }
 
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     private async Task WriteScanLogSilentlyAsync(
         string barcode,
         string? deviceCode,
@@ -127,6 +130,7 @@ public sealed class ScanIngressService : IScanIngressService {
         DateTime scanTimeLocal,
         CancellationToken cancellationToken)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         try
         {
             await _scanLogRepository.SaveAsync(new ScanLogEntity
@@ -150,3 +154,4 @@ public sealed class ScanIngressService : IScanIngressService {
         }
     }
 }
+

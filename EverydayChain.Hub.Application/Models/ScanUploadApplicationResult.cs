@@ -1,31 +1,32 @@
-namespace EverydayChain.Hub.Application.Models;
+﻿namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 扫描上传应用层执行结果。
+/// 定义当前类型。
 /// </summary>
 public sealed class ScanUploadApplicationResult {
     /// <summary>
-    /// 是否处理成功。
+    /// 获取或设置当前属性值。
     /// </summary>
     public bool IsAccepted { get; set; }
 
     /// <summary>
-    /// 业务任务编码。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string TaskCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 结果描述。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string Message { get; set; } = string.Empty;
 
     /// <summary>
-    /// 条码类型，候选值：Split、FullCase、Unknown。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string BarcodeType { get; set; } = "Unknown";
 
     /// <summary>
-    /// 失败语义代码，候选值：InvalidBarcode、UnsupportedBarcodeType、ParseError；成功时为空。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string FailureReason { get; set; } = string.Empty;
 }
+

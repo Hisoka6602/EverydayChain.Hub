@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Services;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
@@ -7,13 +7,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 落格回传服务测试（接入真实仓储替身）。
+/// 定义当前类型。
 /// </summary>
 public sealed class DropFeedbackServiceTests
 {
-    /// <summary>
-    /// 构建测试用的 DropFeedbackService。
-    /// </summary>
     private static (DropFeedbackService Service, InMemoryBusinessTaskRepository Repository) CreateService()
     {
         var repo = new InMemoryBusinessTaskRepository();
@@ -22,9 +19,6 @@ public sealed class DropFeedbackServiceTests
         return (service, repo);
     }
 
-    /// <summary>
-    /// TaskCode 和 Barcode 同时为空时应返回参数校验失败。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldFail_WhenBothTaskCodeAndBarcodeAreEmpty()
     {
@@ -44,9 +38,6 @@ public sealed class DropFeedbackServiceTests
         Assert.NotEmpty(result.FailureReason);
     }
 
-    /// <summary>
-    /// 任务不存在时应返回失败结果。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldFail_WhenTaskNotFound()
     {
@@ -65,9 +56,6 @@ public sealed class DropFeedbackServiceTests
         Assert.Equal("TaskNotFound", result.FailureReason);
     }
 
-    /// <summary>
-    /// TaskCode 与 Barcode 同时提供但不匹配时应返回参数冲突失败。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldFail_WhenBarcodeConflictsWithTaskCode()
     {
@@ -98,9 +86,6 @@ public sealed class DropFeedbackServiceTests
         Assert.Equal("BarcodeMismatch", result.FailureReason);
     }
 
-    /// <summary>
-    /// 任务状态不是已扫描时应拒绝落格回传。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldFail_WhenTaskIsNotScanned()
     {
@@ -130,9 +115,6 @@ public sealed class DropFeedbackServiceTests
         Assert.Equal("InvalidTaskStatus", result.FailureReason);
     }
 
-    /// <summary>
-    /// 落格成功时任务应推进到 Dropped 状态。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldTransitionToDropped_WhenSuccessIsTrue()
     {
@@ -170,9 +152,6 @@ public sealed class DropFeedbackServiceTests
         Assert.Equal(dropTime, updated.DroppedAtLocal);
     }
 
-    /// <summary>
-    /// 同一任务多次落格时应覆盖实际码头并刷新归并码头编码。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldOverwriteResolvedDockCode_WhenDropFeedbackCalledMultipleTimes()
     {
@@ -213,9 +192,6 @@ public sealed class DropFeedbackServiceTests
         Assert.Equal("9", updated.ResolvedDockCode);
     }
 
-    /// <summary>
-    /// 落格失败时任务应推进到 Exception 状态。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldTransitionToException_WhenSuccessIsFalse()
     {
@@ -252,3 +228,4 @@ public sealed class DropFeedbackServiceTests
         Assert.Equal("分拣臂故障", updated.FailureReason);
     }
 }
+

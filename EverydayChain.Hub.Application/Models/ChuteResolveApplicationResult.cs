@@ -1,26 +1,27 @@
-namespace EverydayChain.Hub.Application.Models;
+﻿namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 请求格口应用层执行结果。
+/// 定义当前类型。
 /// </summary>
 public sealed class ChuteResolveApplicationResult {
     /// <summary>
-    /// 是否成功解析格口。
+    /// 获取或设置当前属性值。
     /// </summary>
     public bool IsResolved { get; set; }
 
     /// <summary>
-    /// 业务任务编码。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string TaskCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 目标格口编码。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string ChuteCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 结果描述。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string Message { get; set; } = string.Empty;
 }
+

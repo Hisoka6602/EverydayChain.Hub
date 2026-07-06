@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using EverydayChain.Hub.Application.Abstractions.Integrations;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
@@ -11,48 +11,52 @@ using Oracle.ManagedDataAccess.Client;
 namespace EverydayChain.Hub.Infrastructure.Integrations;
 
 /// <summary>
-/// Oracle WMS 业务回传网关实现，按业务键更新 Oracle 目标表中的回传状态列。
-/// 配置未启用（<see cref="WmsFeedbackOptions.Enabled"/> 为 false）时仅记录日志，不实际写入。
+/// 定义当前类型。
 /// </summary>
 public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
 {
-    /// <summary>默认命令超时秒数。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int DefaultCommandTimeoutSeconds = 60;
-    /// <summary>无目标表时的占位文本。</summary>
     private const string EmptyTargetsPlaceholder = "(无目标表)";
 
-    /// <summary>业务回传配置快照。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly WmsFeedbackOptions _options;
 
-    /// <summary>Oracle 连接串。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly string _connectionString;
 
-    /// <summary>危险动作执行器。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly IDangerZoneExecutor _dangerZoneExecutor;
 
-    /// <summary>日志记录器。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly ILogger<OracleWmsFeedbackGateway> _logger;
 
     /// <summary>
-    /// 初始化 Oracle WMS 业务回传网关。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="wmsFeedbackOptions">业务回传配置。</param>
-    /// <param name="oracleOptions">Oracle 连接配置。</param>
-    /// <param name="dangerZoneExecutor">危险动作执行器。</param>
-    /// <param name="logger">日志记录器。</param>
     public OracleWmsFeedbackGateway(
         IOptions<WmsFeedbackOptions> wmsFeedbackOptions,
         IOptions<OracleOptions> oracleOptions,
         IDangerZoneExecutor dangerZoneExecutor,
         ILogger<OracleWmsFeedbackGateway> logger)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         _options = wmsFeedbackOptions.Value;
         _connectionString = OracleConnectionStringResolver.BuildEffectiveConnectionString(oracleOptions.Value);
         _dangerZoneExecutor = dangerZoneExecutor;
         _logger = logger;
     }
 
-    /// <inheritdoc/>
     public async Task<int> WriteFeedbackAsync(IReadOnlyList<BusinessTaskEntity> tasks, CancellationToken ct)
     {
         if (tasks.Count == 0)
@@ -60,7 +64,6 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
             return 0;
         }
 
-        // 若回传写入未启用，返回 0 表示跳过（任务状态应由调用方保持 Pending 不变）。
         if (!_options.Enabled)
         {
             _logger.LogInformation(
@@ -139,16 +142,8 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
     }
 
     /// <summary>
-    /// 执行单个目标表的批量写入。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="connection">已打开的 Oracle 连接。</param>
-    /// <param name="schema">目标 Schema。</param>
-    /// <param name="table">目标表名。</param>
-    /// <param name="businessKeyColumn">目标业务键列名。</param>
-    /// <param name="tasks">待写入任务列表。</param>
-    /// <param name="feedbackTime">本批次回传时间。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>影响行数。</returns>
     private async Task<int> ExecuteWriteBatchAsync(
         OracleConnection connection,
         string schema,
@@ -158,6 +153,7 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         DateTime feedbackTime,
         CancellationToken ct)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var sql = BuildUpdateSql(schema, table, businessKeyColumn);
         await using var command = connection.CreateCommand();
         command.BindByName = true;
@@ -269,13 +265,12 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
     }
 
     /// <summary>
-    /// 按来源类型将任务分流为目标写入表。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="tasks">待写入任务集合。</param>
-    /// <returns>分流后的任务字典。</returns>
     private Dictionary<(string Schema, string Table, string BusinessKeyColumn), List<BusinessTaskEntity>> GroupTasksByWriteTarget(
         IReadOnlyList<BusinessTaskEntity> tasks)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var grouped = new Dictionary<(string Schema, string Table, string BusinessKeyColumn), List<BusinessTaskEntity>>();
         foreach (var task in tasks)
         {
@@ -292,11 +287,6 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         return grouped;
     }
 
-    /// <summary>
-    /// 按来源类型解析写入目标表配置。
-    /// </summary>
-    /// <param name="sourceType">来源类型。</param>
-    /// <returns>目标 Schema、表名与业务键列名。</returns>
     private (string Schema, string Table, string BusinessKeyColumn) ResolveTargetBySourceType(BusinessTaskSourceType sourceType)
     {
         if (sourceType == BusinessTaskSourceType.Split)
@@ -318,9 +308,6 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         throw new InvalidOperationException($"不支持的业务来源类型，无法确定 WMS 回写目标表。sourceType={sourceType}");
     }
 
-    /// <summary>
-    /// 校验共享列配置安全性。
-    /// </summary>
     private void EnsureCommonColumnsSafe()
     {
         EnsureSafeIdentifier(_options.FeedbackStatusColumn, nameof(_options.FeedbackStatusColumn));
@@ -336,13 +323,6 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         EnsureOptionalIdentifierSafe(_options.BusinessStatusColumn, nameof(_options.BusinessStatusColumn));
     }
 
-    /// <summary>
-    /// 构建 Oracle 更新语句。
-    /// </summary>
-    /// <param name="schema">目标 Schema。</param>
-    /// <param name="table">目标表。</param>
-    /// <param name="businessKeyColumn">业务键列。</param>
-    /// <returns>更新 SQL。</returns>
     private string BuildUpdateSql(string schema, string table, string businessKeyColumn)
     {
         var setClauses = new List<string>
@@ -403,11 +383,6 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         return $"UPDATE {schema}.{table} SET {string.Join(", ", setClauses)} WHERE {businessKeyColumn} = :p_businessKey";
     }
 
-    /// <summary>
-    /// 标识符安全校验，仅允许字母、数字与下划线。
-    /// </summary>
-    /// <param name="identifier">标识符文本。</param>
-    /// <param name="fieldName">字段名（用于错误消息）。</param>
     private static void EnsureSafeIdentifier(string identifier, string fieldName)
     {
         if (string.IsNullOrWhiteSpace(identifier))
@@ -421,11 +396,6 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         }
     }
 
-    /// <summary>
-    /// 可选标识符安全校验；为空时跳过。
-    /// </summary>
-    /// <param name="identifier">标识符文本。</param>
-    /// <param name="fieldName">字段名（用于错误消息）。</param>
     private static void EnsureOptionalIdentifierSafe(string? identifier, string fieldName)
     {
         if (!string.IsNullOrWhiteSpace(identifier))
@@ -434,11 +404,6 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         }
     }
 
-    /// <summary>
-    /// 判断字符是否属于 ASCII 字母、数字或下划线。
-    /// </summary>
-    /// <param name="ch">待判断字符。</param>
-    /// <returns>满足规则返回 true，否则返回 false。</returns>
     private static bool IsAsciiLetterDigitOrUnderscore(char ch)
     {
         return (ch >= 'A' && ch <= 'Z')
@@ -447,11 +412,6 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
             || ch == '_';
     }
 
-    /// <summary>
-    /// 构建目标写入表摘要文本。
-    /// </summary>
-    /// <param name="targets">目标写入键集合。</param>
-    /// <returns>目标摘要文本。</returns>
     private static string BuildTargetSummary(IEnumerable<(string Schema, string Table, string BusinessKeyColumn)> targets)
     {
         var entries = targets
@@ -460,13 +420,6 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         return entries.Count > 0 ? string.Join(", ", entries) : EmptyTargetsPlaceholder;
     }
 
-    /// <summary>
-    /// 创建指定长度并填充相同值的数组。
-    /// </summary>
-    /// <typeparam name="T">元素类型。</typeparam>
-    /// <param name="value">填充值。</param>
-    /// <param name="count">数组长度。</param>
-    /// <returns>填充后的数组。</returns>
     private static T[] FillArray<T>(T value, int count)
     {
         var arr = new T[count];
@@ -475,15 +428,13 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
     }
 
     /// <summary>
-    /// 构建可空字符串参数数组，空值写入数据库空值。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="tasks">任务集合。</param>
-    /// <param name="selector">值选择器。</param>
-    /// <returns>可空字符串数组。</returns>
     private static object[] BuildNullableStringArray(
         IReadOnlyList<BusinessTaskEntity> tasks,
         Func<BusinessTaskEntity, string?> selector)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         return tasks
             .Select(task =>
             {
@@ -494,32 +445,29 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
     }
 
     /// <summary>
-    /// 构建可空时间参数数组，空值写入数据库空值。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="tasks">任务集合。</param>
-    /// <param name="selector">值选择器。</param>
-    /// <returns>可空时间数组。</returns>
     private static object[] BuildNullableDateTimeArray(
         IReadOnlyList<BusinessTaskEntity> tasks,
         Func<BusinessTaskEntity, DateTime?> selector)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         return tasks
             .Select(task => selector(task) is DateTime value ? (object)value : DBNull.Value)
             .ToArray();
     }
 
     /// <summary>
-    /// 构建可空小数参数数组，空值写入数据库空值。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="tasks">任务集合。</param>
-    /// <param name="selector">值选择器。</param>
-    /// <returns>可空小数数组。</returns>
     private static object[] BuildNullableDecimalArray(
         IReadOnlyList<BusinessTaskEntity> tasks,
         Func<BusinessTaskEntity, decimal?> selector)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         return tasks
             .Select(task => selector(task) is decimal value ? (object)value : DBNull.Value)
             .ToArray();
     }
 }
+

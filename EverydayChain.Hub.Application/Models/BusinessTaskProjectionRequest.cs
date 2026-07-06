@@ -1,12 +1,13 @@
-namespace EverydayChain.Hub.Application.Models;
+﻿namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 业务任务投影请求。
+/// 定义当前类型。
 /// </summary>
 public class BusinessTaskProjectionRequest
 {
     /// <summary>
-    /// 待投影行集合。
+    /// 获取或设置当前属性值。
     /// </summary>
     public IReadOnlyList<BusinessTaskProjectionRow> Rows { get; set; } = [];
 }
+

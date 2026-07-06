@@ -1,21 +1,18 @@
-using EverydayChain.Hub.Application.Abstractions.Queries;
+﻿using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
 
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 码头看板查询服务替身。
+/// 定义当前类型。
 /// </summary>
 internal sealed class StubDockDashboardQueryService : IDockDashboardQueryService
 {
     /// <summary>
-    /// 最近一次查询请求。
+    /// 获取或设置当前属性值。
     /// </summary>
     public DockDashboardQueryRequest? LastRequest { get; private set; }
 
-    /// <summary>
-    /// 固定返回结果。
-    /// </summary>
     public DockDashboardQueryResult Result { get; set; } = new()
     {
         StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 0, 0, 0), DateTimeKind.Local),
@@ -34,10 +31,10 @@ internal sealed class StubDockDashboardQueryService : IDockDashboardQueryService
         }]
     };
 
-    /// <inheritdoc/>
     public Task<DockDashboardQueryResult> QueryAsync(DockDashboardQueryRequest request, CancellationToken cancellationToken)
     {
         LastRequest = request;
         return Task.FromResult(Result);
     }
 }
+

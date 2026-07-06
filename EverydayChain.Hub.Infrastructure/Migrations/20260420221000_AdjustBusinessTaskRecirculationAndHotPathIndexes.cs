@@ -4,10 +4,11 @@
 
 namespace EverydayChain.Hub.Infrastructure.Migrations
 {
-    /// <inheritdoc />
+    /// <summary>
+    /// 定义当前类型。
+    /// </summary>
     public partial class _20260420221000_AdjustBusinessTaskRecirculationAndHotPathIndexes : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(
@@ -33,7 +34,6 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 columns: new[] { "CreatedTimeLocal", "SourceType", "Status", "IsException", "ResolvedDockCode" });
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(
@@ -60,3 +60,4 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
         }
     }
 }
+

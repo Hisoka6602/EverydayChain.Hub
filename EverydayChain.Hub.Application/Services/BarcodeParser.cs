@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Services;
+﻿using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Domain.Enums;
 using NLog;
@@ -6,20 +6,12 @@ using NLog;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 条码解析服务，负责拆零与整件分类、目标格口提取及无效码识别。
+/// 定义当前类型。
 /// </summary>
 public sealed class BarcodeParser : IBarcodeParser
 {
-    /// <summary>
-    /// 条码解析日志记录器。
-    /// </summary>
     private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-    /// <summary>
-    /// 解析条码文本并返回统一语义结果。
-    /// </summary>
-    /// <param name="barcodeText">待解析条码文本。</param>
-    /// <returns>解析结果。</returns>
     public BarcodeParseResult Parse(string barcodeText)
     {
         try
@@ -50,43 +42,16 @@ public sealed class BarcodeParser : IBarcodeParser
         }
     }
 
-    /// <summary>
-    /// 按“02 + 格口号 + 其余内容”规则提取拆零目标格口。
-    /// </summary>
-    /// <param name="normalizedBarcode">标准化条码。</param>
-    /// <param name="targetChuteCode">提取出的目标格口编码。</param>
-    /// <returns>提取成功返回 true，否则返回 false。</returns>
-    /// <remarks>
-    /// 固定前缀长度为 2（02），格口号取第 3 位字符且必须为数字。
-    /// 当前缀不匹配、条码长度不足或格口位非数字时返回 false。
-    /// </remarks>
     private static bool TryExtractSplitChuteCode(string normalizedBarcode, out string targetChuteCode)
     {
         return TryExtractChuteCodeByPrefix(normalizedBarcode, "02", out targetChuteCode);
     }
 
-    /// <summary>
-    /// 按“Z + 格口号 + 其余内容”规则提取整件目标格口。
-    /// </summary>
-    /// <param name="normalizedBarcode">标准化条码。</param>
-    /// <param name="targetChuteCode">提取出的目标格口编码。</param>
-    /// <returns>提取成功返回 true，否则返回 false。</returns>
-    /// <remarks>
-    /// 固定前缀长度为 1（Z），格口号取第 2 位字符且必须为数字。
-    /// 当前缀不匹配、条码长度不足或格口位非数字时返回 false。
-    /// </remarks>
     private static bool TryExtractFullCaseChuteCode(string normalizedBarcode, out string targetChuteCode)
     {
         return TryExtractChuteCodeByPrefix(normalizedBarcode, "Z", out targetChuteCode);
     }
 
-    /// <summary>
-    /// 按固定前缀提取目标格口编码（前缀后的首位字符）。
-    /// </summary>
-    /// <param name="normalizedBarcode">标准化条码。</param>
-    /// <param name="prefix">条码固定前缀。</param>
-    /// <param name="targetChuteCode">提取出的目标格口编码。</param>
-    /// <returns>提取成功返回 true，否则返回 false。</returns>
     private static bool TryExtractChuteCodeByPrefix(string normalizedBarcode, string prefix, out string targetChuteCode)
     {
         targetChuteCode = string.Empty;
@@ -110,13 +75,6 @@ public sealed class BarcodeParser : IBarcodeParser
         return true;
     }
 
-    /// <summary>
-    /// 构建解析成功结果。
-    /// </summary>
-    /// <param name="normalizedBarcode">标准化条码。</param>
-    /// <param name="barcodeType">条码类型。</param>
-    /// <param name="targetChuteCode">目标格口编码。</param>
-    /// <returns>成功结果。</returns>
     private static BarcodeParseResult BuildSuccessResult(string normalizedBarcode, BarcodeType barcodeType, string targetChuteCode)
     {
         return new BarcodeParseResult
@@ -130,13 +88,6 @@ public sealed class BarcodeParser : IBarcodeParser
         };
     }
 
-    /// <summary>
-    /// 构建解析失败结果。
-    /// </summary>
-    /// <param name="failureReason">失败语义。</param>
-    /// <param name="failureMessage">失败描述。</param>
-    /// <param name="normalizedBarcode">标准化条码。</param>
-    /// <returns>失败结果。</returns>
     private static BarcodeParseResult BuildFailureResult(BarcodeParseFailureReason failureReason, string failureMessage, string normalizedBarcode = "")
     {
         return new BarcodeParseResult
@@ -150,3 +101,4 @@ public sealed class BarcodeParser : IBarcodeParser
         };
     }
 }
+

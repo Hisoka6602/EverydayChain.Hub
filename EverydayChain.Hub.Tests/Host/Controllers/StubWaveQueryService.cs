@@ -1,19 +1,42 @@
-using EverydayChain.Hub.Application.Abstractions.Queries;
+﻿using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
 
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
+/// <summary>
+/// 定义当前类型。
+/// </summary>
 internal sealed class StubWaveQueryService : IWaveQueryService
 {
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public CurrentWaveQueryRequest? LastCurrentRequest { get; private set; }
 
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public WaveOptionsQueryRequest? LastOptionsRequest { get; private set; }
 
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public WaveSummaryQueryRequest? LastSummaryRequest { get; private set; }
 
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public WaveZoneQueryRequest? LastZoneRequest { get; private set; }
 
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public WaveListQueryRequest? LastListRequest { get; private set; }
+
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
+    public WaveDetailQueryRequest? LastDetailRequest { get; private set; }
 
     public CurrentWaveQueryResult CurrentResult { get; set; } = new()
     {
@@ -80,10 +103,64 @@ internal sealed class StubWaveQueryService : IWaveQueryService
                 WaveCode = "W1",
                 WaveRemark = "Remark1",
                 PackageTotal = 10,
+                UnsortedCount = 2,
+                SplitTotal = 6,
+                FullCaseTotal = 4,
+                SplitRatioPercent = 60M,
+                FullCaseRatioPercent = 40M,
+                RecirculatedCount = 3,
+                ExceptionCount = 1,
+                CreatedTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 8, 0, 0), DateTimeKind.Local),
+                Status = "Sorting"
+            }
+        ]
+    };
+
+    public WaveCleanupQueryResult CleanupResult { get; set; } = new()
+    {
+        Items =
+        [
+            new WaveCleanupWaveItem
+            {
+                WaveCode = "W1",
+                WaveRemark = "Remark1",
+                PackageTotal = 10,
                 SplitTotal = 6,
                 FullCaseTotal = 4,
                 CreatedTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 8, 0, 0), DateTimeKind.Local),
                 Status = "Sorting"
+            }
+        ]
+    };
+
+    public WaveDetailQueryResult DetailResult { get; set; } = new()
+    {
+        StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local),
+        EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 21, 0, 0, 0), DateTimeKind.Local),
+        WaveCode = "W1",
+        WaveRemark = "Remark1",
+        Items =
+        [
+            new WaveDetailItem
+            {
+                TaskCode = "TASK-001",
+                WaveCode = "W1",
+                WaveRemark = "Remark1",
+                SourceType = "FullCase",
+                WorkingArea = "1",
+                Barcode = "BC-001",
+                OrderId = "ORDER-001",
+                StoreId = "STORE-001",
+                StoreName = "Store 1",
+                ProductCode = "SKU-001",
+                PickLocation = "A-01-01",
+                ChuteCode = "8",
+                Status = "Scanned",
+                IsRecirculated = true,
+                IsException = false,
+                ScannedAtLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 8, 30, 0), DateTimeKind.Local),
+                CreatedTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 8, 0, 0), DateTimeKind.Local),
+                UpdatedTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 8, 35, 0), DateTimeKind.Local)
             }
         ]
     };
@@ -127,6 +204,24 @@ internal sealed class StubWaveQueryService : IWaveQueryService
     public Task<string> ExportListCsvAsync(WaveListQueryRequest request, CancellationToken cancellationToken)
     {
         LastListRequest = request;
-        return Task.FromResult("WaveId,Remark,PackageTotal,SplitTotal,FullTotal,CreatedAt,Status\r\nW1,Remark1,10,6,4,2026-04-20 08:00:00,Sorting\r\n");
+        return Task.FromResult("WaveId,Remark,PackageTotal,UnsortedCount,SplitTotal,FullTotal,SplitRatioPercent,FullRatioPercent,RecirculatedCount,ExceptionCount,CreatedAt,Status\r\nW1,Remark1,10,2,6,4,60,40,3,1,2026-04-20 08:00:00,Sorting\r\n");
+    }
+
+    public Task<WaveCleanupQueryResult> QueryCleanupWaveAsync(string waveCode, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(CleanupResult);
+    }
+
+    public Task<WaveDetailQueryResult> QueryDetailsAsync(WaveDetailQueryRequest request, CancellationToken cancellationToken)
+    {
+        LastDetailRequest = request;
+        return Task.FromResult(DetailResult);
+    }
+
+    public Task<string> ExportDetailsCsvAsync(WaveDetailQueryRequest request, CancellationToken cancellationToken)
+    {
+        LastDetailRequest = request;
+        return Task.FromResult("TaskCode,WaveCode,WaveRemark,SourceType,WorkingArea,Barcode,OrderId,StoreId,StoreName,ProductCode,PickLocation,ChuteCode,Status,IsRecirculated,IsException,ScannedAt,CreatedAt,UpdatedAt\r\nTASK-001,W1,Remark1,FullCase,1,BC-001,ORDER-001,STORE-001,Store 1,SKU-001,A-01-01,8,Scanned,True,False,2026-04-20 08:30:00,2026-04-20 08:00:00,2026-04-20 08:35:00\r\n");
     }
 }
+

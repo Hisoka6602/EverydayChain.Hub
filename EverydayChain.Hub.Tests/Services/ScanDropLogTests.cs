@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.ScanMatch.Services;
 using EverydayChain.Hub.Application.Services;
 using EverydayChain.Hub.Application.TaskExecution.Services;
@@ -9,13 +9,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 扫描日志与落格日志落库行为测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class ScanDropLogTests
 {
-    /// <summary>
-    /// 扫描匹配成功时应写入匹配成功的扫描日志。
-    /// </summary>
     [Fact]
     public async Task MarkScannedAsync_ShouldWriteScanLog_OnSuccess()
     {
@@ -51,9 +48,6 @@ public sealed class ScanDropLogTests
         Assert.Equal("DVC-01", log.DeviceCode);
     }
 
-    /// <summary>
-    /// 扫描匹配失败时应写入匹配失败的扫描日志。
-    /// </summary>
     [Fact]
     public async Task MarkScannedAsync_ShouldWriteScanLog_OnFailure()
     {
@@ -78,9 +72,6 @@ public sealed class ScanDropLogTests
         Assert.NotEmpty(log.FailureReason!);
     }
 
-    /// <summary>
-    /// 落格成功时应写入落格成功的落格日志，且任务 FeedbackStatus 应为 Pending。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldWriteDropLog_AndSetFeedbackPending_OnSuccess()
     {
@@ -118,9 +109,6 @@ public sealed class ScanDropLogTests
         Assert.Equal(BusinessTaskFeedbackStatus.Pending, updated!.FeedbackStatus);
     }
 
-    /// <summary>
-    /// 落格失败时应写入落格失败的落格日志。
-    /// </summary>
     [Fact]
     public async Task ExecuteAsync_ShouldWriteDropLog_OnFailure()
     {
@@ -154,3 +142,4 @@ public sealed class ScanDropLogTests
         Assert.Equal("分拣机故障", log.FailureReason);
     }
 }
+

@@ -1,30 +1,29 @@
-using EverydayChain.Hub.Infrastructure.Services;
+﻿using EverydayChain.Hub.Infrastructure.Services;
 
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 记录建表调用的分表预建器桩实现。
+/// 定义当前类型。
 /// </summary>
 public sealed class RecordingShardTableProvisioner : IShardTableProvisioner
 {
-    /// <summary>已触发建表的后缀列表。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public List<string> EnsuredSuffixes { get; } = [];
 
-    /// <inheritdoc />
     public Task EnsureShardTableAsync(string suffix, CancellationToken cancellationToken)
     {
         EnsuredSuffixes.Add(suffix);
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc />
     public Task EnsureShardTableAsync(string logicalTable, string suffix, CancellationToken cancellationToken)
     {
         EnsuredSuffixes.Add($"{logicalTable}:{suffix}");
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc />
     public Task EnsureShardTablesAsync(IEnumerable<string> suffixes, CancellationToken cancellationToken)
     {
         foreach (var suffix in suffixes)
@@ -35,3 +34,4 @@ public sealed class RecordingShardTableProvisioner : IShardTableProvisioner
         return Task.CompletedTask;
     }
 }
+

@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Aggregates.SyncChangeLogAggregate;
 using EverydayChain.Hub.Domain.Sync;
 using EverydayChain.Hub.Infrastructure.Persistence;
@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 同步变更日志仓储 SQL Server 持久化实现（按月分片）。
+/// 定义当前类型。
 /// </summary>
 public class SyncChangeLogRepository(
     IDbContextFactory<HubDbContext> dbContextFactory,
@@ -18,10 +18,11 @@ public class SyncChangeLogRepository(
     IShardTableProvisioner shardTableProvisioner,
     ILogger<SyncChangeLogRepository> logger) : ISyncChangeLogRepository
 {
-    /// <summary>同步变更日志逻辑表名。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string SyncChangeLogLogicalTable = "sync_change_logs";
 
-    /// <inheritdoc/>
     public async Task WriteChangesAsync(IReadOnlyList<SyncChangeLog> changes, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -52,11 +53,6 @@ public class SyncChangeLogRepository(
         }
     }
 
-    /// <summary>
-    /// 构建待持久化实体集合。
-    /// </summary>
-    /// <param name="changes">变更日志集合。</param>
-    /// <returns>按分片后缀标注的实体集合。</returns>
     private List<StagedChangeLogEntity> BuildStagedEntities(IReadOnlyList<SyncChangeLog> changes)
     {
         var stagedEntities = new List<StagedChangeLogEntity>(changes.Count);
@@ -84,9 +80,9 @@ public class SyncChangeLogRepository(
     }
 
     /// <summary>
-    /// 已分片的变更日志实体。
+    /// 定义当前类型。
     /// </summary>
-    /// <param name="Suffix">分片后缀。</param>
-    /// <param name="Entity">持久化实体。</param>
     private readonly record struct StagedChangeLogEntity(string Suffix, SyncChangeLogEntity Entity);
 }
+
+

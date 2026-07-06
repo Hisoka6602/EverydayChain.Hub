@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Domain.Options;
+﻿using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Infrastructure.DependencyInjection;
 using EverydayChain.Hub.Infrastructure.Persistence;
@@ -11,13 +11,10 @@ using Microsoft.Extensions.DependencyInjection;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// ServiceCollectionExtensions 逻辑表构建行为测试。
+/// 定义当前类型。
 /// </summary>
 public class ServiceCollectionExtensionsTests
 {
-    /// <summary>
-    /// AddInfrastructure 注册的 DbContextFactory 应保证不同分表后缀获得独立映射。
-    /// </summary>
     [Fact]
     public async Task AddInfrastructure_ShouldCreateIndependentMappingPerTableSuffix()
     {
@@ -52,9 +49,6 @@ public class ServiceCollectionExtensionsTests
         Assert.Equal("business_tasks_202605", secondTableName);
     }
 
-    /// <summary>
-    /// AddInfrastructure 应注册分表结构同步抽象。
-    /// </summary>
     [Fact]
     public void AddInfrastructure_ShouldRegisterShardSchemaSynchronizer()
     {
@@ -75,9 +69,6 @@ public class ServiceCollectionExtensionsTests
         Assert.NotNull(synchronizer);
     }
 
-    /// <summary>
-    /// AddInfrastructure 应正确绑定并注入日志表保留期配置集合。
-    /// </summary>
     [Fact]
     public void AddInfrastructure_WithRetentionLogTablesConfig_ShouldBindAndInject()
     {
@@ -111,9 +102,6 @@ public class ServiceCollectionExtensionsTests
         Assert.False(logTables[0].AllowDrop);
     }
 
-    /// <summary>
-    /// 非法逻辑表名应抛出配置异常。
-    /// </summary>
     [Fact]
     public void BuildManagedLogicalTables_WithInvalidIdentifier_ShouldThrow()
     {
@@ -136,9 +124,6 @@ public class ServiceCollectionExtensionsTests
         Assert.Contains("非法逻辑表名", ex.Message);
     }
 
-    /// <summary>
-    /// 无启用同步表时仍应包含固定纳管逻辑表。
-    /// </summary>
     [Fact]
     public void BuildManagedLogicalTables_WithEmptyEnabledTables_ShouldContainFixedManagedTables()
     {
@@ -166,9 +151,6 @@ public class ServiceCollectionExtensionsTests
         Assert.Contains("sync_deletion_logs", tables);
     }
 
-    /// <summary>
-    /// 逻辑表名应按大小写不敏感规则去重。
-    /// </summary>
     [Fact]
     public void BuildManagedLogicalTables_WithCaseInsensitiveDuplicates_ShouldDeduplicate()
     {
@@ -210,9 +192,6 @@ public class ServiceCollectionExtensionsTests
         Assert.Contains("Table_A", tables);
     }
 
-    /// <summary>
-    /// 启用表的逻辑表名为空白时应立即抛出配置异常。
-    /// </summary>
     [Fact]
     public void BuildManagedLogicalTables_WithEnabledTableAndBlankTargetLogicalTable_ShouldThrow()
     {
@@ -236,3 +215,4 @@ public class ServiceCollectionExtensionsTests
         Assert.Contains("不能为空白", ex.Message);
     }
 }
+

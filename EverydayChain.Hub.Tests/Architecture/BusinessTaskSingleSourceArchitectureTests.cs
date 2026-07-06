@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Domain.Options;
+﻿using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -8,13 +8,10 @@ using Xunit;
 namespace EverydayChain.Hub.Tests.Architecture;
 
 /// <summary>
-/// 业务主表单一来源架构防回退测试。
+/// 定义当前类型。
 /// </summary>
 public class BusinessTaskSingleSourceArchitectureTests
 {
-    /// <summary>
-    /// DbContext 模型中不应再包含本地镜像表映射。
-    /// </summary>
     [Fact]
     public void HubDbContextModel_ShouldNotContainLocalIdxMirrorTables()
     {
@@ -29,9 +26,6 @@ public class BusinessTaskSingleSourceArchitectureTests
         Assert.Contains("business_tasks", tableNames);
     }
 
-    /// <summary>
-    /// 模型快照中不应再包含本地镜像表映射文本。
-    /// </summary>
     [Fact]
     public void HubDbContextModelSnapshot_ShouldNotContainLocalIdxMirrorTableMappings()
     {
@@ -47,9 +41,6 @@ public class BusinessTaskSingleSourceArchitectureTests
         Assert.DoesNotContain("IDX_PICKTOWCS2", snapshotText, StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// WMS 两条状态驱动任务应固定投影到业务逻辑表，并保持分表读取不回退固定表。
-    /// </summary>
     [Fact]
     public void HostAppSettings_WmsStatusDrivenTables_ShouldProjectToBusinessTasks()
     {
@@ -69,7 +60,6 @@ public class BusinessTaskSingleSourceArchitectureTests
 
         Assert.NotNull(shardingOptions);
         Assert.False(shardingOptions!.EnableLegacyBaseTableReadFallback);
-        // 此处断言为逻辑表名，运行态实际写入目标为 business_tasks_yyyyMM 月分表。
         Assert.Equal("business_tasks", splitTable.TargetLogicalTable);
         Assert.Equal("business_tasks", fullCaseTable.TargetLogicalTable);
         Assert.Equal("StatusDriven", splitTable.SyncMode);
@@ -80,10 +70,6 @@ public class BusinessTaskSingleSourceArchitectureTests
         Assert.False(string.IsNullOrWhiteSpace(fullCaseTable.BusinessKeyColumn));
     }
 
-    /// <summary>
-    /// 创建测试用数据库上下文。
-    /// </summary>
-    /// <returns>数据库上下文实例。</returns>
     private static HubDbContext CreateDbContext()
     {
         var connectionString = Environment.GetEnvironmentVariable("HUB_TEST_SQLSERVER_CONNECTION_STRING")
@@ -98,10 +84,6 @@ public class BusinessTaskSingleSourceArchitectureTests
         return new HubDbContext(dbContextOptions, shardingOptions);
     }
 
-    /// <summary>
-    /// 解析仓库根目录绝对路径。
-    /// </summary>
-    /// <returns>仓库根目录。</returns>
     private static string ResolveRepositoryRootPath()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
@@ -119,3 +101,4 @@ public class BusinessTaskSingleSourceArchitectureTests
         throw new InvalidOperationException("未找到仓库根目录，无法定位 appsettings.json 与模型快照文件。");
     }
 }
+

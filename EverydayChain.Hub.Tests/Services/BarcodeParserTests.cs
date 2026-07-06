@@ -1,16 +1,13 @@
-using EverydayChain.Hub.Application.Services;
+﻿using EverydayChain.Hub.Application.Services;
 using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 条码解析服务测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class BarcodeParserTests
 {
-    /// <summary>
-    /// 拆零条码应解析为 Split。
-    /// </summary>
     [Fact]
     public void Parse_ShouldReturnSplit_WhenBarcodeMatchesSplitPattern()
     {
@@ -25,9 +22,6 @@ public sealed class BarcodeParserTests
         Assert.Equal(BarcodeParseFailureReason.None, result.FailureReason);
     }
 
-    /// <summary>
-    /// 整件条码应解析为 FullCase。
-    /// </summary>
     [Fact]
     public void Parse_ShouldReturnFullCase_WhenBarcodeMatchesFullCasePattern()
     {
@@ -42,9 +36,6 @@ public sealed class BarcodeParserTests
         Assert.Equal(BarcodeParseFailureReason.None, result.FailureReason);
     }
 
-    /// <summary>
-    /// 不支持条码应返回 UnsupportedBarcodeType。
-    /// </summary>
     [Fact]
     public void Parse_ShouldReturnUnsupportedBarcodeType_WhenBarcodeCannotBeMapped()
     {
@@ -58,9 +49,6 @@ public sealed class BarcodeParserTests
         Assert.Equal(BarcodeParseFailureReason.UnsupportedBarcodeType, result.FailureReason);
     }
 
-    /// <summary>
-    /// 标识前缀后的首位字符非数字时应返回 UnsupportedBarcodeType。
-    /// </summary>
     [Fact]
     public void Parse_ShouldReturnUnsupportedBarcodeType_WhenChuteCodeIsNotDigit()
     {
@@ -74,3 +62,4 @@ public sealed class BarcodeParserTests
         Assert.Equal(BarcodeParseFailureReason.UnsupportedBarcodeType, result.FailureReason);
     }
 }
+

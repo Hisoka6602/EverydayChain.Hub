@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Infrastructure.Persistence;
+﻿using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -9,7 +9,7 @@ using SortingTaskTraceEntity = EverydayChain.Hub.Domain.Aggregates.SortingTaskTr
 namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// 分拣任务追踪写入服务实现，按分表后缀分组后分批写入，并将结果回传给自动调谐器。
+/// 定义当前类型。
 /// </summary>
 public class SortingTaskTraceWriter(
     IDbContextFactory<HubDbContext> dbContextFactory,
@@ -18,13 +18,8 @@ public class SortingTaskTraceWriter(
     ISqlExecutionTuner tuner,
     ILogger<SortingTaskTraceWriter> logger) : ISortingTaskTraceWriter
 {
-    /// <summary>
-    /// 各后缀对应的建表确认任务缓存，键为分表后缀，值为首次调用 EnsureShardTableAsync 返回的 Task（惰性包装）。
-    /// 后续并发调用会等待同一 Task 完成，避免在建表尚未结束时提前写入分表。
-    /// </summary>
     private readonly ConcurrentDictionary<string, Lazy<Task>> _ensureTasks = new(StringComparer.Ordinal);
 
-    /// <inheritdoc/>
     public async Task WriteAsync(IReadOnlyCollection<SortingTaskTraceEntity> traces, CancellationToken cancellationToken)
     {
         if (traces.Count == 0)
@@ -32,14 +27,9 @@ public class SortingTaskTraceWriter(
             return;
         }
 
-        // 步骤1：按分表后缀分组，确保同一分表内的数据在同一 DbContext 下写入。
         var grouped = traces.GroupBy(x => shardSuffixResolver.Resolve(x.CreatedAt));
         foreach (var group in grouped)
         {
-            // 使用 Lazy<Task> 保证同一后缀的建表操作在进程生命周期内仅执行一次：
-            // - 共享建表 Task 使用 CancellationToken.None，确保不会因调用方 token 被取消而导致所有并发/后续调用"连坐"；
-            // - 每次调用方用 WaitAsync(cancellationToken) 等待，仅取消当前调用的等待，不中断共享建表任务；
-            // - 仅当建表任务自身失败（非调用方取消）时才移除缓存，避免并发重复触发建表。
             var lazyEnsure = _ensureTasks.GetOrAdd(
                 group.Key,
                 suffix => new Lazy<Task>(
@@ -51,12 +41,10 @@ public class SortingTaskTraceWriter(
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                // 调用方主动取消了等待，共享建表任务仍在继续，保留缓存，直接向上传播。
                 throw;
             }
             catch
             {
-                // 建表任务自身失败，移除缓存以允许后续重新触发建表。
                 _ensureTasks.TryRemove(new KeyValuePair<string, Lazy<Task>>(group.Key, lazyEnsure));
                 throw;
             }
@@ -64,7 +52,6 @@ public class SortingTaskTraceWriter(
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
             dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
 
-            // 步骤2：从调谐器获取当前批量写入窗口，分批执行写入。
             var batchSize = Math.Max(1, tuner.CurrentBatchSize);
             var items = group.ToArray();
             for (var i = 0; i < items.Length; i += batchSize)
@@ -88,10 +75,10 @@ public class SortingTaskTraceWriter(
                 finally
                 {
                     stopwatch.Stop();
-                    // 步骤3：将本次写入的耗时与成功标志回传给调谐器进行窗口升降决策。
                     tuner.Record(stopwatch.Elapsed, success);
                 }
             }
         }
     }
 }
+

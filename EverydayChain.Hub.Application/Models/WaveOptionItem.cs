@@ -1,17 +1,18 @@
-namespace EverydayChain.Hub.Application.Models;
+﻿namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 波次选项项。
+/// 定义当前类型。
 /// </summary>
 public sealed class WaveOptionItem
 {
     /// <summary>
-    /// 波次号。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string WaveCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 波次备注。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string? WaveRemark { get; set; }
 }
+

@@ -1,19 +1,13 @@
 namespace EverydayChain.Hub.SharedKernel.Utilities;
 
 /// <summary>
-/// 本地时间区间校验工具。
+/// 定义当前类型。
 /// </summary>
 public static class LocalTimeRangeValidator
 {
     /// <summary>
-    /// 校验必填时间区间并规范化为本地时间语义。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="startTimeLocal">开始时间（本地时间，包含）。</param>
-    /// <param name="endTimeLocal">结束时间（本地时间，不包含）。</param>
-    /// <param name="normalizedStart">规范化后的开始时间。</param>
-    /// <param name="normalizedEnd">规范化后的结束时间。</param>
-    /// <param name="validationMessage">校验失败消息。</param>
-    /// <returns>是否通过校验。</returns>
     public static bool TryNormalizeRequiredRange(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
@@ -21,6 +15,7 @@ public static class LocalTimeRangeValidator
         out DateTime normalizedEnd,
         out string validationMessage)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         normalizedStart = default;
         normalizedEnd = default;
         validationMessage = string.Empty;
@@ -59,15 +54,8 @@ public static class LocalTimeRangeValidator
     }
 
     /// <summary>
-    /// 校验可选时间区间并规范化为本地时间语义。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="startTimeLocal">可选开始时间（本地时间，包含）。</param>
-    /// <param name="endTimeLocal">可选结束时间（本地时间，不包含）。</param>
-    /// <param name="defaultStartLocal">默认开始时间（本地时间）。</param>
-    /// <param name="normalizedStart">规范化后的开始时间。</param>
-    /// <param name="normalizedEnd">规范化后的结束时间。</param>
-    /// <param name="validationMessage">校验失败消息。</param>
-    /// <returns>是否通过校验。</returns>
     public static bool TryNormalizeOptionalRange(
         DateTime? startTimeLocal,
         DateTime? endTimeLocal,
@@ -76,6 +64,7 @@ public static class LocalTimeRangeValidator
         out DateTime normalizedEnd,
         out string validationMessage)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         normalizedStart = default;
         normalizedEnd = default;
         validationMessage = string.Empty;

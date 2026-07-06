@@ -1,28 +1,119 @@
+﻿using System.Text;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
-using System.Text;
+using EverydayChain.Hub.Application.Utilities;
+using EverydayChain.Hub.Domain.Options;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace EverydayChain.Hub.Application.Queries;
 
-public sealed class RecirculationQueryService(IBusinessTaskRepository businessTaskRepository) : IRecirculationQueryService
+/// <summary>
+/// 定义当前类型。
+/// </summary>
+public sealed class RecirculationQueryService : IRecirculationQueryService
 {
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
+    private const string CacheKeyDateTimeFormat = "yyyyMMddHHmmssfffffff";
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
+    private const string NullCacheValue = "_";
+
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
+    private readonly IBusinessTaskRepository _businessTaskRepository;
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
+    private readonly IMemoryCache _memoryCache;
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
+    private readonly QueryCacheOptions _queryCacheOptions;
+
+    public RecirculationQueryService(IBusinessTaskRepository businessTaskRepository)
+        : this(
+            businessTaskRepository,
+            new MemoryCache(new MemoryCacheOptions()),
+            new QueryCacheOptions())
+    {
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    public RecirculationQueryService(
+        IBusinessTaskRepository businessTaskRepository,
+        IMemoryCache memoryCache,
+        QueryCacheOptions queryCacheOptions)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        _businessTaskRepository = businessTaskRepository;
+        _memoryCache = memoryCache;
+        _queryCacheOptions = queryCacheOptions;
+    }
+
     public async Task<RecirculationSummaryQueryResult> QuerySummaryAsync(RecirculationSummaryQueryRequest request, CancellationToken cancellationToken)
     {
         var selectedChuteCode = NormalizeOptionalText(request.ChuteCode);
         var sortOrder = NormalizeSortOrder(request.SortOrder);
+        var emptyResult = new RecirculationSummaryQueryResult
+        {
+            StartTimeLocal = request.StartTimeLocal,
+            EndTimeLocal = request.EndTimeLocal,
+            SelectedChuteCode = selectedChuteCode,
+            SortOrder = sortOrder
+        };
         if (request.EndTimeLocal <= request.StartTimeLocal)
         {
-            return new RecirculationSummaryQueryResult
-            {
-                StartTimeLocal = request.StartTimeLocal,
-                EndTimeLocal = request.EndTimeLocal,
-                SelectedChuteCode = selectedChuteCode,
-                SortOrder = sortOrder
-            };
+            return emptyResult;
         }
 
-        var rows = await businessTaskRepository.AggregateRecirculationSummaryAsync(
+        var cacheKey =
+            $"recirculation-summary:{request.StartTimeLocal.ToString(CacheKeyDateTimeFormat)}:{request.EndTimeLocal.ToString(CacheKeyDateTimeFormat)}:{selectedChuteCode ?? NullCacheValue}:{sortOrder}";
+        if (_queryCacheOptions.Enabled)
+        {
+            var ttl = Math.Clamp(_queryCacheOptions.RecirculationSummarySeconds, 1, 60);
+            var cached = await MemoryCacheSingleFlight.GetOrCreateAsync(
+                _memoryCache,
+                cacheKey,
+                TimeSpan.FromSeconds(ttl),
+                _ => BuildSummaryAsync(request, selectedChuteCode, sortOrder, CancellationToken.None),
+                cancellationToken);
+            return cached ?? emptyResult;
+        }
+
+        return await BuildSummaryAsync(request, selectedChuteCode, sortOrder, cancellationToken);
+    }
+
+    public async Task<string> ExportCsvAsync(RecirculationSummaryQueryRequest request, CancellationToken cancellationToken)
+    {
+        var result = await QuerySummaryAsync(request, cancellationToken);
+        var builder = new StringBuilder();
+        builder.AppendLine("Chute,WaveNo,Reflow");
+        foreach (var row in result.Rows)
+        {
+            builder.AppendLine($"{EscapeCsvField(row.ChuteCode)},{EscapeCsvField(row.WaveCode)},{row.RecirculatedCount}");
+        }
+
+        return builder.ToString();
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    private async Task<RecirculationSummaryQueryResult> BuildSummaryAsync(
+        RecirculationSummaryQueryRequest request,
+        string? selectedChuteCode,
+        string sortOrder,
+        CancellationToken cancellationToken)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        var rows = await _businessTaskRepository.AggregateRecirculationSummaryAsync(
             request.StartTimeLocal,
             request.EndTimeLocal,
             selectedChuteCode,
@@ -48,19 +139,6 @@ public sealed class RecirculationQueryService(IBusinessTaskRepository businessTa
         };
     }
 
-    public async Task<string> ExportCsvAsync(RecirculationSummaryQueryRequest request, CancellationToken cancellationToken)
-    {
-        var result = await QuerySummaryAsync(request, cancellationToken);
-        var builder = new StringBuilder();
-        builder.AppendLine("Chute,WaveNo,Reflow");
-        foreach (var row in result.Rows)
-        {
-            builder.AppendLine($"{EscapeCsvField(row.ChuteCode)},{EscapeCsvField(row.WaveCode)},{row.RecirculatedCount}");
-        }
-
-        return builder.ToString();
-    }
-
     private static string NormalizeSortOrder(string? sortOrder)
     {
         return string.Equals(sortOrder, "Least", StringComparison.OrdinalIgnoreCase) ? "Least" : "Most";
@@ -81,3 +159,4 @@ public sealed class RecirculationQueryService(IBusinessTaskRepository businessTa
         return $"\"{value.Replace("\"", "\"\"")}\"";
     }
 }
+

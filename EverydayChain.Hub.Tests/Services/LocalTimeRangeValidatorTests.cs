@@ -1,15 +1,12 @@
-using EverydayChain.Hub.SharedKernel.Utilities;
+﻿using EverydayChain.Hub.SharedKernel.Utilities;
 
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 本地时间区间校验工具测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class LocalTimeRangeValidatorTests
 {
-    /// <summary>
-    /// 必填时间区间校验通过时应返回规范化时间。
-    /// </summary>
     [Fact]
     public void TryNormalizeRequiredRange_ShouldReturnTrue_WhenRangeIsValid()
     {
@@ -24,9 +21,6 @@ public sealed class LocalTimeRangeValidatorTests
         Assert.Equal(string.Empty, validationMessage);
     }
 
-    /// <summary>
-    /// 可选时间区间仅传开始时间时应默认结束时间为开始时间加一天。
-    /// </summary>
     [Fact]
     public void TryNormalizeOptionalRange_ShouldDefaultEndToStartPlusOneDay_WhenOnlyStartProvided()
     {
@@ -41,9 +35,6 @@ public sealed class LocalTimeRangeValidatorTests
         Assert.Equal(string.Empty, validationMessage);
     }
 
-    /// <summary>
-    /// 可选时间区间双空参数时应使用默认时间窗。
-    /// </summary>
     [Fact]
     public void TryNormalizeOptionalRange_ShouldUseDefaultWindow_WhenStartAndEndAreNull()
     {
@@ -57,9 +48,6 @@ public sealed class LocalTimeRangeValidatorTests
         Assert.Equal(string.Empty, validationMessage);
     }
 
-    /// <summary>
-    /// 可选时间区间仅传结束时间时应使用默认开始时间。
-    /// </summary>
     [Fact]
     public void TryNormalizeOptionalRange_ShouldUseDefaultStart_WhenOnlyEndProvided()
     {
@@ -74,9 +62,6 @@ public sealed class LocalTimeRangeValidatorTests
         Assert.Equal(string.Empty, validationMessage);
     }
 
-    /// <summary>
-    /// 可选时间区间结束时间不大于开始时间时应校验失败。
-    /// </summary>
     [Fact]
     public void TryNormalizeOptionalRange_ShouldReturnFalse_WhenEndIsNotGreaterThanStart()
     {
@@ -90,9 +75,6 @@ public sealed class LocalTimeRangeValidatorTests
         Assert.Equal("结束时间必须大于开始时间。", validationMessage);
     }
 
-    /// <summary>
-    /// 必填时间区间传入 UTC 时间时应校验失败。
-    /// </summary>
     [Fact]
     public void TryNormalizeRequiredRange_ShouldReturnFalse_WhenDisallowedTimeKindProvided()
     {
@@ -106,3 +88,4 @@ public sealed class LocalTimeRangeValidatorTests
         Assert.Contains("本地时间", validationMessage);
     }
 }
+

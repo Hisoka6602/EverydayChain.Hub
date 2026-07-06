@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Host.Controllers;
+﻿using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using Microsoft.AspNetCore.Http;
@@ -7,13 +7,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 业务任务查询控制器测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class BusinessTaskQueryControllerTests
 {
-    /// <summary>
-    /// 任务查询有效请求应返回成功结果。
-    /// </summary>
     [Fact]
     public async Task QueryTasksAsync_ShouldReturnOk_WhenRequestIsValid()
     {
@@ -39,11 +36,14 @@ public sealed class BusinessTaskQueryControllerTests
         Assert.Equal(stubService.Result.NextLastCreatedTimeLocal, responseData.NextLastCreatedTimeLocal);
         Assert.Equal(stubService.Result.NextLastId, responseData.NextLastId);
         Assert.Equal(stubService.Result.PaginationMode, responseData.PaginationMode);
+        Assert.Single(responseData.Items);
+        Assert.Equal("ORDER-1", responseData.Items[0].OrderId);
+        Assert.Equal("STORE-1", responseData.Items[0].StoreId);
+        Assert.Equal("Store Name 1", responseData.Items[0].StoreName);
+        Assert.Equal("SKU-1", responseData.Items[0].ProductCode);
+        Assert.Equal("A-01-01", responseData.Items[0].PickLocation);
     }
 
-    /// <summary>
-    /// 非法分页参数应返回 BadRequest。
-    /// </summary>
     [Fact]
     public async Task QueryTasksAsync_ShouldReturnBadRequest_WhenPageSizeInvalid()
     {
@@ -60,9 +60,6 @@ public sealed class BusinessTaskQueryControllerTests
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
-    /// <summary>
-    /// 游标参数不成对时应返回 BadRequest。
-    /// </summary>
     [Fact]
     public async Task QueryTasksAsync_ShouldReturnBadRequest_WhenCursorParameterPairIsInvalid()
     {
@@ -83,9 +80,6 @@ public sealed class BusinessTaskQueryControllerTests
         Assert.Contains("LastCreatedTimeLocal 与 LastId 必须同时传入或同时为空", apiResponse.Message);
     }
 
-    /// <summary>
-    /// 游标主键非法时应返回 BadRequest。
-    /// </summary>
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
@@ -109,9 +103,6 @@ public sealed class BusinessTaskQueryControllerTests
         Assert.Contains("LastId 必须大于 0", apiResponse.Message);
     }
 
-    /// <summary>
-    /// 请求体为空时任务查询应回退使用查询字符串请求。
-    /// </summary>
     [Fact]
     public async Task QueryTasksAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull()
     {
@@ -135,9 +126,6 @@ public sealed class BusinessTaskQueryControllerTests
         Assert.Equal(queryRequest.EndTimeLocal, stubService.LastRequest.EndTimeLocal);
     }
 
-    /// <summary>
-    /// 请求体为空时异常件查询应回退使用查询字符串请求。
-    /// </summary>
     [Fact]
     public async Task QueryExceptionsAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull()
     {
@@ -161,9 +149,6 @@ public sealed class BusinessTaskQueryControllerTests
         Assert.Equal(queryRequest.EndTimeLocal, stubService.LastRequest.EndTimeLocal);
     }
 
-    /// <summary>
-    /// 请求体为空时回流记录查询应回退使用查询字符串请求。
-    /// </summary>
     [Fact]
     public async Task QueryRecirculationsAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull()
     {
@@ -187,3 +172,4 @@ public sealed class BusinessTaskQueryControllerTests
         Assert.Equal(queryRequest.EndTimeLocal, stubService.LastRequest.EndTimeLocal);
     }
 }
+

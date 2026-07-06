@@ -1,37 +1,49 @@
-using System.Diagnostics;
-using Microsoft.Extensions.Logging;
-using EverydayChain.Hub.Domain.Sync;
-using EverydayChain.Hub.Domain.Enums;
-using EverydayChain.Hub.Application.Models;
-using EverydayChain.Hub.SharedKernel.Utilities;
+﻿using System.Diagnostics;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
+using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.Domain.Sync;
+using EverydayChain.Hub.SharedKernel.Utilities;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 同步编排服务实现。
+/// 定义当前类型。
 /// </summary>
-public class SyncOrchestrator(
+public sealed class SyncOrchestrator(
     ISyncTaskConfigRepository configRepository,
     ISyncCheckpointRepository checkpointRepository,
     ISyncBatchRepository batchRepository,
+    IRuntimeLeaseRepository runtimeLeaseRepository,
     ISyncWindowCalculator windowCalculator,
     ISyncExecutionService executionService,
-    ILogger<SyncOrchestrator> logger) : ISyncOrchestrator {
-    /// <summary>默认同步并发上限保护阈值（当配置值无效时启用，避免连接池/线程池被打满）。</summary>
+    IOptions<SyncJobOptions> syncJobOptions,
+    ILogger<SyncOrchestrator> logger) : ISyncOrchestrator
+{
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int DefaultParallelTablesSafetyCap = 4;
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
+    private readonly SyncJobOptions _syncJobOptions = syncJobOptions.Value;
 
-    /// <inheritdoc/>
-    public async Task<SyncBatchResult> RunTableSyncAsync(string tableCode, CancellationToken ct) {
-        try {
+    public async Task<SyncBatchResult> RunTableSyncAsync(string tableCode, CancellationToken ct)
+    {
+        try
+        {
             var definition = await configRepository.GetByTableCodeAsync(tableCode, ct);
             var checkpoint = await checkpointRepository.GetAsync(tableCode, ct);
             var window = windowCalculator.CalculateWindow(definition, checkpoint, DateTime.Now);
             var parentBatchId = !string.IsNullOrWhiteSpace(checkpoint.LastError)
                 ? await batchRepository.GetLatestFailedBatchIdAsync(tableCode, ct)
                 : null;
-            var context = new SyncExecutionContext {
+            var context = new SyncExecutionContext
+            {
                 Definition = definition,
                 Checkpoint = checkpoint,
                 Window = window,
@@ -39,16 +51,46 @@ public class SyncOrchestrator(
                 ParentBatchId = parentBatchId,
                 NormalizedExcludedColumns = SyncColumnFilter.NormalizeColumns(definition.ExcludedColumns),
             };
-            return await executionService.ExecuteBatchAsync(context, ct);
+
+            var leaseKey = $"sync-table:{definition.TableCode.Trim()}";
+            var leaseOwnerId = context.BatchId;
+            var acquiredTimeLocal = DateTime.Now;
+            var leaseSeconds = Math.Clamp(_syncJobOptions.TableLeaseSeconds > 0 ? _syncJobOptions.TableLeaseSeconds : 900, 30, 86400);
+            if (!await runtimeLeaseRepository.TryAcquireAsync(
+                    leaseKey,
+                    leaseOwnerId,
+                    acquiredTimeLocal,
+                    acquiredTimeLocal.AddSeconds(leaseSeconds),
+                    ct))
+            {
+                logger.LogWarning("Skipped table sync because another execution still owns the lease. TableCode={TableCode}", definition.TableCode);
+                return new SyncBatchResult
+                {
+                    BatchId = string.Empty,
+                    TableCode = definition.TableCode,
+                    FailureRate = 1D,
+                    FailureMessage = "Table sync is already running."
+                };
+            }
+
+            try
+            {
+                return await executionService.ExecuteBatchAsync(context, ct);
+            }
+            finally
+            {
+                await runtimeLeaseRepository.ReleaseAsync(leaseKey, leaseOwnerId, CancellationToken.None);
+            }
         }
-        catch (Exception ex) {
-            logger.LogError(ex, "同步编排失败。TableCode={TableCode}", tableCode);
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Sync orchestration failed. TableCode={TableCode}", tableCode);
             throw;
         }
     }
 
-    /// <inheritdoc/>
-    public async Task<IReadOnlyList<SyncBatchResult>> RunAllEnabledTableSyncAsync(CancellationToken ct) {
+    public async Task<IReadOnlyList<SyncBatchResult>> RunAllEnabledTableSyncAsync(CancellationToken ct)
+    {
         var definitions = await configRepository.ListEnabledAsync(ct);
         var orderedDefinitions = definitions
             .OrderByDescending(x => x.Priority)
@@ -58,21 +100,23 @@ public class SyncOrchestrator(
         var maxParallelTables = await configRepository.GetMaxParallelTablesAsync(ct);
         var effectiveParallelTables = ResolveEffectiveParallelTables(maxParallelTables, orderedDefinitions.Count);
         logger.LogInformation(
-            "开始执行多表同步调度。ConfiguredMaxParallelTables={ConfiguredMaxParallelTables}, EffectiveParallelTables={EffectiveParallelTables}, EnabledTables={EnabledTables}",
+            "Starting multi-table sync. ConfiguredMaxParallelTables={ConfiguredMaxParallelTables}, EffectiveParallelTables={EffectiveParallelTables}, EnabledTables={EnabledTables}",
             maxParallelTables,
             effectiveParallelTables,
             orderedDefinitions.Count);
         if (maxParallelTables <= 0 && orderedDefinitions.Count > DefaultParallelTablesSafetyCap)
         {
             logger.LogWarning(
-                "同步并发配置无效，已启用安全上限保护。ConfiguredMaxParallelTables={ConfiguredMaxParallelTables}, SafetyCap={SafetyCap}, EnabledTables={EnabledTables}",
+                "MaxParallelTables is invalid, so the safety cap is being used. ConfiguredMaxParallelTables={ConfiguredMaxParallelTables}, SafetyCap={SafetyCap}, EnabledTables={EnabledTables}",
                 maxParallelTables,
                 DefaultParallelTablesSafetyCap,
                 orderedDefinitions.Count);
         }
-        if (orderedDefinitions.Count > 1 && effectiveParallelTables == 1) {
+
+        if (orderedDefinitions.Count > 1 && effectiveParallelTables == 1)
+        {
             logger.LogWarning(
-                "当前同步并发度为 1，多表将串行执行。ConfiguredMaxParallelTables={ConfiguredMaxParallelTables}, EnabledTables={EnabledTables}",
+                "Current sync parallelism is 1, so enabled tables will run serially. ConfiguredMaxParallelTables={ConfiguredMaxParallelTables}, EnabledTables={EnabledTables}",
                 maxParallelTables,
                 orderedDefinitions.Count);
         }
@@ -80,63 +124,62 @@ public class SyncOrchestrator(
         var results = new SyncBatchResult[orderedDefinitions.Count];
         using var concurrencyLimiter = new SemaphoreSlim(effectiveParallelTables, effectiveParallelTables);
         var runningCount = 0;
-        var tableTasks = orderedDefinitions.Select(async item => {
+        var tableTasks = orderedDefinitions.Select(async item =>
+        {
             await concurrencyLimiter.WaitAsync(ct);
             var currentRunning = Interlocked.Increment(ref runningCount);
             var stopwatch = Stopwatch.StartNew();
             logger.LogInformation(
-                "表同步已启动。TableCode={TableCode}, RunningTables={RunningTables}, EffectiveParallelTables={EffectiveParallelTables}",
+                "Table sync started. TableCode={TableCode}, RunningTables={RunningTables}, EffectiveParallelTables={EffectiveParallelTables}",
                 item.definition.TableCode,
                 currentRunning,
                 effectiveParallelTables);
 
-            try {
+            try
+            {
                 results[item.index] = await RunTableSyncAsync(item.definition.TableCode, ct);
                 logger.LogInformation(
-                    "表同步已完成。TableCode={TableCode}, ElapsedMs={ElapsedMs}",
+                    "Table sync completed. TableCode={TableCode}, ElapsedMs={ElapsedMs}",
                     item.definition.TableCode,
                     stopwatch.ElapsedMilliseconds);
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested) {
-                // 全局取消时向外传播，停止整轮同步。
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
                 throw;
             }
-            catch (Exception) {
-                // RunTableSyncAsync 内部已记录详细异常日志，此处仅构造失败结果，不重复记录。
-                // 单表失败不阻塞其余表继续推进。
-                results[item.index] = new SyncBatchResult {
+            catch (Exception)
+            {
+                results[item.index] = new SyncBatchResult
+                {
                     BatchId = string.Empty,
                     TableCode = item.definition.TableCode,
                     FailureRate = 1D,
-                    FailureMessage = "单表同步失败，详情见详细日志。",
+                    FailureMessage = "Single-table sync failed. See detailed logs."
                 };
             }
-            finally {
+            finally
+            {
                 Interlocked.Decrement(ref runningCount);
                 concurrencyLimiter.Release();
             }
         });
         await Task.WhenAll(tableTasks);
-        // 每个槽位在成功或异常分支中均已写入，Parallel.ForEachAsync 正常完成即保证所有槽位非空。
         return results;
     }
 
-    /// <summary>
-    /// 解析生效并行度：当配置小于等于 0 时，以安全上限保护值（<see cref="DefaultParallelTablesSafetyCap"/>）
-    /// 与启用表数中的较小值作为生效并发上限，避免连接池/线程池被打满。
-    /// </summary>
-    /// <param name="configuredMaxParallelTables">配置并发上限。</param>
-    /// <param name="enabledTableCount">启用表数量。</param>
-    /// <returns>生效并发上限。</returns>
-    private static int ResolveEffectiveParallelTables(int configuredMaxParallelTables, int enabledTableCount) {
-        if (enabledTableCount <= 1) {
+    private static int ResolveEffectiveParallelTables(int configuredMaxParallelTables, int enabledTableCount)
+    {
+        if (enabledTableCount <= 1)
+        {
             return 1;
         }
 
-        if (configuredMaxParallelTables <= 0) {
+        if (configuredMaxParallelTables <= 0)
+        {
             return Math.Min(DefaultParallelTablesSafetyCap, enabledTableCount);
         }
 
         return Math.Min(configuredMaxParallelTables, enabledTableCount);
     }
 }
+

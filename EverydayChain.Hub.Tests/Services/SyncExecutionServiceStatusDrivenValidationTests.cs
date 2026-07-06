@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Abstractions.Sync;
@@ -10,16 +10,15 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// SyncExecutionService 状态驱动配置校验测试。
+/// 定义当前类型。
 /// </summary>
 public class SyncExecutionServiceStatusDrivenValidationTests
 {
-    /// <summary>未命中路径替身的统一异常消息。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string UnexpectedCallMessage = "此方法不应在配置校验测试路径中被调用。";
 
-    /// <summary>
-    /// 当 TargetLogicalTable 非 business_tasks 时应抛出配置异常。
-    /// </summary>
     [Fact]
     public async Task ExecuteBatchAsync_ShouldThrow_WhenStatusDrivenTargetLogicalTableInvalid()
     {
@@ -33,9 +32,6 @@ public class SyncExecutionServiceStatusDrivenValidationTests
         Assert.Contains("TargetLogicalTable 必须为 business_tasks", exception.Message, StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// 当 SourceType 为 Unknown 时应抛出配置异常。
-    /// </summary>
     [Fact]
     public async Task ExecuteBatchAsync_ShouldThrow_WhenStatusDrivenSourceTypeUnknown()
     {
@@ -49,9 +45,6 @@ public class SyncExecutionServiceStatusDrivenValidationTests
         Assert.Contains("SourceType 不能为 Unknown", exception.Message, StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// 当 BusinessKeyColumn 为空白时应抛出配置异常。
-    /// </summary>
     [Fact]
     public async Task ExecuteBatchAsync_ShouldThrow_WhenStatusDrivenBusinessKeyColumnBlank()
     {
@@ -65,10 +58,6 @@ public class SyncExecutionServiceStatusDrivenValidationTests
         Assert.Contains("BusinessKeyColumn 不能为空白", exception.Message, StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// 创建待测服务。
-    /// </summary>
-    /// <returns>同步执行服务实例。</returns>
     private static SyncExecutionService CreateService()
     {
         return new SyncExecutionService(
@@ -84,20 +73,11 @@ public class SyncExecutionServiceStatusDrivenValidationTests
             NullLogger<SyncExecutionService>.Instance);
     }
 
-    /// <summary>
-    /// 创建未命中路径异常。
-    /// </summary>
-    /// <returns>异常实例。</returns>
     private static NotSupportedException CreateUnexpectedCallException()
     {
         return new NotSupportedException(UnexpectedCallMessage);
     }
 
-    /// <summary>
-    /// 创建状态驱动执行上下文。
-    /// </summary>
-    /// <param name="configure">定义定制器。</param>
-    /// <returns>执行上下文。</returns>
     private static SyncExecutionContext CreateStatusDrivenContext(Action<SyncTableDefinition> configure)
     {
         var definition = new SyncTableDefinition
@@ -122,16 +102,17 @@ public class SyncExecutionServiceStatusDrivenValidationTests
     }
 
     /// <summary>
-    /// 未命中路径的 Oracle 读取器替身。
+    /// 定义当前类型。
     /// </summary>
     private sealed class NotInvokedOracleSourceReader : IOracleSourceReader
     {
         public Task<SyncReadResult> ReadIncrementalPageAsync(SyncReadRequest request, CancellationToken ct) => throw CreateUnexpectedCallException();
         public Task<IReadOnlySet<string>> ReadByKeysAsync(SyncKeyReadRequest request, CancellationToken ct) => throw CreateUnexpectedCallException();
+        public Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReadRowsByBusinessKeysAsync(OracleBusinessKeyRowReadRequest request, CancellationToken ct) => throw CreateUnexpectedCallException();
     }
 
     /// <summary>
-    /// 未命中路径的暂存仓储替身。
+    /// 定义当前类型。
     /// </summary>
     private sealed class NotInvokedSyncStagingRepository : ISyncStagingRepository
     {
@@ -141,7 +122,7 @@ public class SyncExecutionServiceStatusDrivenValidationTests
     }
 
     /// <summary>
-    /// 未命中路径的合并仓储替身。
+    /// 定义当前类型。
     /// </summary>
     private sealed class NotInvokedSyncUpsertRepository : ISyncUpsertRepository
     {
@@ -151,7 +132,7 @@ public class SyncExecutionServiceStatusDrivenValidationTests
     }
 
     /// <summary>
-    /// 未命中路径的删除执行服务替身。
+    /// 定义当前类型。
     /// </summary>
     private sealed class NotInvokedDeletionExecutionService : IDeletionExecutionService
     {
@@ -159,7 +140,7 @@ public class SyncExecutionServiceStatusDrivenValidationTests
     }
 
     /// <summary>
-    /// 未命中路径的批次仓储替身。
+    /// 定义当前类型。
     /// </summary>
     private sealed class NotInvokedSyncBatchRepository : ISyncBatchRepository
     {
@@ -168,10 +149,11 @@ public class SyncExecutionServiceStatusDrivenValidationTests
         public Task CompleteBatchAsync(SyncBatchResult result, DateTime completedTimeLocal, CancellationToken ct) => throw CreateUnexpectedCallException();
         public Task FailBatchAsync(string batchId, string errorMessage, DateTime failedTimeLocal, CancellationToken ct) => throw CreateUnexpectedCallException();
         public Task<string?> GetLatestFailedBatchIdAsync(string tableCode, CancellationToken ct) => throw CreateUnexpectedCallException();
+        public Task<IReadOnlyList<SyncBatch>> ListLatestByTableCodesAsync(IReadOnlyCollection<string> tableCodes, CancellationToken ct) => throw CreateUnexpectedCallException();
     }
 
     /// <summary>
-    /// 未命中路径的变更日志仓储替身。
+    /// 定义当前类型。
     /// </summary>
     private sealed class NotInvokedSyncChangeLogRepository : ISyncChangeLogRepository
     {
@@ -179,7 +161,7 @@ public class SyncExecutionServiceStatusDrivenValidationTests
     }
 
     /// <summary>
-    /// 未命中路径的删除日志仓储替身。
+    /// 定义当前类型。
     /// </summary>
     private sealed class NotInvokedSyncDeletionLogRepository : ISyncDeletionLogRepository
     {
@@ -187,7 +169,7 @@ public class SyncExecutionServiceStatusDrivenValidationTests
     }
 
     /// <summary>
-    /// 未命中路径的检查点仓储替身。
+    /// 定义当前类型。
     /// </summary>
     private sealed class NotInvokedSyncCheckpointRepository : ISyncCheckpointRepository
     {
@@ -196,10 +178,11 @@ public class SyncExecutionServiceStatusDrivenValidationTests
     }
 
     /// <summary>
-    /// 未命中路径的状态驱动消费服务替身。
+    /// 定义当前类型。
     /// </summary>
     private sealed class NotInvokedBusinessTaskStatusConsumeService : IBusinessTaskStatusConsumeService
     {
         public Task<RemoteStatusConsumeResult> ConsumeAsync(SyncTableDefinition definition, string batchId, SyncWindow window, CancellationToken ct) => throw CreateUnexpectedCallException();
     }
 }
+

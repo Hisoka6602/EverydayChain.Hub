@@ -1,10 +1,13 @@
-using EverydayChain.Hub.Application.Abstractions.Queries;
+﻿using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EverydayChain.Hub.Tests.Services;
 
+/// <summary>
+/// 定义当前类型。
+/// </summary>
 public sealed class ApiWarmupServiceTests
 {
     [Fact]
@@ -29,6 +32,9 @@ public sealed class ApiWarmupServiceTests
         Assert.Equal(1, waveService.ZonesQueryCount);
     }
 
+    /// <summary>
+    /// 定义当前类型。
+    /// </summary>
     private sealed class ThrowingGlobalDashboardQueryService : IGlobalDashboardQueryService
     {
         public Task<GlobalDashboardQueryResult> QueryAsync(GlobalDashboardQueryRequest request, CancellationToken cancellationToken)
@@ -37,8 +43,14 @@ public sealed class ApiWarmupServiceTests
         }
     }
 
+    /// <summary>
+    /// 定义当前类型。
+    /// </summary>
     private sealed class RecordingDockDashboardQueryService : IDockDashboardQueryService
     {
+        /// <summary>
+        /// 获取或设置当前属性值。
+        /// </summary>
         public int QueryCount { get; private set; }
 
         public Task<DockDashboardQueryResult> QueryAsync(DockDashboardQueryRequest request, CancellationToken cancellationToken)
@@ -48,16 +60,34 @@ public sealed class ApiWarmupServiceTests
         }
     }
 
+    /// <summary>
+    /// 定义当前类型。
+    /// </summary>
     private sealed class RecordingWaveQueryService : IWaveQueryService
     {
+        /// <summary>
+        /// 获取或设置当前属性值。
+        /// </summary>
         public int CurrentQueryCount { get; private set; }
 
+        /// <summary>
+        /// 获取或设置当前属性值。
+        /// </summary>
         public int OptionsQueryCount { get; private set; }
 
+        /// <summary>
+        /// 获取或设置当前属性值。
+        /// </summary>
         public int SummaryQueryCount { get; private set; }
 
+        /// <summary>
+        /// 获取或设置当前属性值。
+        /// </summary>
         public int ZonesQueryCount { get; private set; }
 
+        /// <summary>
+        /// 获取或设置当前属性值。
+        /// </summary>
         public int ListQueryCount { get; private set; }
 
         public Task<CurrentWaveQueryResult> QueryCurrentAsync(CurrentWaveQueryRequest request, CancellationToken cancellationToken)
@@ -101,5 +131,21 @@ public sealed class ApiWarmupServiceTests
             ListQueryCount++;
             return Task.FromResult(string.Empty);
         }
+
+        public Task<WaveCleanupQueryResult> QueryCleanupWaveAsync(string waveCode, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new WaveCleanupQueryResult());
+        }
+
+        public Task<WaveDetailQueryResult> QueryDetailsAsync(WaveDetailQueryRequest request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new WaveDetailQueryResult());
+        }
+
+        public Task<string> ExportDetailsCsvAsync(WaveDetailQueryRequest request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(string.Empty);
+        }
     }
 }
+

@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Domain.Enums;
+﻿using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Repositories;
 using EverydayChain.Hub.Tests.Services;
@@ -7,13 +7,10 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// 业务任务状态回写配置门禁测试，校验 CompletedStatusValue 完全来自配置并保留 PendingStatusValue=null 的 IS NULL 语义映射。
+/// 定义当前类型。
 /// </summary>
 public class BusinessTaskStatusWriteBackConfigurationTests
 {
-    /// <summary>
-    /// CompletedStatusValue 应完全来自配置，不允许写死常量。
-    /// </summary>
     [Fact]
     public async Task GetByTableCodeAsync_WhenCompletedStatusValueChanged_ShouldMapFromConfiguration()
     {
@@ -32,9 +29,6 @@ public class BusinessTaskStatusWriteBackConfigurationTests
         Assert.Equal("DONE", definition.StatusConsumeProfile!.CompletedStatusValue);
     }
 
-    /// <summary>
-    /// PendingStatusValue 为 null 时应保留 null 语义。
-    /// </summary>
     [Fact]
     public async Task GetByTableCodeAsync_WhenPendingStatusValueIsNull_ShouldKeepNull()
     {
@@ -53,11 +47,6 @@ public class BusinessTaskStatusWriteBackConfigurationTests
         Assert.Null(definition.StatusConsumeProfile!.PendingStatusValue);
     }
 
-    /// <summary>
-    /// 构建测试用同步配置。
-    /// </summary>
-    /// <param name="configureTable">表级配置回调。</param>
-    /// <returns>同步配置对象。</returns>
     private static SyncJobOptions BuildOptions(Action<SyncTableOptions>? configureTable = null)
     {
         var table = new SyncTableOptions
@@ -97,3 +86,4 @@ public class BusinessTaskStatusWriteBackConfigurationTests
         };
     }
 }
+

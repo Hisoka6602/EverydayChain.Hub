@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+    <CodeConventionValidatorScript>$(MSBuildThisFileDirectory)build\Validate-CodeConventions.ps1</CodeConventionValidatorScript>
+    <TextCommentConventionValidatorScript>$(MSBuildThisFileDirectory)build\Validate-TextCommentConventions.ps1</TextCommentConventionValidatorScript>
+  </PropertyGroup>
+
+  <Target Name="ValidateCodeConventions"
+          BeforeTargets="CoreCompile"
+          Condition="Exists('$(CodeConventionValidatorScript)') and '$(SkipCodeConventionValidation)' != 'true'">
+    <Exec Command="powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File &quot;$(CodeConventionValidatorScript)&quot; -ProjectDirectory &quot;$(MSBuildProjectDirectory)&quot; -ProjectName &quot;$(MSBuildProjectName)&quot;" />
+  </Target>
+
+  <Target Name="ValidateRepositoryTextCommentConventions"
+          BeforeTargets="CoreCompile"
+          Condition="'$(MSBuildProjectName)' == 'EverydayChain.Hub.Host' and Exists('$(TextCommentConventionValidatorScript)') and '$(SkipCodeConventionValidation)' != 'true'">
+    <Exec Command="powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File &quot;$(TextCommentConventionValidatorScript)&quot; -RepositoryRootDirectory &quot;$(MSBuildThisFileDirectory)&quot;" />
+  </Target>
+</Project>

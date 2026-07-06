@@ -1,24 +1,29 @@
-using EverydayChain.Hub.Domain.Sync;
+﻿using EverydayChain.Hub.Domain.Sync;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using Microsoft.Extensions.Logging;
 
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 同步窗口计算器实现。
+/// 定义当前类型。
 /// </summary>
 public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncWindowCalculator
 {
-    /// <summary>DST 非法本地时刻初始跳跃分钟数。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int InitialDstInvalidTimeJumpMinutes = 60;
 
-    /// <summary>DST 非法本地时刻二次跳跃分钟数。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int SecondaryDstInvalidTimeJumpMinutes = 120;
 
-    /// <summary>DST 非法本地时刻三次跳跃分钟数。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int TertiaryDstInvalidTimeJumpMinutes = 180;
 
-    /// <inheritdoc/>
     public SyncWindow CalculateWindow(SyncTableDefinition definition, SyncCheckpoint checkpoint, DateTime nowLocal)
     {
         var windowStartLocal = NormalizeLocalWindowBoundary(
@@ -39,13 +44,6 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
         return new SyncWindow(windowStartLocal, windowEndLocal);
     }
 
-    /// <summary>
-    /// 解析有效的当前本地时间，防止时钟回拨导致窗口倒退。
-    /// </summary>
-    /// <param name="nowLocal">当前本地时间。</param>
-    /// <param name="lastSuccessTimeLocal">上次成功执行时间。</param>
-    /// <param name="tableCode">表编码。</param>
-    /// <returns>有效当前本地时间。</returns>
     private DateTime ResolveEffectiveNowLocal(DateTime nowLocal, DateTime? lastSuccessTimeLocal, string tableCode)
     {
         if (!lastSuccessTimeLocal.HasValue)
@@ -67,13 +65,6 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
         return normalizedLastSuccessTimeLocal;
     }
 
-    /// <summary>
-    /// 规范化窗口边界时间，避免进入 DST 非法本地时刻。
-    /// </summary>
-    /// <param name="localTime">本地时间。</param>
-    /// <param name="tableCode">表编码。</param>
-    /// <param name="scene">场景描述。</param>
-    /// <returns>规范化后的本地时间。</returns>
     private DateTime NormalizeLocalWindowBoundary(DateTime localTime, string tableCode, string scene)
     {
         var normalizedLocalTime = EnsureLocalOrUnspecified(localTime, tableCode, scene);
@@ -103,13 +94,6 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
         return adjustedLocalTime;
     }
 
-    /// <summary>
-    /// 在指定顺延分钟数下尝试修复 DST 非法时刻。
-    /// </summary>
-    /// <param name="originalLocalTime">原始本地时间。</param>
-    /// <param name="candidateLocalTime">当前候选时间。</param>
-    /// <param name="adjustMinutes">顺延分钟数。</param>
-    /// <returns>修复后的候选时间。</returns>
     private static DateTime TryResolveInvalidLocalTime(DateTime originalLocalTime, DateTime candidateLocalTime, int adjustMinutes)
     {
         if (!TimeZoneInfo.Local.IsInvalidTime(candidateLocalTime))
@@ -120,14 +104,6 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
         return originalLocalTime.AddMinutes(adjustMinutes);
     }
 
-    /// <summary>
-    /// 规范化输入时间，拒绝 UTC 语义并统一为本地语义。
-    /// </summary>
-    /// <param name="localTime">输入时间。</param>
-    /// <param name="tableCode">表编码。</param>
-    /// <param name="scene">场景描述。</param>
-    /// <returns>规范化后的本地时间。</returns>
-    /// <exception cref="InvalidOperationException">输入为 UTC 语义时抛出。</exception>
     private DateTime EnsureLocalOrUnspecified(DateTime localTime, string tableCode, string scene)
     {
         if (localTime.Kind is not (DateTimeKind.Local or DateTimeKind.Unspecified))
@@ -146,3 +122,4 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
             : DateTime.SpecifyKind(localTime, DateTimeKind.Local);
     }
 }
+

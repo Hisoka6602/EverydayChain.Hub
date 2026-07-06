@@ -1,39 +1,56 @@
-using EverydayChain.Hub.Application.Abstractions.Services;
+﻿using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Domain.Options;
 using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Host.Workers;
 
 /// <summary>
-/// 业务回传主后台任务，按配置周期消费待回传任务并触发 Oracle 回写。
+/// 定义当前类型。
 /// </summary>
 public sealed class WmsFeedbackBackgroundWorker(
     IWmsFeedbackService wmsFeedbackService,
     IOptions<WmsFeedbackOptions> wmsFeedbackOptions,
     ILogger<WmsFeedbackBackgroundWorker> logger) : BackgroundService
 {
-    /// <summary>单轮主回传执行超时秒数（危险动作隔离器）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int SingleRunTimeoutSeconds = 300;
-    /// <summary>主回传任务默认轮询间隔（秒）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int DefaultPollingIntervalSeconds = 300;
-    /// <summary>主回传任务轮询间隔最小值（秒）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int MinPollingIntervalSeconds = 1;
-    /// <summary>主回传任务轮询间隔最大值（秒）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int MaxPollingIntervalSeconds = 86400;
-    /// <summary>主回传任务默认批处理上限。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int DefaultBatchSize = 100;
-    /// <summary>主回传任务批处理上限最小值。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int MinBatchSize = 1;
-    /// <summary>主回传任务批处理上限最大值。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int MaxBatchSize = 1000;
 
-    /// <summary>业务回传配置快照。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly WmsFeedbackOptions _wmsFeedbackOptions = wmsFeedbackOptions.Value;
 
     /// <summary>
-    /// 后台循环入口。
+    /// 周期执行业务主回传任务。
     /// </summary>
-    /// <param name="stoppingToken">取消令牌。</param>
+    /// <param name="stoppingToken">停止令牌。</param>
+    /// <returns>后台执行任务。</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (!_wmsFeedbackOptions.Enabled)
@@ -93,3 +110,4 @@ public sealed class WmsFeedbackBackgroundWorker(
         }
     }
 }
+

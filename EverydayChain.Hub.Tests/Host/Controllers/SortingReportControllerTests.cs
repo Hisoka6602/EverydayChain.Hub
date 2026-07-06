@@ -7,16 +7,17 @@ using System.Text;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 分拣报表控制器测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class SortingReportControllerTests
 {
     /// <summary>
-    /// 查询接口有效请求应返回成功结果。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task QueryAsync_ShouldReturnOk_WhenRequestIsValid()
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubSortingReportQueryService();
         var controller = new SortingReportController(stubService);
         var request = new SortingReportQueryRequest
@@ -33,11 +34,12 @@ public sealed class SortingReportControllerTests
     }
 
     /// <summary>
-    /// 导出接口应返回 CSV 文件。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task ExportCsvAsync_ShouldReturnFile_WhenRequestIsValid()
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubSortingReportQueryService();
         var controller = new SortingReportController(stubService);
         var request = new SortingReportQueryRequest
@@ -59,11 +61,34 @@ public sealed class SortingReportControllerTests
     }
 
     /// <summary>
-    /// 请求体为空时查询接口应回退使用查询字符串请求。
+    /// 执行当前方法。
+    /// </summary>
+    [Fact]
+    public async Task ExportXlsxAsync_ShouldReturnFile_WhenRequestIsValid()
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        var stubService = new StubSortingReportQueryService();
+        var controller = new SortingReportController(stubService);
+        var request = new SortingReportQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 0, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 18, 0, 0, 0), DateTimeKind.Local)
+        };
+
+        var result = await controller.ExportXlsxAsync(request, null, CancellationToken.None);
+        var fileResult = Assert.IsType<FileContentResult>(result);
+
+        Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileResult.ContentType);
+        Assert.NotEmpty(fileResult.FileContents);
+    }
+
+    /// <summary>
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task QueryAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull()
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubSortingReportQueryService();
         var controller = new SortingReportController(stubService);
         var queryRequest = new SortingReportQueryRequest
@@ -80,11 +105,12 @@ public sealed class SortingReportControllerTests
     }
 
     /// <summary>
-    /// 请求体为空时导出接口应回退使用查询字符串请求。
+    /// 执行当前方法。
     /// </summary>
     [Fact]
     public async Task ExportCsvAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull()
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var stubService = new StubSortingReportQueryService();
         var controller = new SortingReportController(stubService);
         var queryRequest = new SortingReportQueryRequest

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Collections.Concurrent;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.SharedKernel.Utilities;
@@ -8,88 +8,111 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// 运行期存储守护服务。
+/// 定义当前类型。
 /// </summary>
 public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogger<RuntimeStorageGuard> logger) : IRuntimeStorageGuard
 {
-    /// <summary>单表内存告警阈值上限（MB）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const long MaxTableMemoryWarningThresholdMb = 65536;
 
-    /// <summary>单表内存估算默认每条字节数（单位：Byte）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const double DefaultBytesPerEntryEstimate = 1024d;
 
-    /// <summary>单表内存告警默认阈值（MB）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const long DefaultTableMemoryWarningThresholdMb = 256;
 
-    /// <summary>单表内存告警节流间隔默认值（秒）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int DefaultTableMemoryWarningLogIntervalSeconds = 300;
 
-    /// <summary>单表内存告警节流间隔上限（秒）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int MaxTableMemoryWarningLogIntervalSeconds = 86400;
 
-    /// <summary>检查点文件绝对路径（由配置项 CheckpointFilePath 决定；为空时使用应用基目录下 sync-checkpoints.json）。</summary>
     private readonly string _checkpointFilePath = RuntimeStoragePathResolver.ResolveAbsolutePath(
         syncJobOptions.Value.CheckpointFilePath,
         "sync-checkpoints.json");
 
-    /// <summary>运行期配置。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly SyncJobOptions _options = syncJobOptions.Value;
 
-    /// <summary>关键写入磁盘检查缓存。</summary>
     private readonly Dictionary<string, long> _writeSpaceCheckCache = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>关键写入磁盘检查缓存锁。</summary>
     private readonly object _writeSpaceCheckCacheLock = new();
 
-    /// <summary>阈值日志锁。</summary>
     private readonly object _thresholdLogLock = new();
 
-    /// <summary>启动阈值关闭日志是否已输出。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private bool _startupThresholdDisabledLogged;
 
-    /// <summary>启动阈值非法日志是否已输出。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private bool _startupThresholdInvalidLogged;
 
-    /// <summary>写入阈值关闭日志是否已输出。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private bool _writeThresholdDisabledLogged;
 
-    /// <summary>写入阈值非法日志是否已输出。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private bool _writeThresholdInvalidLogged;
 
-    /// <summary>单表内存监控关闭日志是否已输出。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private bool _tableMemoryMonitoringDisabledLogged;
 
-    /// <summary>单表内存阈值关闭日志是否已输出。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private bool _tableMemoryThresholdDisabledLogged;
 
-    /// <summary>单表内存阈值非法日志是否已输出。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private bool _tableMemoryThresholdInvalidLogged;
 
-    /// <summary>单表内存阈值超上限日志是否已输出。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private bool _tableMemoryThresholdTooLargeLogged;
 
-    /// <summary>单表内存告警节流配置非法日志是否已输出。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private bool _tableMemoryWarningIntervalInvalidLogged;
 
-    /// <summary>单表内存告警节流配置超上限日志是否已输出。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private bool _tableMemoryWarningIntervalTooLargeLogged;
 
-    /// <summary>单表内存告警最近输出时间缓存（Stopwatch 时间戳）。</summary>
     private readonly ConcurrentDictionary<string, long> _tableMemoryWarningLogTimestamps = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>单表内存告警判定与时间戳更新锁。</summary>
     private readonly object _tableMemoryWarningGateLock = new();
 
     /// <summary>
-    /// 单表内存告警节流间隔缓存（Stopwatch Tick）。
-    /// 初始值 -1 表示尚未初始化；读取时须通过 <see cref="Interlocked.Read"/> 保证跨线程可见性（long 不支持 volatile）。
+    /// 存储当前字段值。
     /// </summary>
     private long _tableMemoryWarningIntervalTicksCache = -1;
 
-    /// <summary>单表内存告警节流间隔缓存锁。</summary>
     private readonly object _tableMemoryWarningIntervalTicksCacheLock = new();
 
-    /// <inheritdoc/>
     public Task EnsureStartupHealthyAsync(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -107,7 +130,6 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc/>
     public Task EnsureWriteSpaceAsync(string targetPath, string scene, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -127,7 +149,6 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc/>
     public Task ReportTableMemoryAsync(string tableCode, int entryCount, string scene, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -172,10 +193,6 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         return Task.CompletedTask;
     }
 
-    /// <summary>
-    /// 获取规范化后的启动最小可用空间。
-    /// </summary>
-    /// <returns>最小可用空间（MB）。</returns>
     private long NormalizeStartupMinFreeSpaceMb()
     {
         if (_options.StartupMinFreeSpaceMb == 0)
@@ -213,10 +230,6 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         return _options.StartupMinFreeSpaceMb;
     }
 
-    /// <summary>
-    /// 获取规范化后的关键写入最小可用空间。
-    /// </summary>
-    /// <returns>最小可用空间（MB）。</returns>
     private long NormalizeWriteMinFreeSpaceMb()
     {
         if (_options.WriteMinFreeSpaceMb == 0)
@@ -254,10 +267,6 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         return _options.WriteMinFreeSpaceMb;
     }
 
-    /// <summary>
-    /// 获取规范化后的单表内存告警阈值。
-    /// </summary>
-    /// <returns>阈值（MB）。</returns>
     private long NormalizeTableMemoryWarningThresholdMb()
     {
         if (_options.TableMemoryWarningThresholdMb == 0)
@@ -315,24 +324,12 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         return _options.TableMemoryWarningThresholdMb;
     }
 
-    /// <summary>
-    /// 估算单表内存占用（MB）。
-    /// </summary>
-    /// <param name="entryCount">条目数量。</param>
-    /// <returns>估算内存（MB）。</returns>
     private static double EstimateTableMemoryMb(int entryCount)
     {
-        // 保守估算：按每条记录约 1KB（1024 Byte）计算，适用于键+字段字典常见场景。
-        // 该值用于告警预估而非精确计量；若单条字段显著增多或大字段占比提升，应结合实测调整。
         var estimatedBytes = entryCount * DefaultBytesPerEntryEstimate;
         return estimatedBytes / 1024d / 1024d;
     }
 
-    /// <summary>
-    /// 判断并获取单表内存告警日志输出许可（原子执行）。
-    /// </summary>
-    /// <param name="tableCode">表编码。</param>
-    /// <returns>允许输出返回 <c>true</c>。</returns>
     private bool TryAcquireTableMemoryWarningLogPermission(string tableCode)
     {
         var intervalTicks = GetTableMemoryWarningIntervalTicks();
@@ -355,14 +352,8 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         }
     }
 
-    /// <summary>
-    /// 获取单表内存告警节流间隔（Stopwatch Tick）。
-    /// </summary>
-    /// <returns>节流间隔 Tick（0 表示不节流）。</returns>
     private long GetTableMemoryWarningIntervalTicks()
     {
-        // 首次检查使用 Interlocked.Read 将值读入局部变量，保证 64 位读取的原子性与 Acquire 内存屏障，
-        // 避免 CPU/JIT 缓存导致 DCL 首检读到过期值（long 不支持 volatile）。
         var cached = Interlocked.Read(ref _tableMemoryWarningIntervalTicksCache);
         if (cached >= 0)
         {
@@ -371,7 +362,6 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
 
         lock (_tableMemoryWarningIntervalTicksCacheLock)
         {
-            // 锁内二次检查同样读入局部变量，与首检保持语义一致，避免混用同步原语引发维护困惑。
             cached = Interlocked.Read(ref _tableMemoryWarningIntervalTicksCache);
             if (cached >= 0)
             {
@@ -386,10 +376,6 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         }
     }
 
-    /// <summary>
-    /// 获取规范化后的单表内存告警节流间隔。
-    /// </summary>
-    /// <returns>节流间隔（秒）。</returns>
     private int NormalizeTableMemoryWarningLogIntervalSeconds()
     {
         if (_options.TableMemoryWarningLogIntervalSeconds < 0)
@@ -431,11 +417,6 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         return _options.TableMemoryWarningLogIntervalSeconds;
     }
 
-    /// <summary>
-    /// 判断是否可跳过本次关键写入磁盘检查。
-    /// </summary>
-    /// <param name="targetPath">目标路径。</param>
-    /// <returns>可跳过返回 <c>true</c>。</returns>
     private bool CanSkipWriteSpaceCheck(string targetPath)
     {
         var cacheSeconds = _options.WriteSpaceCheckCacheSeconds;
@@ -453,10 +434,6 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         }
     }
 
-    /// <summary>
-    /// 更新关键写入磁盘检查时间戳。
-    /// </summary>
-    /// <param name="targetPath">目标路径。</param>
     private void UpdateWriteSpaceCheckTime(string targetPath)
     {
         lock (_writeSpaceCheckCacheLock)
@@ -465,11 +442,6 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         }
     }
 
-    /// <summary>
-    /// 校验目录可写。
-    /// </summary>
-    /// <param name="targetFilePath">目标文件路径。</param>
-    /// <param name="scene">场景描述。</param>
     private void EnsureDirectoryWritable(string targetFilePath, string scene)
     {
         var directoryPath = Path.GetDirectoryName(targetFilePath);
@@ -506,11 +478,6 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         }
     }
 
-    /// <summary>
-    /// 校验文件可读写。
-    /// </summary>
-    /// <param name="targetFilePath">目标文件路径。</param>
-    /// <param name="scene">场景描述。</param>
     private void EnsureFileReadableAndWritable(string targetFilePath, string scene)
     {
         try
@@ -535,12 +502,6 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         }
     }
 
-    /// <summary>
-    /// 校验磁盘可用空间。
-    /// </summary>
-    /// <param name="targetFilePath">目标文件路径。</param>
-    /// <param name="minFreeSpaceMb">最小可用空间（MB）。</param>
-    /// <param name="scene">场景描述。</param>
     private void EnsureDiskFreeSpace(string targetFilePath, long minFreeSpaceMb, string scene)
     {
         string? rootPath = Path.GetPathRoot(Path.GetFullPath(targetFilePath));
@@ -588,14 +549,8 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     }
 
     /// <summary>
-    /// 创建磁盘可用空间校验异常并输出错误日志。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="exception">原始异常。</param>
-    /// <param name="scene">场景描述。</param>
-    /// <param name="targetFilePath">目标文件路径。</param>
-    /// <param name="rootPath">磁盘根路径。</param>
-    /// <param name="minFreeSpaceMb">最小可用空间。</param>
-    /// <returns>包装后的异常。</returns>
     private InvalidOperationException CreateDiskSpaceValidationException(
         Exception exception,
         string scene,
@@ -603,6 +558,7 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         string? rootPath,
         long minFreeSpaceMb)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         logger.LogError(
             exception,
             "{Scene}失败：磁盘可用空间校验异常。Path={Path}, Root={Root}, ThresholdMb={ThresholdMb}",
@@ -615,3 +571,4 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
             exception);
     }
 }
+

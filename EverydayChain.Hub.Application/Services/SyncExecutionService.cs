@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Abstractions.Sync;
@@ -12,10 +12,7 @@ using Newtonsoft.Json;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 同步执行服务实现。
-/// 支持 KeyedMerge（键控合并）与 StatusDriven（状态驱动消费）两种执行模式。
-/// KeyedMerge 为默认模式，复用既有读取/合并/删除链路；
-/// StatusDriven 委托给 <see cref="IBusinessTaskStatusConsumeService"/> 执行。
+/// 定义当前类型。
 /// </summary>
 public class SyncExecutionService(
     IOracleSourceReader oracleSourceReader,
@@ -29,26 +26,27 @@ public class SyncExecutionService(
     IBusinessTaskStatusConsumeService businessTaskStatusConsumeService,
     ILogger<SyncExecutionService> logger) : ISyncExecutionService
 {
-    /// <summary>失败检查点写入超时秒数。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int ErrorCheckpointSaveTimeoutSeconds = 3;
-    /// <summary>StatusDriven 业务任务收口目标逻辑表名。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string StatusDrivenBusinessTaskLogicalTable = "business_tasks";
-    /// <summary>批次失败状态更新异常日志模板。</summary>
     private const string FailBatchStatusUpdateErrorLogTemplate = "更新同步失败批次状态异常。TableCode={TableCode}, BatchId={BatchId}";
-    /// <summary>批次取消状态更新异常日志模板。</summary>
     private const string FailBatchOnCancelErrorLogTemplate = "在处理同步批次取消时更新批次失败。TableCode={TableCode}, BatchId={BatchId}";
-    /// <summary>“读取到数据但目标端0写入（全部跳过）”告警采样间隔（有效值范围：1~1000，建议值：100）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int FullySkippedPageWarningInterval = 100;
-    /// <summary>快照序列化配置。</summary>
     private static readonly JsonSerializerSettings SnapshotSerializerSettings = new()
     {
         Formatting = Formatting.None,
     };
 
-    /// <inheritdoc/>
     public async Task<SyncBatchResult> ExecuteBatchAsync(SyncExecutionContext context, CancellationToken ct)
     {
-        // StatusDriven 模式委托给专用消费服务，KeyedMerge 路径保持不变。
         if (context.Definition.SyncMode == SyncMode.StatusDriven)
         {
             ValidateStatusDrivenBusinessTaskDefinition(context.Definition);
@@ -64,7 +62,6 @@ public class SyncExecutionService(
         var skipCount = 0;
         DateTime? lastSuccessCursorLocal = context.Checkpoint.LastSuccessCursorLocal;
         var pendingChanges = new List<SyncChangeLog>();
-        // 各步骤累计耗时（毫秒），用于批次完成后输出详细性能日志。
         var batchInitElapsedMs = 0L;
         var readElapsedMs = 0L;
         var stagingElapsedMs = 0L;
@@ -91,7 +88,6 @@ public class SyncExecutionService(
             var processedPageCount = 0;
             while (!ct.IsCancellationRequested)
             {
-                // 步骤1：按窗口分页读取源端增量数据。
                 var readRequest = new SyncReadRequest
                 {
                     TableCode = context.Definition.TableCode,
@@ -125,7 +121,6 @@ public class SyncExecutionService(
                     break;
                 }
 
-                // 步骤2：写入暂存并执行幂等合并。
                 stepSw.Restart();
                 await stagingRepository.BulkInsertAsync(context.BatchId, pageNo, readResult.Rows, context.NormalizedExcludedColumns, ct);
                 stagingElapsedMs += stepSw.ElapsedMilliseconds;
@@ -167,12 +162,10 @@ public class SyncExecutionService(
                             throw;
                         }
 
-                        // 合并异常将向外抛出，此处不覆盖原始失败原因。
                     }
                 }
                 mergeElapsedMs += stepSw.ElapsedMilliseconds;
 
-                // 步骤3：累计统计并推进最大游标。
                 readCount += readResult.Rows.Count;
                 insertCount += mergeResult.InsertCount;
                 updateCount += mergeResult.UpdateCount;
@@ -214,7 +207,6 @@ public class SyncExecutionService(
                 pageNo++;
             }
 
-            // 步骤4：执行删除同步（识别+执行+删除变更构建）。
             stepSw.Restart();
             var deletionExecutionResult = await deletionExecutionService.ExecuteDeletionAsync(context, ct);
             deletionElapsedMs = stepSw.ElapsedMilliseconds;
@@ -224,13 +216,11 @@ public class SyncExecutionService(
                 pendingChanges.Add(deletionChange);
             }
 
-            // 步骤5：读取、合并、删除处理完成后，先落变更日志与删除日志。
             stepSw.Restart();
             await changeLogRepository.WriteChangesAsync(pendingChanges, ct);
             await deletionLogRepository.WriteDeletionsAsync(deletionExecutionResult.DeletionLogs, ct);
             persistElapsedMs = stepSw.ElapsedMilliseconds;
 
-            // 步骤6：仅在读取、合并、删除、日志写入全部完成后提交检查点。
             stepSw.Restart();
             await checkpointRepository.SaveAsync(new SyncCheckpoint
             {
@@ -354,11 +344,6 @@ public class SyncExecutionService(
         }
     }
 
-    /// <summary>
-    /// 校验 StatusDriven 模式下业务任务收口配置合法性。
-    /// </summary>
-    /// <param name="definition">同步定义。</param>
-    /// <exception cref="InvalidOperationException">配置不满足业务任务收口要求时抛出。</exception>
     private static void ValidateStatusDrivenBusinessTaskDefinition(SyncTableDefinition definition)
     {
         if (!string.Equals(definition.TargetLogicalTable, StatusDrivenBusinessTaskLogicalTable, StringComparison.OrdinalIgnoreCase))
@@ -380,80 +365,53 @@ public class SyncExecutionService(
         }
     }
 
-    /// <summary>
-    /// 构建唯一键文本。
-    /// </summary>
-    /// <param name="uniqueKeys">唯一键集合。</param>
-    /// <returns>用于日志输出的唯一键文本。</returns>
     private static string BuildUniqueKeysText(IReadOnlyList<string> uniqueKeys)
     {
         return uniqueKeys.Count == 0 ? "未配置" : string.Join(",", uniqueKeys);
     }
 
     /// <summary>
-    /// 构建统一指标快照。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="window">同步窗口。</param>
-    /// <param name="processedRows">处理行数。</param>
-    /// <param name="elapsed">耗时。</param>
-    /// <returns>指标元组。</returns>
     private static (double LagMinutes, double BacklogMinutes, double ThroughputRowsPerSecond) BuildMetrics(
         SyncWindow window,
         int processedRows,
         TimeSpan elapsed)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         return (
             CalculateLagMinutes(window.WindowEndLocal),
             CalculateBacklogMinutes(window.WindowStartLocal),
             CalculateThroughputRowsPerSecond(processedRows, elapsed));
     }
 
-    /// <summary>
-    /// 计算窗口滞后分钟数。
-    /// </summary>
-    /// <param name="windowEndLocal">窗口结束时间。</param>
-    /// <returns>滞后分钟数。</returns>
     private static double CalculateLagMinutes(DateTime windowEndLocal)
     {
         var lag = DateTime.Now - windowEndLocal;
         return lag.TotalMinutes < 0 ? 0 : lag.TotalMinutes;
     }
 
-    /// <summary>
-    /// 计算窗口积压分钟数。
-    /// </summary>
-    /// <param name="windowStartLocal">窗口起始时间。</param>
-    /// <returns>积压分钟数。</returns>
     private static double CalculateBacklogMinutes(DateTime windowStartLocal)
     {
         var backlog = DateTime.Now - windowStartLocal;
         return backlog.TotalMinutes < 0 ? 0 : backlog.TotalMinutes;
     }
 
-    /// <summary>
-    /// 计算吞吐（每秒处理行数）。
-    /// </summary>
-    /// <param name="processedRows">处理行数。</param>
-    /// <param name="elapsed">耗时。</param>
-    /// <returns>吞吐。</returns>
     private static double CalculateThroughputRowsPerSecond(int processedRows, TimeSpan elapsed)
     {
         return elapsed.TotalSeconds <= 0 ? 0 : processedRows / elapsed.TotalSeconds;
     }
 
     /// <summary>
-    /// 追加本页变更日志。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="context">执行上下文。</param>
-    /// <param name="changes">待写入日志集合。</param>
-    /// <param name="rows">当前页行数据。</param>
-    /// <param name="changedOperations">业务键对应的变更操作类型映射（仅包含 Insert/Update 的变更键）。</param>
     private static void AppendChangeLogs(
         SyncExecutionContext context,
         ICollection<SyncChangeLog> changes,
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows,
         IReadOnlyDictionary<string, SyncChangeOperationType> changedOperations)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var nowLocal = DateTime.Now;
         foreach (var row in rows)
         {
@@ -482,23 +440,11 @@ public class SyncExecutionService(
         }
     }
 
-    /// <summary>
-    /// 构建行快照文本。
-    /// </summary>
-    /// <param name="row">数据行。</param>
-    /// <returns>快照文本。</returns>
     private static string BuildSnapshot(IReadOnlyDictionary<string, object?> row)
     {
         return JsonConvert.SerializeObject(row, SnapshotSerializerSettings);
     }
 
-    /// <summary>
-    /// 尝试标记批次失败（失败时仅记录日志，不影响主流程异常传递）。
-    /// </summary>
-    /// <param name="batchPersistedToRepository">是否已成功创建并持久化批次。</param>
-    /// <param name="context">执行上下文。</param>
-    /// <param name="errorMessage">错误信息。</param>
-    /// <param name="onFailureLogTemplate">状态更新失败日志模板。</param>
     private async Task TryMarkBatchFailedAsync(bool batchPersistedToRepository, SyncExecutionContext context, string errorMessage, string onFailureLogTemplate)
     {
         if (!batchPersistedToRepository)
@@ -516,18 +462,10 @@ public class SyncExecutionService(
         }
     }
 
-    /// <summary>
-    /// 执行 StatusDriven 批次：委托给 <see cref="IBusinessTaskStatusConsumeService"/> 完成读取、投影、幂等写入与可选回写。
-    /// 不调用 Merge/删除仓储；检查点提交与批次管理逻辑与 KeyedMerge 路径相同。
-    /// </summary>
-    /// <param name="context">执行上下文。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>批次结果。</returns>
     private async Task<SyncBatchResult> ExecuteStatusDrivenBatchAsync(SyncExecutionContext context, CancellationToken ct)
     {
         var stopwatch = Stopwatch.StartNew();
         var batchPersistedToRepository = false;
-        // 各步骤耗时（毫秒），用于批次完成后输出详细性能日志。
         var batchInitElapsedMs = 0L;
         var consumeElapsedMs = 0L;
         var persistElapsedMs = 0L;
@@ -547,7 +485,6 @@ public class SyncExecutionService(
             await batchRepository.MarkInProgressAsync(context.BatchId, DateTime.Now, ct);
             batchInitElapsedMs = stepSw.ElapsedMilliseconds;
 
-            // StatusDriven 主流程：委托给业务任务专用消费服务完成分页读取→投影→幂等写入→可选回写。
             stepSw.Restart();
             var consumeResult = await businessTaskStatusConsumeService.ConsumeAsync(
                 context.Definition,
@@ -556,13 +493,11 @@ public class SyncExecutionService(
                 ct);
             consumeElapsedMs = stepSw.ElapsedMilliseconds;
 
-            // StatusDriven 不产生变更日志与删除日志，写入空集合保持链路一致。
             stepSw.Restart();
             await changeLogRepository.WriteChangesAsync([], ct);
             await deletionLogRepository.WriteDeletionsAsync([], ct);
             persistElapsedMs = stepSw.ElapsedMilliseconds;
 
-            // 提交检查点（StatusDriven 无游标推进，保留原检查点游标不变）。
             stepSw.Restart();
             await checkpointRepository.SaveAsync(new SyncCheckpoint
             {
@@ -662,3 +597,4 @@ public class SyncExecutionService(
         }
     }
 }
+

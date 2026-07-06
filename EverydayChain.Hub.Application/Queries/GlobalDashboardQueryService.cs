@@ -1,82 +1,97 @@
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.Domain.Sync;
 using Microsoft.Extensions.Caching.Memory;
+using EverydayChain.Hub.Application.Utilities;
+
 namespace EverydayChain.Hub.Application.Queries;
 
 /// <summary>
-/// 总看板查询服务实现。
+/// 定义当前类型。
 /// </summary>
 public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
 {
     /// <summary>
-    /// 缓存键时间格式。
+    /// 存储当前字段值。
     /// </summary>
     private const string CacheKeyDateTimeFormat = "yyyyMMddHHmmssfffffff";
 
     /// <summary>
-    /// 业务任务仓储。
+    /// 存储当前字段值。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
-    private readonly IScanLogRepository _scanLogRepository;
-
     /// <summary>
-    /// 内存缓存。
+    /// 存储当前字段值。
+    /// </summary>
+    private readonly IScanLogRepository _scanLogRepository;
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
+    private readonly ISyncBatchRepository _syncBatchRepository;
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
+    private readonly ISyncTaskConfigRepository _syncTaskConfigRepository;
+    /// <summary>
+    /// 存储当前字段值。
     /// </summary>
     private readonly IMemoryCache _memoryCache;
-
     /// <summary>
-    /// 查询缓存配置。
+    /// 存储当前字段值。
     /// </summary>
     private readonly QueryCacheOptions _queryCacheOptions;
 
-    /// <summary>
-    /// 初始化总看板查询服务。
-    /// </summary>
-    /// <param name="businessTaskRepository">业务任务仓储。</param>
     public GlobalDashboardQueryService(IBusinessTaskRepository businessTaskRepository, IScanLogRepository scanLogRepository)
-        : this(businessTaskRepository, scanLogRepository, new MemoryCache(new MemoryCacheOptions()), new QueryCacheOptions())
+        : this(
+            businessTaskRepository,
+            scanLogRepository,
+            new EmptySyncBatchRepository(),
+            new EmptySyncTaskConfigRepository(),
+            new MemoryCache(new MemoryCacheOptions()),
+            new QueryCacheOptions())
     {
     }
 
     /// <summary>
-    /// 初始化总看板查询服务。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="businessTaskRepository">业务任务仓储。</param>
-    /// <param name="memoryCache">内存缓存。</param>
-    /// <param name="queryCacheOptions">缓存配置。</param>
     public GlobalDashboardQueryService(
         IBusinessTaskRepository businessTaskRepository,
         IScanLogRepository scanLogRepository,
+        ISyncBatchRepository syncBatchRepository,
+        ISyncTaskConfigRepository syncTaskConfigRepository,
         IMemoryCache memoryCache,
         QueryCacheOptions queryCacheOptions)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         _businessTaskRepository = businessTaskRepository;
         _scanLogRepository = scanLogRepository;
+        _syncBatchRepository = syncBatchRepository;
+        _syncTaskConfigRepository = syncTaskConfigRepository;
         _memoryCache = memoryCache;
         _queryCacheOptions = queryCacheOptions;
     }
 
-    /// <inheritdoc/>
     public async Task<GlobalDashboardQueryResult> QueryAsync(GlobalDashboardQueryRequest request, CancellationToken cancellationToken)
     {
-        // 步骤 1：校验时间区间，避免无效区间进入仓储查询。
         if (request.EndTimeLocal <= request.StartTimeLocal)
         {
             return new GlobalDashboardQueryResult();
         }
 
-        // 步骤 2：按时间区间执行仓储侧聚合，避免全量任务加载后内存聚合。
         var cacheKey = $"global-dashboard:{request.StartTimeLocal.ToString(CacheKeyDateTimeFormat)}:{request.EndTimeLocal.ToString(CacheKeyDateTimeFormat)}";
         if (_queryCacheOptions.Enabled)
         {
             var ttl = Math.Clamp(_queryCacheOptions.GlobalDashboardSeconds, 1, 60);
-            var cachedResult = await _memoryCache.GetOrCreateAsync(cacheKey, async entry =>
-            {
-                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(ttl);
-                return await BuildResultAsync(request.StartTimeLocal, request.EndTimeLocal, cancellationToken);
-            });
+            var cachedResult = await MemoryCacheSingleFlight.GetOrCreateAsync(
+                _memoryCache,
+                cacheKey,
+                TimeSpan.FromSeconds(ttl),
+                _ => BuildResultAsync(request.StartTimeLocal, request.EndTimeLocal, CancellationToken.None),
+                cancellationToken);
             return cachedResult ?? new GlobalDashboardQueryResult();
         }
 
@@ -84,32 +99,29 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
     }
 
     /// <summary>
-    /// 构建总看板查询结果。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="startTimeLocal">开始时间。</param>
-    /// <param name="endTimeLocal">结束时间。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>总看板结果。</returns>
     private async Task<GlobalDashboardQueryResult> BuildResultAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
         CancellationToken cancellationToken)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var waveRows = await _businessTaskRepository.AggregateWaveDashboardAsync(startTimeLocal, endTimeLocal, cancellationToken);
+        var recognitionAggregate = await _scanLogRepository.AggregateRecognitionAsync(startTimeLocal, endTimeLocal, cancellationToken);
+        var feedbackAggregate = await _businessTaskRepository.AggregateFeedbackAsync(startTimeLocal, endTimeLocal, cancellationToken);
+        var enabledDefinitions = await _syncTaskConfigRepository.ListEnabledAsync(cancellationToken);
+        var latestBatches = await _syncBatchRepository.ListLatestByTableCodesAsync(
+            enabledDefinitions.Select(definition => definition.TableCode).ToArray(),
+            cancellationToken);
+
         var totalCount = waveRows.Sum(row => row.TotalCount);
         var unsortedCount = waveRows.Sum(row => row.UnsortedCount);
         var fullCaseTotalCount = waveRows.Sum(row => row.FullCaseTotalCount);
         var fullCaseUnsortedCount = waveRows.Sum(row => row.FullCaseUnsortedCount);
         var splitTotalCount = waveRows.Sum(row => row.SplitTotalCount);
         var splitUnsortedCount = waveRows.Sum(row => row.SplitUnsortedCount);
-        var recognitionAggregate = await _scanLogRepository.AggregateRecognitionAsync(startTimeLocal, endTimeLocal, cancellationToken);
-        var recirculatedCount = waveRows.Sum(row => row.RecirculatedCount);
-        var exceptionCount = waveRows.Sum(row => row.ExceptionCount);
-        var totalVolumeMm3 = waveRows.Sum(row => row.TotalVolumeMm3);
-        var totalWeightGram = waveRows.Sum(row => row.TotalWeightGram);
-        var waveSummaries = BuildWaveSummaries(waveRows);
 
-        // 步骤 3：输出标准化查询结果。
         return new GlobalDashboardQueryResult
         {
             TotalCount = totalCount,
@@ -122,19 +134,27 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
             SplitUnsortedCount = splitUnsortedCount,
             SplitSortedProgressPercent = CalculateProgressPercent(splitTotalCount, splitUnsortedCount),
             RecognitionRatePercent = CalculateRatePercent(recognitionAggregate.MatchedScanCount, recognitionAggregate.TotalScanCount),
-            RecirculatedCount = recirculatedCount,
-            ExceptionCount = exceptionCount,
-            TotalVolumeMm3 = totalVolumeMm3,
-            TotalWeightGram = totalWeightGram,
-            WaveSummaries = waveSummaries
+            RecirculatedCount = waveRows.Sum(row => row.RecirculatedCount),
+            ExceptionCount = waveRows.Sum(row => row.ExceptionCount),
+            TotalVolumeMm3 = waveRows.Sum(row => row.TotalVolumeMm3),
+            TotalWeightGram = waveRows.Sum(row => row.TotalWeightGram),
+            LatestSyncTimeLocal = latestBatches
+                .Select(ResolveBatchReferenceTime)
+                .Where(value => value.HasValue)
+                .OrderByDescending(value => value)
+                .FirstOrDefault(),
+            DataDownloadProgressPercent = enabledDefinitions.Count == 0
+                ? 0M
+                : CalculateRatePercent(
+                    latestBatches.Count(batch => batch.Status == SyncBatchStatus.Completed),
+                    enabledDefinitions.Count),
+            DataWritebackProgressPercent = CalculateRatePercent(
+                feedbackAggregate.CompletedFeedbackCount,
+                feedbackAggregate.RequiredFeedbackCount),
+            WaveSummaries = BuildWaveSummaries(waveRows)
         };
     }
 
-    /// <summary>
-    /// 根据波次聚合行构建波次维度统计结果。
-    /// </summary>
-    /// <param name="waveRows">波次聚合行。</param>
-    /// <returns>波次统计集合。</returns>
     private static IReadOnlyList<WaveDashboardSummary> BuildWaveSummaries(IReadOnlyList<BusinessTaskWaveAggregateRow> waveRows)
     {
         return waveRows
@@ -149,12 +169,13 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
             .ToList();
     }
 
-    /// <summary>
-    /// 计算分拣进度百分比。
-    /// </summary>
-    /// <param name="totalCount">总数。</param>
-    /// <param name="unsortedCount">未分拣数量。</param>
-    /// <returns>百分比。</returns>
+    private static DateTime? ResolveBatchReferenceTime(SyncBatch batch)
+    {
+        return batch.CompletedTimeLocal
+            ?? batch.StartedTimeLocal
+            ?? (batch.WindowEndLocal == default ? null : batch.WindowEndLocal);
+    }
+
     private static decimal CalculateProgressPercent(int totalCount, int unsortedCount)
     {
         if (totalCount <= 0)
@@ -166,12 +187,6 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
         return Math.Round((decimal)sortedCount * 100M / totalCount, 2, MidpointRounding.AwayFromZero);
     }
 
-    /// <summary>
-    /// 计算比率百分比。
-    /// </summary>
-    /// <param name="numerator">分子。</param>
-    /// <param name="denominator">分母。</param>
-    /// <returns>百分比。</returns>
     private static decimal CalculateRatePercent(int numerator, int denominator)
     {
         if (denominator <= 0)
@@ -182,4 +197,59 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
         return Math.Round((decimal)numerator * 100M / denominator, 2, MidpointRounding.AwayFromZero);
     }
 
+    /// <summary>
+    /// 定义当前类型。
+    /// </summary>
+    private sealed class EmptySyncBatchRepository : ISyncBatchRepository
+    {
+        /// <summary>
+        /// 执行当前方法。
+        /// </summary>
+        public Task CreateBatchAsync(SyncBatch batch, CancellationToken ct) => Task.CompletedTask;
+
+        /// <summary>
+        /// 执行当前方法。
+        /// </summary>
+        public Task MarkInProgressAsync(string batchId, DateTime startedTimeLocal, CancellationToken ct) => Task.CompletedTask;
+
+        /// <summary>
+        /// 执行当前方法。
+        /// </summary>
+        public Task CompleteBatchAsync(SyncBatchResult result, DateTime completedTimeLocal, CancellationToken ct) => Task.CompletedTask;
+
+        /// <summary>
+        /// 执行当前方法。
+        /// </summary>
+        public Task FailBatchAsync(string batchId, string errorMessage, DateTime failedTimeLocal, CancellationToken ct) => Task.CompletedTask;
+
+        public Task<string?> GetLatestFailedBatchIdAsync(string tableCode, CancellationToken ct) => Task.FromResult<string?>(null);
+
+        public Task<IReadOnlyList<SyncBatch>> ListLatestByTableCodesAsync(IReadOnlyCollection<string> tableCodes, CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<SyncBatch>>([]);
+        }
+    }
+
+    /// <summary>
+    /// 定义当前类型。
+    /// </summary>
+    private sealed class EmptySyncTaskConfigRepository : ISyncTaskConfigRepository
+    {
+        public Task<SyncTableDefinition> GetByTableCodeAsync(string tableCode, CancellationToken ct)
+        {
+            throw new InvalidOperationException("Empty sync config repository does not support direct table lookup.");
+        }
+
+        public Task<IReadOnlyList<SyncTableDefinition>> ListEnabledAsync(CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<SyncTableDefinition>>([]);
+        }
+
+        public Task<int> GetMaxParallelTablesAsync(CancellationToken ct)
+        {
+            return Task.FromResult(1);
+        }
+    }
 }
+
+

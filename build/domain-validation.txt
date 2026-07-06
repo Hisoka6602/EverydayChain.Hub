@@ -1,0 +1,234 @@
+﻿powershell : Code convention validation failed for project 'EverydayChain.Hub.Domain'.
+所在位置 行:2 字符: 1
++ powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\build\V ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Code convention...in.Hub.Domain'.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Abstractions\IEntity.cs(11): Comments must use Chinese.
+Abstractions\IEntity.cs(9): Comments must use Chinese.
+Abstractions\IEntity.cs(5): Comments must use Chinese.
+Abstractions\IEntity.cs(3): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(196): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(195): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(194): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(244): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(190): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(189): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(188): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(184): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(183): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(182): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(178): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(177): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(176): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(172): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(170): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(166): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(164): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(160): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(157): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(223): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(153): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(151): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(148): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(146): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(143): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(141): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(138): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(136): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(133): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(131): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(128): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(126): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(123): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(121): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(118): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(116): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(113): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(111): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(108): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(106): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(211): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(103): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(101): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(98): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(96): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(93): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(91): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(87): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(85): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(81): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(79): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(75): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(73): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(234): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(69): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(66): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(62): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(60): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(254): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(56): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(54): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(216): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(50): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(47): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(242): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(43): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(41): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(206): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(37): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(35): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(231): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(32): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(30): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(226): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(228): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(252): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(26): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(24): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(218): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(20): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(18): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(213): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(14): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(12): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(208): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(9): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(7): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(202): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(201): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(200): Comments must use Chinese.
+Aggregates\BusinessTaskAggregate\BusinessTaskEntity.cs(221): Comments must use Chinese.
+Aggregates\DashboardSnapshotAggregate\DashboardScanSnapshotEntity.cs(6): Comments must use Chinese.
+Aggregates\DashboardSnapshotAggregate\DashboardScanSnapshotEntity.cs(8): Comments must use Chinese.
+Aggregates\DashboardSnapshotAggregate\DashboardScanSnapshotEntity.cs(7): Comments must use Chinese.
+Aggregates\DashboardSnapshotAggregate\DashboardScanSnapshotEntity.cs(12): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardScanSnapshotEntity.cs(14): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardScanSnapshotEntity.cs(16): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardScanSnapshotEntity.cs(18): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardSnapshotStateEntity.cs(6): Comments must use Chinese.
+Aggregates\DashboardSnapshotAggregate\DashboardSnapshotStateEntity.cs(8): Comments must use Chinese.
+Aggregates\DashboardSnapshotAggregate\DashboardSnapshotStateEntity.cs(7): Comments must use Chinese.
+Aggregates\DashboardSnapshotAggregate\DashboardSnapshotStateEntity.cs(11): Properties must have Chinese comments above 
+the declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardSnapshotStateEntity.cs(13): Properties must have Chinese comments above 
+the declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardSnapshotStateEntity.cs(15): Properties must have Chinese comments above 
+the declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardSnapshotStateEntity.cs(17): Properties must have Chinese comments above 
+the declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(9): Comments must use Chinese.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(8): Comments must use Chinese.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(7): Comments must use Chinese.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(13): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(16): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(19): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(22): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(25): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(27): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(29): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(31): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(33): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(35): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(37): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(39): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(41): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(43): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(45): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(47): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(49): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DashboardSnapshotAggregate\DashboardTaskSnapshotEntity.cs(51): Properties must have Chinese comments above t
+he declaration.
+Aggregates\DropLogAggregate\DropLogEntity.cs(58): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(56): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(53): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(51): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(47): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(45): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(42): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(40): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(36): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(34): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(30): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(28): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(24): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(22): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(19): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(17): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(13): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(11): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(8): Comments must use Chinese.
+Aggregates\DropLogAggregate\DropLogEntity.cs(6): Comments must use Chinese.
+Aggregates\RuntimeLeaseAggregate\RuntimeLeaseEntity.cs(31): Comments must use Chinese.
+Aggregates\RuntimeLeaseAggregate\RuntimeLeaseEntity.cs(30): Comments must use Chinese.
+Aggregates\RuntimeLeaseAggregate\RuntimeLeaseEntity.cs(29): Comments must use Chinese.
+Aggregates\RuntimeLeaseAggregate\RuntimeLeaseEntity.cs(26): Comments must use Chinese.
+Aggregates\RuntimeLeaseAggregate\RuntimeLeaseEntity.cs(25): Comments must use Chinese.
+Aggregates\RuntimeLeaseAggregate\RuntimeLeaseEntity.cs(24): Comments must use Chinese.
+Aggregates\RuntimeLeaseAggregate\RuntimeLeaseEntity.cs(20): Comments must use Chinese.
+Aggregates\RuntimeLeaseAggregate\RuntimeLeaseEntity.cs(19): Comments must use Chinese.
+Aggregates\RuntimeLeaseAggregate\RuntimeLeaseEntity.cs(18): Comments must use Chinese.
+Aggregates\RuntimeLeaseAggregate\RuntimeLeaseEntity.cs(13): Comments must use Chinese.
+Aggregates\RuntimeLeaseAggregate\RuntimeLeaseEntity.cs(12): Comments must use Chinese.
+Aggregates\RuntimeLeaseAggregate\RuntimeLeaseEntity.cs(11): Comments must use Chinese.
+Aggregates\RuntimeLeaseAggregate\RuntimeLeaseEntity.cs(8): Comments must use Chinese.
+Aggregates\RuntimeLeaseAggregate\RuntimeLeaseEntity.cs(7): Comments must use Chinese.
+Aggregates\RuntimeLeaseAggregate\RuntimeLeaseEntity.cs(6): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(64): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(62): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(59): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(57): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(53): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(51): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(47): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(45): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(42): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(40): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(36): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(34): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(30): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(28): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(24): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(22): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(19): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(17): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(13): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(11): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(8): Comments must use Chinese.
+Aggregates\ScanLogAggregate\ScanLogEntity.cs(6): Comments must use Chinese.
+Aggregates\SortingTaskTraceAggregate\SortingTaskTraceEntity.cs(35): Comments must use Chinese.
+Aggregates\SortingTaskTraceAggregate\SortingTaskTraceEntity.cs(31): Comments must use Chinese.
+Aggregates\SortingTaskTraceAggregate\SortingTaskTraceEntity.cs(29): Comments must use Chinese.
+Aggregates\SortingTaskTraceAggregate\SortingTaskTraceEntity.cs(25): Comments must use Chinese.
+Aggregates\SortingTaskTraceAggregate\SortingTaskTraceEntity.cs(23): Comments must use Chinese.
+Aggregates\SortingTaskTraceAggregate\SortingTaskTraceEntity.cs(44): Comments must use Chinese.
+Aggregates\SortingTaskTraceAggregate\SortingTaskTraceEntity.cs(19): Comments must use Chinese.
+Aggregates\SortingTaskTraceAggregate\SortingTaskTraceEntity.cs(17): Comments must use Chinese.
+Aggregates\SortingTaskTraceAggregate\SortingTaskTraceEntity.cs(13): Comments must use Chinese.
+Aggregates\SortingTaskTraceAggregate\SortingTaskTraceEntity.cs(11): Comments must use Chinese.
+Aggregates\SortingTaskTraceAggregate\SortingTaskTraceEntity.cs(47): Comments must use Chinese.
+Aggregates\SortingTaskTraceAggregate\SortingTaskTraceEntity.cs(49): Comments must use Chinese.
+Aggregates\SortingTaskTraceAggregate\SortingTaskTraceEntity.cs(8): Comments must use Chinese.
+... and 476 more violations.

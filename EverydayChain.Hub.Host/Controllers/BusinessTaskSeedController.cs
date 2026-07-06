@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Services;
+﻿using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
@@ -9,46 +9,42 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 业务任务模拟补数控制器。
+/// 定义当前类型。
 /// </summary>
 [ApiController]
 [Route("api/v1/business-task-seed")]
 public sealed class BusinessTaskSeedController : ControllerBase
 {
     /// <summary>
-    /// 空请求体错误消息。
+    /// 存储当前字段值。
     /// </summary>
     private const string EmptyRequestBodyMessage = "模拟补数请求体不能为空。";
 
     /// <summary>
-    /// 业务任务模拟补数应用服务。
+    /// 存储当前字段值。
     /// </summary>
     private readonly IBusinessTaskSeedService _businessTaskSeedService;
 
     /// <summary>
-    /// 日志记录器。
+    /// 存储当前字段值。
     /// </summary>
     private readonly ILogger<BusinessTaskSeedController> _logger;
 
     /// <summary>
-    /// 初始化业务任务模拟补数控制器。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="businessTaskSeedService">业务任务模拟补数应用服务。</param>
-    /// <param name="logger">日志记录器。</param>
     public BusinessTaskSeedController(
         IBusinessTaskSeedService businessTaskSeedService,
         ILogger<BusinessTaskSeedController> logger)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         _businessTaskSeedService = businessTaskSeedService;
         _logger = logger;
     }
 
     /// <summary>
-    /// 手工提交条码并写入指定业务任务分表。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="request">模拟补数请求体。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>模拟补数执行结果。</returns>
     [HttpPost("manual")]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskSeedResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskSeedResponse>), StatusCodes.Status400BadRequest)]
@@ -57,6 +53,7 @@ public sealed class BusinessTaskSeedController : ControllerBase
         [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] BusinessTaskSeedRequest? request,
         CancellationToken cancellationToken)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (request is null)
         {
             return BadRequest(ApiResponse<BusinessTaskSeedResponse>.Fail(EmptyRequestBodyMessage));
@@ -92,11 +89,6 @@ public sealed class BusinessTaskSeedController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// 构建响应对象。
-    /// </summary>
-    /// <param name="result">补数结果。</param>
-    /// <returns>响应对象。</returns>
     private static BusinessTaskSeedResponse BuildResponse(BusinessTaskSeedResult result)
     {
         return new BusinessTaskSeedResponse
@@ -113,3 +105,4 @@ public sealed class BusinessTaskSeedController : ControllerBase
         };
     }
 }
+

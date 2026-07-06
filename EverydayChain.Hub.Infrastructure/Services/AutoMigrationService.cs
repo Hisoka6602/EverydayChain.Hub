@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+﻿using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
@@ -14,7 +14,7 @@ using System.Data;
 namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// 自动迁移服务实现，在应用启动时执行 EF Core 基础迁移、启动期分表预建与历史分表结构同步。
+/// 定义当前类型。
 /// </summary>
 public class AutoMigrationService(
     IDbContextFactory<HubDbContext> dbContextFactory,
@@ -26,29 +26,42 @@ public class AutoMigrationService(
     IDangerZoneExecutor dangerZoneExecutor,
     ILogger<AutoMigrationService> logger) : IAutoMigrationService {
 
-    /// <summary>迁移基线固定 Schema。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string ExpectedMigrationSchema = "dbo";
-    /// <summary>重建迁移基线 Id。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string BaselineMigrationId = "20260418204107_RebuildHubBaselineV2";
-    /// <summary>EF 迁移历史写入版本号。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string BaselineProductVersion = "9.0.14";
-    /// <summary>启动迁移阶段元数据探测 SQL 超时秒数（危险动作隔离器）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int StartupMetadataProbeTimeoutSeconds = 15;
 
-    /// <summary>分表配置快照。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly ShardingOptions _options = shardingOptions.Value;
 
-    /// <summary>危险动作门禁配置快照。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly DangerZoneOptions _dangerZoneOptions = dangerZoneOptions.Value;
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public async Task RunAsync(CancellationToken cancellationToken) {
+        // 步骤：按既定流程执行当前方法逻辑。
         LogConnectionSecuritySnapshot();
         ValidateMigrationSchemaOrThrow();
 
-        // 步骤1：通过隔离器执行 EF Core 基础 Migration。
         await dangerZoneExecutor.ExecuteAsync("auto-migrate-base", async token => {
-            // 明确在“无后缀基础表”上下文执行迁移，避免外层异步上下文遗留后缀影响模型对比。
             using var _ = TableSuffixScope.Use(string.Empty);
             await using var dbContext = await dbContextFactory.CreateDbContextAsync(token);
             await EnsureDatabaseCreatedAsync(dbContext, token);
@@ -58,21 +71,19 @@ public class AutoMigrationService(
             logger.LogInformation("自动迁移: 基础迁移已执行完成。");
         }, cancellationToken, _dangerZoneOptions.AutoMigrateTimeoutSeconds);
 
-        // 步骤2：解析当前及未来分表后缀，并依次执行分表预建与历史分表结构同步。
         var localNow = DateTimeOffset.Now;
         var suffixes = BuildBootstrapSuffixes(resolver, localNow, _options.AutoCreateMonthsAhead);
+        /// <summary>
+        /// 执行当前方法。
+        /// </summary>
         await ExecuteShardMaintenanceAsync(shardTableProvisioner, shardSchemaSynchronizer, logger, suffixes, cancellationToken);
     }
 
     /// <summary>
-    /// 构建启动预建分表后缀集合（仅包含显式后缀分表，不包含无后缀基础表）。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="suffixResolver">后缀解析器。</param>
-    /// <param name="localNow">当前本地时间。</param>
-    /// <param name="monthsAhead">未来预建月数。</param>
-    /// <returns>后缀列表。</returns>
     internal static IReadOnlyList<string> BuildBootstrapSuffixes(IShardSuffixResolver suffixResolver, DateTimeOffset localNow, int monthsAhead) {
-        // 约定：空字符串代表“无后缀基础表”，当前策略明确只预建后缀分表，因此此处过滤空后缀。
+        // 步骤：按既定流程执行当前方法逻辑。
         return suffixResolver.ResolveBootstrapSuffixes(localNow, monthsAhead)
             .Where(suffix => !string.IsNullOrWhiteSpace(suffix))
             .Distinct(StringComparer.Ordinal)
@@ -80,13 +91,8 @@ public class AutoMigrationService(
     }
 
     /// <summary>
-     /// 执行主表迁移后的分表治理步骤。
-     /// </summary>
-    /// <param name="shardTableProvisioner">分表预建服务。</param>
-    /// <param name="shardSchemaSynchronizer">分表结构同步服务。</param>
-    /// <param name="logger">日志记录器。</param>
-    /// <param name="suffixes">启动期预建后缀。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
+    /// 执行当前方法。
+    /// </summary>
     internal static async Task ExecuteShardMaintenanceAsync(
         IShardTableProvisioner shardTableProvisioner,
         IShardSchemaSynchronizer shardSchemaSynchronizer,
@@ -94,30 +100,25 @@ public class AutoMigrationService(
         IReadOnlyList<string> suffixes,
         CancellationToken cancellationToken)
     {
-        // 步骤1：先预建启动期分表；该步骤仅负责新分表首次创建，不负责历史分表升级。
+        // 步骤：按既定流程执行当前方法逻辑。
         logger.LogInformation("自动迁移: 开始预创建启动期分表。SuffixCount={SuffixCount}", suffixes.Count);
         await shardTableProvisioner.EnsureShardTablesAsync(suffixes, cancellationToken);
         logger.LogInformation("自动迁移: 启动期分表预创建已完成。SuffixCount={SuffixCount}", suffixes.Count);
 
-        // 步骤2：再同步历史分表结构；仅自动补齐缺可空列、缺索引与带安全默认值的非空新增列，高风险结构变更仅告警不强补。
         logger.LogInformation("自动迁移: 开始同步历史分表结构。");
         await shardSchemaSynchronizer.SynchronizeAllAsync(cancellationToken);
         logger.LogInformation("自动迁移: 历史分表结构同步已完成。");
     }
 
     /// <summary>
-    /// 判断是否需要对存量库执行“基线迁移已应用”标记。
-    /// 固定表 <c>business_tasks</c> 在此仅用于识别历史基线，不代表运行态写入目标。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="allMigrations">当前程序集全部迁移。</param>
-    /// <param name="appliedMigrations">数据库已应用迁移。</param>
-    /// <param name="existingCoreTableCount">已存在核心业务表数量。</param>
-    /// <returns>需要标记返回 true，否则返回 false。</returns>
     internal static bool ShouldMarkBaselineMigration(
         IReadOnlyList<string> allMigrations,
         IReadOnlyCollection<string> appliedMigrations,
         int existingCoreTableCount)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (allMigrations.Count != 1)
         {
             return false;
@@ -138,10 +139,10 @@ public class AutoMigrationService(
     }
 
     /// <summary>
-    /// 校验迁移与运行时 Schema 一致性，不满足时阻断启动。
+    /// 执行当前方法。
     /// </summary>
-    /// <exception cref="InvalidOperationException">当 Schema 不是 dbo 时抛出。</exception>
     private void ValidateMigrationSchemaOrThrow() {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (string.Equals(_options.Schema, ExpectedMigrationSchema, StringComparison.OrdinalIgnoreCase)) {
             return;
         }
@@ -156,9 +157,10 @@ public class AutoMigrationService(
     }
 
     /// <summary>
-    /// 输出连接参数快照，便于定位 pre-login 握手失败。
+    /// 执行当前方法。
     /// </summary>
     private void LogConnectionSecuritySnapshot() {
+        // 步骤：按既定流程执行当前方法逻辑。
         try {
             var builder = new SqlConnectionStringBuilder(_options.ConnectionString);
             logger.LogInformation(
@@ -176,11 +178,10 @@ public class AutoMigrationService(
     }
 
     /// <summary>
-    /// 在目标库不存在时自动创建数据库，确保新库可执行后续迁移。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="dbContext">数据库上下文。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
     private async Task EnsureDatabaseCreatedAsync(HubDbContext dbContext, CancellationToken cancellationToken) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var dbConnection = dbContext.Database.GetDbConnection();
         var dataSource = dbConnection.DataSource;
         var initialCatalog = dbConnection.Database;
@@ -208,11 +209,6 @@ public class AutoMigrationService(
             initialCatalog);
     }
 
-    /// <summary>
-    /// 针对迁移历史重建场景，在检测到存量业务表且仅存在基线迁移时自动写入迁移历史标记。
-    /// </summary>
-    /// <param name="dbContext">数据库上下文。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
     private async Task TryMarkBaselineMigrationForExistingDatabaseAsync(HubDbContext dbContext, CancellationToken cancellationToken)
     {
         var allMigrations = dbContext.Database.GetMigrations().ToList();
@@ -255,13 +251,6 @@ public class AutoMigrationService(
         logger.LogInformation("自动迁移已补写基线迁移历史。BaselineMigration={BaselineMigration}", BaselineMigrationId);
     }
 
-    /// <summary>
-    /// 统计当前数据库中已存在的核心业务表数量。
-    /// 固定表 <c>business_tasks</c> 属于迁移遗留探测对象，正式运行写入目标始终为 <c>business_tasks_yyyyMM</c>。
-    /// </summary>
-    /// <param name="dbContext">数据库上下文。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>核心表数量。</returns>
     private static async Task<int> CountExistingCoreTablesAsync(HubDbContext dbContext, CancellationToken cancellationToken)
     {
         var connection = dbContext.Database.GetDbConnection();
@@ -301,11 +290,10 @@ public class AutoMigrationService(
     }
 
     /// <summary>
-    /// 输出待应用迁移清单，用于识别新迁移是否已纳入执行。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="dbContext">数据库上下文。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
     private async Task LogPendingMigrationsAsync(HubDbContext dbContext, CancellationToken cancellationToken) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var pendingMigrations = await dbContext.Database.GetPendingMigrationsAsync(cancellationToken);
         var pendingMigrationList = pendingMigrations.ToList();
         if (pendingMigrationList.Count == 0) {
@@ -316,3 +304,4 @@ public class AutoMigrationService(
         logger.LogInformation("自动迁移: 检测到待执行迁移：{PendingMigrations}", string.Join(", ", pendingMigrationList));
     }
 }
+

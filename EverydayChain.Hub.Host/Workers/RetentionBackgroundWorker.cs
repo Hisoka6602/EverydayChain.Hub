@@ -1,28 +1,35 @@
-using EverydayChain.Hub.Application.Abstractions.Services;
+﻿using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Domain.Options;
 using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Host.Workers;
 
 /// <summary>
-/// 保留期后台任务，按配置周期触发分表保留期治理。
+/// 定义当前类型。
 /// </summary>
 public class RetentionBackgroundWorker(
     IRetentionExecutionService retentionExecutionService,
     IOptions<RetentionJobOptions> retentionJobOptions,
     ILogger<RetentionBackgroundWorker> logger) : BackgroundService
 {
-    /// <summary>单轮保留期执行超时秒数（危险动作隔离器）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int SingleRunTimeoutSeconds = 600;
-    /// <summary>保留期任务配置快照。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly RetentionJobOptions _retentionJobOptions = retentionJobOptions.Value;
-    /// <summary>是否已记录过总开关关闭日志。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private bool _dangerSwitchOffLogged;
 
     /// <summary>
-    /// 后台循环入口。
+    /// 周期执行保留期清理任务。
     /// </summary>
-    /// <param name="stoppingToken">取消令牌。</param>
+    /// <param name="stoppingToken">停止令牌。</param>
+    /// <returns>后台执行任务。</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (!_retentionJobOptions.Enabled)
@@ -78,3 +85,4 @@ public class RetentionBackgroundWorker(
         }
     }
 }
+

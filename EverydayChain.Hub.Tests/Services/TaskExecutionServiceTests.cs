@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.ScanMatch.Services;
 using EverydayChain.Hub.Application.TaskExecution.Services;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
@@ -8,13 +8,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 任务执行服务单元测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class TaskExecutionServiceTests
 {
-    /// <summary>
-    /// 构建测试用的 TaskExecutionService。
-    /// </summary>
     private static (TaskExecutionService Service, InMemoryBusinessTaskRepository Repository, InMemoryScanLogRepository ScanLogRepository) CreateService()
     {
         var repo = new InMemoryBusinessTaskRepository();
@@ -24,9 +21,6 @@ public sealed class TaskExecutionServiceTests
         return (execService, repo, scanLogRepo);
     }
 
-    /// <summary>
-    /// 无对应任务时应返回失败结果。
-    /// </summary>
     [Fact]
     public async Task MarkScannedAsync_ShouldFail_WhenNoTaskFound()
     {
@@ -44,9 +38,6 @@ public sealed class TaskExecutionServiceTests
         Assert.NotEmpty(result.FailureReason);
     }
 
-    /// <summary>
-    /// 任务处于已创建状态时应成功推进到已扫描。
-    /// </summary>
     [Fact]
     public async Task MarkScannedAsync_ShouldSucceed_WhenTaskIsCreated()
     {
@@ -76,9 +67,6 @@ public sealed class TaskExecutionServiceTests
         Assert.Equal(nameof(BusinessTaskStatus.Scanned), result.TaskStatus);
     }
 
-    /// <summary>
-    /// 任务处于已落格状态时应允许重复扫描并重新推进到已扫描。
-    /// </summary>
     [Fact]
     public async Task MarkScannedAsync_ShouldSucceed_WhenTaskIsDropped()
     {
@@ -128,9 +116,6 @@ public sealed class TaskExecutionServiceTests
         Assert.Equal(3, updatedTask.ScanCount);
     }
 
-    /// <summary>
-    /// 扫描成功后仓储中任务状态应更新为已扫描。
-    /// </summary>
     [Fact]
     public async Task MarkScannedAsync_ShouldPersistScannedStatus()
     {
@@ -173,9 +158,6 @@ public sealed class TaskExecutionServiceTests
         Assert.Equal(1, updatedTask.ScanCount);
     }
 
-    /// <summary>
-    /// 请求包含目标格口编码时应覆盖旧值并刷新归并码头编码。
-    /// </summary>
     [Fact]
     public async Task MarkScannedAsync_ShouldOverwriteTargetChuteCode_WhenRequestHasTargetChuteCode()
     {
@@ -208,9 +190,6 @@ public sealed class TaskExecutionServiceTests
         Assert.Equal("1", updatedTask.ResolvedDockCode);
     }
 
-    /// <summary>
-    /// 请求未提供目标格口编码时应保留旧值。
-    /// </summary>
     [Fact]
     public async Task MarkScannedAsync_ShouldKeepTargetChuteCode_WhenRequestHasNoTargetChuteCode()
     {
@@ -243,9 +222,6 @@ public sealed class TaskExecutionServiceTests
         Assert.Equal("7", updatedTask.ResolvedDockCode);
     }
 
-    /// <summary>
-    /// 扫描失败时不应错误覆盖任务目标格口编码。
-    /// </summary>
     [Fact]
     public async Task MarkScannedAsync_ShouldNotUpdateTargetChuteCode_WhenTaskStateIsInvalid()
     {
@@ -279,3 +255,4 @@ public sealed class TaskExecutionServiceTests
         Assert.True(scanLogRepository.Logs[0].IsMatched);
     }
 }
+

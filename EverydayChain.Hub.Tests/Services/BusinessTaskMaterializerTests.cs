@@ -1,17 +1,14 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Services;
 using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// <see cref="BusinessTaskMaterializer"/> 行为测试。
+/// 定义当前类型。
 /// </summary>
 public class BusinessTaskMaterializerTests
 {
-    /// <summary>
-    /// 物化时应写入默认状态与统一时间字段。
-    /// </summary>
     [Fact]
     public void Materialize_WithValidRequest_ShouldAssignDefaultStatusAndTime()
     {
@@ -44,7 +41,7 @@ public class BusinessTaskMaterializerTests
     }
 
     /// <summary>
-    /// 必填字段为空白时应抛出参数异常。
+    /// 执行当前方法。
     /// </summary>
     [Theory]
     [InlineData(" ", "WMS_PICK", "K1", "TaskCode")]
@@ -56,6 +53,7 @@ public class BusinessTaskMaterializerTests
         string businessKey,
         string expectedParamName)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var sut = new BusinessTaskMaterializer();
         var fixedTime = new DateTime(2026, 4, 13, 10, 20, 30, DateTimeKind.Local);
         var request = new BusinessTaskMaterializeRequest
@@ -72,9 +70,6 @@ public class BusinessTaskMaterializerTests
         Assert.Equal(expectedParamName, exception.ParamName);
     }
 
-    /// <summary>
-    /// 物化时间缺失时应阻断写入，避免误用处理时间作为业务时间。
-    /// </summary>
     [Fact]
     public void Materialize_WhenMaterializedTimeLocalMissing_ShouldThrow()
     {
@@ -92,3 +87,4 @@ public class BusinessTaskMaterializerTests
         Assert.Contains("MaterializedTimeLocal 缺失", exception.Message, StringComparison.Ordinal);
     }
 }
+

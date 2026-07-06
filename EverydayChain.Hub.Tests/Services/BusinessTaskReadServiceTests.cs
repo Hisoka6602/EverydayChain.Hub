@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Queries;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
@@ -6,13 +6,10 @@ using EverydayChain.Hub.Domain.Enums;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 业务任务查询服务测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class BusinessTaskReadServiceTests
 {
-    /// <summary>
-    /// 业务任务查询应支持筛选与分页。
-    /// </summary>
     [Fact]
     public async Task QueryTasksAsync_ShouldApplyFiltersAndPaging()
     {
@@ -29,6 +26,11 @@ public sealed class BusinessTaskReadServiceTests
             BusinessKey = "Q1",
             WaveCode = "W1",
             Barcode = "B1",
+            OrderId = "ORDER-1",
+            StoreId = "STORE-1",
+            StoreName = "Store Name 1",
+            ProductCode = "SKU-1",
+            PickLocation = "A-01-01",
             TargetChuteCode = "7",
             Status = BusinessTaskStatus.Created,
             CreatedTimeLocal = start.AddHours(1),
@@ -61,11 +63,13 @@ public sealed class BusinessTaskReadServiceTests
         Assert.Equal(1, result.TotalCount);
         Assert.Single(result.Items);
         Assert.Equal("Q1", result.Items[0].TaskCode);
+        Assert.Equal("ORDER-1", result.Items[0].OrderId);
+        Assert.Equal("STORE-1", result.Items[0].StoreId);
+        Assert.Equal("Store Name 1", result.Items[0].StoreName);
+        Assert.Equal("SKU-1", result.Items[0].ProductCode);
+        Assert.Equal("A-01-01", result.Items[0].PickLocation);
     }
 
-    /// <summary>
-    /// 异常件与回流查询应按对应状态筛选。
-    /// </summary>
     [Fact]
     public async Task QueryExceptionsAndRecirculations_ShouldReturnMatchedRows()
     {
@@ -110,9 +114,6 @@ public sealed class BusinessTaskReadServiceTests
         Assert.Equal("E1", recirculationResult.Items[0].TaskCode);
     }
 
-    /// <summary>
-    /// 回流查询应仅按归并码头编码口径筛选，不受 IsRecirculated 领域状态字段影响。
-    /// </summary>
     [Fact]
     public async Task QueryRecirculationsAsync_ShouldUseResolvedDockCodeRule()
     {
@@ -161,9 +162,6 @@ public sealed class BusinessTaskReadServiceTests
         Assert.Equal("R2", result.Items[0].TaskCode);
     }
 
-    /// <summary>
-    /// 回流筛选应按 Trim 后的归并码头编码判定。
-    /// </summary>
     [Fact]
     public async Task QueryRecirculationsAsync_ShouldUseTrimmedResolvedDockCode()
     {
@@ -197,9 +195,6 @@ public sealed class BusinessTaskReadServiceTests
         Assert.Equal("R3", result.Items[0].TaskCode);
     }
 
-    /// <summary>
-    /// 游标分页应返回游标语义并支持连续翻页。
-    /// </summary>
     [Fact]
     public async Task QueryTasksAsync_ShouldSupportCursorPaging()
     {
@@ -266,9 +261,6 @@ public sealed class BusinessTaskReadServiceTests
         Assert.Equal("C3", secondPage.Items[0].TaskCode);
     }
 
-    /// <summary>
-    /// 游标分页末页应返回无更多数据。
-    /// </summary>
     [Fact]
     public async Task QueryTasksAsync_ShouldReturnNoMore_WhenCursorReachesLastPage()
     {
@@ -307,9 +299,6 @@ public sealed class BusinessTaskReadServiceTests
         Assert.Null(result.NextLastId);
     }
 
-    /// <summary>
-    /// 仅传入单侧游标参数时应回退页码分页语义。
-    /// </summary>
     [Fact]
     public async Task QueryTasksAsync_ShouldFallbackToPageMode_WhenCursorParametersAreIncomplete()
     {
@@ -345,3 +334,4 @@ public sealed class BusinessTaskReadServiceTests
         Assert.Single(result.Items);
     }
 }
+

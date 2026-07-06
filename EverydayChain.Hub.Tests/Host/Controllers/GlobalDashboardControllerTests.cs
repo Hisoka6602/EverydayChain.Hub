@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Host.Controllers;
+﻿using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using Microsoft.AspNetCore.Mvc;
@@ -6,13 +6,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 总看板控制器基础行为测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class GlobalDashboardControllerTests
 {
-    /// <summary>
-    /// 开始或结束时间未传入时应返回 BadRequest。
-    /// </summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -34,9 +31,6 @@ public sealed class GlobalDashboardControllerTests
         Assert.IsType<BadRequestObjectResult>(actionResult.Result);
     }
 
-    /// <summary>
-    /// 结束时间小于等于开始时间时应返回 BadRequest。
-    /// </summary>
     [Fact]
     public async Task QueryOverviewAsync_ShouldReturnBadRequest_WhenEndTimeIsNotGreaterThanStartTime()
     {
@@ -52,9 +46,6 @@ public sealed class GlobalDashboardControllerTests
         Assert.IsType<BadRequestObjectResult>(actionResult.Result);
     }
 
-    /// <summary>
-    /// 有效请求时应返回 Ok 并透传统计结果。
-    /// </summary>
     [Fact]
     public async Task QueryOverviewAsync_ShouldReturnOk_WhenRequestIsValid()
     {
@@ -79,9 +70,6 @@ public sealed class GlobalDashboardControllerTests
         Assert.Equal(request.EndTimeLocal, stubService.LastRequest.EndTimeLocal);
     }
 
-    /// <summary>
-    /// 请求体为空时应回退使用查询字符串请求。
-    /// </summary>
     [Fact]
     public async Task QueryOverviewAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull()
     {
@@ -103,3 +91,4 @@ public sealed class GlobalDashboardControllerTests
         Assert.Equal(queryRequest.EndTimeLocal, stubService.LastRequest.EndTimeLocal);
     }
 }
+

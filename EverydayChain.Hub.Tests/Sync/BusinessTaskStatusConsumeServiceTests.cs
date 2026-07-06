@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Services;
+﻿using EverydayChain.Hub.Application.Services;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Sync;
 using EverydayChain.Hub.Domain.Sync.Models;
@@ -9,13 +9,10 @@ using EverydayChain.Hub.Tests.Sync.Fakes;
 namespace EverydayChain.Hub.Tests.Sync;
 
 /// <summary>
-/// BusinessTaskStatusConsumeService 行为测试。
+/// 定义当前类型。
 /// </summary>
 public class BusinessTaskStatusConsumeServiceTests
 {
-    /// <summary>
-    /// 启用回写时应写入业务主表并回写远端状态。
-    /// </summary>
     [Fact]
     public async Task ConsumeAsync_WhenWriteBackEnabled_ShouldProjectAndWriteBack()
     {
@@ -58,9 +55,6 @@ public class BusinessTaskStatusConsumeServiceTests
         Assert.Null(entity.PickLocation);
     }
 
-    /// <summary>
-    /// 关闭回写时应仅写入本地业务主表，不执行远端状态回写。
-    /// </summary>
     [Fact]
     public async Task ConsumeAsync_WhenWriteBackDisabled_ShouldSkipRemoteWriteBack()
     {
@@ -102,9 +96,6 @@ public class BusinessTaskStatusConsumeServiceTests
         Assert.Equal("LOC-2", entity.PickLocation);
     }
 
-    /// <summary>
-    /// 缺失 RowId 时不得误回写。
-    /// </summary>
     [Fact]
     public async Task ConsumeAsync_WhenRowIdMissing_ShouldSkipWriteBack()
     {
@@ -134,9 +125,6 @@ public class BusinessTaskStatusConsumeServiceTests
         Assert.Equal(0, writer.TotalWriteBackRows);
     }
 
-    /// <summary>
-    /// 固定第一页回写模式下，若当前页无可投影行应提前结束，避免死循环。
-    /// </summary>
     [Fact]
     public async Task ConsumeAsync_WhenFixedFirstPageAndNoProjectionRows_ShouldBreak()
     {
@@ -163,9 +151,6 @@ public class BusinessTaskStatusConsumeServiceTests
         Assert.Contains(logger.Logs, log => log.Message.Contains("无可投影行", StringComparison.Ordinal));
     }
 
-    /// <summary>
-    /// 源行包含游标业务时间时应按业务时间投影。
-    /// </summary>
     [Fact]
     public async Task ConsumeAsync_WhenCursorColumnContainsBusinessTime_ShouldUseBusinessTime()
     {
@@ -189,6 +174,9 @@ public class BusinessTaskStatusConsumeServiceTests
         var service = new BusinessTaskStatusConsumeService(reader, writer, projectionService, repository, logger);
         var window = new SyncWindow(
             new DateTime(2026, 4, 20, 0, 0, 0, DateTimeKind.Local),
+            /// <summary>
+            /// 执行当前方法。
+            /// </summary>
             new DateTime(2026, 4, 20, 23, 59, 59, DateTimeKind.Local));
 
         var result = await service.ConsumeAsync(BuildSplitDefinition(false), "B5", window, CancellationToken.None);
@@ -201,9 +189,6 @@ public class BusinessTaskStatusConsumeServiceTests
         Assert.NotEqual(DateTime.Now, entity.CreatedTimeLocal);
     }
 
-    /// <summary>
-    /// 游标业务时间非法时应阻断并抛出中文异常。
-    /// </summary>
     [Fact]
     public async Task ConsumeAsync_WhenCursorTimeInvalid_ShouldThrow()
     {
@@ -237,9 +222,6 @@ public class BusinessTaskStatusConsumeServiceTests
             && log.Message.Contains("远端业务时间缺失", StringComparison.Ordinal));
     }
 
-    /// <summary>
-    /// 游标业务时间缺失时应阻断并抛出中文异常。
-    /// </summary>
     [Fact]
     public async Task ConsumeAsync_WhenCursorTimeMissing_ShouldThrow()
     {
@@ -272,11 +254,6 @@ public class BusinessTaskStatusConsumeServiceTests
             && log.Message.Contains("远端业务时间缺失", StringComparison.Ordinal));
     }
 
-    /// <summary>
-    /// 构建拆零定义。
-    /// </summary>
-    /// <param name="writeBack">是否回写。</param>
-    /// <returns>同步定义。</returns>
     private static SyncTableDefinition BuildSplitDefinition(bool writeBack)
     {
         return new SyncTableDefinition
@@ -308,11 +285,6 @@ public class BusinessTaskStatusConsumeServiceTests
         };
     }
 
-    /// <summary>
-    /// 构建整件定义。
-    /// </summary>
-    /// <param name="writeBack">是否回写。</param>
-    /// <returns>同步定义。</returns>
     private static SyncTableDefinition BuildFullCaseDefinition(bool writeBack)
     {
         return new SyncTableDefinition
@@ -346,3 +318,4 @@ public class BusinessTaskStatusConsumeServiceTests
         };
     }
 }
+

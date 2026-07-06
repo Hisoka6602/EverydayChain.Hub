@@ -1,19 +1,35 @@
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Application.Utilities;
 using EverydayChain.Hub.Domain.Options;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace EverydayChain.Hub.Application.Queries;
 
+/// <summary>
+/// 定义当前类型。
+/// </summary>
 public sealed class DockDashboardQueryService : IDockDashboardQueryService
 {
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string CacheKeyDateTimeFormat = "yyyyMMddHHmmssfffffff";
     private const string NullCacheValue = "(null)";
 
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
     private readonly BusinessTaskQueryPolicy _queryPolicy = new();
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly IMemoryCache _memoryCache;
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly QueryCacheOptions _queryCacheOptions;
 
     public DockDashboardQueryService(IBusinessTaskRepository businessTaskRepository)
@@ -21,11 +37,15 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
     {
     }
 
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public DockDashboardQueryService(
         IBusinessTaskRepository businessTaskRepository,
         IMemoryCache memoryCache,
         QueryCacheOptions queryCacheOptions)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         _businessTaskRepository = businessTaskRepository;
         _memoryCache = memoryCache;
         _queryCacheOptions = queryCacheOptions;
@@ -43,18 +63,19 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
         }
 
         var selectedWaveCode = NormalizeOptionalText(request.WaveCode);
-        if (!_queryCacheOptions.Enabled || string.IsNullOrWhiteSpace(selectedWaveCode))
+        if (!_queryCacheOptions.Enabled)
         {
             return await BuildResultAsync(request.StartTimeLocal, request.EndTimeLocal, selectedWaveCode, cancellationToken);
         }
 
         var cacheKey = $"dock-dashboard:{request.StartTimeLocal.ToString(CacheKeyDateTimeFormat)}:{request.EndTimeLocal.ToString(CacheKeyDateTimeFormat)}:{selectedWaveCode ?? NullCacheValue}";
         var ttl = Math.Clamp(_queryCacheOptions.DockDashboardSeconds, 1, 60);
-        var cached = await _memoryCache.GetOrCreateAsync(cacheKey, async entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(ttl);
-            return await BuildResultAsync(request.StartTimeLocal, request.EndTimeLocal, selectedWaveCode, cancellationToken);
-        });
+        var cached = await MemoryCacheSingleFlight.GetOrCreateAsync(
+            _memoryCache,
+            cacheKey,
+            TimeSpan.FromSeconds(ttl),
+            _ => BuildResultAsync(request.StartTimeLocal, request.EndTimeLocal, selectedWaveCode, CancellationToken.None),
+            cancellationToken);
         return cached ?? new DockDashboardQueryResult
         {
             StartTimeLocal = request.StartTimeLocal,
@@ -62,12 +83,16 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
         };
     }
 
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     private async Task<DockDashboardQueryResult> BuildResultAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
         string? selectedWaveCode,
         CancellationToken cancellationToken)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var waveOptions = await _businessTaskRepository.ListWaveCodesByCreatedTimeRangeAsync(startTimeLocal, endTimeLocal, cancellationToken);
         var effectiveSelectedWaveCode = selectedWaveCode;
         if (string.IsNullOrWhiteSpace(effectiveSelectedWaveCode))
@@ -116,3 +141,4 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }
+

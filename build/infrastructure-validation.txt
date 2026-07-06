@@ -1,0 +1,251 @@
+﻿powershell : Code convention validation failed for project 'EverydayChain.Hub.Infrastructure'.
+所在位置 行:2 字符: 1
++ powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\build\V ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Code convention...nfrastructure'.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+DependencyInjection\ServiceCollectionExtensions.cs(66): Comments must use Chinese.
+DependencyInjection\ServiceCollectionExtensions.cs(64): Comments must use Chinese.
+DependencyInjection\ServiceCollectionExtensions.cs(42): Comments must use Chinese.
+DependencyInjection\ServiceCollectionExtensions.cs(40): Comments must use Chinese.
+DependencyInjection\ServiceCollectionExtensions.cs(213): Comments must use Chinese.
+DependencyInjection\ServiceCollectionExtensions.cs(211): Comments must use Chinese.
+DependencyInjection\ServiceCollectionExtensions.cs(217): Complex methods must contain step comments in Chinese.
+DependencyInjection\ServiceCollectionExtensions.cs(228): Methods must have Chinese comments above the declaration.
+Integrations\OracleWmsFeedbackGateway.cs(465): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(341): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(143): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(141): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(424): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(323): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(321): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(513): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(511): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(408): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(498): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(297): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(295): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(479): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(339): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(273): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(271): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(463): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(452): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(450): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(55): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(439): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(437): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(38): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(36): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(426): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(496): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(16): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(13): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(406): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(477): Comments must use Chinese.
+Integrations\OracleWmsFeedbackGateway.cs(318): Methods must have Chinese comments above the declaration.
+Integrations\OracleWmsFeedbackGateway.cs(415): Methods must have Chinese comments above the declaration.
+Integrations\OracleWmsFeedbackGateway.cs(420): Methods must have Chinese comments above the declaration.
+Integrations\OracleWmsFeedbackGateway.cs(472): Fields must have Chinese comments above the declaration.
+Migrations\20260418204107_RebuildHubBaselineV2.cs(11): Comments must use Chinese.
+Migrations\20260418204107_RebuildHubBaselineV2.cs(494): Comments must use Chinese.
+Migrations\20260418204107_RebuildHubBaselineV2.cs(8): Comments must use Chinese.
+Migrations\20260419033227_AddBusinessTaskUpdatedTimeLocalIndex.cs(20): Comments must use Chinese.
+Migrations\20260419033227_AddBusinessTaskUpdatedTimeLocalIndex.cs(10): Comments must use Chinese.
+Migrations\20260419033227_AddBusinessTaskUpdatedTimeLocalIndex.cs(7): Comments must use Chinese.
+Migrations\20260420195621_AddBusinessTaskWorkingArea.cs(10): Comments must use Chinese.
+Migrations\20260420195621_AddBusinessTaskWorkingArea.cs(22): Comments must use Chinese.
+Migrations\20260420195621_AddBusinessTaskWorkingArea.cs(7): Comments must use Chinese.
+Migrations\20260420211433_20260420213000_StrengthenHotPathIndexesAndRecirculationFilter.cs(104): Comments must use Chin
+ese.
+Migrations\20260420211433_20260420213000_StrengthenHotPathIndexesAndRecirculationFilter.cs(10): Comments must use Chine
+se.
+Migrations\20260420211433_20260420213000_StrengthenHotPathIndexesAndRecirculationFilter.cs(7): Comments must use Chines
+e.
+Migrations\20260420221000_AdjustBusinessTaskRecirculationAndHotPathIndexes.cs(10): Comments must use Chinese.
+Migrations\20260420221000_AdjustBusinessTaskRecirculationAndHotPathIndexes.cs(36): Comments must use Chinese.
+Migrations\20260420221000_AdjustBusinessTaskRecirculationAndHotPathIndexes.cs(7): Comments must use Chinese.
+Migrations\20260618085535_AddBusinessTaskTraceFields.cs(54): Comments must use Chinese.
+Migrations\20260618085535_AddBusinessTaskTraceFields.cs(10): Comments must use Chinese.
+Migrations\20260618085535_AddBusinessTaskTraceFields.cs(7): Comments must use Chinese.
+Migrations\20260706110000_AddDashboardSnapshotsAndRuntimeLeases.cs(143): Comments must use Chinese.
+Migrations\20260706110000_AddDashboardSnapshotsAndRuntimeLeases.cs(10): Comments must use Chinese.
+Migrations\20260706110000_AddDashboardSnapshotsAndRuntimeLeases.cs(7): Comments must use Chinese.
+Persistence\DesignTimeHubDbContextFactory.cs(16): Comments must use Chinese.
+Persistence\DesignTimeHubDbContextFactory.cs(13): Comments must use Chinese.
+Persistence\DesignTimeHubDbContextFactory.cs(10): Comments must use Chinese.
+Persistence\DesignTimeHubDbContextFactory.cs(18): Comments must use Chinese.
+Persistence\HubDbContext.cs(20): Comments must use Chinese.
+Persistence\HubDbContext.cs(19): Comments must use Chinese.
+Persistence\HubDbContext.cs(18): Comments must use Chinese.
+Persistence\HubDbContext.cs(21): Comments must use Chinese.
+Persistence\HubDbContext.cs(24): Fields must have Chinese comments above the declaration.
+Persistence\HubDbContext.cs(25): Fields must have Chinese comments above the declaration.
+Persistence\HubDbContext.cs(26): Fields must have Chinese comments above the declaration.
+Persistence\HubDbContext.cs(27): Fields must have Chinese comments above the declaration.
+Persistence\HubDbContext.cs(28): Fields must have Chinese comments above the declaration.
+Persistence\HubDbContext.cs(29): Fields must have Chinese comments above the declaration.
+Persistence\HubDbContext.cs(30): Fields must have Chinese comments above the declaration.
+Persistence\HubDbContext.cs(31): Fields must have Chinese comments above the declaration.
+Persistence\HubDbContext.cs(32): Fields must have Chinese comments above the declaration.
+Persistence\HubDbContext.cs(33): Fields must have Chinese comments above the declaration.
+Persistence\HubDbContext.cs(34): Fields must have Chinese comments above the declaration.
+Persistence\HubDbContext.cs(36): Fields must have Chinese comments above the declaration.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(10): Comments must use Chinese.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(7): Comments must use Chinese.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(21): Comments must use Chinese.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(19): Comments must use Chinese.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(30): Comments must use Chinese.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(72): Methods must have Chinese comments above t
+he declaration.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(84): Methods must have Chinese comments above t
+he declaration.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(91): Methods must have Chinese comments above t
+he declaration.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(92): Methods must have Chinese comments above t
+he declaration.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(93): Methods must have Chinese comments above t
+he declaration.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(94): Methods must have Chinese comments above t
+he declaration.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(95): Methods must have Chinese comments above t
+he declaration.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(96): Methods must have Chinese comments above t
+he declaration.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(97): Methods must have Chinese comments above t
+he declaration.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(98): Methods must have Chinese comments above t
+he declaration.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(99): Methods must have Chinese comments above t
+he declaration.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(100): Methods must have Chinese comments above 
+the declaration.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(101): Methods must have Chinese comments above 
+the declaration.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(102): Methods must have Chinese comments above 
+the declaration.
+Persistence\EntityConfigurations\BusinessTaskEntityTypeConfiguration.cs(103): Methods must have Chinese comments above 
+the declaration.
+Persistence\EntityConfigurations\DashboardScanSnapshotEntityTypeConfiguration.cs(9): Comments must use Chinese.
+Persistence\EntityConfigurations\DashboardScanSnapshotEntityTypeConfiguration.cs(8): Comments must use Chinese.
+Persistence\EntityConfigurations\DashboardScanSnapshotEntityTypeConfiguration.cs(7): Comments must use Chinese.
+Persistence\EntityConfigurations\DashboardScanSnapshotEntityTypeConfiguration.cs(12): Fields must have Chinese comments
+ above the declaration.
+Persistence\EntityConfigurations\DashboardScanSnapshotEntityTypeConfiguration.cs(13): Fields must have Chinese comments
+ above the declaration.
+Persistence\EntityConfigurations\DashboardSnapshotStateEntityTypeConfiguration.cs(9): Comments must use Chinese.
+Persistence\EntityConfigurations\DashboardSnapshotStateEntityTypeConfiguration.cs(8): Comments must use Chinese.
+Persistence\EntityConfigurations\DashboardSnapshotStateEntityTypeConfiguration.cs(7): Comments must use Chinese.
+Persistence\EntityConfigurations\DashboardSnapshotStateEntityTypeConfiguration.cs(12): Fields must have Chinese comment
+s above the declaration.
+Persistence\EntityConfigurations\DashboardSnapshotStateEntityTypeConfiguration.cs(13): Fields must have Chinese comment
+s above the declaration.
+Persistence\EntityConfigurations\DashboardTaskSnapshotEntityTypeConfiguration.cs(9): Comments must use Chinese.
+Persistence\EntityConfigurations\DashboardTaskSnapshotEntityTypeConfiguration.cs(8): Comments must use Chinese.
+Persistence\EntityConfigurations\DashboardTaskSnapshotEntityTypeConfiguration.cs(7): Comments must use Chinese.
+Persistence\EntityConfigurations\DashboardTaskSnapshotEntityTypeConfiguration.cs(12): Fields must have Chinese comments
+ above the declaration.
+Persistence\EntityConfigurations\DashboardTaskSnapshotEntityTypeConfiguration.cs(13): Fields must have Chinese comments
+ above the declaration.
+Persistence\EntityConfigurations\DashboardTaskSnapshotEntityTypeConfiguration.cs(44): Methods must have Chinese comment
+s above the declaration.
+Persistence\EntityConfigurations\DashboardTaskSnapshotEntityTypeConfiguration.cs(45): Methods must have Chinese comment
+s above the declaration.
+Persistence\EntityConfigurations\DashboardTaskSnapshotEntityTypeConfiguration.cs(46): Methods must have Chinese comment
+s above the declaration.
+Persistence\EntityConfigurations\DashboardTaskSnapshotEntityTypeConfiguration.cs(47): Methods must have Chinese comment
+s above the declaration.
+Persistence\EntityConfigurations\DashboardTaskSnapshotEntityTypeConfiguration.cs(48): Methods must have Chinese comment
+s above the declaration.
+Persistence\EntityConfigurations\DropLogEntityTypeConfiguration.cs(29): Comments must use Chinese.
+Persistence\EntityConfigurations\DropLogEntityTypeConfiguration.cs(9): Comments must use Chinese.
+Persistence\EntityConfigurations\DropLogEntityTypeConfiguration.cs(7): Comments must use Chinese.
+Persistence\EntityConfigurations\DropLogEntityTypeConfiguration.cs(20): Comments must use Chinese.
+Persistence\EntityConfigurations\DropLogEntityTypeConfiguration.cs(18): Comments must use Chinese.
+Persistence\EntityConfigurations\DropLogEntityTypeConfiguration.cs(46): Methods must have Chinese comments above the de
+claration.
+Persistence\EntityConfigurations\DropLogEntityTypeConfiguration.cs(47): Methods must have Chinese comments above the de
+claration.
+Persistence\EntityConfigurations\DropLogEntityTypeConfiguration.cs(48): Methods must have Chinese comments above the de
+claration.
+Persistence\EntityConfigurations\DropLogEntityTypeConfiguration.cs(49): Methods must have Chinese comments above the de
+claration.
+Persistence\EntityConfigurations\RuntimeLeaseEntityTypeConfiguration.cs(9): Comments must use Chinese.
+Persistence\EntityConfigurations\RuntimeLeaseEntityTypeConfiguration.cs(8): Comments must use Chinese.
+Persistence\EntityConfigurations\RuntimeLeaseEntityTypeConfiguration.cs(7): Comments must use Chinese.
+Persistence\EntityConfigurations\RuntimeLeaseEntityTypeConfiguration.cs(12): Fields must have Chinese comments above th
+e declaration.
+Persistence\EntityConfigurations\RuntimeLeaseEntityTypeConfiguration.cs(13): Fields must have Chinese comments above th
+e declaration.
+Persistence\EntityConfigurations\ScanLogEntityTypeConfiguration.cs(29): Comments must use Chinese.
+Persistence\EntityConfigurations\ScanLogEntityTypeConfiguration.cs(9): Comments must use Chinese.
+Persistence\EntityConfigurations\ScanLogEntityTypeConfiguration.cs(7): Comments must use Chinese.
+Persistence\EntityConfigurations\ScanLogEntityTypeConfiguration.cs(20): Comments must use Chinese.
+Persistence\EntityConfigurations\ScanLogEntityTypeConfiguration.cs(18): Comments must use Chinese.
+Persistence\EntityConfigurations\ScanLogEntityTypeConfiguration.cs(45): Methods must have Chinese comments above the de
+claration.
+Persistence\EntityConfigurations\ScanLogEntityTypeConfiguration.cs(46): Methods must have Chinese comments above the de
+claration.
+Persistence\EntityConfigurations\ScanLogEntityTypeConfiguration.cs(47): Methods must have Chinese comments above the de
+claration.
+Persistence\EntityConfigurations\ScanLogEntityTypeConfiguration.cs(48): Methods must have Chinese comments above the de
+claration.
+Persistence\EntityConfigurations\SortingTaskTraceEntityTypeConfiguration.cs(10): Comments must use Chinese.
+Persistence\EntityConfigurations\SortingTaskTraceEntityTypeConfiguration.cs(7): Comments must use Chinese.
+Persistence\EntityConfigurations\SortingTaskTraceEntityTypeConfiguration.cs(21): Comments must use Chinese.
+Persistence\EntityConfigurations\SortingTaskTraceEntityTypeConfiguration.cs(19): Comments must use Chinese.
+Persistence\EntityConfigurations\SortingTaskTraceEntityTypeConfiguration.cs(30): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncBatchEntityTypeConfiguration.cs(15): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncBatchEntityTypeConfiguration.cs(29): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncBatchEntityTypeConfiguration.cs(9): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncBatchEntityTypeConfiguration.cs(7): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncBatchEntityTypeConfiguration.cs(22): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncBatchEntityTypeConfiguration.cs(20): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncBatchEntityTypeConfiguration.cs(18): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncBatchEntityTypeConfiguration.cs(40): Methods must have Chinese comments above the 
+declaration.
+Persistence\EntityConfigurations\SyncBatchEntityTypeConfiguration.cs(41): Methods must have Chinese comments above the 
+declaration.
+Persistence\EntityConfigurations\SyncChangeLogEntityTypeConfiguration.cs(15): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncChangeLogEntityTypeConfiguration.cs(29): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncChangeLogEntityTypeConfiguration.cs(9): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncChangeLogEntityTypeConfiguration.cs(7): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncChangeLogEntityTypeConfiguration.cs(22): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncChangeLogEntityTypeConfiguration.cs(20): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncChangeLogEntityTypeConfiguration.cs(18): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncChangeLogEntityTypeConfiguration.cs(40): Methods must have Chinese comments above 
+the declaration.
+Persistence\EntityConfigurations\SyncDeletionLogEntityTypeConfiguration.cs(15): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncDeletionLogEntityTypeConfiguration.cs(29): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncDeletionLogEntityTypeConfiguration.cs(9): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncDeletionLogEntityTypeConfiguration.cs(7): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncDeletionLogEntityTypeConfiguration.cs(22): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncDeletionLogEntityTypeConfiguration.cs(20): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncDeletionLogEntityTypeConfiguration.cs(18): Comments must use Chinese.
+Persistence\EntityConfigurations\SyncDeletionLogEntityTypeConfiguration.cs(41): Methods must have Chinese comments abov
+e the declaration.
+Persistence\Sharding\IShardSuffixResolver.cs(24): Comments must use Chinese.
+Persistence\Sharding\IShardSuffixResolver.cs(22): Comments must use Chinese.
+Persistence\Sharding\IShardSuffixResolver.cs(17): Comments must use Chinese.
+Persistence\Sharding\IShardSuffixResolver.cs(15): Comments must use Chinese.
+Persistence\Sharding\IShardSuffixResolver.cs(10): Comments must use Chinese.
+Persistence\Sharding\IShardSuffixResolver.cs(8): Comments must use Chinese.
+Persistence\Sharding\IShardSuffixResolver.cs(5): Comments must use Chinese.
+Persistence\Sharding\IShardSuffixResolver.cs(3): Comments must use Chinese.
+Persistence\Sharding\MonthShardSuffixResolver.cs(11): Comments must use Chinese.
+Persistence\Sharding\MonthShardSuffixResolver.cs(8): Comments must use Chinese.
+Persistence\Sharding\MonthShardSuffixResolver.cs(5): Comments must use Chinese.
+Persistence\Sharding\MonthShardSuffixResolver.cs(3): Comments must use Chinese.
+Persistence\Sharding\MonthShardSuffixResolver.cs(18): Comments must use Chinese.
+Persistence\Sharding\ShardModelCacheKeyFactory.cs(13): Comments must use Chinese.
+Persistence\Sharding\ShardModelCacheKeyFactory.cs(11): Comments must use Chinese.
+Persistence\Sharding\ShardModelCacheKeyFactory.cs(8): Comments must use Chinese.
+Persistence\Sharding\ShardModelCacheKeyFactory.cs(6): Comments must use Chinese.
+Persistence\Sharding\TableSuffixScope.cs(30): Comments must use Chinese.
+Persistence\Sharding\TableSuffixScope.cs(28): Comments must use Chinese.
+Persistence\Sharding\TableSuffixScope.cs(18): Comments must use Chinese.
+Persistence\Sharding\TableSuffixScope.cs(16): Comments must use Chinese.
+Persistence\Sharding\TableSuffixScope.cs(13): Comments must use Chinese.
+Persistence\Sharding\TableSuffixScope.cs(11): Comments must use Chinese.
+... and 872 more violations.

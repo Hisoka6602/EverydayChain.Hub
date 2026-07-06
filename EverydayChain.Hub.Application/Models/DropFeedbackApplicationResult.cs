@@ -1,31 +1,32 @@
-namespace EverydayChain.Hub.Application.Models;
+﻿namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 落格回传应用层执行结果。
+/// 定义当前类型。
 /// </summary>
 public sealed class DropFeedbackApplicationResult {
     /// <summary>
-    /// 是否处理成功。
+    /// 获取或设置当前属性值。
     /// </summary>
     public bool IsAccepted { get; set; }
 
     /// <summary>
-    /// 业务任务编码。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string TaskCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 当前任务状态。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string Status { get; set; } = string.Empty;
 
     /// <summary>
-    /// 结果描述。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string Message { get; set; } = string.Empty;
 
     /// <summary>
-    /// 失败原因；成功时为空。
+    /// 获取或设置当前属性值。
     /// </summary>
     public string FailureReason { get; set; } = string.Empty;
 }
+

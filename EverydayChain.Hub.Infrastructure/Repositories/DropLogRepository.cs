@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Aggregates.DropLogAggregate;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
@@ -8,17 +8,18 @@ using Microsoft.EntityFrameworkCore;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 落格日志仓储 EF Core 实现，按月写入 <c>drop_logs_{yyyyMM}</c> 分表。
+/// 定义当前类型。
 /// </summary>
 public class DropLogRepository(
     IDbContextFactory<HubDbContext> contextFactory,
     IShardSuffixResolver shardSuffixResolver,
     IShardTableProvisioner shardTableProvisioner) : IDropLogRepository
 {
-    /// <summary>落格日志逻辑表名。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string DropLogLogicalTable = "drop_logs";
 
-    /// <inheritdoc/>
     public async Task SaveAsync(DropLogEntity entity, CancellationToken ct)
     {
         var suffix = shardSuffixResolver.ResolveLocal(entity.CreatedTimeLocal);
@@ -29,3 +30,4 @@ public class DropLogRepository(
         await db.SaveChangesAsync(ct);
     }
 }
+

@@ -5,10 +5,11 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace EverydayChain.Hub.Infrastructure.Migrations
 {
-    /// <inheritdoc />
+    /// <summary>
+    /// 定义当前类型。
+    /// </summary>
     public partial class RebuildHubBaselineV2 : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.EnsureSchema(
@@ -491,7 +492,6 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 columns: new[] { "TableCode", "DeletedTimeLocal" });
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
@@ -524,3 +524,4 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
         }
     }
 }
+

@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Queries;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
@@ -6,13 +6,10 @@ using EverydayChain.Hub.Domain.Enums;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 分拣报表查询服务测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class SortingReportQueryServiceTests
 {
-    /// <summary>
-    /// 报表查询应按码头输出聚合统计。
-    /// </summary>
     [Fact]
     public async Task QueryAsync_ShouldAggregateRowsByDock()
     {
@@ -63,9 +60,6 @@ public sealed class SortingReportQueryServiceTests
         Assert.Equal(1, row.ExceptionCount);
     }
 
-    /// <summary>
-    /// CSV 导出应包含表头与数据行。
-    /// </summary>
     [Fact]
     public async Task ExportCsvAsync_ShouldContainHeaderAndRows()
     {
@@ -96,3 +90,4 @@ public sealed class SortingReportQueryServiceTests
         Assert.Contains("9,1,0", csv);
     }
 }
+

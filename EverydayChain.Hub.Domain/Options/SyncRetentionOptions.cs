@@ -1,19 +1,28 @@
-namespace EverydayChain.Hub.Domain.Options;
+﻿namespace EverydayChain.Hub.Domain.Options;
 
 /// <summary>
-/// 单表保留期治理配置（仅作用于本地 SQL Server 目标端）。
+/// 定义当前类型。
 /// </summary>
 public class SyncRetentionOptions
 {
-    /// <summary>是否启用保留期治理（仅作用于本地 SQL Server 目标端）。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public bool Enabled { get; set; }
 
-    /// <summary>保留最近月份数（最小为 1，默认 3）。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public int KeepMonths { get; set; } = 3;
 
-    /// <summary>保留期清理是否仅预演（仅审计，不执行；仅作用于本地 SQL Server 目标端）。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public bool DryRun { get; set; } = true;
 
-    /// <summary>是否允许执行删除分表动作（仅作用于本地 SQL Server 目标端）。</summary>
+    /// <summary>
+    /// 获取或设置当前属性值。
+    /// </summary>
     public bool AllowDrop { get; set; }
 }
+

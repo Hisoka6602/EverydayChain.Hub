@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Integrations;
+﻿using EverydayChain.Hub.Application.Abstractions.Integrations;
 using EverydayChain.Hub.Application.Feedback.Services;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
@@ -7,13 +7,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 业务回传补偿服务单元测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class FeedbackCompensationServiceTests
 {
-    /// <summary>
-    /// 构建测试用补偿服务。
-    /// </summary>
     private static (FeedbackCompensationService Service, InMemoryBusinessTaskRepository Repository, CapturingCompensationGateway Gateway) CreateService()
     {
         var repository = new InMemoryBusinessTaskRepository();
@@ -22,9 +19,6 @@ public sealed class FeedbackCompensationServiceTests
         return (service, repository, gateway);
     }
 
-    /// <summary>
-    /// 批次补偿成功时，应将失败任务更新为已回传。
-    /// </summary>
     [Fact]
     public async Task RetryFailedBatchAsync_ShouldMarkCompleted_WhenGatewaySucceeds()
     {
@@ -44,9 +38,6 @@ public sealed class FeedbackCompensationServiceTests
         Assert.NotNull(updated.FeedbackTimeLocal);
     }
 
-    /// <summary>
-    /// 网关异常时，应保持失败状态并记录失败计数。
-    /// </summary>
     [Fact]
     public async Task RetryFailedBatchAsync_ShouldKeepFailed_WhenGatewayThrows()
     {
@@ -65,9 +56,6 @@ public sealed class FeedbackCompensationServiceTests
         Assert.Null(updated.FeedbackTimeLocal);
     }
 
-    /// <summary>
-    /// 按任务补偿仅允许失败状态任务执行重试。
-    /// </summary>
     [Fact]
     public async Task RetryByTaskCodeAsync_ShouldSkip_WhenTaskNotFailed()
     {
@@ -90,9 +78,6 @@ public sealed class FeedbackCompensationServiceTests
         Assert.Empty(gateway.CapturedTasks);
     }
 
-    /// <summary>
-    /// 按任务补偿成功时，仅重试目标任务。
-    /// </summary>
     [Fact]
     public async Task RetryByTaskCodeAsync_ShouldRetryOneTask_WhenFailedTaskExists()
     {
@@ -109,11 +94,6 @@ public sealed class FeedbackCompensationServiceTests
         Assert.Equal("TASK-COMP-004", gateway.CapturedTasks[0].TaskCode);
     }
 
-    /// <summary>
-    /// 构建回传失败任务。
-    /// </summary>
-    /// <param name="taskCode">任务编码。</param>
-    /// <returns>业务任务实体。</returns>
     private static BusinessTaskEntity CreateFailedTask(string taskCode)
     {
         return new BusinessTaskEntity
@@ -129,25 +109,25 @@ public sealed class FeedbackCompensationServiceTests
     }
 
     /// <summary>
-    /// 补偿网关测试替身。
+    /// 定义当前类型。
     /// </summary>
     private sealed class CapturingCompensationGateway : IWmsOracleFeedbackGateway
     {
-        /// <summary>捕获到的任务列表。</summary>
+        /// <summary>
+        /// 获取或设置当前属性值。
+        /// </summary>
         public List<BusinessTaskEntity> CapturedTasks { get; } = [];
 
-        /// <summary>是否抛出异常。</summary>
+        /// <summary>
+        /// 获取或设置当前属性值。
+        /// </summary>
         public bool ThrowOnWrite { get; set; }
 
-        /// <summary>返回写入行数。</summary>
+        /// <summary>
+        /// 获取或设置当前属性值。
+        /// </summary>
         public int? ReturnCount { get; set; }
 
-        /// <summary>
-        /// 执行写入。
-        /// </summary>
-        /// <param name="tasks">待写入任务。</param>
-        /// <param name="ct">取消令牌。</param>
-        /// <returns>写入行数。</returns>
         public Task<int> WriteFeedbackAsync(IReadOnlyList<BusinessTaskEntity> tasks, CancellationToken ct)
         {
             CapturedTasks.AddRange(tasks);
@@ -160,3 +140,4 @@ public sealed class FeedbackCompensationServiceTests
         }
     }
 }
+

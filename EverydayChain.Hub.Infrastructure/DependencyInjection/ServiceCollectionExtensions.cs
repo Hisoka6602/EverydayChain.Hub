@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -38,36 +38,48 @@ using EverydayChain.Hub.Infrastructure.Services.Sharding;
 namespace EverydayChain.Hub.Infrastructure.DependencyInjection;
 
 /// <summary>
-/// 基础设施层依赖注入扩展，统一向 DI 容器注册所有基础设施服务。
+/// 定义当前类型。
 /// </summary>
 public static class ServiceCollectionExtensions {
 
-    /// <summary>分拣任务追踪逻辑表名。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string SortingTaskTraceLogicalTable = "sorting_task_trace";
 
-    /// <summary>同步批次逻辑表名。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string SyncBatchLogicalTable = "sync_batches";
 
-    /// <summary>业务任务逻辑表名。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string BusinessTaskLogicalTable = "business_tasks";
 
-    /// <summary>扫描日志逻辑表名。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string ScanLogLogicalTable = "scan_logs";
 
-    /// <summary>落格日志逻辑表名。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string DropLogLogicalTable = "drop_logs";
-    /// <summary>同步变更日志逻辑表名。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string SyncChangeLogLogicalTable = "sync_change_logs";
-    /// <summary>同步删除日志逻辑表名。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const string SyncDeletionLogLogicalTable = "sync_deletion_logs";
 
     /// <summary>
-    /// 注册基础设施层全部服务，包括 EF Core 工厂、分表服务、调谐器、危险操作执行器与自动迁移应用服务（不含 HostedService 注册，该注册由 Host 层 Program.cs 负责）。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="services">服务集合。</param>
-    /// <param name="configuration">应用配置，用于绑定 Sharding/AutoTune/DangerZone 配置节。</param>
-    /// <returns>原服务集合（链式调用）。</returns>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration) {
+        // 步骤：按既定流程执行当前方法逻辑。
         services.Configure<ShardingOptions>(configuration.GetSection(ShardingOptions.SectionName));
         services.Configure<AutoTuneOptions>(configuration.GetSection(AutoTuneOptions.SectionName));
         services.Configure<DangerZoneOptions>(configuration.GetSection(DangerZoneOptions.SectionName));
@@ -79,6 +91,7 @@ public static class ServiceCollectionExtensions {
         services.Configure<ExceptionRuleOptions>(configuration.GetSection(ExceptionRuleOptions.SectionName));
         services.Configure<QueryCacheOptions>(configuration.GetSection(QueryCacheOptions.SectionName));
         services.Configure<EfCoreOptions>(configuration.GetSection(EfCoreOptions.SectionName));
+        services.Configure<DashboardSnapshotOptions>(configuration.GetSection(DashboardSnapshotOptions.SectionName));
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
         var queryCacheOptions = configuration.GetSection(QueryCacheOptions.SectionName).Get<QueryCacheOptions>() ?? new QueryCacheOptions();
@@ -94,7 +107,6 @@ public static class ServiceCollectionExtensions {
                 sqlServerOptions.EnableRetryOnFailure();
                 sqlServerOptions.CommandTimeout(commandTimeoutSeconds);
             });
-            // 运行时自动迁移阶段仅需执行已生成迁移，忽略“模型较快照有待提交变更”的告警，避免阻断启动链路。
             options.ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
             options.ReplaceService<IModelCacheKeyFactory, ShardModelCacheKeyFactory>();
         });
@@ -107,10 +119,12 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IShardTableProvisioner, ShardTableProvisioner>();
         services.AddSingleton<IShardSchemaSynchronizer, ShardSchemaSynchronizer>();
         services.AddScoped<IAutoMigrationService, AutoMigrationService>();
+        services.AddSingleton<IDashboardSnapshotService, DashboardSnapshotService>();
         services.AddSingleton<ISortingTaskTraceWriter, SortingTaskTraceWriter>();
         services.AddSingleton<ISyncTaskConfigRepository, SyncTaskConfigRepository>();
         services.AddSingleton<IShardTableResolver, ShardTableResolver>();
         services.AddSingleton<IShardRetentionRepository, ShardRetentionRepository>();
+        services.AddSingleton<IRuntimeLeaseRepository, RuntimeLeaseRepository>();
         services.AddSingleton<IOracleSourceReader, OracleSourceReader>();
         services.AddSingleton<ISyncStagingRepository, SyncStagingRepository>();
         services.AddSingleton<ISyncUpsertRepository, SqlServerSyncUpsertRepository>();
@@ -125,66 +139,101 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<ISyncWindowCalculator, SyncWindowCalculator>();
         services.AddSingleton<IBusinessTaskMaterializer, BusinessTaskMaterializer>();
         services.AddSingleton<IBusinessTaskProjectionService, BusinessTaskProjectionService>();
+        services.AddSingleton<IBusinessTaskProjectionBackfillService, BusinessTaskProjectionBackfillService>();
         services.AddSingleton<IBarcodeParser, BarcodeParser>();
         services.AddSingleton<IBusinessTaskRepository, BusinessTaskRepository>();
         services.AddSingleton<IBusinessTaskSeedRepository, BusinessTaskSeedRepository>();
         services.AddSingleton<IScanMatchService, ScanMatchService>();
         services.AddSingleton<ITaskExecutionService, TaskExecutionService>();
-        // PR-09：注册扫描日志与落格日志仓储。
         services.AddSingleton<IScanLogRepository, ScanLogRepository>();
         services.AddSingleton<IDropLogRepository, DropLogRepository>();
-        // 注册 API 骨架服务：扫描上传、请求格口、落格回传（PR-05/06/07 接入真实实现）。
         services.AddSingleton<IScanIngressService, ScanIngressService>();
         services.AddSingleton<IChuteQueryService, ChuteQueryService>();
         services.AddSingleton<IDropFeedbackService, DropFeedbackService>();
         services.AddSingleton<IApiWarmupService, ApiWarmupService>();
         services.AddSingleton<IBusinessTaskSeedService, BusinessTaskSeedService>();
         services.AddSingleton<IGlobalDashboardQueryService>(sp =>
+            /// <summary>
+            /// 执行当前方法。
+            /// </summary>
             new GlobalDashboardQueryService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
                 sp.GetRequiredService<IScanLogRepository>(),
+                sp.GetRequiredService<ISyncBatchRepository>(),
+                sp.GetRequiredService<ISyncTaskConfigRepository>(),
                 sp.GetRequiredService<IMemoryCache>(),
                 queryCacheOptions));
         services.AddSingleton<IDockDashboardQueryService>(sp =>
+            /// <summary>
+            /// 执行当前方法。
+            /// </summary>
             new DockDashboardQueryService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
                 sp.GetRequiredService<IMemoryCache>(),
                 queryCacheOptions));
         services.AddSingleton<ISortingReportQueryService>(sp =>
+            /// <summary>
+            /// 执行当前方法。
+            /// </summary>
             new SortingReportQueryService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
                 sp.GetRequiredService<IMemoryCache>(),
                 queryCacheOptions));
         services.AddSingleton<IBoxTrackingQueryService, BoxTrackingQueryService>();
-        services.AddSingleton<IWaveQueryService, WaveQueryService>();
-        services.AddSingleton<IRecirculationQueryService, RecirculationQueryService>();
+        services.AddSingleton<IWaveQueryService>(sp =>
+            /// <summary>
+            /// 执行当前方法。
+            /// </summary>
+            new WaveQueryService(
+                sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<ILogger<WaveQueryService>>(),
+                sp.GetRequiredService<IMemoryCache>(),
+                queryCacheOptions));
+        services.AddSingleton<IRecirculationQueryService>(sp =>
+            /// <summary>
+            /// 执行当前方法。
+            /// </summary>
+            new RecirculationQueryService(
+                sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<IMemoryCache>(),
+                queryCacheOptions));
         services.AddSingleton<IExportCatalogQueryService, ExportCatalogQueryService>();
         services.AddSingleton<IBusinessTaskReadService, BusinessTaskReadService>();
         services.AddSingleton<IDeletionExecutionService, DeletionExecutionService>();
         services.AddSingleton<IRetentionExecutionService, RetentionExecutionService>();
         services.AddSingleton<ISyncExecutionService, SyncExecutionService>();
         services.AddSingleton<ISyncOrchestrator, SyncOrchestrator>();
-        // PR-08：注册 WMS Oracle 回传网关与业务回传服务。
         services.AddSingleton<IWmsOracleFeedbackGateway, OracleWmsFeedbackGateway>();
         services.AddSingleton<IWmsFeedbackService>(sp =>
+            /// <summary>
+            /// 执行当前方法。
+            /// </summary>
             new WmsFeedbackService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
                 sp.GetRequiredService<IWmsOracleFeedbackGateway>(),
                 sp.GetRequiredService<IOptions<WmsFeedbackOptions>>().Value,
                 sp.GetRequiredService<ILogger<WmsFeedbackService>>()));
         services.AddSingleton<IFeedbackCompensationService, FeedbackCompensationService>();
-        // PR-10：注册异常规则服务（波次清理、多标签决策、回流规则）。
         services.AddSingleton<IWaveCleanupService>(sp =>
+            /// <summary>
+            /// 执行当前方法。
+            /// </summary>
             new WaveCleanupService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
                 sp.GetRequiredService<IOptions<ExceptionRuleOptions>>().Value,
                 sp.GetRequiredService<ILogger<WaveCleanupService>>()));
         services.AddSingleton<IMultiLabelDecisionService>(sp =>
+            /// <summary>
+            /// 执行当前方法。
+            /// </summary>
             new MultiLabelDecisionService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
                 sp.GetRequiredService<IOptions<ExceptionRuleOptions>>().Value,
                 sp.GetRequiredService<ILogger<MultiLabelDecisionService>>()));
         services.AddSingleton<IRecirculationService>(sp =>
+            /// <summary>
+            /// 执行当前方法。
+            /// </summary>
             new RecirculationService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
                 sp.GetRequiredService<IOptions<ExceptionRuleOptions>>().Value,
@@ -194,12 +243,10 @@ public static class ServiceCollectionExtensions {
     }
 
     /// <summary>
-    /// 构建分表纳管逻辑表集合。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="syncJobOptions">同步配置。</param>
-    /// <returns>去重、去空白并通过安全校验后的逻辑表集合（大小写不敏感去重，保留首次出现的原始大小写）。</returns>
-    /// <exception cref="InvalidOperationException">配置缺失或包含非法表名时抛出。</exception>
     public static HashSet<string> BuildManagedLogicalTables(SyncJobOptions syncJobOptions) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var managedTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         LogicalTableNameNormalizer.AddValidated(managedTables, SortingTaskTraceLogicalTable, "Sharding.SortingTaskTrace");
         LogicalTableNameNormalizer.AddValidated(managedTables, SyncBatchLogicalTable, "Sharding.SyncBatch");
@@ -220,3 +267,4 @@ public static class ServiceCollectionExtensions {
     }
 
 }
+

@@ -1,17 +1,14 @@
-using EverydayChain.Hub.Application.Models;
+﻿using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Infrastructure.Repositories;
 using System.Reflection;
 
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// 业务任务模拟补数仓储测试。
+/// 定义当前类型。
 /// </summary>
 public sealed class BusinessTaskSeedRepositoryTests
 {
-    /// <summary>
-    /// 非法表名应校验失败。
-    /// </summary>
     [Theory]
     [InlineData("")]
     [InlineData("business_tasks")]
@@ -28,9 +25,6 @@ public sealed class BusinessTaskSeedRepositoryTests
         Assert.Equal(string.Empty, suffix);
     }
 
-    /// <summary>
-    /// 合法表名应解析出后缀。
-    /// </summary>
     [Fact]
     public void TryParseTargetTableName_ShouldParseSuffix_WhenTargetTableNameValid()
     {
@@ -41,9 +35,6 @@ public sealed class BusinessTaskSeedRepositoryTests
         Assert.Equal("_202604", suffix);
     }
 
-    /// <summary>
-    /// 已存在 manual_seed + BusinessKey 条码应跳过。
-    /// </summary>
     [Fact]
     public void FilterInsertBarcodes_ShouldSkipExistingManualSeedBusinessKeys()
     {
@@ -59,9 +50,6 @@ public sealed class BusinessTaskSeedRepositoryTests
         Assert.Equal(["BC001", "BC003"], result);
     }
 
-    /// <summary>
-    /// 过滤已存在条码时不应改写既有集合。
-    /// </summary>
     [Fact]
     public void FilterInsertBarcodes_ShouldNotUpdateExistingSet()
     {
@@ -79,9 +67,6 @@ public sealed class BusinessTaskSeedRepositoryTests
         Assert.Contains("BC001", existingSet);
     }
 
-    /// <summary>
-    /// 批量插入候选应仅保留不存在数据。
-    /// </summary>
     [Fact]
     public void FilterInsertBarcodes_ShouldKeepOnlyNotExistingCandidates()
     {
@@ -98,9 +83,6 @@ public sealed class BusinessTaskSeedRepositoryTests
         Assert.Equal(["BC002", "BC004"], result);
     }
 
-    /// <summary>
-    /// 成功结果应包含插入与跳过条码明细。
-    /// </summary>
     [Fact]
     public void BuildSuccessResult_ShouldContainInsertedAndSkippedBarcodes()
     {
@@ -119,9 +101,6 @@ public sealed class BusinessTaskSeedRepositoryTests
         Assert.Equal(["BC002"], result.SkippedBarcodes);
     }
 
-    /// <summary>
-    /// 无新增场景应返回空插入集合与非空跳过集合。
-    /// </summary>
     [Fact]
     public void BuildSuccessResult_ShouldReturnEmptyInsertedBarcodes_WhenNoBarcodeInserted()
     {
@@ -140,15 +119,8 @@ public sealed class BusinessTaskSeedRepositoryTests
     }
 
     /// <summary>
-    /// 通过反射调用私有方法、校验 BuildSuccessResult 对插入/跳过条码集合的赋值行为。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="targetTableName">目标表名。</param>
-    /// <param name="insertedCount">插入数量。</param>
-    /// <param name="skippedExistingCount">跳过数量。</param>
-    /// <param name="skippedBarcodes">跳过条码。</param>
-    /// <param name="insertedBarcodes">插入条码。</param>
-    /// <param name="message">结果消息。</param>
-    /// <returns>成功结果。</returns>
     private static BusinessTaskSeedResult InvokeBuildSuccessResult(
         string targetTableName,
         int insertedCount,
@@ -157,6 +129,7 @@ public sealed class BusinessTaskSeedRepositoryTests
         IReadOnlyList<string> insertedBarcodes,
         string message)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var method = typeof(BusinessTaskSeedRepository).GetMethod(
             "BuildSuccessResult",
             BindingFlags.NonPublic | BindingFlags.Static);
@@ -168,3 +141,4 @@ public sealed class BusinessTaskSeedRepositoryTests
         return typedResult;
     }
 }
+

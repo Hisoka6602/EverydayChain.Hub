@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.Data.SqlClient;
@@ -10,21 +10,23 @@ using System.Text.RegularExpressions;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 分表保留期仓储实现。
+/// 定义当前类型。
 /// </summary>
 public class ShardRetentionRepository(
     IOptions<ShardingOptions> shardingOptions,
     IDangerZoneExecutor dangerZoneExecutor,
     ILogger<ShardRetentionRepository> logger) : IShardRetentionRepository
 {
-    /// <summary>分表保留期元数据与删除命令超时秒数（危险动作隔离器）。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int RetentionCommandTimeoutSeconds = 30;
-    /// <summary>安全对象名校验正则（仅允许字母、数字、下划线）。</summary>
     private static readonly Regex SqlIdentifierRegex = new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
-    /// <summary>分表配置快照。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly ShardingOptions _options = shardingOptions.Value;
 
-    /// <inheritdoc/>
     public Task<string> GenerateRollbackScriptAsync(string logicalTableName, string physicalTableName, CancellationToken ct)
     {
         if (!IsSafeSqlIdentifier(_options.Schema) || !IsSafeSqlIdentifier(physicalTableName))
@@ -233,7 +235,6 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
         }, ct);
     }
 
-    /// <inheritdoc/>
     public Task DropShardTableAsync(string logicalTableName, string physicalTableName, string rollbackScript, CancellationToken ct)
     {
         if (!IsSafeSqlIdentifier(_options.Schema) || !IsSafeSqlIdentifier(physicalTableName))
@@ -258,23 +259,11 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
         }, ct);
     }
 
-    /// <summary>
-    /// 判断对象名是否满足安全标识符规则。
-    /// </summary>
-    /// <param name="identifier">对象名。</param>
-    /// <returns>合法返回 <c>true</c>。</returns>
     private static bool IsSafeSqlIdentifier(string identifier)
     {
         return !string.IsNullOrWhiteSpace(identifier) && SqlIdentifierRegex.IsMatch(identifier);
     }
 
-    /// <summary>
-    /// 创建元数据查询命令。
-    /// </summary>
-    /// <param name="connection">数据库连接。</param>
-    /// <param name="sql">查询 SQL。</param>
-    /// <param name="tableName">表名。</param>
-    /// <returns>配置好的命令对象。</returns>
     private SqlCommand CreateMetadataCommand(SqlConnection connection, string sql, string tableName)
     {
         var command = connection.CreateCommand();
@@ -285,11 +274,6 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
         return command;
     }
 
-    /// <summary>
-    /// 构建列类型 SQL 片段。
-    /// </summary>
-    /// <param name="column">列元数据。</param>
-    /// <returns>类型 SQL。</returns>
     private static string BuildTypeSql(ColumnMetadata column)
     {
         var typeName = column.TypeName.ToLowerInvariant();
@@ -302,11 +286,6 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
         };
     }
 
-    /// <summary>
-    /// 将字节长度转换为 Unicode 长度 SQL。
-    /// </summary>
-    /// <param name="maxLength">字节长度。</param>
-    /// <returns>Unicode 长度表达式。</returns>
     private static string GetUnicodeLengthSql(short maxLength)
     {
         if (maxLength < 0)
@@ -317,27 +296,14 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
         return (maxLength / 2).ToString();
     }
 
-    /// <summary>
-    /// 将字节长度转换为 SQL 长度。
-    /// </summary>
-    /// <param name="maxLength">字节长度。</param>
-    /// <returns>长度表达式。</returns>
     private static string GetLengthSql(short maxLength)
     {
         return maxLength < 0 ? "MAX" : maxLength.ToString();
     }
 
     /// <summary>
-    /// 列元数据模型。
+    /// 定义当前类型。
     /// </summary>
-    /// <param name="ColumnId">列序号。</param>
-    /// <param name="ColumnName">列名。</param>
-    /// <param name="TypeName">类型名。</param>
-    /// <param name="MaxLength">长度。</param>
-    /// <param name="NumericPrecision">精度。</param>
-    /// <param name="NumericScale">小数位。</param>
-    /// <param name="IsNullable">是否可空。</param>
-    /// <param name="IsIdentity">是否自增。</param>
     private readonly record struct ColumnMetadata(
         int ColumnId,
         string ColumnName,
@@ -349,30 +315,16 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
         bool IsIdentity);
 
     /// <summary>
-    /// 主键列元数据。
+    /// 定义当前类型。
     /// </summary>
-    /// <param name="ConstraintName">主键约束名。</param>
-    /// <param name="ColumnName">列名。</param>
-    /// <param name="IsDescending">是否倒序。</param>
     private readonly record struct PrimaryKeyColumnMetadata(
         string ConstraintName,
         string ColumnName,
         bool IsDescending);
 
     /// <summary>
-    /// 索引元数据行。
+    /// 定义当前类型。
     /// </summary>
-    /// <param name="IndexName">索引名。</param>
-    /// <param name="IsUnique">是否唯一。</param>
-    /// <param name="TypeDesc">索引类型。</param>
-    /// <param name="FilterDefinition">过滤条件。</param>
-    /// <param name="FillFactor">填充因子。</param>
-    /// <param name="IsDisabled">是否禁用。</param>
-    /// <param name="KeyOrdinal">键序号。</param>
-    /// <param name="IndexColumnId">索引列序号。</param>
-    /// <param name="IsIncludedColumn">是否包含列。</param>
-    /// <param name="IsDescending">是否倒序。</param>
-    /// <param name="ColumnName">列名。</param>
     private readonly record struct IndexMetadataRow(
         string IndexName,
         bool IsUnique,
@@ -386,3 +338,5 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
         bool IsDescending,
         string ColumnName);
 }
+
+

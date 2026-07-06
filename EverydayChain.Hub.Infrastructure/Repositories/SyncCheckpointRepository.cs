@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Persistence;
+﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using EverydayChain.Hub.Domain.Options;
@@ -10,28 +10,24 @@ using Newtonsoft.Json;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 同步检查点仓储基础实现（文件持久化）。
+/// 定义当前类型。
 /// </summary>
 public class SyncCheckpointRepository(
     IOptions<SyncJobOptions> syncJobOptions,
     IRuntimeStorageGuard runtimeStorageGuard,
     ILogger<SyncCheckpointRepository> logger) : ISyncCheckpointRepository
 {
-    /// <summary>文件访问锁。</summary>
     private static readonly SemaphoreSlim FileLock = new(1, 1);
 
-    /// <summary>检查点 JSON 序列化配置（缩进输出，复用避免重复分配）。</summary>
     private static readonly JsonSerializerSettings CheckpointSerializerSettings = new()
     {
         Formatting = Formatting.Indented
     };
 
-    /// <summary>检查点文件路径（由配置项 CheckpointFilePath 决定；为空时使用应用基目录下 sync-checkpoints.json）。</summary>
     private readonly string _checkpointFilePath = RuntimeStoragePathResolver.ResolveAbsolutePath(
         syncJobOptions.Value.CheckpointFilePath,
         "sync-checkpoints.json");
 
-    /// <inheritdoc/>
     public async Task<SyncCheckpoint> GetAsync(string tableCode, CancellationToken ct)
     {
         logger.LogInformation("读取同步检查点。Path={CheckpointFilePath}, TableCode={TableCode}", _checkpointFilePath, tableCode);
@@ -47,7 +43,6 @@ public class SyncCheckpointRepository(
         };
     }
 
-    /// <inheritdoc/>
     public async Task SaveAsync(SyncCheckpoint checkpoint, CancellationToken ct)
     {
         logger.LogInformation("开始写入同步检查点。Path={CheckpointFilePath}, TableCode={TableCode}, BatchId={BatchId}",
@@ -68,7 +63,6 @@ public class SyncCheckpointRepository(
             checkpoints[checkpoint.TableCode] = checkpoint;
             var json = JsonConvert.SerializeObject(checkpoints, CheckpointSerializerSettings);
 
-            // 原子写入：先落临时文件，再通过 File.Replace/Move 替换，避免进程崩溃时产生半写 JSON。
             var tempFilePath = $"{_checkpointFilePath}.tmp";
             var backupFilePath = $"{_checkpointFilePath}.bak";
             await WriteAtomicAsync(tempFilePath, backupFilePath, json, ct);
@@ -89,14 +83,6 @@ public class SyncCheckpointRepository(
         }
     }
 
-    /// <summary>
-    /// 将 JSON 内容原子写入目标文件（写临时文件后替换）。
-    /// 写入失败时尝试清理临时文件并重新抛出原始异常。
-    /// </summary>
-    /// <param name="tempFilePath">临时文件路径。</param>
-    /// <param name="backupFilePath">替换备份文件路径。</param>
-    /// <param name="json">待写入内容。</param>
-    /// <param name="ct">取消令牌。</param>
     private async Task WriteAtomicAsync(string tempFilePath, string backupFilePath, string json, CancellationToken ct)
     {
         try
@@ -132,11 +118,6 @@ public class SyncCheckpointRepository(
         }
     }
 
-    /// <summary>
-    /// 加载全部检查点。
-    /// </summary>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>检查点字典。</returns>
     private async Task<Dictionary<string, SyncCheckpoint>> LoadAllAsync(CancellationToken ct)
     {
         await FileLock.WaitAsync(ct);
@@ -155,11 +136,6 @@ public class SyncCheckpointRepository(
         }
     }
 
-    /// <summary>
-    /// 在外部已持锁前提下读取全部检查点。
-    /// </summary>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>检查点字典。</returns>
     private async Task<Dictionary<string, SyncCheckpoint>> LoadAllWithoutLockAsync(CancellationToken ct)
     {
         if (!File.Exists(_checkpointFilePath))
@@ -177,3 +153,4 @@ public class SyncCheckpointRepository(
         return new Dictionary<string, SyncCheckpoint>(data, StringComparer.OrdinalIgnoreCase);
     }
 }
+

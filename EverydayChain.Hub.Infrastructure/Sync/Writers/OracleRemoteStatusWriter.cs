@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using EverydayChain.Hub.Domain.Sync;
@@ -11,30 +11,35 @@ using EverydayChain.Hub.Application.Abstractions.Sync;
 namespace EverydayChain.Hub.Infrastructure.Sync.Writers;
 
 /// <summary>
-/// Oracle 远端状态回写器。
-/// 仅按 <c>ROWID</c> 更新状态列，禁止主键条件更新。
+/// 定义当前类型。
 /// </summary>
 public class OracleRemoteStatusWriter(
     IOptions<OracleOptions> oracleOptions,
     IDangerZoneExecutor dangerZoneExecutor,
     ILogger<OracleRemoteStatusWriter> logger) : IOracleRemoteStatusWriter {
 
-    /// <summary>默认命令超时秒数。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private const int DefaultCommandTimeoutSeconds = 60;
 
-    /// <summary>生效连接字符串。</summary>
     private readonly string _effectiveConnectionString = BuildConnectionString(oracleOptions.Value);
 
-    /// <summary>Oracle 配置快照。</summary>
+    /// <summary>
+    /// 存储当前字段值。
+    /// </summary>
     private readonly OracleOptions _options = oracleOptions.Value;
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
     public async Task<int> WriteBackByRowIdAsync(
         SyncTableDefinition definition,
         RemoteStatusConsumeProfile profile,
         string batchId,
         IReadOnlyList<string> rowIds,
         CancellationToken ct) {
+            // 步骤：按既定流程执行当前方法逻辑。
         if (rowIds.Count == 0) {
             return 0;
         }
@@ -131,43 +136,39 @@ public class OracleRemoteStatusWriter(
     }
 
     /// <summary>
-    /// 命令超时解析。
+    /// 执行当前方法。
     /// </summary>
-    /// <returns>超时秒数。</returns>
     private int ResolveCommandTimeout() {
+        // 步骤：按既定流程执行当前方法逻辑。
         return _options.CommandTimeoutSeconds > 0 ? _options.CommandTimeoutSeconds : DefaultCommandTimeoutSeconds;
     }
 
     /// <summary>
-    /// 构建连接串。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="options">Oracle 配置。</param>
-    /// <returns>连接串。</returns>
     private static string BuildConnectionString(OracleOptions options) {
+        // 步骤：按既定流程执行当前方法逻辑。
         return OracleConnectionStringResolver.BuildEffectiveConnectionString(options);
     }
 
     /// <summary>
-    /// 标识符安全校验。
+    /// 执行当前方法。
     /// </summary>
-    /// <param name="identifier">标识符。</param>
-    /// <param name="fieldName">字段名。</param>
     private static void EnsureSafeIdentifier(string identifier, string fieldName) {
+        // 步骤：按既定流程执行当前方法逻辑。
         if (string.IsNullOrWhiteSpace(identifier) || !identifier.All(ch => char.IsLetterOrDigit(ch) || ch == '_')) {
             throw new InvalidOperationException($"{fieldName} 包含非法字符，仅允许字母、数字、下划线。 ");
         }
     }
 
     /// <summary>
-    /// 创建指定长度并填充相同值的数组，避免 LINQ 分配开销。
+    /// 执行当前方法。
     /// </summary>
-    /// <typeparam name="T">元素类型。</typeparam>
-    /// <param name="value">填充值。</param>
-    /// <param name="count">数组长度。</param>
-    /// <returns>填充后的数组。</returns>
     private static T[] FillArray<T>(T value, int count) {
+        // 步骤：按既定流程执行当前方法逻辑。
         var arr = new T[count];
         Array.Fill(arr, value);
         return arr;
     }
 }
+

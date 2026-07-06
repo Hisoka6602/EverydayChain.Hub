@@ -1,21 +1,24 @@
-using EverydayChain.Hub.Application.Abstractions.Queries;
+﻿using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using System.Text;
 
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// Exposes box-tracking queries backed by scan logs and local business tasks.
+/// 定义当前类型。
 /// </summary>
 [ApiController]
 [Route("api/v1/box-tracking")]
 public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQueryService) : QueryControllerBase
 {
+    private static readonly UTF8Encoding Utf8EncodingWithBom = new(true);
+
     /// <summary>
-    /// Returns box-tracking rows within the requested local time range.
+    /// 执行当前方法。
     /// </summary>
     [HttpPost("query")]
     [ProducesResponseType(typeof(ApiResponse<BoxTrackingResponse>), StatusCodes.Status200OK)]
@@ -25,6 +28,7 @@ public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQu
         [FromQuery] BoxTrackingQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
+        // 步骤：按既定流程执行当前方法逻辑。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -46,18 +50,123 @@ public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQu
             return BadRequest(ApiResponse<BoxTrackingResponse>.Fail("PageSize must be between 1 and 1000."));
         }
 
-        var result = await boxTrackingQueryService.QueryAsync(new EverydayChain.Hub.Application.Models.BoxTrackingQueryRequest
+        var result = await boxTrackingQueryService.QueryAsync(BuildQueryRequest(resolvedRequest, normalizedStart, normalizedEnd), cancellationToken);
+        return Ok(ApiResponse<BoxTrackingResponse>.Success(BuildResponse(result), "Box tracking query succeeded."));
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    [HttpPost("export/csv")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> ExportCsvAsync(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] BoxTrackingQueryRequest? request,
+        [FromQuery] BoxTrackingQueryRequest? queryRequest,
+        CancellationToken cancellationToken)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        var rows = await QueryAllRowsAsync(request, queryRequest, cancellationToken);
+        if (rows.Result is not null)
+        {
+            return rows.Result;
+        }
+
+        var csv = BuildCsv(rows.Value!);
+        var fileName = $"box-tracking-{DateTimeOffset.Now.LocalDateTime:yyyyMMddHHmmss}.csv";
+        return File(BuildUtf8BomCsvBytes(csv), "text/csv; charset=utf-8", fileName);
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    [HttpPost("export/xlsx")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> ExportXlsxAsync(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] BoxTrackingQueryRequest? request,
+        [FromQuery] BoxTrackingQueryRequest? queryRequest,
+        CancellationToken cancellationToken)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        var rows = await QueryAllRowsAsync(request, queryRequest, cancellationToken);
+        if (rows.Result is not null)
+        {
+            return rows.Result;
+        }
+
+        var content = SimpleXlsxBuilder.BuildSingleSheet(
+            "BoxTracking",
+            ["OrderId", "BoxId", "StoreId", "StoreName", "ProductCode", "PickLocation", "Scanner", "ScannedAt", "Chute", "Status"],
+            rows.Value!
+                .Select(item => (IReadOnlyList<string?>)
+                [
+                    item.OrderId,
+                    item.BoxId,
+                    item.StoreId,
+                    item.StoreName,
+                    item.ProductCode,
+                    item.PickLocation,
+                    item.Scanner,
+                    item.ScannedAtLocal.ToString("yyyy-MM-dd HH:mm:ss"),
+                    item.Chute,
+                    item.Status
+                ])
+                .ToList());
+        var fileName = $"box-tracking-{DateTimeOffset.Now.LocalDateTime:yyyyMMddHHmmss}.xlsx";
+        return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    private async Task<(IReadOnlyList<EverydayChain.Hub.Application.Models.BoxTrackingItem>? Value, ActionResult? Result)> QueryAllRowsAsync(
+        BoxTrackingQueryRequest? request,
+        BoxTrackingQueryRequest? queryRequest,
+        CancellationToken cancellationToken)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        var resolvedRequest = ResolveRequest(request, queryRequest);
+        if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
+                resolvedRequest.StartTimeLocal,
+                resolvedRequest.EndTimeLocal,
+                out var normalizedStart,
+                out var normalizedEnd,
+                out var validationMessage))
+        {
+            return (null, BadRequest(ApiResponse<object>.Fail(validationMessage)));
+        }
+
+        var items = await boxTrackingQueryService.QueryAllAsync(BuildQueryRequest(resolvedRequest, normalizedStart, normalizedEnd), cancellationToken);
+        return (items, null);
+    }
+
+    /// <summary>
+    /// 执行当前方法。
+    /// </summary>
+    private static EverydayChain.Hub.Application.Models.BoxTrackingQueryRequest BuildQueryRequest(
+        BoxTrackingQueryRequest request,
+        DateTime normalizedStart,
+        DateTime normalizedEnd)
+    {
+        // 步骤：按既定流程执行当前方法逻辑。
+        return new EverydayChain.Hub.Application.Models.BoxTrackingQueryRequest
         {
             StartTimeLocal = normalizedStart,
             EndTimeLocal = normalizedEnd,
-            BoxId = resolvedRequest.BoxId,
-            Scanner = resolvedRequest.Scanner,
-            ChuteCode = resolvedRequest.ChuteCode,
-            PageNumber = resolvedRequest.PageNumber,
-            PageSize = resolvedRequest.PageSize
-        }, cancellationToken);
+            BoxId = request.BoxId,
+            OrderId = request.OrderId,
+            StoreId = request.StoreId,
+            Scanner = request.Scanner,
+            ChuteCode = request.ChuteCode,
+            PageNumber = request.PageNumber,
+            PageSize = request.PageSize
+        };
+    }
 
-        var response = new BoxTrackingResponse
+    private static BoxTrackingResponse BuildResponse(EverydayChain.Hub.Application.Models.BoxTrackingQueryResult result)
+    {
+        return new BoxTrackingResponse
         {
             StartTimeLocal = result.StartTimeLocal,
             EndTimeLocal = result.EndTimeLocal,
@@ -84,7 +193,53 @@ public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQu
                 })
                 .ToList()
         };
+    }
 
-        return Ok(ApiResponse<BoxTrackingResponse>.Success(response, "Box tracking query succeeded."));
+    private static string BuildCsv(IReadOnlyList<EverydayChain.Hub.Application.Models.BoxTrackingItem> items)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("OrderId,BoxId,StoreId,StoreName,ProductCode,PickLocation,Scanner,ScannedAt,Chute,Status");
+        foreach (var item in items)
+        {
+            builder.AppendLine(string.Join(",",
+                EscapeCsvField(item.OrderId),
+                EscapeCsvField(item.BoxId),
+                EscapeCsvField(item.StoreId),
+                EscapeCsvField(item.StoreName),
+                EscapeCsvField(item.ProductCode),
+                EscapeCsvField(item.PickLocation),
+                EscapeCsvField(item.Scanner),
+                EscapeCsvField(item.ScannedAtLocal.ToString("yyyy-MM-dd HH:mm:ss")),
+                EscapeCsvField(item.Chute),
+                EscapeCsvField(item.Status)));
+        }
+
+        return builder.ToString();
+    }
+
+    private static byte[] BuildUtf8BomCsvBytes(string csvContent)
+    {
+        var preamble = Utf8EncodingWithBom.GetPreamble();
+        var contentBytes = Utf8EncodingWithBom.GetBytes(csvContent);
+        var bytes = new byte[preamble.Length + contentBytes.Length];
+        Buffer.BlockCopy(preamble, 0, bytes, 0, preamble.Length);
+        Buffer.BlockCopy(contentBytes, 0, bytes, preamble.Length, contentBytes.Length);
+        return bytes;
+    }
+
+    private static string EscapeCsvField(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        if (!value.Contains(',') && !value.Contains('"') && !value.Contains('\n') && !value.Contains('\r'))
+        {
+            return value;
+        }
+
+        return $"\"{value.Replace("\"", "\"\"")}\"";
     }
 }
+
