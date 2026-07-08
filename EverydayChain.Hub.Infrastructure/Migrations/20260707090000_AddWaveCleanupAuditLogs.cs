@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore.Migrations;
+using EverydayChain.Hub.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 #nullable disable
 
@@ -7,6 +9,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
     /// <summary>
     /// 为波次清理敏感操作增加审计表。
     /// </summary>
+    [DbContext(typeof(HubDbContext))]
+    [Migration("20260707090000_AddWaveCleanupAuditLogs")]
     public partial class AddWaveCleanupAuditLogs : Migration
     {
         /// <summary>

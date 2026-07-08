@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore.Migrations;
+using EverydayChain.Hub.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 #nullable disable
 
@@ -7,6 +9,8 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
     /// <summary>
     /// 为保留期自动清理增加审计表。
     /// </summary>
+    [DbContext(typeof(HubDbContext))]
+    [Migration("20260707150000_AddRetentionCleanupAuditLogs")]
     public partial class AddRetentionCleanupAuditLogs : Migration
     {
         /// <summary>

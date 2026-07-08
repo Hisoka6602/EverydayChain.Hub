@@ -1,7 +1,11 @@
-﻿using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Application.Abstractions.Infrastructure;
+using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.Infrastructure.Persistence;
+using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using EverydayChain.Hub.Infrastructure.Services;
 using EverydayChain.Hub.Tests.Services.Sharding;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Tests.Services;
 
@@ -14,6 +18,16 @@ public class AutoMigrationServiceTests
     /// 存储 BaselineMigrationId 字段。
     /// </summary>
     private const string BaselineMigrationId = "20260418204107_RebuildHubBaselineV2";
+
+    /// <summary>
+    /// 存储 WaveCleanupAuditLogsMigrationId 字段。
+    /// </summary>
+    private const string WaveCleanupAuditLogsMigrationId = "20260707090000_AddWaveCleanupAuditLogs";
+
+    /// <summary>
+    /// 存储 RetentionCleanupAuditLogsMigrationId 字段。
+    /// </summary>
+    private const string RetentionCleanupAuditLogsMigrationId = "20260707150000_AddRetentionCleanupAuditLogs";
 
     [Fact]
     public void BuildBootstrapSuffixes_ShouldFilterEmptySuffix()
@@ -57,6 +71,24 @@ public class AutoMigrationServiceTests
     }
 
     [Fact]
+    public void HubDbContext_ShouldDiscoverCleanupAuditLogMigrations()
+    {
+        var options = new DbContextOptionsBuilder<HubDbContext>()
+            .UseSqlServer("Server=127.0.0.1,1433;Database=EverydayChainHub_Test;User Id=sa;Password=Test123!;Encrypt=False;TrustServerCertificate=True;")
+            .Options;
+        var shardingOptions = Options.Create(new ShardingOptions
+        {
+            Schema = "dbo",
+        });
+
+        using var dbContext = new HubDbContext(options, shardingOptions);
+        var migrations = dbContext.Database.GetMigrations().ToList();
+
+        Assert.Contains(WaveCleanupAuditLogsMigrationId, migrations);
+        Assert.Contains(RetentionCleanupAuditLogsMigrationId, migrations);
+    }
+
+    [Fact]
     public async Task ExecuteShardMaintenanceAsync_ShouldProvisionBeforeSynchronize()
     {
         var provisioner = new RecordingShardTableProvisioner();
@@ -97,4 +129,3 @@ public class AutoMigrationServiceTests
         Assert.Equal(1, synchronizer.SynchronizeAllCallCount);
     }
 }
-

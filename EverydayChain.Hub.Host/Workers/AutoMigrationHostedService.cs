@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Host.Workers;
 
 /// <summary>
-/// 定义自动迁移启动托管服务。
+/// 启动期执行自动迁移与分表自治流程的托管服务。
 /// </summary>
 public class AutoMigrationHostedService(
     IServiceScopeFactory scopeFactory,
@@ -17,12 +17,12 @@ public class AutoMigrationHostedService(
     ILogger<AutoMigrationHostedService> logger) : IHostedService
 {
     /// <summary>
-    /// 存储自动迁移阶段名称。
+    /// 自动迁移阶段名称。
     /// </summary>
     private const string AutoMigrationStage = "自动迁移阶段";
 
     /// <summary>
-    /// 存储启动阶段超时秒数。
+    /// 启动阶段超时秒数。
     /// </summary>
     private const int StartupStageTimeoutSeconds = 120;
 
@@ -49,10 +49,9 @@ public class AutoMigrationHostedService(
             var connectivitySnapshot = await databaseConnectivityService.GetSnapshotAsync(connectivityCheckCts.Token);
             if (!connectivitySnapshot.LocalSqlServer.IsAvailable)
             {
-                logger.LogError(
-                    "自动迁移阶段已跳过：{Description}。应用将继续启动，并由接口层返回数据库不可用提示。",
+                logger.LogWarning(
+                    "本地 MSSQL 连通性预检未通过：{Description}。将继续尝试自动迁移，以覆盖目标数据库缺失等可自愈场景。",
                     connectivitySnapshot.LocalSqlServer.Description);
-                return;
             }
 
             using var scope = scopeFactory.CreateScope();
@@ -61,11 +60,16 @@ public class AutoMigrationHostedService(
             using var migrationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             migrationCts.CancelAfter(TimeSpan.FromSeconds(StartupStageTimeoutSeconds));
             await autoMigrationService.RunAsync(migrationCts.Token);
+
+            currentStage = "数据库连通性刷新阶段";
+            using var connectivityRefreshCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            connectivityRefreshCts.CancelAfter(TimeSpan.FromSeconds(StartupStageTimeoutSeconds));
+            await databaseConnectivityService.RefreshSnapshotAsync(connectivityRefreshCts.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             logger.LogError(
-                "自动迁移与分表自治流程在{Stage}执行超时（>{TimeoutSeconds}s），已降级跳过并继续启动。",
+                "自动迁移与分表自治流程在{Stage}执行超时（{TimeoutSeconds}s），已降级跳过并继续启动。",
                 currentStage,
                 StartupStageTimeoutSeconds);
         }

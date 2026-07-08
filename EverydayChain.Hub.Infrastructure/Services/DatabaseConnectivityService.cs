@@ -106,11 +106,7 @@ public sealed class DatabaseConnectivityService(
         await _probeLock.WaitAsync(cancellationToken);
         try
         {
-            if (CanReuseCachedSnapshot())
-            {
-                return _lastSnapshot;
-            }
-
+            // 步骤：Refresh 语义必须绕过缓存，确保自动迁移后的可用性状态能够被立即重新探测。
             var snapshot = await ProbeSnapshotAsync(cancellationToken);
             UpdateCachedSnapshot(snapshot);
             return snapshot;
