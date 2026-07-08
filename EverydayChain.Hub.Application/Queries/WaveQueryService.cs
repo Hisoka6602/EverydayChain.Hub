@@ -12,36 +12,36 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Application.Queries;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 WaveQueryService 类型。
 /// </summary>
 public sealed class WaveQueryService : IWaveQueryService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 CacheKeyDateTimeFormat 字段。
     /// </summary>
     private const string CacheKeyDateTimeFormat = "yyyyMMddHHmmssfffffff";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 NullCacheValue 字段。
     /// </summary>
     private const string NullCacheValue = "_";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SplitZone1Code 字段。
     /// </summary>
     private const string SplitZone1Code = "SplitZone1";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SplitZone2Code 字段。
     /// </summary>
     private const string SplitZone2Code = "SplitZone2";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SplitZone3Code 字段。
     /// </summary>
     private const string SplitZone3Code = "SplitZone3";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SplitZone4Code 字段。
     /// </summary>
     private const string SplitZone4Code = "SplitZone4";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 FullCaseCode 字段。
     /// </summary>
     private const string FullCaseCode = "FullCase";
 
@@ -55,19 +55,19 @@ public sealed class WaveQueryService : IWaveQueryService
     ];
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _businessTaskRepository 字段。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _logger 字段。
     /// </summary>
     private readonly ILogger<WaveQueryService> _logger;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _memoryCache 字段。
     /// </summary>
     private readonly IMemoryCache _memoryCache;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _queryCacheOptions 字段。
     /// </summary>
     private readonly QueryCacheOptions _queryCacheOptions;
     private readonly BusinessTaskQueryPolicy _queryPolicy = new();
@@ -82,7 +82,7 @@ public sealed class WaveQueryService : IWaveQueryService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 WaveQueryService 方法。
     /// </summary>
     public WaveQueryService(
         IBusinessTaskRepository businessTaskRepository,
@@ -90,7 +90,7 @@ public sealed class WaveQueryService : IWaveQueryService
         IMemoryCache memoryCache,
         QueryCacheOptions queryCacheOptions)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 WaveQueryService 方法的核心处理流程。
         _businessTaskRepository = businessTaskRepository;
         _logger = logger;
         _memoryCache = memoryCache;
@@ -387,14 +387,14 @@ public sealed class WaveQueryService : IWaveQueryService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildSummaryAsync 方法。
     /// </summary>
     private async Task<WaveSummaryQueryResult?> BuildSummaryAsync(
         WaveSummaryQueryRequest request,
         string normalizedWaveCode,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildSummaryAsync 方法的核心处理流程。
         var taskStats = await FindWaveTaskStatsAsync(request.StartTimeLocal, request.EndTimeLocal, normalizedWaveCode, cancellationToken);
         if (taskStats.Count == 0)
         {
@@ -417,14 +417,14 @@ public sealed class WaveQueryService : IWaveQueryService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildZonesAsync 方法。
     /// </summary>
     private async Task<WaveZoneQueryResult?> BuildZonesAsync(
         WaveZoneQueryRequest request,
         string normalizedWaveCode,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildZonesAsync 方法的核心处理流程。
         var taskStats = await FindWaveTaskStatsAsync(request.StartTimeLocal, request.EndTimeLocal, normalizedWaveCode, cancellationToken);
         if (taskStats.Count == 0)
         {
@@ -554,7 +554,7 @@ public sealed class WaveQueryService : IWaveQueryService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行当前业务方法。
     /// </summary>
     private async Task<T> GetCachedAsync<T>(
         string cacheKey,
@@ -563,7 +563,7 @@ public sealed class WaveQueryService : IWaveQueryService
         T fallback,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行当前业务方法的核心处理流程。
         if (!_queryCacheOptions.Enabled)
         {
             return await factory();
@@ -580,7 +580,7 @@ public sealed class WaveQueryService : IWaveQueryService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 FindWaveTaskStatsAsync 方法。
     /// </summary>
     private async Task<IReadOnlyList<BusinessTaskWaveTaskStatsRow>> FindWaveTaskStatsAsync(
         DateTime startTimeLocal,
@@ -588,7 +588,7 @@ public sealed class WaveQueryService : IWaveQueryService
         string waveCode,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 FindWaveTaskStatsAsync 方法的核心处理流程。
         if (endTimeLocal <= startTimeLocal || string.IsNullOrWhiteSpace(waveCode))
         {
             return [];
@@ -742,37 +742,37 @@ public sealed class WaveQueryService : IWaveQueryService
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 ZoneAccumulator 类型。
     /// </summary>
     private sealed class ZoneAccumulator(string zoneCode, string zoneName)
     {
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 ZoneCode。
         /// </summary>
         public string ZoneCode { get; } = zoneCode;
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 ZoneName。
         /// </summary>
         public string ZoneName { get; } = zoneName;
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 TotalCount。
         /// </summary>
         public int TotalCount { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 UnsortedCount。
         /// </summary>
         public int UnsortedCount { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 RecirculatedCount。
         /// </summary>
         public int RecirculatedCount { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 ExceptionCount。
         /// </summary>
         public int ExceptionCount { get; set; }
     }

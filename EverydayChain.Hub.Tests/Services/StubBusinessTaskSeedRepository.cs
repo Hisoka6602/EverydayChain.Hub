@@ -4,17 +4,17 @@ using EverydayChain.Hub.Application.Models;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 StubBusinessTaskSeedRepository 类型。
 /// </summary>
 internal sealed class StubBusinessTaskSeedRepository : IBusinessTaskSeedRepository
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 LastCommand。
     /// </summary>
     public BusinessTaskSeedCommand? LastCommand { get; private set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 command。
     /// </summary>
     public Func<BusinessTaskSeedCommand, BusinessTaskSeedResult> ResultFactory { get; set; } = command => new BusinessTaskSeedResult
     {

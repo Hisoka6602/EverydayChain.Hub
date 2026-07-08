@@ -36,7 +36,7 @@ public sealed class DashboardCurrentWaveSnapshotEntityTypeConfiguration : IEntit
     /// <param name="builder">实体构建器。</param>
     public void Configure(EntityTypeBuilder<DashboardCurrentWaveSnapshotEntity> builder)
     {
-        // 步骤：配置表、主键、字段长度以及查询所需索引。
+        // 步骤：配置表、主键、字段长度以及分钟级查询所需索引。
         builder.ToTable(_tableName, _schema);
         builder.HasKey(x => x.Id).IsClustered();
         builder.Property(x => x.Id).ValueGeneratedOnAdd();

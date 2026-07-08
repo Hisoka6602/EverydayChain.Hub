@@ -11,7 +11,7 @@ using EverydayChain.Hub.Application.Abstractions.Sync;
 namespace EverydayChain.Hub.Infrastructure.Sync.Writers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 OracleRemoteStatusWriter 类型。
 /// </summary>
 public class OracleRemoteStatusWriter(
     IOptions<OracleOptions> oracleOptions,
@@ -19,19 +19,19 @@ public class OracleRemoteStatusWriter(
     ILogger<OracleRemoteStatusWriter> logger) : IOracleRemoteStatusWriter {
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DefaultCommandTimeoutSeconds 字段。
     /// </summary>
     private const int DefaultCommandTimeoutSeconds = 60;
 
     private readonly string _effectiveConnectionString = BuildConnectionString(oracleOptions.Value);
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _options 字段。
     /// </summary>
     private readonly OracleOptions _options = oracleOptions.Value;
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 WriteBackByRowIdAsync 方法。
     /// </summary>
     public async Task<int> WriteBackByRowIdAsync(
         SyncTableDefinition definition,
@@ -39,7 +39,7 @@ public class OracleRemoteStatusWriter(
         string batchId,
         IReadOnlyList<string> rowIds,
         CancellationToken ct) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 WriteBackByRowIdAsync 方法的核心处理流程。
         if (rowIds.Count == 0) {
             return 0;
         }
@@ -136,36 +136,36 @@ public class OracleRemoteStatusWriter(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveCommandTimeout 方法。
     /// </summary>
     private int ResolveCommandTimeout() {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveCommandTimeout 方法的核心处理流程。
         return _options.CommandTimeoutSeconds > 0 ? _options.CommandTimeoutSeconds : DefaultCommandTimeoutSeconds;
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildConnectionString 方法。
     /// </summary>
     private static string BuildConnectionString(OracleOptions options) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildConnectionString 方法的核心处理流程。
         return OracleConnectionStringResolver.BuildEffectiveConnectionString(options);
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 EnsureSafeIdentifier 方法。
     /// </summary>
     private static void EnsureSafeIdentifier(string identifier, string fieldName) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 EnsureSafeIdentifier 方法的核心处理流程。
         if (string.IsNullOrWhiteSpace(identifier) || !identifier.All(ch => char.IsLetterOrDigit(ch) || ch == '_')) {
             throw new InvalidOperationException($"{fieldName} 包含非法字符，仅允许字母、数字、下划线。 ");
         }
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行当前业务方法。
     /// </summary>
     private static T[] FillArray<T>(T value, int count) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行当前业务方法的核心处理流程。
         var arr = new T[count];
         Array.Fill(arr, value);
         return arr;

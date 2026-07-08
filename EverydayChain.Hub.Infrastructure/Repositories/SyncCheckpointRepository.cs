@@ -10,7 +10,7 @@ using Newtonsoft.Json;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncCheckpointRepository 类型。
 /// </summary>
 public class SyncCheckpointRepository(
     IOptions<SyncJobOptions> syncJobOptions,

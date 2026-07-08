@@ -4,17 +4,17 @@ using EverydayChain.Hub.Domain.Aggregates.DropLogAggregate;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 InMemoryDropLogRepository 类型。
 /// </summary>
 internal sealed class InMemoryDropLogRepository : IDropLogRepository
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 Logs。
     /// </summary>
     public List<DropLogEntity> Logs { get; } = [];
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _nextId 字段。
     /// </summary>
     private long _nextId = 1;
 

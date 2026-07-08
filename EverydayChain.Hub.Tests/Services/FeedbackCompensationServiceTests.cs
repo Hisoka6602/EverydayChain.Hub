@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 FeedbackCompensationServiceTests 类型。
 /// </summary>
 public sealed class FeedbackCompensationServiceTests
 {
@@ -109,22 +109,22 @@ public sealed class FeedbackCompensationServiceTests
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 CapturingCompensationGateway 类型。
     /// </summary>
     private sealed class CapturingCompensationGateway : IWmsOracleFeedbackGateway
     {
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 CapturedTasks。
         /// </summary>
         public List<BusinessTaskEntity> CapturedTasks { get; } = [];
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 ThrowOnWrite。
         /// </summary>
         public bool ThrowOnWrite { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 ReturnCount。
         /// </summary>
         public int? ReturnCount { get; set; }
 

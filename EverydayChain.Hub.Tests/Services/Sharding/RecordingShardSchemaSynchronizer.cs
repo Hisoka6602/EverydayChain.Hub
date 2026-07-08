@@ -3,17 +3,17 @@
 namespace EverydayChain.Hub.Tests.Services.Sharding;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 RecordingShardSchemaSynchronizer 类型。
 /// </summary>
 public sealed class RecordingShardSchemaSynchronizer : IShardSchemaSynchronizer
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 SynchronizeAllCallCount。
     /// </summary>
     public int SynchronizeAllCallCount { get; private set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 SynchronizedLogicalTables。
     /// </summary>
     public List<string> SynchronizedLogicalTables { get; } = [];
 

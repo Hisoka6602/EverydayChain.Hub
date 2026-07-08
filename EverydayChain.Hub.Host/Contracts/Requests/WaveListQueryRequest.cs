@@ -1,17 +1,17 @@
 ﻿namespace EverydayChain.Hub.Host.Contracts.Requests;
 
 /// <summary>
-/// 定义当前类型。
+/// 表示波次列表查询条件。
 /// </summary>
 public sealed class WaveListQueryRequest
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 表示查询或统计开始时间（本地时间）。
     /// </summary>
     public DateTime StartTimeLocal { get; set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 表示查询或统计结束时间（本地时间）。
     /// </summary>
     public DateTime EndTimeLocal { get; set; }
 }

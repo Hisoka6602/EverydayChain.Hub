@@ -3,27 +3,27 @@
 namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncMergeResult 类型。
 /// </summary>
 public class SyncMergeResult
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 InsertCount。
     /// </summary>
     public int InsertCount { get; set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 UpdateCount。
     /// </summary>
     public int UpdateCount { get; set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 SkipCount。
     /// </summary>
     public int SkipCount { get; set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 LastSuccessCursorLocal。
     /// </summary>
     public DateTime? LastSuccessCursorLocal { get; set; }
 

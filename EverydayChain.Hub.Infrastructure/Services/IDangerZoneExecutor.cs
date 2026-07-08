@@ -1,7 +1,7 @@
 ﻿namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 IDangerZoneExecutor 类型。
 /// </summary>
 public interface IDangerZoneExecutor
 {

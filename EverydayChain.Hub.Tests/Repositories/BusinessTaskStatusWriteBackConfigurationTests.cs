@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskStatusWriteBackConfigurationTests 类型。
 /// </summary>
 public class BusinessTaskStatusWriteBackConfigurationTests
 {

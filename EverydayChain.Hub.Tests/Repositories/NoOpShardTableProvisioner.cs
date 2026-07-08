@@ -3,7 +3,7 @@
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 NoOpShardTableProvisioner 类型。
 /// </summary>
 public sealed class NoOpShardTableProvisioner : IShardTableProvisioner
 {

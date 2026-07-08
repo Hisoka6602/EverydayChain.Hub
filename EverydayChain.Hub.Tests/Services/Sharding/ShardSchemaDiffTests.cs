@@ -10,17 +10,17 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Tests.Services.Sharding;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ShardSchemaDiffTests 类型。
 /// </summary>
 public class ShardSchemaDiffTests
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 BusinessTaskLogicalTable 字段。
     /// </summary>
     private const string BusinessTaskLogicalTable = "business_tasks";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 TestConnectionString 字段。
     /// </summary>
     private const string TestConnectionString = "Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;";
 
@@ -30,7 +30,7 @@ public class ShardSchemaDiffTests
         var synchronizer = CreateSynchronizer();
         var template = synchronizer.ResolveTableTemplate(BusinessTaskLogicalTable);
         /// <summary>
-        /// 存储当前字段值。
+        /// 存储 physicalTableName 字段。
         /// </summary>
         const string physicalTableName = "business_tasks_202604";
         var physicalSchema = BuildAlignedPhysicalSchema(template, physicalTableName);

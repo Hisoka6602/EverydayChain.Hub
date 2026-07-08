@@ -5,12 +5,12 @@ using EverydayChain.Hub.Domain.Enums;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 StubBusinessTaskReadService 类型。
 /// </summary>
 internal sealed class StubBusinessTaskReadService : IBusinessTaskReadService
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 LastRequest。
     /// </summary>
     public BusinessTaskQueryRequest? LastRequest { get; private set; }
 

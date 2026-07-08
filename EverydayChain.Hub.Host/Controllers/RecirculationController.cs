@@ -9,7 +9,7 @@ using System.Text;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 提供回流汇总、回流明细与导出接口，用于分析不同格口和波次下的回流情况。
 /// </summary>
 [ApiController]
 [Route("api/v1/recirculations")]
@@ -20,8 +20,12 @@ public sealed class RecirculationController(
     private static readonly UTF8Encoding Utf8EncodingWithBom = new(true);
 
     /// <summary>
-    /// 执行当前方法。
+    /// 查询回流汇总，返回指定时间范围内各格口、各波次的回流次数统计。
     /// </summary>
+    /// <param name="request">请求体查询条件，支持按时间范围、格口与排序方式筛选。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>回流汇总结果。</returns>
     [HttpPost("summary")]
     [ProducesResponseType(typeof(ApiResponse<RecirculationSummaryResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<RecirculationSummaryResponse>), StatusCodes.Status400BadRequest)]
@@ -30,7 +34,7 @@ public sealed class RecirculationController(
         [FromQuery] RecirculationSummaryQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QuerySummaryAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -68,8 +72,12 @@ public sealed class RecirculationController(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 查询回流明细，返回具体发生回流的业务任务列表，包含条码、波次、格口与业务扩展字段。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>回流明细分页结果。</returns>
     [HttpPost("details")]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskQueryResponse>), StatusCodes.Status400BadRequest)]
@@ -78,7 +86,7 @@ public sealed class RecirculationController(
         [FromQuery] BusinessTaskQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryDetailsAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!TryValidateBusinessTaskRequest(resolvedRequest, out var normalizedStart, out var normalizedEnd, out var badRequest))
         {
@@ -103,8 +111,12 @@ public sealed class RecirculationController(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 导出回流汇总 CSV 文件，适用于按格口和波次核对回流数量。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>CSV 文件流。</returns>
     [HttpPost("summary/export/csv")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -113,7 +125,7 @@ public sealed class RecirculationController(
         [FromQuery] RecirculationSummaryQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportSummaryCsvAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -137,8 +149,12 @@ public sealed class RecirculationController(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 导出回流汇总 Excel 文件，适用于报表归档和人工分析。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>Excel 文件流。</returns>
     [HttpPost("summary/export/xlsx")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -147,7 +163,7 @@ public sealed class RecirculationController(
         [FromQuery] RecirculationSummaryQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportSummaryXlsxAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -182,11 +198,11 @@ public sealed class RecirculationController(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildBusinessTaskResponse 方法。
     /// </summary>
     private static BusinessTaskQueryResponse BuildBusinessTaskResponse(EverydayChain.Hub.Application.Models.BusinessTaskQueryResult queryResult)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildBusinessTaskResponse 方法的核心处理流程。
         return new BusinessTaskQueryResponse
         {
             TotalCount = queryResult.TotalCount,
@@ -221,7 +237,7 @@ public sealed class RecirculationController(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 TryValidateBusinessTaskRequest 方法。
     /// </summary>
     private bool TryValidateBusinessTaskRequest(
         BusinessTaskQueryRequest request,
@@ -229,7 +245,7 @@ public sealed class RecirculationController(
         out DateTime normalizedEnd,
         out ActionResult<ApiResponse<BusinessTaskQueryResponse>>? validationResult)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 TryValidateBusinessTaskRequest 方法的核心处理流程。
         normalizedStart = default;
         normalizedEnd = default;
         validationResult = null;
@@ -268,11 +284,11 @@ public sealed class RecirculationController(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildUtf8BomCsvBytes 方法。
     /// </summary>
     private static byte[] BuildUtf8BomCsvBytes(string csvContent)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildUtf8BomCsvBytes 方法的核心处理流程。
         var preamble = Utf8EncodingWithBom.GetPreamble();
         var contentBytes = Utf8EncodingWithBom.GetBytes(csvContent);
         var bytes = new byte[preamble.Length + contentBytes.Length];

@@ -1,32 +1,32 @@
 ﻿namespace EverydayChain.Hub.Host.Contracts.Responses;
 
 /// <summary>
-/// 定义当前类型。
+/// 表示波次明细查询结果。
 /// </summary>
 public sealed class WaveDetailResponse
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 表示查询或统计开始时间（本地时间）。
     /// </summary>
     public DateTime StartTimeLocal { get; set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 表示查询或统计结束时间（本地时间）。
     /// </summary>
     public DateTime EndTimeLocal { get; set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 表示波次号。
     /// </summary>
     public string WaveCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 表示波次备注。
     /// </summary>
     public string? WaveRemark { get; set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 表示当前结果包含的明细列表。
     /// </summary>
     public IReadOnlyList<WaveDetailItemResponse> Items { get; set; } = [];
 }

@@ -6,33 +6,33 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskSeedService 类型。
 /// </summary>
 public sealed class BusinessTaskSeedService : IBusinessTaskSeedService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 MaxBarcodeCountPerRequest 字段。
     /// </summary>
     private const int MaxBarcodeCountPerRequest = 5000;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _businessTaskSeedRepository 字段。
     /// </summary>
     private readonly IBusinessTaskSeedRepository _businessTaskSeedRepository;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _logger 字段。
     /// </summary>
     private readonly ILogger<BusinessTaskSeedService> _logger;
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BusinessTaskSeedService 方法。
     /// </summary>
     public BusinessTaskSeedService(
         IBusinessTaskSeedRepository businessTaskSeedRepository,
         ILogger<BusinessTaskSeedService> logger)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BusinessTaskSeedService 方法的核心处理流程。
         _businessTaskSeedRepository = businessTaskSeedRepository;
         _logger = logger;
     }

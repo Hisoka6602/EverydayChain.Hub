@@ -4,14 +4,14 @@ using Microsoft.Extensions.Caching.Memory;
 namespace EverydayChain.Hub.Application.Utilities;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 MemoryCacheSingleFlight 类型。
 /// </summary>
 public static class MemoryCacheSingleFlight
 {
     private static readonly ConcurrentDictionary<string, Lazy<Task<object?>>> InflightTasks = new(StringComparer.Ordinal);
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行当前业务方法。
     /// </summary>
     public static async Task<T> GetOrCreateAsync<T>(
         IMemoryCache memoryCache,
@@ -20,7 +20,7 @@ public static class MemoryCacheSingleFlight
         Func<CancellationToken, Task<T>> factory,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行当前业务方法的核心处理流程。
         if (memoryCache.TryGetValue(cacheKey, out object? cachedValue))
         {
             return cachedValue is null ? default! : (T)cachedValue;
@@ -36,7 +36,7 @@ public static class MemoryCacheSingleFlight
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行当前业务方法。
     /// </summary>
     private static async Task<object?> PopulateCacheAsync<T>(
         IMemoryCache memoryCache,
@@ -45,7 +45,7 @@ public static class MemoryCacheSingleFlight
         Func<CancellationToken, Task<T>> factory,
         Lazy<Task<object?>>? lazyTask)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行当前业务方法的核心处理流程。
         try
         {
             if (memoryCache.TryGetValue(cacheKey, out object? cachedValue))

@@ -6,7 +6,7 @@ using EverydayChain.Hub.Domain.Enums;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskMaterializer 类型。
 /// </summary>
 public class BusinessTaskMaterializer : IBusinessTaskMaterializer
 {

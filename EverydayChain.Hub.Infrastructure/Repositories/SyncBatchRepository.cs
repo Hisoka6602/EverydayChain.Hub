@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncBatchRepository 类型。
 /// </summary>
 public class SyncBatchRepository(
     IDbContextFactory<HubDbContext> dbContextFactory,
@@ -21,7 +21,7 @@ public class SyncBatchRepository(
     ILogger<SyncBatchRepository> logger) : ISyncBatchRepository
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SyncBatchLogicalTable 字段。
     /// </summary>
     private const string SyncBatchLogicalTable = "sync_batches";
 
@@ -314,7 +314,7 @@ public class SyncBatchRepository(
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 LoadedBatchEntity 类型。
     /// </summary>
     private readonly record struct LoadedBatchEntity(string Suffix, SyncBatchEntity Entity);
 }

@@ -11,7 +11,7 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ShardTableProvisioner 类型。
 /// </summary>
 public class ShardTableProvisioner(
     IOptions<ShardingOptions> options,
@@ -21,12 +21,12 @@ public class ShardTableProvisioner(
     IDangerZoneExecutor dangerZoneExecutor) : IShardTableProvisioner
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 ProvisionCommandTimeoutSeconds 字段。
     /// </summary>
     private const int ProvisionCommandTimeoutSeconds = 30;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _options 字段。
     /// </summary>
     private readonly ShardingOptions _options = options.Value;
 
@@ -72,7 +72,7 @@ public class ShardTableProvisioner(
     public Task EnsureShardTableAsync(string logicalTable, string suffix, CancellationToken cancellationToken) => dangerZoneExecutor.ExecuteAsync(
         $"ensure-shard-table-{logicalTable}-{suffix}",
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 token。
         /// </summary>
         async token =>
         {
@@ -164,14 +164,14 @@ END";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 RunWithConcurrencyAsync 方法。
     /// </summary>
     private static async Task RunWithConcurrencyAsync(
         SemaphoreSlim semaphore,
         Func<CancellationToken, Task> action,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 RunWithConcurrencyAsync 方法的核心处理流程。
         await semaphore.WaitAsync(cancellationToken);
         try
         {

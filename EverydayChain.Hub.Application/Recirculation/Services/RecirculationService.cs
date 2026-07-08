@@ -8,34 +8,34 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Application.Recirculation.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 RecirculationService 类型。
 /// </summary>
 public sealed class RecirculationService : IRecirculationService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _businessTaskRepository 字段。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _options 字段。
     /// </summary>
     private readonly ExceptionRuleOptions _options;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _logger 字段。
     /// </summary>
     private readonly ILogger<RecirculationService> _logger;
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 RecirculationService 方法。
     /// </summary>
     public RecirculationService(
         IBusinessTaskRepository businessTaskRepository,
         ExceptionRuleOptions options,
         ILogger<RecirculationService> logger)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 RecirculationService 方法的核心处理流程。
         _businessTaskRepository = businessTaskRepository;
         _options = options;
         _logger = logger;

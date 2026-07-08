@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 namespace EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ShardModelCacheKeyFactory 类型。
 /// </summary>
 public class ShardModelCacheKeyFactory : IModelCacheKeyFactory
 {

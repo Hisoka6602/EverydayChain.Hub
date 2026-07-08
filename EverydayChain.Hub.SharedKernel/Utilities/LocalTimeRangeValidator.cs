@@ -1,12 +1,12 @@
-namespace EverydayChain.Hub.SharedKernel.Utilities;
+﻿namespace EverydayChain.Hub.SharedKernel.Utilities;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 LocalTimeRangeValidator 类型。
 /// </summary>
 public static class LocalTimeRangeValidator
 {
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 TryNormalizeRequiredRange 方法。
     /// </summary>
     public static bool TryNormalizeRequiredRange(
         DateTime startTimeLocal,
@@ -15,7 +15,7 @@ public static class LocalTimeRangeValidator
         out DateTime normalizedEnd,
         out string validationMessage)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 TryNormalizeRequiredRange 方法的核心处理流程。
         normalizedStart = default;
         normalizedEnd = default;
         validationMessage = string.Empty;
@@ -54,7 +54,7 @@ public static class LocalTimeRangeValidator
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 TryNormalizeOptionalRange 方法。
     /// </summary>
     public static bool TryNormalizeOptionalRange(
         DateTime? startTimeLocal,
@@ -64,7 +64,7 @@ public static class LocalTimeRangeValidator
         out DateTime normalizedEnd,
         out string validationMessage)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 if 方法的核心处理流程。
         normalizedStart = default;
         normalizedEnd = default;
         validationMessage = string.Empty;

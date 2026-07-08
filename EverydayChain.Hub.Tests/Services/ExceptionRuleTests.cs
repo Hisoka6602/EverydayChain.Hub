@@ -9,37 +9,38 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ExceptionRuleTests 类型。
 /// </summary>
 public sealed class ExceptionRuleTests
 {
     #region 辅助方法
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 static 方法。
     /// </summary>
     private static (WaveCleanupService Service, InMemoryBusinessTaskRepository Repository) CreateWaveCleanupService(
         bool enabled = true, bool waveEnabled = true, bool dryRun = false)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 static 方法的核心处理流程。
         var repo = new InMemoryBusinessTaskRepository();
+        var auditRepo = new InMemoryWaveCleanupAuditLogRepository();
         var options = new ExceptionRuleOptions
         {
             Enabled = enabled,
             DryRun = dryRun,
             WaveCleanup = new WaveCleanupRuleOptions { Enabled = waveEnabled }
         };
-        var service = new WaveCleanupService(repo, options, NullLogger<WaveCleanupService>.Instance);
+        var service = new WaveCleanupService(repo, auditRepo, options, NullLogger<WaveCleanupService>.Instance);
         return (service, repo);
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 static 方法。
     /// </summary>
     private static (MultiLabelDecisionService Service, InMemoryBusinessTaskRepository Repository) CreateMultiLabelService(
         bool enabled = true, bool multiLabelEnabled = true, string strategy = "MarkException", bool dryRun = false)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 static 方法的核心处理流程。
         var repo = new InMemoryBusinessTaskRepository();
         var options = new ExceptionRuleOptions
         {
@@ -52,12 +53,12 @@ public sealed class ExceptionRuleTests
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 static 方法。
     /// </summary>
     private static (RecirculationService Service, InMemoryBusinessTaskRepository Repository) CreateRecirculationService(
         bool enabled = true, bool recirculationEnabled = true, int maxRetries = 3, bool dryRun = false)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 static 方法的核心处理流程。
         var repo = new InMemoryBusinessTaskRepository();
         var options = new ExceptionRuleOptions
         {
@@ -70,7 +71,7 @@ public sealed class ExceptionRuleTests
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildTask 方法。
     /// </summary>
     private static BusinessTaskEntity BuildTask(
         string taskCode,
@@ -79,7 +80,7 @@ public sealed class ExceptionRuleTests
         string? waveCode = null,
         int scanRetryCount = 0)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildTask 方法的核心处理流程。
         return new BusinessTaskEntity
         {
             TaskCode = taskCode,
@@ -163,7 +164,7 @@ public sealed class ExceptionRuleTests
             DryRun = false,
             WaveCleanup = new WaveCleanupRuleOptions { Enabled = true, TargetStatusOnCleanup = "Exception" }
         };
-        var service = new WaveCleanupService(repo, options, NullLogger<WaveCleanupService>.Instance);
+        var service = new WaveCleanupService(repo, new InMemoryWaveCleanupAuditLogRepository(), options, NullLogger<WaveCleanupService>.Instance);
 
         await repo.SaveAsync(BuildTask("T1", BusinessTaskStatus.Created, waveCode: "WAVE002"), CancellationToken.None);
 
@@ -184,7 +185,7 @@ public sealed class ExceptionRuleTests
             DryRun = false,
             WaveCleanup = new WaveCleanupRuleOptions { Enabled = true, TargetStatusOnCleanup = "InvalidStatus" }
         };
-        var service = new WaveCleanupService(repo, options, NullLogger<WaveCleanupService>.Instance);
+        var service = new WaveCleanupService(repo, new InMemoryWaveCleanupAuditLogRepository(), options, NullLogger<WaveCleanupService>.Instance);
 
         await repo.SaveAsync(BuildTask("T1", BusinessTaskStatus.Created, waveCode: "WAVE003"), CancellationToken.None);
 

@@ -12,7 +12,7 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ScanLogRepository 类型。
 /// </summary>
 public class ScanLogRepository(
     IDbContextFactory<HubDbContext> contextFactory,
@@ -22,11 +22,11 @@ public class ScanLogRepository(
     IOptions<DashboardSnapshotOptions> dashboardSnapshotOptions) : IScanLogRepository
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 ScanLogLogicalTable 字段。
     /// </summary>
     private const string ScanLogLogicalTable = "scan_logs";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _dashboardSnapshotOptions 字段。
     /// </summary>
     private readonly DashboardSnapshotOptions _dashboardSnapshotOptions = dashboardSnapshotOptions.Value;
 
@@ -92,7 +92,7 @@ public class ScanLogRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryRangeAsync 方法。
     /// </summary>
     public async Task<IReadOnlyList<ScanLogEntity>> QueryRangeAsync(
         DateTime startTimeLocal,
@@ -101,7 +101,7 @@ public class ScanLogRepository(
         string? deviceCode,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryRangeAsync 方法的核心处理流程。
         if (endTimeLocal <= startTimeLocal)
         {
             return Array.Empty<ScanLogEntity>();
@@ -137,7 +137,7 @@ public class ScanLogRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryPageAsync 方法。
     /// </summary>
     public async Task<(int TotalCount, IReadOnlyList<ScanLogEntity> Items)> QueryPageAsync(
         DateTime startTimeLocal,
@@ -148,7 +148,7 @@ public class ScanLogRepository(
         int take,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryPageAsync 方法的核心处理流程。
         if (take <= 0)
         {
             return (0, Array.Empty<ScanLogEntity>());
@@ -241,14 +241,14 @@ public class ScanLogRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ListShardSuffixesByScanTimeRangeAsync 方法。
     /// </summary>
     private async Task<IReadOnlyList<string>> ListShardSuffixesByScanTimeRangeAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ListShardSuffixesByScanTimeRangeAsync 方法的核心处理流程。
         var tables = await shardTableResolver.ListPhysicalTablesAsync(ScanLogLogicalTable, ct);
         var availableSuffixes = tables
             .Select(table => table[ScanLogLogicalTable.Length..])

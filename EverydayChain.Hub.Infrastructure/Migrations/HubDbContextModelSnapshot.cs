@@ -452,6 +452,175 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                     b.ToTable("runtime_leases", "dbo");
                 });
 
+            modelBuilder.Entity("EverydayChain.Hub.Domain.Aggregates.AuditLogs.WaveCleanupAuditLogEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<int>("CleanedCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ClientIp")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime?>("CompletedTimeLocal")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ExecutionStage")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("HttpMethod")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<int>("IdentifiedCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<string>("OperatorId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("RequestPath")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime>("RequestedTimeLocal")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TargetStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("TraceId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("UserAgent")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("WaveCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"));
+
+                    b.HasIndex("ExecutionStage");
+
+                    b.HasIndex("RequestedTimeLocal");
+
+                    b.HasIndex("WaveCode", "RequestedTimeLocal");
+
+                    b.ToTable("wave_cleanup_audit_logs", "dbo");
+                });
+
+            modelBuilder.Entity("EverydayChain.Hub.Domain.Aggregates.AuditLogs.RetentionCleanupAuditLogEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<bool>("AllowDelete")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("BatchId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<int>("CandidateCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CompletedTimeLocal")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DeletedCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ExecutionStage")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("InstanceId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<bool>("IsDryRun")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("KeepMonths")
+                        .HasColumnType("int");
+
+                    b.Property<string>("LogicalTableName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<string>("RetentionMode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<int>("ScannedCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("StartedTimeLocal")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TargetCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("ThresholdTimeLocal")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TimeColumnName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"));
+
+                    b.HasIndex("ExecutionStage");
+
+                    b.HasIndex("StartedTimeLocal");
+
+                    b.HasIndex("BatchId", "StartedTimeLocal");
+
+                    b.HasIndex("LogicalTableName", "StartedTimeLocal");
+
+                    b.ToTable("retention_cleanup_audit_logs", "dbo");
+                });
+
             modelBuilder.Entity("EverydayChain.Hub.Domain.Aggregates.DropLogAggregate.DropLogEntity", b =>
                 {
                     b.Property<long>("Id")

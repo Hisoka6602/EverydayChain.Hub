@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Host.Workers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 FeedbackCompensationBackgroundWorker 类型。
 /// </summary>
 public sealed class FeedbackCompensationBackgroundWorker(
     IFeedbackCompensationService feedbackCompensationService,
@@ -13,11 +13,35 @@ public sealed class FeedbackCompensationBackgroundWorker(
     ILogger<FeedbackCompensationBackgroundWorker> logger) : BackgroundService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SingleRunTimeoutSeconds 字段。
     /// </summary>
     private const int SingleRunTimeoutSeconds = 300;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DefaultPollingIntervalSeconds 字段。
+    /// </summary>
+    private const int DefaultPollingIntervalSeconds = 300;
+    /// <summary>
+    /// 存储 MinPollingIntervalSeconds 字段。
+    /// </summary>
+    private const int MinPollingIntervalSeconds = 1;
+    /// <summary>
+    /// 存储 MaxPollingIntervalSeconds 字段。
+    /// </summary>
+    private const int MaxPollingIntervalSeconds = 86400;
+    /// <summary>
+    /// 存储 DefaultBatchSize 字段。
+    /// </summary>
+    private const int DefaultBatchSize = 100;
+    /// <summary>
+    /// 存储 MinBatchSize 字段。
+    /// </summary>
+    private const int MinBatchSize = 1;
+    /// <summary>
+    /// 存储 MaxBatchSize 字段。
+    /// </summary>
+    private const int MaxBatchSize = 1000;
+    /// <summary>
+    /// 存储 _compensationJobOptions 字段。
     /// </summary>
     private readonly FeedbackCompensationJobOptions _compensationJobOptions = compensationJobOptions.Value;
 
@@ -34,12 +58,14 @@ public sealed class FeedbackCompensationBackgroundWorker(
             return;
         }
 
-        var pollingIntervalSeconds = _compensationJobOptions.PollingIntervalSeconds > 0
+        var pollingCandidate = _compensationJobOptions.PollingIntervalSeconds > 0
             ? _compensationJobOptions.PollingIntervalSeconds
-            : 300;
-        var batchSize = _compensationJobOptions.BatchSize > 0
+            : DefaultPollingIntervalSeconds;
+        var batchCandidate = _compensationJobOptions.BatchSize > 0
             ? _compensationJobOptions.BatchSize
-            : 100;
+            : DefaultBatchSize;
+        var pollingIntervalSeconds = Math.Clamp(pollingCandidate, MinPollingIntervalSeconds, MaxPollingIntervalSeconds);
+        var batchSize = Math.Clamp(batchCandidate, MinBatchSize, MaxBatchSize);
 
         while (!stoppingToken.IsCancellationRequested)
         {

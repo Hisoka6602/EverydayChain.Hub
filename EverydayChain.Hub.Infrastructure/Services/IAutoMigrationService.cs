@@ -1,12 +1,12 @@
 ﻿namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 IAutoMigrationService 类型。
 /// </summary>
 public interface IAutoMigrationService
 {
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 RunAsync 方法。
     /// </summary>
     Task RunAsync(CancellationToken cancellationToken);
 }

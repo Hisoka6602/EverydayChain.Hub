@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskSeedControllerTests 类型。
 /// </summary>
 public sealed class BusinessTaskSeedControllerTests
 {

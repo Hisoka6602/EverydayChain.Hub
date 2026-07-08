@@ -4,37 +4,37 @@ using EverydayChain.Hub.Application.Models;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 StubWaveQueryService 类型。
 /// </summary>
 internal sealed class StubWaveQueryService : IWaveQueryService
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 LastCurrentRequest。
     /// </summary>
     public CurrentWaveQueryRequest? LastCurrentRequest { get; private set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 LastOptionsRequest。
     /// </summary>
     public WaveOptionsQueryRequest? LastOptionsRequest { get; private set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 LastSummaryRequest。
     /// </summary>
     public WaveSummaryQueryRequest? LastSummaryRequest { get; private set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 LastZoneRequest。
     /// </summary>
     public WaveZoneQueryRequest? LastZoneRequest { get; private set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 LastListRequest。
     /// </summary>
     public WaveListQueryRequest? LastListRequest { get; private set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 LastDetailRequest。
     /// </summary>
     public WaveDetailQueryRequest? LastDetailRequest { get; private set; }
 

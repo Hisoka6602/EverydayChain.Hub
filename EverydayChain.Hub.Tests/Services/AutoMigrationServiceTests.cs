@@ -6,12 +6,12 @@ using EverydayChain.Hub.Tests.Services.Sharding;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 AutoMigrationServiceTests 类型。
 /// </summary>
 public class AutoMigrationServiceTests
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 BaselineMigrationId 字段。
     /// </summary>
     private const string BaselineMigrationId = "20260418204107_RebuildHubBaselineV2";
 

@@ -1,21 +1,21 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 
 namespace EverydayChain.Hub.SharedKernel.Utilities;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BoundedConcurrentQueueHelper 类型。
 /// </summary>
 public static class BoundedConcurrentQueueHelper
 {
     /// <summary>
-    /// 执行当前方法。
+    /// 执行当前业务方法。
     /// </summary>
     public static void TrimExcessIfNeeded<TItem>(
         ConcurrentQueue<TItem> queue,
         int maxCapacity,
         int extraEvictionCount)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行当前业务方法的核心处理流程。
         var currentCount = queue.Count;
         if (currentCount <= maxCapacity)
         {

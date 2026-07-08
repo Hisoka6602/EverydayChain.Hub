@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 namespace EverydayChain.Hub.Infrastructure.Services.Sharding;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ShardSchemaTemplateBuilder 类型。
 /// </summary>
 internal static class ShardSchemaTemplateBuilder
 {
@@ -32,13 +32,13 @@ internal static class ShardSchemaTemplateBuilder
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildTableTemplates 方法。
     /// </summary>
     internal static IReadOnlyDictionary<string, ShardTableSchemaTemplate> BuildTableTemplates(
         IDbContextFactory<HubDbContext> dbContextFactory,
         IReadOnlyList<string> managedLogicalTables)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildTableTemplates 方法的核心处理流程。
         ArgumentNullException.ThrowIfNull(dbContextFactory);
         var validatedLogicalTables = ValidateManagedLogicalTables(managedLogicalTables);
         var result = new Dictionary<string, ShardTableSchemaTemplate>(StringComparer.OrdinalIgnoreCase);

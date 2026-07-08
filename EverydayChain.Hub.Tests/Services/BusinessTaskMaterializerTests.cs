@@ -5,7 +5,7 @@ using EverydayChain.Hub.Domain.Enums;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskMaterializerTests 类型。
 /// </summary>
 public class BusinessTaskMaterializerTests
 {
@@ -41,7 +41,7 @@ public class BusinessTaskMaterializerTests
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 Materialize_WithBlankRequiredField_ShouldThrowArgumentException 方法。
     /// </summary>
     [Theory]
     [InlineData(" ", "WMS_PICK", "K1", "TaskCode")]
@@ -53,7 +53,7 @@ public class BusinessTaskMaterializerTests
         string businessKey,
         string expectedParamName)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 Materialize_WithBlankRequiredField_ShouldThrowArgumentException 方法的核心处理流程。
         var sut = new BusinessTaskMaterializer();
         var fixedTime = new DateTime(2026, 4, 13, 10, 20, 30, DateTimeKind.Local);
         var request = new BusinessTaskMaterializeRequest

@@ -5,7 +5,7 @@
 namespace EverydayChain.Hub.Infrastructure.Migrations
 {
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 _20260420213000_StrengthenHotPathIndexesAndRecirculationFilter 类型。
     /// </summary>
     public partial class _20260420213000_StrengthenHotPathIndexesAndRecirculationFilter : Migration
     {

@@ -9,42 +9,45 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 提供业务任务模拟补数接口，用于按条码将远端数据补写进本地业务任务表，便于联调、回灌与数据修复。
 /// </summary>
 [ApiController]
 [Route("api/v1/business-task-seed")]
 public sealed class BusinessTaskSeedController : ControllerBase
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 EmptyRequestBodyMessage 字段。
     /// </summary>
     private const string EmptyRequestBodyMessage = "模拟补数请求体不能为空。";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _businessTaskSeedService 字段。
     /// </summary>
     private readonly IBusinessTaskSeedService _businessTaskSeedService;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _logger 字段。
     /// </summary>
     private readonly ILogger<BusinessTaskSeedController> _logger;
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BusinessTaskSeedController 方法。
     /// </summary>
     public BusinessTaskSeedController(
         IBusinessTaskSeedService businessTaskSeedService,
         ILogger<BusinessTaskSeedController> logger)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BusinessTaskSeedController 方法的核心处理流程。
         _businessTaskSeedService = businessTaskSeedService;
         _logger = logger;
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 手工触发业务任务补数，将指定条码批量补写到目标业务表中，并返回插入与跳过明细。
     /// </summary>
+    /// <param name="request">模拟补数请求，包含目标表名与待补写条码列表。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>模拟补数执行结果。</returns>
     [HttpPost("manual")]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskSeedResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<BusinessTaskSeedResponse>), StatusCodes.Status400BadRequest)]
@@ -53,7 +56,7 @@ public sealed class BusinessTaskSeedController : ControllerBase
         [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] BusinessTaskSeedRequest? request,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ManualSeedAsync 方法的核心处理流程。
         if (request is null)
         {
             return BadRequest(ApiResponse<BusinessTaskSeedResponse>.Fail(EmptyRequestBodyMessage));

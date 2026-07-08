@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Host.Controllers;
+﻿using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using Microsoft.AspNetCore.Mvc;
@@ -7,17 +7,17 @@ using System.Text;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SortingReportControllerTests 类型。
 /// </summary>
 public sealed class SortingReportControllerTests
 {
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryAsync_ShouldReturnOk_WhenRequestIsValid 方法。
     /// </summary>
     [Fact]
     public async Task QueryAsync_ShouldReturnOk_WhenRequestIsValid()
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryAsync_ShouldReturnOk_WhenRequestIsValid 方法的核心处理流程。
         var stubService = new StubSortingReportQueryService();
         var controller = new SortingReportController(stubService);
         var request = new SortingReportQueryRequest
@@ -34,12 +34,12 @@ public sealed class SortingReportControllerTests
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExportCsvAsync_ShouldReturnFile_WhenRequestIsValid 方法。
     /// </summary>
     [Fact]
     public async Task ExportCsvAsync_ShouldReturnFile_WhenRequestIsValid()
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportCsvAsync_ShouldReturnFile_WhenRequestIsValid 方法的核心处理流程。
         var stubService = new StubSortingReportQueryService();
         var controller = new SortingReportController(stubService);
         var request = new SortingReportQueryRequest
@@ -61,12 +61,12 @@ public sealed class SortingReportControllerTests
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExportXlsxAsync_ShouldReturnFile_WhenRequestIsValid 方法。
     /// </summary>
     [Fact]
     public async Task ExportXlsxAsync_ShouldReturnFile_WhenRequestIsValid()
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportXlsxAsync_ShouldReturnFile_WhenRequestIsValid 方法的核心处理流程。
         var stubService = new StubSortingReportQueryService();
         var controller = new SortingReportController(stubService);
         var request = new SortingReportQueryRequest
@@ -83,12 +83,12 @@ public sealed class SortingReportControllerTests
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull 方法。
     /// </summary>
     [Fact]
     public async Task QueryAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull()
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull 方法的核心处理流程。
         var stubService = new StubSortingReportQueryService();
         var controller = new SortingReportController(stubService);
         var queryRequest = new SortingReportQueryRequest
@@ -105,12 +105,12 @@ public sealed class SortingReportControllerTests
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExportCsvAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull 方法。
     /// </summary>
     [Fact]
     public async Task ExportCsvAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull()
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportCsvAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull 方法的核心处理流程。
         var stubService = new StubSortingReportQueryService();
         var controller = new SortingReportController(stubService);
         var queryRequest = new SortingReportQueryRequest

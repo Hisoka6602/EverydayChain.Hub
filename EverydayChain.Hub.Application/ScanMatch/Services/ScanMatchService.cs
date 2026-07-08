@@ -5,12 +5,12 @@ using EverydayChain.Hub.Application.Models;
 namespace EverydayChain.Hub.Application.ScanMatch.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ScanMatchService 类型。
 /// </summary>
 public sealed class ScanMatchService : IScanMatchService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _businessTaskRepository 字段。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
 

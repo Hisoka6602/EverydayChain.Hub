@@ -8,7 +8,7 @@ using EverydayChain.Hub.Tests.Services;
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 OracleSourceReaderTests 类型。
 /// </summary>
 public class OracleSourceReaderTests
 {

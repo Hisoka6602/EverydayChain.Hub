@@ -4,12 +4,12 @@ using EverydayChain.Hub.Application.Models;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 StubSortingReportQueryService 类型。
 /// </summary>
 internal sealed class StubSortingReportQueryService : ISortingReportQueryService
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 LastRequest。
     /// </summary>
     public SortingReportQueryRequest? LastRequest { get; private set; }
 
@@ -21,7 +21,7 @@ internal sealed class StubSortingReportQueryService : ISortingReportQueryService
     };
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 CsvContent。
     /// </summary>
     public string CsvContent { get; set; } = "码头号,拆零总数,整件总数,拆零分拣数,整件分拣数,回流数,异常数\n7,1,2,0,0,0,0";
 

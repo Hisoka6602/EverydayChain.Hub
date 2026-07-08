@@ -8,29 +8,29 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Application.TaskExecution.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 TaskExecutionService 类型。
 /// </summary>
 public sealed class TaskExecutionService : ITaskExecutionService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _scanMatchService 字段。
     /// </summary>
     private readonly IScanMatchService _scanMatchService;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _businessTaskRepository 字段。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _scanLogRepository 字段。
     /// </summary>
     private readonly IScanLogRepository _scanLogRepository;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _logger 字段。
     /// </summary>
     private readonly ILogger<TaskExecutionService> _logger;
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 TaskExecutionService 方法。
     /// </summary>
     public TaskExecutionService(
         IScanMatchService scanMatchService,
@@ -38,7 +38,7 @@ public sealed class TaskExecutionService : ITaskExecutionService
         IScanLogRepository scanLogRepository,
         ILogger<TaskExecutionService> logger)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 TaskExecutionService 方法的核心处理流程。
         _scanMatchService = scanMatchService;
         _businessTaskRepository = businessTaskRepository;
         _scanLogRepository = scanLogRepository;
@@ -177,7 +177,7 @@ public sealed class TaskExecutionService : ITaskExecutionService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 WriteScanLogSilentlyAsync 方法。
     /// </summary>
     private async Task WriteScanLogSilentlyAsync(
         long? businessTaskId,
@@ -190,7 +190,7 @@ public sealed class TaskExecutionService : ITaskExecutionService
         DateTime scanTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 IsAllowedScanTransitionSourceStatus 方法的核心处理流程。
         try
         {
             var log = new ScanLogEntity

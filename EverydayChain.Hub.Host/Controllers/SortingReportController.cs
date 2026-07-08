@@ -9,7 +9,7 @@ using System.Text;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 提供分拣报表查询与导出接口，用于按码头查看拆零、整件、回流与异常的统计结果。
 /// </summary>
 [ApiController]
 [Route("api/v1/reports")]
@@ -21,7 +21,7 @@ public sealed class SortingReportController : QueryControllerBase
     private static readonly UTF8Encoding Utf8EncodingWithBom = new(true);
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _sortingReportQueryService 字段。
     /// </summary>
     private readonly ISortingReportQueryService _sortingReportQueryService;
 
@@ -35,8 +35,12 @@ public sealed class SortingReportController : QueryControllerBase
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 查询分拣报表，返回指定时间段内各码头的拆零件量、整件量、已分拣量、回流量与异常量。
     /// </summary>
+    /// <param name="request">请求体查询条件，支持按时间范围与码头筛选。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>分拣报表结果。</returns>
     [HttpPost("query")]
     [ProducesResponseType(typeof(ApiResponse<SortingReportResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<SortingReportResponse>), StatusCodes.Status400BadRequest)]
@@ -45,7 +49,7 @@ public sealed class SortingReportController : QueryControllerBase
         [FromQuery] SortingReportQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(resolvedRequest.StartTimeLocal, resolvedRequest.EndTimeLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
         {
@@ -82,8 +86,12 @@ public sealed class SortingReportController : QueryControllerBase
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 导出分拣报表 CSV 文件，适用于离线核对码头维度的统计结果。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>CSV 文件流。</returns>
     [HttpPost("export/csv")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -92,7 +100,7 @@ public sealed class SortingReportController : QueryControllerBase
         [FromQuery] SortingReportQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportCsvAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(resolvedRequest.StartTimeLocal, resolvedRequest.EndTimeLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
         {
@@ -113,8 +121,12 @@ public sealed class SortingReportController : QueryControllerBase
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 导出分拣报表 Excel 文件，适用于报表沉淀与二次加工。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>Excel 文件流。</returns>
     [HttpPost("export/xlsx")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -123,7 +135,7 @@ public sealed class SortingReportController : QueryControllerBase
         [FromQuery] SortingReportQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportXlsxAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(resolvedRequest.StartTimeLocal, resolvedRequest.EndTimeLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
         {
@@ -159,11 +171,11 @@ public sealed class SortingReportController : QueryControllerBase
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildUtf8BomCsvBytes 方法。
     /// </summary>
     private static byte[] BuildUtf8BomCsvBytes(string csvContent)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildUtf8BomCsvBytes 方法的核心处理流程。
         var preamble = Utf8EncodingWithBom.GetPreamble();
         var contentBytes = Utf8EncodingWithBom.GetBytes(csvContent);
         var bytes = new byte[preamble.Length + contentBytes.Length];

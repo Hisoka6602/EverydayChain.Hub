@@ -81,6 +81,35 @@ function Test-GarbledText {
     return $false
 }
 
+function Test-PlaceholderComment {
+    param(
+        [AllowEmptyString()]
+        [string]$Text
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return $false
+    }
+
+    $normalizedText = $Text.Trim()
+    $placeholderPatterns = @(
+        '^定义当前类型。?$',
+        '^定义当前成员。?$',
+        '^执行当前方法。?$',
+        '^存储当前字段值。?$',
+        '^获取或设置当前属性值。?$',
+        '^步骤：按既定流程执行当前方法逻辑。?$'
+    )
+
+    foreach ($placeholderPattern in $placeholderPatterns) {
+        if ($normalizedText -match $placeholderPattern) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
 function Get-RepositoryTextFiles {
     param(
         [string]$RootDirectory
@@ -154,6 +183,10 @@ foreach ($repositoryTextFile in $repositoryTextFiles) {
 
         if (Test-GarbledText -Text $commentText) {
             Add-Violation -FilePath $repositoryTextFile -LineNumber ($lineIndex + 1) -Message "Comments contain garbled text."
+        }
+
+        if (Test-PlaceholderComment -Text $commentText) {
+            Add-Violation -FilePath $repositoryTextFile -LineNumber ($lineIndex + 1) -Message "Comments must be meaningful and cannot use placeholder text."
         }
     }
 }

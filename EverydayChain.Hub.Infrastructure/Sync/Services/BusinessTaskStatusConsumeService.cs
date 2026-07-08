@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Infrastructure.Sync.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskStatusConsumeService 类型。
 /// </summary>
 public class BusinessTaskStatusConsumeService(
     IOracleStatusDrivenSourceReader sourceReader,
@@ -163,14 +163,14 @@ public class BusinessTaskStatusConsumeService(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 TryBuildProjectionRow 方法。
     /// </summary>
     private BusinessTaskProjectionRow? TryBuildProjectionRow(
         SyncTableDefinition definition,
         string batchId,
         IReadOnlyDictionary<string, object?> row)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 TryBuildProjectionRow 方法的核心处理流程。
         if (!TryReadNonEmptyString(row, definition.BusinessKeyColumn, out var businessKey))
         {
             logger.LogWarning(
@@ -209,7 +209,7 @@ public class BusinessTaskStatusConsumeService(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveProjectedTimeLocal 方法。
     /// </summary>
     private DateTime ResolveProjectedTimeLocal(
         SyncTableDefinition definition,
@@ -217,7 +217,7 @@ public class BusinessTaskStatusConsumeService(
         string businessKey,
         IReadOnlyDictionary<string, object?> row)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveProjectedTimeLocal 方法的核心处理流程。
         if (TryResolveProjectedTimeFromCursorColumn(definition, row, out var projectedTimeLocal, out var fallbackReason))
         {
             return projectedTimeLocal;
@@ -235,7 +235,7 @@ public class BusinessTaskStatusConsumeService(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 TryResolveProjectedTimeFromCursorColumn 方法。
     /// </summary>
     private static bool TryResolveProjectedTimeFromCursorColumn(
         SyncTableDefinition definition,
@@ -243,7 +243,7 @@ public class BusinessTaskStatusConsumeService(
         out DateTime projectedTimeLocal,
         out string failureReason)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 TryResolveProjectedTimeFromCursorColumn 方法的核心处理流程。
         projectedTimeLocal = default;
         failureReason = string.Empty;
         if (string.IsNullOrWhiteSpace(definition.CursorColumn))

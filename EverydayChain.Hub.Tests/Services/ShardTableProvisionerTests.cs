@@ -8,16 +8,16 @@ using Microsoft.EntityFrameworkCore;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ShardTableProvisionerTests 类型。
 /// </summary>
 public class ShardTableProvisionerTests
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SortingTaskTraceLogicalTable 字段。
     /// </summary>
     private const string SortingTaskTraceLogicalTable = "sorting_task_trace";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 BusinessTaskLogicalTable 字段。
     /// </summary>
     private const string BusinessTaskLogicalTable = "business_tasks";
 
@@ -31,7 +31,7 @@ public class ShardTableProvisionerTests
             CreateDbContextFactory(),
             NullLogger<ShardTableProvisioner>.Instance,
             /// <summary>
-            /// 执行当前方法。
+            /// 执行 PassThroughDangerZoneExecutor 方法。
             /// </summary>
             new PassThroughDangerZoneExecutor());
 
@@ -53,7 +53,7 @@ public class ShardTableProvisionerTests
             CreateDbContextFactory(),
             NullLogger<ShardTableProvisioner>.Instance,
             /// <summary>
-            /// 执行当前方法。
+            /// 执行 PassThroughDangerZoneExecutor 方法。
             /// </summary>
             new PassThroughDangerZoneExecutor());
 
@@ -117,7 +117,7 @@ public class ShardTableProvisionerTests
             CreateDbContextFactory(),
             NullLogger<ShardTableProvisioner>.Instance,
             /// <summary>
-            /// 执行当前方法。
+            /// 执行 PassThroughDangerZoneExecutor 方法。
             /// </summary>
             new PassThroughDangerZoneExecutor());
     }

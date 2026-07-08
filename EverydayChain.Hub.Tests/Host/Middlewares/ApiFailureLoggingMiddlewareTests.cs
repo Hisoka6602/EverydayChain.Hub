@@ -7,15 +7,15 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Tests.Host.Middlewares;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ApiFailureLoggingMiddlewareTests 类型。
 /// </summary>
 public sealed class ApiFailureLoggingMiddlewareTests {
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 InvokeAsync_ShouldLogError_WhenStatusCodeIsBadRequest 方法。
     /// </summary>
     [Fact]
     public async Task InvokeAsync_ShouldLogError_WhenStatusCodeIsBadRequest() {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 InvokeAsync_ShouldLogError_WhenStatusCodeIsBadRequest 方法的核心处理流程。
         var logger = new TestLogger<ApiFailureLoggingMiddleware>();
         var middleware = new ApiFailureLoggingMiddleware(async context => {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -32,11 +32,11 @@ public sealed class ApiFailureLoggingMiddlewareTests {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 InvokeAsync_ShouldLogError_WhenBusinessResponseIsFailure 方法。
     /// </summary>
     [Fact]
     public async Task InvokeAsync_ShouldLogError_WhenBusinessResponseIsFailure() {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 InvokeAsync_ShouldLogError_WhenBusinessResponseIsFailure 方法的核心处理流程。
         var logger = new TestLogger<ApiFailureLoggingMiddleware>();
         var middleware = new ApiFailureLoggingMiddleware(async context => {
             context.Response.StatusCode = StatusCodes.Status200OK;
@@ -50,11 +50,11 @@ public sealed class ApiFailureLoggingMiddlewareTests {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 InvokeAsync_ShouldNotLogError_WhenResponseIsSuccessful 方法。
     /// </summary>
     [Fact]
     public async Task InvokeAsync_ShouldNotLogError_WhenResponseIsSuccessful() {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 InvokeAsync_ShouldNotLogError_WhenResponseIsSuccessful 方法的核心处理流程。
         var logger = new TestLogger<ApiFailureLoggingMiddleware>();
         var middleware = new ApiFailureLoggingMiddleware(async context => {
             context.Response.StatusCode = StatusCodes.Status200OK;
@@ -68,11 +68,11 @@ public sealed class ApiFailureLoggingMiddlewareTests {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 InvokeAsync_ShouldLogExceptionAndRethrow_WhenRequestDelegateThrows 方法。
     /// </summary>
     [Fact]
     public async Task InvokeAsync_ShouldLogExceptionAndRethrow_WhenRequestDelegateThrows() {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 InvokeAsync_ShouldLogExceptionAndRethrow_WhenRequestDelegateThrows 方法的核心处理流程。
         var logger = new TestLogger<ApiFailureLoggingMiddleware>();
         var middleware = new ApiFailureLoggingMiddleware(_ => throw new InvalidOperationException("boom"), logger);
         var context = CreateContext("/api/v1/test", """{"waveCode":"WAVE-001"}""");
@@ -84,11 +84,11 @@ public sealed class ApiFailureLoggingMiddlewareTests {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 InvokeAsync_ShouldLogRequestBody_WhenContentLengthIsNull 方法。
     /// </summary>
     [Fact]
     public async Task InvokeAsync_ShouldLogRequestBody_WhenContentLengthIsNull() {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 InvokeAsync_ShouldLogRequestBody_WhenContentLengthIsNull 方法的核心处理流程。
         var logger = new TestLogger<ApiFailureLoggingMiddleware>();
         var middleware = new ApiFailureLoggingMiddleware(async context => {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -102,10 +102,10 @@ public sealed class ApiFailureLoggingMiddlewareTests {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 CreateContext 方法。
     /// </summary>
     private static DefaultHttpContext CreateContext(string path, string requestBody, long? contentLength = null) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 CreateContext 方法的核心处理流程。
         var context = new DefaultHttpContext();
         context.TraceIdentifier = "TRACE-UNITTEST";
         context.Request.Method = HttpMethods.Post;
@@ -120,10 +120,10 @@ public sealed class ApiFailureLoggingMiddlewareTests {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ReadResponseBodyAsync 方法。
     /// </summary>
     private static async Task<string> ReadResponseBodyAsync(Stream responseBody) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ReadResponseBodyAsync 方法的核心处理流程。
         responseBody.Position = 0;
         using var reader = new StreamReader(responseBody, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
         return await reader.ReadToEndAsync();

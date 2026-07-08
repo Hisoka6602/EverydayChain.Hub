@@ -4,7 +4,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$packageCache = Join-Path $env:USERPROFILE ".nuget\packages"
+$userProfileDirectory = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::UserProfile)
+$packageCache = Join-Path $userProfileDirectory ".nuget\packages"
 $vsOffline = "C:\Program Files (x86)\Microsoft SDKs\NuGetPackages"
 
 if (-not (Test-Path $packageCache)) {
@@ -15,8 +16,6 @@ $restoreSources = @($packageCache)
 if (Test-Path $vsOffline) {
     $restoreSources += $vsOffline
 }
-
-$env:NUGET_PACKAGES = $packageCache
 
 dotnet restore $Solution `
     --packages $packageCache `

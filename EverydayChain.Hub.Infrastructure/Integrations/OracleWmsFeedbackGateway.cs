@@ -11,38 +11,38 @@ using Oracle.ManagedDataAccess.Client;
 namespace EverydayChain.Hub.Infrastructure.Integrations;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 OracleWmsFeedbackGateway 类型。
 /// </summary>
 public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DefaultCommandTimeoutSeconds 字段。
     /// </summary>
     private const int DefaultCommandTimeoutSeconds = 60;
     private const string EmptyTargetsPlaceholder = "(无目标表)";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _options 字段。
     /// </summary>
     private readonly WmsFeedbackOptions _options;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _connectionString 字段。
     /// </summary>
     private readonly string _connectionString;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _dangerZoneExecutor 字段。
     /// </summary>
     private readonly IDangerZoneExecutor _dangerZoneExecutor;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _logger 字段。
     /// </summary>
     private readonly ILogger<OracleWmsFeedbackGateway> _logger;
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 OracleWmsFeedbackGateway 方法。
     /// </summary>
     public OracleWmsFeedbackGateway(
         IOptions<WmsFeedbackOptions> wmsFeedbackOptions,
@@ -50,7 +50,7 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         IDangerZoneExecutor dangerZoneExecutor,
         ILogger<OracleWmsFeedbackGateway> logger)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 OracleWmsFeedbackGateway 方法的核心处理流程。
         _options = wmsFeedbackOptions.Value;
         _connectionString = OracleConnectionStringResolver.BuildEffectiveConnectionString(oracleOptions.Value);
         _dangerZoneExecutor = dangerZoneExecutor;
@@ -142,7 +142,7 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExecuteWriteBatchAsync 方法。
     /// </summary>
     private async Task<int> ExecuteWriteBatchAsync(
         OracleConnection connection,
@@ -153,7 +153,7 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
         DateTime feedbackTime,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 catch 方法的核心处理流程。
         var sql = BuildUpdateSql(schema, table, businessKeyColumn);
         await using var command = connection.CreateCommand();
         command.BindByName = true;
@@ -265,12 +265,12 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 GroupTasksByWriteTarget 方法。
     /// </summary>
     private Dictionary<(string Schema, string Table, string BusinessKeyColumn), List<BusinessTaskEntity>> GroupTasksByWriteTarget(
         IReadOnlyList<BusinessTaskEntity> tasks)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 GroupTasksByWriteTarget 方法的核心处理流程。
         var grouped = new Dictionary<(string Schema, string Table, string BusinessKeyColumn), List<BusinessTaskEntity>>();
         foreach (var task in tasks)
         {
@@ -428,13 +428,13 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildNullableStringArray 方法。
     /// </summary>
     private static object[] BuildNullableStringArray(
         IReadOnlyList<BusinessTaskEntity> tasks,
         Func<BusinessTaskEntity, string?> selector)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildNullableStringArray 方法的核心处理流程。
         return tasks
             .Select(task =>
             {
@@ -445,26 +445,26 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildNullableDateTimeArray 方法。
     /// </summary>
     private static object[] BuildNullableDateTimeArray(
         IReadOnlyList<BusinessTaskEntity> tasks,
         Func<BusinessTaskEntity, DateTime?> selector)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildNullableDateTimeArray 方法的核心处理流程。
         return tasks
             .Select(task => selector(task) is DateTime value ? (object)value : DBNull.Value)
             .ToArray();
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildNullableDecimalArray 方法。
     /// </summary>
     private static object[] BuildNullableDecimalArray(
         IReadOnlyList<BusinessTaskEntity> tasks,
         Func<BusinessTaskEntity, decimal?> selector)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildNullableDecimalArray 方法的核心处理流程。
         return tasks
             .Select(task => selector(task) is decimal value ? (object)value : DBNull.Value)
             .ToArray();

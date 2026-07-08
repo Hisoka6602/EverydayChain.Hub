@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Application.Abstractions.Queries;
+﻿using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Responses;
@@ -9,17 +9,17 @@ using AppRecirculationSummaryQueryRequest = EverydayChain.Hub.Application.Models
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 RecirculationControllerTests 类型。
 /// </summary>
 public sealed class RecirculationControllerTests
 {
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QuerySummaryAsync_ShouldReturnOk_WhenRequestIsValid 方法。
     /// </summary>
     [Fact]
     public async Task QuerySummaryAsync_ShouldReturnOk_WhenRequestIsValid()
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QuerySummaryAsync_ShouldReturnOk_WhenRequestIsValid 方法的核心处理流程。
         var stubService = new StubRecirculationQueryService();
         var controller = new RecirculationController(stubService, new StubBusinessTaskReadService());
         var request = new HostRecirculationSummaryQueryRequest
@@ -44,12 +44,12 @@ public sealed class RecirculationControllerTests
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExportSummaryXlsxAsync_ShouldReturnFile_WhenRequestIsValid 方法。
     /// </summary>
     [Fact]
     public async Task ExportSummaryXlsxAsync_ShouldReturnFile_WhenRequestIsValid()
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportSummaryXlsxAsync_ShouldReturnFile_WhenRequestIsValid 方法的核心处理流程。
         var stubService = new StubRecirculationQueryService();
         var controller = new RecirculationController(stubService, new StubBusinessTaskReadService());
         var request = new HostRecirculationSummaryQueryRequest
@@ -68,21 +68,21 @@ public sealed class RecirculationControllerTests
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 StubRecirculationQueryService 类型。
     /// </summary>
     private sealed class StubRecirculationQueryService : IRecirculationQueryService
     {
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 LastRequest。
         /// </summary>
         public AppRecirculationSummaryQueryRequest? LastRequest { get; private set; }
 
         /// <summary>
-        /// 执行当前方法。
+        /// 执行 QuerySummaryAsync 方法。
         /// </summary>
         public Task<RecirculationSummaryQueryResult> QuerySummaryAsync(AppRecirculationSummaryQueryRequest request, CancellationToken cancellationToken)
         {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 QuerySummaryAsync 方法的核心处理流程。
             LastRequest = request;
             return Task.FromResult(new RecirculationSummaryQueryResult
             {
@@ -103,11 +103,11 @@ public sealed class RecirculationControllerTests
         }
 
         /// <summary>
-        /// 执行当前方法。
+        /// 执行 ExportCsvAsync 方法。
         /// </summary>
         public Task<string> ExportCsvAsync(AppRecirculationSummaryQueryRequest request, CancellationToken cancellationToken)
         {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 ExportCsvAsync 方法的核心处理流程。
             LastRequest = request;
             return Task.FromResult("Chute,WaveNo,Reflow\r\nA-12,WAVE-001,3\r\n");
         }

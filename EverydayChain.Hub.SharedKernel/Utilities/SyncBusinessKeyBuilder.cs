@@ -1,14 +1,14 @@
-using System.Globalization;
+﻿using System.Globalization;
 
 namespace EverydayChain.Hub.SharedKernel.Utilities;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncBusinessKeyBuilder 类型。
 /// </summary>
 public static class SyncBusinessKeyBuilder
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 LocalDateTimeBusinessKeyFormat 字段。
     /// </summary>
     private const string LocalDateTimeBusinessKeyFormat = "yyyy-MM-dd HH:mm:ss.fffffff";
 

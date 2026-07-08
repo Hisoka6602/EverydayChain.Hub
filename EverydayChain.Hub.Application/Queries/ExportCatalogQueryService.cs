@@ -4,16 +4,16 @@ using EverydayChain.Hub.Application.Models;
 namespace EverydayChain.Hub.Application.Queries;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ExportCatalogQueryService 类型。
 /// </summary>
 public sealed class ExportCatalogQueryService : IExportCatalogQueryService
 {
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryAsync 方法。
     /// </summary>
     public Task<ExportCatalogQueryResult> QueryAsync(ExportCatalogQueryRequest request, CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryAsync 方法的核心处理流程。
         var updatedTimeLocal = DateTime.Now;
         var result = new ExportCatalogQueryResult
         {

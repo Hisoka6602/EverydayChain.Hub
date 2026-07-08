@@ -4,19 +4,19 @@ using EverydayChain.Hub.Application.Models;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 StubChuteQueryService 类型。
 /// </summary>
 public sealed class StubChuteQueryService : IChuteQueryService {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 LastRequest。
     /// </summary>
     public ChuteResolveApplicationRequest? LastRequest { get; private set; }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExecuteAsync 方法。
     /// </summary>
     public Task<ChuteResolveApplicationResult> ExecuteAsync(ChuteResolveApplicationRequest request, CancellationToken cancellationToken) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExecuteAsync 方法的核心处理流程。
         LastRequest = request;
         _ = cancellationToken;
         return Task.FromResult(new ChuteResolveApplicationResult {

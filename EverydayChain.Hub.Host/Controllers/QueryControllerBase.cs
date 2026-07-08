@@ -3,7 +3,7 @@
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义查询类控制器公共基类，负责统一解析请求体与查询字符串中的查询参数。
 /// </summary>
 public abstract class QueryControllerBase : ControllerBase
 {

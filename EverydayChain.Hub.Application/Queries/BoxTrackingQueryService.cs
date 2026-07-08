@@ -8,7 +8,8 @@ using EverydayChain.Hub.Domain.Enums;
 namespace EverydayChain.Hub.Application.Queries;
 
 /// <summary>
-/// 定义当前类型。
+/// 提供箱子追踪查询能力。
+/// 该服务只做查询口径整合，不改变分拣机既有扫描上传、格口解析和落格回传的处理协议。
 /// </summary>
 public sealed class BoxTrackingQueryService(
     IScanLogRepository scanLogRepository,
@@ -124,6 +125,7 @@ public sealed class BoxTrackingQueryService(
     /// <returns>箱子追踪项。</returns>
     private BoxTrackingItem MapItem(ScanLogEntity log, BusinessTaskEntity? task)
     {
+        // 步骤：boxId 继续直接映射扫描日志 Barcode，只澄清命名，不修改既有字段语义。
         var chute = task is null ? null : ResolveChute(task);
         return new BoxTrackingItem
         {
@@ -158,13 +160,13 @@ public sealed class BoxTrackingQueryService(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveTask 方法。
     /// </summary>
     private static BusinessTaskEntity? ResolveTask(
         ScanLogEntity log,
         IReadOnlyDictionary<long, BusinessTaskEntity> taskMap)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveTask 方法的核心处理流程。
         if (!log.BusinessTaskId.HasValue)
         {
             return null;

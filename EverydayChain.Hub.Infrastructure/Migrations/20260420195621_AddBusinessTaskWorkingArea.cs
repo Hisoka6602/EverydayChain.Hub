@@ -5,7 +5,7 @@
 namespace EverydayChain.Hub.Infrastructure.Migrations
 {
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 AddBusinessTaskWorkingArea 类型。
     /// </summary>
     public partial class AddBusinessTaskWorkingArea : Migration
     {

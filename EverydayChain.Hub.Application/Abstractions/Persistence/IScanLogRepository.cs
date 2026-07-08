@@ -4,17 +4,17 @@ using EverydayChain.Hub.Domain.Aggregates.ScanLogAggregate;
 namespace EverydayChain.Hub.Application.Abstractions.Persistence;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 IScanLogRepository 类型。
 /// </summary>
 public interface IScanLogRepository
 {
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 SaveAsync 方法。
     /// </summary>
     Task SaveAsync(ScanLogEntity entity, CancellationToken ct);
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 AggregateRecognitionAsync 方法。
     /// </summary>
     Task<ScanLogRecognitionAggregate> AggregateRecognitionAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct);
 

@@ -11,7 +11,7 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncOrchestrator 类型。
 /// </summary>
 public sealed class SyncOrchestrator(
     ISyncTaskConfigRepository configRepository,
@@ -24,11 +24,11 @@ public sealed class SyncOrchestrator(
     ILogger<SyncOrchestrator> logger) : ISyncOrchestrator
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DefaultParallelTablesSafetyCap 字段。
     /// </summary>
     private const int DefaultParallelTablesSafetyCap = 4;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _syncJobOptions 字段。
     /// </summary>
     private readonly SyncJobOptions _syncJobOptions = syncJobOptions.Value;
 
@@ -68,7 +68,7 @@ public sealed class SyncOrchestrator(
                 {
                     BatchId = string.Empty,
                     TableCode = definition.TableCode,
-                    FailureRate = 1D,
+                    FailureRate = 1.000M,
                     FailureMessage = "Table sync is already running."
                 };
             }
@@ -153,7 +153,7 @@ public sealed class SyncOrchestrator(
                 {
                     BatchId = string.Empty,
                     TableCode = item.definition.TableCode,
-                    FailureRate = 1D,
+                    FailureRate = 1.000M,
                     FailureMessage = "Single-table sync failed. See detailed logs."
                 };
             }

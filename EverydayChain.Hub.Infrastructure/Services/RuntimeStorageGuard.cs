@@ -8,32 +8,32 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 RuntimeStorageGuard 类型。
 /// </summary>
 public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogger<RuntimeStorageGuard> logger) : IRuntimeStorageGuard
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 MaxTableMemoryWarningThresholdMb 字段。
     /// </summary>
     private const long MaxTableMemoryWarningThresholdMb = 65536;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DefaultBytesPerEntryEstimate 字段。
     /// </summary>
-    private const double DefaultBytesPerEntryEstimate = 1024d;
+    private const decimal DefaultBytesPerEntryEstimate = 1024.000M;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DefaultTableMemoryWarningThresholdMb 字段。
     /// </summary>
     private const long DefaultTableMemoryWarningThresholdMb = 256;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DefaultTableMemoryWarningLogIntervalSeconds 字段。
     /// </summary>
     private const int DefaultTableMemoryWarningLogIntervalSeconds = 300;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 MaxTableMemoryWarningLogIntervalSeconds 字段。
     /// </summary>
     private const int MaxTableMemoryWarningLogIntervalSeconds = 86400;
 
@@ -42,7 +42,7 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         "sync-checkpoints.json");
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _options 字段。
     /// </summary>
     private readonly SyncJobOptions _options = syncJobOptions.Value;
 
@@ -53,52 +53,52 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     private readonly object _thresholdLogLock = new();
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _startupThresholdDisabledLogged 字段。
     /// </summary>
     private bool _startupThresholdDisabledLogged;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _startupThresholdInvalidLogged 字段。
     /// </summary>
     private bool _startupThresholdInvalidLogged;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _writeThresholdDisabledLogged 字段。
     /// </summary>
     private bool _writeThresholdDisabledLogged;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _writeThresholdInvalidLogged 字段。
     /// </summary>
     private bool _writeThresholdInvalidLogged;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _tableMemoryMonitoringDisabledLogged 字段。
     /// </summary>
     private bool _tableMemoryMonitoringDisabledLogged;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _tableMemoryThresholdDisabledLogged 字段。
     /// </summary>
     private bool _tableMemoryThresholdDisabledLogged;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _tableMemoryThresholdInvalidLogged 字段。
     /// </summary>
     private bool _tableMemoryThresholdInvalidLogged;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _tableMemoryThresholdTooLargeLogged 字段。
     /// </summary>
     private bool _tableMemoryThresholdTooLargeLogged;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _tableMemoryWarningIntervalInvalidLogged 字段。
     /// </summary>
     private bool _tableMemoryWarningIntervalInvalidLogged;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _tableMemoryWarningIntervalTooLargeLogged 字段。
     /// </summary>
     private bool _tableMemoryWarningIntervalTooLargeLogged;
 
@@ -107,7 +107,7 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     private readonly object _tableMemoryWarningGateLock = new();
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _tableMemoryWarningIntervalTicksCache 字段。
     /// </summary>
     private long _tableMemoryWarningIntervalTicksCache = -1;
 
@@ -184,7 +184,7 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         }
 
         logger.LogWarning(
-            "场景【{Scene}】触发单表内存水位告警。TableCode={TableCode}, EntryCount={EntryCount}, EstimatedMemoryMb={EstimatedMemoryMb:F2}, WarningThresholdMb={WarningThresholdMb}",
+            "场景【{Scene}】触发单表内存水位告警。TableCode={TableCode}, EntryCount={EntryCount}, EstimatedMemoryMb={EstimatedMemoryMb:F3}, WarningThresholdMb={WarningThresholdMb}",
             scene,
             tableCode,
             entryCount,
@@ -324,10 +324,16 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         return _options.TableMemoryWarningThresholdMb;
     }
 
-    private static double EstimateTableMemoryMb(int entryCount)
+    /// <summary>
+    /// 根据条目数估算单表占用内存。
+    /// </summary>
+    /// <param name="entryCount">当前单表条目数。</param>
+    /// <returns>保留三位小数的内存兆字节估算值。</returns>
+    private static decimal EstimateTableMemoryMb(int entryCount)
     {
         var estimatedBytes = entryCount * DefaultBytesPerEntryEstimate;
-        return estimatedBytes / 1024d / 1024d;
+        var estimatedMemoryMb = estimatedBytes / 1024M / 1024M;
+        return Math.Round(estimatedMemoryMb, 3, MidpointRounding.AwayFromZero);
     }
 
     private bool TryAcquireTableMemoryWarningLogPermission(string tableCode)
@@ -514,21 +520,21 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         try
         {
             var driveInfo = new DriveInfo(rootPath);
-            var freeSpaceMb = driveInfo.AvailableFreeSpace / 1024d / 1024d;
+            var freeSpaceMb = Math.Round(driveInfo.AvailableFreeSpace / 1024M / 1024M, 3, MidpointRounding.AwayFromZero);
             if (freeSpaceMb >= minFreeSpaceMb)
             {
                 return;
             }
 
             logger.LogError(
-                "{Scene}失败：磁盘可用空间不足。Path={Path}, Root={Root}, FreeSpaceMb={FreeSpaceMb:F2}, ThresholdMb={ThresholdMb}",
+                "{Scene}失败：磁盘可用空间不足。Path={Path}, Root={Root}, FreeSpaceMb={FreeSpaceMb:F3}, ThresholdMb={ThresholdMb}",
                 scene,
                 targetFilePath,
                 rootPath,
                 freeSpaceMb,
                 minFreeSpaceMb);
             throw new InvalidOperationException(
-                $"{scene}失败：磁盘可用空间不足。Path={targetFilePath}, Root={rootPath}, FreeSpaceMb={freeSpaceMb:F2}, ThresholdMb={minFreeSpaceMb}");
+                $"{scene}失败：磁盘可用空间不足。Path={targetFilePath}, Root={rootPath}, FreeSpaceMb={freeSpaceMb:F3}, ThresholdMb={minFreeSpaceMb}");
         }
         catch (IOException ex)
         {
@@ -549,7 +555,7 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 CreateDiskSpaceValidationException 方法。
     /// </summary>
     private InvalidOperationException CreateDiskSpaceValidationException(
         Exception exception,
@@ -558,7 +564,7 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
         string? rootPath,
         long minFreeSpaceMb)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 CreateDiskSpaceValidationException 方法的核心处理流程。
         logger.LogError(
             exception,
             "{Scene}失败：磁盘可用空间校验异常。Path={Path}, Root={Root}, ThresholdMb={ThresholdMb}",

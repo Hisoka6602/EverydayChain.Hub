@@ -5,17 +5,17 @@ using EverydayChain.Hub.Domain.Aggregates.ScanLogAggregate;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 InMemoryScanLogRepository 类型。
 /// </summary>
 internal sealed class InMemoryScanLogRepository : IScanLogRepository
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 Logs。
     /// </summary>
     public List<ScanLogEntity> Logs { get; } = [];
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _nextId 字段。
     /// </summary>
     private long _nextId = 1;
 
@@ -41,7 +41,7 @@ internal sealed class InMemoryScanLogRepository : IScanLogRepository
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryRangeAsync 方法。
     /// </summary>
     public Task<IReadOnlyList<ScanLogEntity>> QueryRangeAsync(
         DateTime startTimeLocal,
@@ -50,7 +50,7 @@ internal sealed class InMemoryScanLogRepository : IScanLogRepository
         string? deviceCode,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryRangeAsync 方法的核心处理流程。
         var normalizedBarcode = string.IsNullOrWhiteSpace(barcode) ? null : barcode.Trim();
         var normalizedDeviceCode = string.IsNullOrWhiteSpace(deviceCode) ? null : deviceCode.Trim();
         IReadOnlyList<ScanLogEntity> items = Logs
@@ -64,7 +64,7 @@ internal sealed class InMemoryScanLogRepository : IScanLogRepository
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryPageAsync 方法。
     /// </summary>
     public Task<(int TotalCount, IReadOnlyList<ScanLogEntity> Items)> QueryPageAsync(
         DateTime startTimeLocal,
@@ -75,7 +75,7 @@ internal sealed class InMemoryScanLogRepository : IScanLogRepository
         int take,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryPageAsync 方法的核心处理流程。
         var normalizedBarcode = string.IsNullOrWhiteSpace(barcode) ? null : barcode.Trim();
         var normalizedDeviceCode = string.IsNullOrWhiteSpace(deviceCode) ? null : deviceCode.Trim();
         var ordered = Logs

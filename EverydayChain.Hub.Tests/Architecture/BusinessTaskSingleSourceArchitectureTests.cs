@@ -8,7 +8,7 @@ using Xunit;
 namespace EverydayChain.Hub.Tests.Architecture;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskSingleSourceArchitectureTests 类型。
 /// </summary>
 public class BusinessTaskSingleSourceArchitectureTests
 {
@@ -72,8 +72,10 @@ public class BusinessTaskSingleSourceArchitectureTests
 
     private static HubDbContext CreateDbContext()
     {
-        var connectionString = Environment.GetEnvironmentVariable("HUB_TEST_SQLSERVER_CONNECTION_STRING")
-            ?? "Server=127.0.0.1;Database=Placeholder;User Id=Placeholder;Password=Placeholder;TrustServerCertificate=True;";
+        /// <summary>
+        /// 存储仅用于读取模型元数据的占位连接串。
+        /// </summary>
+        const string connectionString = "Server=127.0.0.1;Database=Placeholder;User Id=Placeholder;Password=Placeholder;TrustServerCertificate=True;";
         var dbContextOptions = new DbContextOptionsBuilder<HubDbContext>()
             .UseSqlServer(connectionString)
             .Options;

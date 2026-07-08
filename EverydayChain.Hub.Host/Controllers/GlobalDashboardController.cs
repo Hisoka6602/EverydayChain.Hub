@@ -12,7 +12,7 @@ using System.Text;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 提供总看板查询、导出与手工同步接口，用于展示整体分拣进度、读码表现与数据同步状态。
 /// </summary>
 [ApiController]
 [Route("api/v1/dashboard")]
@@ -21,29 +21,33 @@ public sealed class GlobalDashboardController : QueryControllerBase
     private static readonly UTF8Encoding Utf8EncodingWithBom = new(true);
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _globalDashboardQueryService 字段。
     /// </summary>
     private readonly IGlobalDashboardQueryService _globalDashboardQueryService;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _syncOrchestrator 字段。
     /// </summary>
     private readonly ISyncOrchestrator _syncOrchestrator;
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 GlobalDashboardController 方法。
     /// </summary>
     public GlobalDashboardController(
         IGlobalDashboardQueryService globalDashboardQueryService,
         ISyncOrchestrator? syncOrchestrator = null)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 GlobalDashboardController 方法的核心处理流程。
         _globalDashboardQueryService = globalDashboardQueryService;
         _syncOrchestrator = syncOrchestrator ?? new NoopSyncOrchestrator();
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 查询总看板汇总，返回指定时间段内的总件量、待分拣量、分拣进度、回流量、异常量与同步进度。
     /// </summary>
+    /// <param name="request">请求体查询条件，指定统计时间范围。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>总看板汇总结果。</returns>
     [HttpPost("overview")]
     [ProducesResponseType(typeof(ApiResponse<GlobalDashboardResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<GlobalDashboardResponse>), StatusCodes.Status400BadRequest)]
@@ -52,7 +56,7 @@ public sealed class GlobalDashboardController : QueryControllerBase
         [FromQuery] GlobalDashboardQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryOverviewAsync 方法的核心处理流程。
         if (!TryResolveQuery(request, queryRequest, out var resolvedRequest, out var validationResult))
         {
             return validationResult!;
@@ -63,8 +67,12 @@ public sealed class GlobalDashboardController : QueryControllerBase
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 导出总看板 CSV 文件，包含页面展示的核心统计指标与汇总数据。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>CSV 文件流。</returns>
     [HttpPost("export/csv")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -73,7 +81,7 @@ public sealed class GlobalDashboardController : QueryControllerBase
         [FromQuery] GlobalDashboardQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportOverviewCsvAsync 方法的核心处理流程。
         if (!TryResolveQuery(request, queryRequest, out var resolvedRequest, out var validationResult))
         {
             return validationResult!;
@@ -85,8 +93,12 @@ public sealed class GlobalDashboardController : QueryControllerBase
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 导出总看板 Excel 文件，便于业务侧做二次整理与存档。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>Excel 文件流。</returns>
     [HttpPost("export/xlsx")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -95,7 +107,7 @@ public sealed class GlobalDashboardController : QueryControllerBase
         [FromQuery] GlobalDashboardQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportOverviewXlsxAsync 方法的核心处理流程。
         if (!TryResolveQuery(request, queryRequest, out var resolvedRequest, out var validationResult))
         {
             return validationResult!;
@@ -109,15 +121,18 @@ public sealed class GlobalDashboardController : QueryControllerBase
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 手工触发同步任务，可指定单张源表或对全部启用表执行一次立即同步。
     /// </summary>
+    /// <param name="request">手工同步请求，可选指定表编码。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>同步批次执行结果。</returns>
     [HttpPost("sync")]
     [ProducesResponseType(typeof(ApiResponse<ManualSyncResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApiResponse<ManualSyncResponse>>> TriggerSyncAsync(
         [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] ManualSyncRequest? request,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 TriggerSyncAsync 方法的核心处理流程。
         var triggeredAtLocal = DateTime.Now;
         var normalizedTableCode = string.IsNullOrWhiteSpace(request?.TableCode) ? null : request.TableCode.Trim();
         IReadOnlyList<SyncBatchResult> results = normalizedTableCode is null
@@ -149,7 +164,7 @@ public sealed class GlobalDashboardController : QueryControllerBase
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 TryResolveQuery 方法。
     /// </summary>
     private bool TryResolveQuery(
         GlobalDashboardQueryRequest? request,
@@ -157,7 +172,7 @@ public sealed class GlobalDashboardController : QueryControllerBase
         out EverydayChain.Hub.Application.Models.GlobalDashboardQueryRequest? resolvedRequest,
         out ActionResult? validationResult)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 TryResolveQuery 方法的核心处理流程。
         resolvedRequest = null;
         validationResult = null;
 
@@ -276,7 +291,7 @@ public sealed class GlobalDashboardController : QueryControllerBase
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 NoopSyncOrchestrator 类型。
     /// </summary>
     private sealed class NoopSyncOrchestrator : ISyncOrchestrator
     {

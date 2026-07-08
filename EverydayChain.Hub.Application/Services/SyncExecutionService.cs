@@ -12,7 +12,7 @@ using Newtonsoft.Json;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncExecutionService 类型。
 /// </summary>
 public class SyncExecutionService(
     IOracleSourceReader oracleSourceReader,
@@ -27,17 +27,17 @@ public class SyncExecutionService(
     ILogger<SyncExecutionService> logger) : ISyncExecutionService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 ErrorCheckpointSaveTimeoutSeconds 字段。
     /// </summary>
     private const int ErrorCheckpointSaveTimeoutSeconds = 3;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 StatusDrivenBusinessTaskLogicalTable 字段。
     /// </summary>
     private const string StatusDrivenBusinessTaskLogicalTable = "business_tasks";
     private const string FailBatchStatusUpdateErrorLogTemplate = "更新同步失败批次状态异常。TableCode={TableCode}, BatchId={BatchId}";
     private const string FailBatchOnCancelErrorLogTemplate = "在处理同步批次取消时更新批次失败。TableCode={TableCode}, BatchId={BatchId}";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 FullySkippedPageWarningInterval 字段。
     /// </summary>
     private const int FullySkippedPageWarningInterval = 100;
     private static readonly JsonSerializerSettings SnapshotSerializerSettings = new()
@@ -248,7 +248,7 @@ public class SyncExecutionService(
                 LagMinutes = metrics.LagMinutes,
                 BacklogMinutes = metrics.BacklogMinutes,
                 ThroughputRowsPerSecond = metrics.ThroughputRowsPerSecond,
-                FailureRate = 0,
+                FailureRate = 0.000M,
             };
             await batchRepository.CompleteBatchAsync(batchResult, DateTime.Now, ct);
             logger.LogInformation(
@@ -284,7 +284,7 @@ public class SyncExecutionService(
                 metrics.LagMinutes,
                 metrics.BacklogMinutes,
                 metrics.ThroughputRowsPerSecond,
-                1D);
+                1.000M);
             logger.LogInformation("同步批次已取消。TableCode={TableCode}, BatchId={BatchId}", context.Definition.TableCode, context.BatchId);
             await TryMarkBatchFailedAsync(
                 batchPersistedToRepository,
@@ -303,7 +303,7 @@ public class SyncExecutionService(
                 metrics.LagMinutes,
                 metrics.BacklogMinutes,
                 metrics.ThroughputRowsPerSecond,
-                1D);
+                1.000M);
             logger.LogError(ex, "同步批次执行失败。TableCode={TableCode}, BatchId={BatchId}, Window=[{WindowStartLocal},{WindowEndLocal}], Checkpoint={Checkpoint}",
                 context.Definition.TableCode,
                 context.BatchId,
@@ -371,39 +371,88 @@ public class SyncExecutionService(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 计算同步批次日志与落库需要的三项核心指标。
     /// </summary>
-    private static (double LagMinutes, double BacklogMinutes, double ThroughputRowsPerSecond) BuildMetrics(
+    private static (decimal LagMinutes, decimal BacklogMinutes, decimal ThroughputRowsPerSecond) BuildMetrics(
         SyncWindow window,
         int processedRows,
         TimeSpan elapsed)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：基于同步窗口边界计算滞后和积压分钟数。
+        // 步骤：基于实际处理行数和耗时计算吞吐。
         return (
             CalculateLagMinutes(window.WindowEndLocal),
             CalculateBacklogMinutes(window.WindowStartLocal),
             CalculateThroughputRowsPerSecond(processedRows, elapsed));
     }
 
-    private static double CalculateLagMinutes(DateTime windowEndLocal)
+    /// <summary>
+    /// 计算同步窗口结束时间到当前时间的滞后分钟数。
+    /// </summary>
+    /// <param name="windowEndLocal">同步窗口结束时间。</param>
+    /// <returns>保留三位小数的滞后分钟数。</returns>
+    private static decimal CalculateLagMinutes(DateTime windowEndLocal)
     {
-        var lag = DateTime.Now - windowEndLocal;
-        return lag.TotalMinutes < 0 ? 0 : lag.TotalMinutes;
-    }
-
-    private static double CalculateBacklogMinutes(DateTime windowStartLocal)
-    {
-        var backlog = DateTime.Now - windowStartLocal;
-        return backlog.TotalMinutes < 0 ? 0 : backlog.TotalMinutes;
-    }
-
-    private static double CalculateThroughputRowsPerSecond(int processedRows, TimeSpan elapsed)
-    {
-        return elapsed.TotalSeconds <= 0 ? 0 : processedRows / elapsed.TotalSeconds;
+        var lagTicks = DateTime.Now.Ticks - windowEndLocal.Ticks;
+        return CalculateNonNegativeMinutes(lagTicks);
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 计算同步窗口开始时间到当前时间的积压分钟数。
+    /// </summary>
+    /// <param name="windowStartLocal">同步窗口开始时间。</param>
+    /// <returns>保留三位小数的积压分钟数。</returns>
+    private static decimal CalculateBacklogMinutes(DateTime windowStartLocal)
+    {
+        var backlogTicks = DateTime.Now.Ticks - windowStartLocal.Ticks;
+        return CalculateNonNegativeMinutes(backlogTicks);
+    }
+
+    /// <summary>
+    /// 计算每秒处理行数。
+    /// </summary>
+    /// <param name="processedRows">已处理行数。</param>
+    /// <param name="elapsed">实际耗时。</param>
+    /// <returns>保留三位小数的每秒处理行数。</returns>
+    private static decimal CalculateThroughputRowsPerSecond(int processedRows, TimeSpan elapsed)
+    {
+        if (processedRows <= 0 || elapsed.Ticks <= 0)
+        {
+            return 0.000M;
+        }
+
+        var throughput = processedRows * (decimal)TimeSpan.TicksPerSecond / elapsed.Ticks;
+        return RoundFixedDecimal(throughput);
+    }
+
+    /// <summary>
+    /// 将时钟差值转换为非负分钟数。
+    /// </summary>
+    /// <param name="ticks">时间差对应的 Tick 数。</param>
+    /// <returns>保留三位小数的分钟数。</returns>
+    private static decimal CalculateNonNegativeMinutes(long ticks)
+    {
+        if (ticks <= 0)
+        {
+            return 0.000M;
+        }
+
+        var minutes = ticks / (decimal)TimeSpan.TicksPerMinute;
+        return RoundFixedDecimal(minutes);
+    }
+
+    /// <summary>
+    /// 统一将小数规整为三位定点精度。
+    /// </summary>
+    /// <param name="value">待规整的小数值。</param>
+    /// <returns>保留三位小数的定点值。</returns>
+    private static decimal RoundFixedDecimal(decimal value)
+    {
+        return Math.Round(value, 3, MidpointRounding.AwayFromZero);
+    }
+
+    /// <summary>
+    /// 执行 AppendChangeLogs 方法。
     /// </summary>
     private static void AppendChangeLogs(
         SyncExecutionContext context,
@@ -411,7 +460,7 @@ public class SyncExecutionService(
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows,
         IReadOnlyDictionary<string, SyncChangeOperationType> changedOperations)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 AppendChangeLogs 方法的核心处理流程。
         var nowLocal = DateTime.Now;
         foreach (var row in rows)
         {
@@ -525,7 +574,9 @@ public class SyncExecutionService(
                 LagMinutes = metrics.LagMinutes,
                 BacklogMinutes = metrics.BacklogMinutes,
                 ThroughputRowsPerSecond = metrics.ThroughputRowsPerSecond,
-                FailureRate = consumeResult.WriteBackFailCount > 0 ? (double)consumeResult.WriteBackFailCount / Math.Max(1, consumeResult.ReadCount) : 0,
+                FailureRate = consumeResult.WriteBackFailCount > 0
+                    ? RoundFixedDecimal(consumeResult.WriteBackFailCount / (decimal)Math.Max(1, consumeResult.ReadCount))
+                    : 0.000M,
             };
             await batchRepository.CompleteBatchAsync(batchResult, DateTime.Now, ct);
             logger.LogInformation(
@@ -560,7 +611,7 @@ public class SyncExecutionService(
                 context.BatchId,
                 metrics.LagMinutes,
                 metrics.ThroughputRowsPerSecond,
-                1D);
+                1.000M);
             logger.LogInformation("状态驱动消费批次已取消。TableCode={TableCode}, BatchId={BatchId}", context.Definition.TableCode, context.BatchId);
             await TryMarkBatchFailedAsync(batchPersistedToRepository, context, "同步任务被取消。", FailBatchOnCancelErrorLogTemplate);
             throw;
@@ -574,7 +625,7 @@ public class SyncExecutionService(
                 context.BatchId,
                 metrics.LagMinutes,
                 metrics.ThroughputRowsPerSecond,
-                1D);
+                1.000M);
             logger.LogError(ex, "状态驱动消费批次执行失败。TableCode={TableCode}, BatchId={BatchId}", context.Definition.TableCode, context.BatchId);
             using var errorCheckpointCts = new CancellationTokenSource(TimeSpan.FromSeconds(ErrorCheckpointSaveTimeoutSeconds));
             await TryMarkBatchFailedAsync(batchPersistedToRepository, context, ex.Message, FailBatchStatusUpdateErrorLogTemplate);

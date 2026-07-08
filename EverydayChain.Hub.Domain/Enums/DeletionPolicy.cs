@@ -3,7 +3,7 @@
 namespace EverydayChain.Hub.Domain.Enums;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 DeletionPolicy 类型。
 /// </summary>
 public enum DeletionPolicy
 {

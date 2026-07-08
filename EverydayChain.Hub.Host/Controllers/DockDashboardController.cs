@@ -9,34 +9,38 @@ using System.Text;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 提供码头看板查询与导出接口，用于按波次查看各码头的待分拣、已分拣、回流与异常情况。
 /// </summary>
 [ApiController]
 [Route("api/v1/dock-dashboard")]
 public sealed class DockDashboardController : QueryControllerBase
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 Utf8EncodingWithBom 字段。
     /// </summary>
     private static readonly UTF8Encoding Utf8EncodingWithBom = new(true);
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _dockDashboardQueryService 字段。
     /// </summary>
     private readonly IDockDashboardQueryService _dockDashboardQueryService;
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 DockDashboardController 方法。
     /// </summary>
     public DockDashboardController(IDockDashboardQueryService dockDashboardQueryService)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 DockDashboardController 方法的核心处理流程。
         _dockDashboardQueryService = dockDashboardQueryService;
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 查询码头看板汇总，返回每个码头在指定时间范围或指定波次下的作业统计。
     /// </summary>
+    /// <param name="request">请求体查询条件，支持按时间范围与波次筛选。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>码头看板汇总结果。</returns>
     [HttpPost("overview")]
     [ProducesResponseType(typeof(ApiResponse<DockDashboardResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<DockDashboardResponse>), StatusCodes.Status400BadRequest)]
@@ -45,7 +49,7 @@ public sealed class DockDashboardController : QueryControllerBase
         [FromQuery] DockDashboardQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryOverviewAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         var todayLocal = DateTime.SpecifyKind(DateTime.Today, DateTimeKind.Local);
         if (!LocalTimeRangeValidator.TryNormalizeOptionalRange(resolvedRequest.StartTimeLocal, resolvedRequest.EndTimeLocal, todayLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
@@ -84,8 +88,12 @@ public sealed class DockDashboardController : QueryControllerBase
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 导出码头看板 CSV 文件，包含各码头的待分拣量、已分拣量、回流量、异常量与进度。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>CSV 文件流。</returns>
     [HttpPost("export/csv")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -94,7 +102,7 @@ public sealed class DockDashboardController : QueryControllerBase
         [FromQuery] DockDashboardQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportCsvAsync 方法的核心处理流程。
         var queryResult = await QueryInternalAsync(request, queryRequest, cancellationToken);
         if (queryResult.Result is not null)
         {
@@ -107,8 +115,12 @@ public sealed class DockDashboardController : QueryControllerBase
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 导出码头看板 Excel 文件，适合线下汇总、筛选与发送报表。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>Excel 文件流。</returns>
     [HttpPost("export/xlsx")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -117,7 +129,7 @@ public sealed class DockDashboardController : QueryControllerBase
         [FromQuery] DockDashboardQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportXlsxAsync 方法的核心处理流程。
         var queryResult = await QueryInternalAsync(request, queryRequest, cancellationToken);
         if (queryResult.Result is not null)
         {
@@ -144,14 +156,14 @@ public sealed class DockDashboardController : QueryControllerBase
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryInternalAsync 方法。
     /// </summary>
     private async Task<(EverydayChain.Hub.Application.Models.DockDashboardQueryResult? Value, ActionResult? Result)> QueryInternalAsync(
         DockDashboardQueryRequest? request,
         DockDashboardQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryInternalAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         var todayLocal = DateTime.SpecifyKind(DateTime.Today, DateTimeKind.Local);
         if (!LocalTimeRangeValidator.TryNormalizeOptionalRange(resolvedRequest.StartTimeLocal, resolvedRequest.EndTimeLocal, todayLocal, out var normalizedStart, out var normalizedEnd, out var validationMessage))
@@ -169,11 +181,11 @@ public sealed class DockDashboardController : QueryControllerBase
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildCsv 方法。
     /// </summary>
     private static string BuildCsv(EverydayChain.Hub.Application.Models.DockDashboardQueryResult result)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildCsv 方法的核心处理流程。
         var builder = new StringBuilder();
         builder.AppendLine("DockCode,SplitUnsortedCount,FullCaseUnsortedCount,RecirculatedCount,ExceptionCount,SortedCount,SortedProgressPercent");
         foreach (var summary in result.DockSummaries)
@@ -192,11 +204,11 @@ public sealed class DockDashboardController : QueryControllerBase
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildUtf8BomCsvBytes 方法。
     /// </summary>
     private static byte[] BuildUtf8BomCsvBytes(string csvContent)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildUtf8BomCsvBytes 方法的核心处理流程。
         var preamble = Utf8EncodingWithBom.GetPreamble();
         var contentBytes = Utf8EncodingWithBom.GetBytes(csvContent);
         var bytes = new byte[preamble.Length + contentBytes.Length];
@@ -206,11 +218,11 @@ public sealed class DockDashboardController : QueryControllerBase
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 EscapeCsvField 方法。
     /// </summary>
     private static string EscapeCsvField(string? value)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 EscapeCsvField 方法的核心处理流程。
         if (string.IsNullOrEmpty(value))
         {
             return string.Empty;

@@ -6,7 +6,7 @@ using EverydayChain.Hub.Domain.Sync;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncStagingRepository 类型。
 /// </summary>
 public class SyncStagingRepository : ISyncStagingRepository
 {

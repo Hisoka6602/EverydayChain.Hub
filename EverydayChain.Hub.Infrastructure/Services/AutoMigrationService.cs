@@ -14,7 +14,7 @@ using System.Data;
 namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 AutoMigrationService 类型。
 /// </summary>
 public class AutoMigrationService(
     IDbContextFactory<HubDbContext> dbContextFactory,
@@ -27,37 +27,37 @@ public class AutoMigrationService(
     ILogger<AutoMigrationService> logger) : IAutoMigrationService {
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 ExpectedMigrationSchema 字段。
     /// </summary>
     private const string ExpectedMigrationSchema = "dbo";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 BaselineMigrationId 字段。
     /// </summary>
     private const string BaselineMigrationId = "20260418204107_RebuildHubBaselineV2";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 BaselineProductVersion 字段。
     /// </summary>
     private const string BaselineProductVersion = "9.0.14";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 StartupMetadataProbeTimeoutSeconds 字段。
     /// </summary>
     private const int StartupMetadataProbeTimeoutSeconds = 15;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _options 字段。
     /// </summary>
     private readonly ShardingOptions _options = shardingOptions.Value;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _dangerZoneOptions 字段。
     /// </summary>
     private readonly DangerZoneOptions _dangerZoneOptions = dangerZoneOptions.Value;
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 RunAsync 方法。
     /// </summary>
     public async Task RunAsync(CancellationToken cancellationToken) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 RunAsync 方法的核心处理流程。
         LogConnectionSecuritySnapshot();
         ValidateMigrationSchemaOrThrow();
 
@@ -74,16 +74,16 @@ public class AutoMigrationService(
         var localNow = DateTimeOffset.Now;
         var suffixes = BuildBootstrapSuffixes(resolver, localNow, _options.AutoCreateMonthsAhead);
         /// <summary>
-        /// 执行当前方法。
+        /// 执行 ExecuteShardMaintenanceAsync 方法。
         /// </summary>
         await ExecuteShardMaintenanceAsync(shardTableProvisioner, shardSchemaSynchronizer, logger, suffixes, cancellationToken);
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildBootstrapSuffixes 方法。
     /// </summary>
     internal static IReadOnlyList<string> BuildBootstrapSuffixes(IShardSuffixResolver suffixResolver, DateTimeOffset localNow, int monthsAhead) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildBootstrapSuffixes 方法的核心处理流程。
         return suffixResolver.ResolveBootstrapSuffixes(localNow, monthsAhead)
             .Where(suffix => !string.IsNullOrWhiteSpace(suffix))
             .Distinct(StringComparer.Ordinal)
@@ -91,7 +91,7 @@ public class AutoMigrationService(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExecuteShardMaintenanceAsync 方法。
     /// </summary>
     internal static async Task ExecuteShardMaintenanceAsync(
         IShardTableProvisioner shardTableProvisioner,
@@ -100,7 +100,7 @@ public class AutoMigrationService(
         IReadOnlyList<string> suffixes,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExecuteShardMaintenanceAsync 方法的核心处理流程。
         logger.LogInformation("自动迁移: 开始预创建启动期分表。SuffixCount={SuffixCount}", suffixes.Count);
         await shardTableProvisioner.EnsureShardTablesAsync(suffixes, cancellationToken);
         logger.LogInformation("自动迁移: 启动期分表预创建已完成。SuffixCount={SuffixCount}", suffixes.Count);
@@ -111,14 +111,14 @@ public class AutoMigrationService(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ShouldMarkBaselineMigration 方法。
     /// </summary>
     internal static bool ShouldMarkBaselineMigration(
         IReadOnlyList<string> allMigrations,
         IReadOnlyCollection<string> appliedMigrations,
         int existingCoreTableCount)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ShouldMarkBaselineMigration 方法的核心处理流程。
         if (allMigrations.Count != 1)
         {
             return false;
@@ -139,10 +139,10 @@ public class AutoMigrationService(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ValidateMigrationSchemaOrThrow 方法。
     /// </summary>
     private void ValidateMigrationSchemaOrThrow() {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ValidateMigrationSchemaOrThrow 方法的核心处理流程。
         if (string.Equals(_options.Schema, ExpectedMigrationSchema, StringComparison.OrdinalIgnoreCase)) {
             return;
         }
@@ -157,10 +157,10 @@ public class AutoMigrationService(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 LogConnectionSecuritySnapshot 方法。
     /// </summary>
     private void LogConnectionSecuritySnapshot() {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 LogConnectionSecuritySnapshot 方法的核心处理流程。
         try {
             var builder = new SqlConnectionStringBuilder(_options.ConnectionString);
             logger.LogInformation(
@@ -178,10 +178,10 @@ public class AutoMigrationService(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 EnsureDatabaseCreatedAsync 方法。
     /// </summary>
     private async Task EnsureDatabaseCreatedAsync(HubDbContext dbContext, CancellationToken cancellationToken) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 EnsureDatabaseCreatedAsync 方法的核心处理流程。
         var dbConnection = dbContext.Database.GetDbConnection();
         var dataSource = dbConnection.DataSource;
         var initialCatalog = dbConnection.Database;
@@ -290,10 +290,10 @@ public class AutoMigrationService(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 LogPendingMigrationsAsync 方法。
     /// </summary>
     private async Task LogPendingMigrationsAsync(HubDbContext dbContext, CancellationToken cancellationToken) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 LogPendingMigrationsAsync 方法的核心处理流程。
         var pendingMigrations = await dbContext.Database.GetPendingMigrationsAsync(cancellationToken);
         var pendingMigrationList = pendingMigrations.ToList();
         if (pendingMigrationList.Count == 0) {

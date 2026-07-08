@@ -1,14 +1,14 @@
-namespace EverydayChain.Hub.SharedKernel.Utilities;
+﻿namespace EverydayChain.Hub.SharedKernel.Utilities;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 LocalDateTimeNormalizer 类型。
 /// </summary>
 public static class LocalDateTimeNormalizer {
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 TryNormalize 方法。
     /// </summary>
     public static bool TryNormalize(DateTime candidateTime, string invalidKindMessage, out DateTime normalizedTime, out string validationMessage) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 TryNormalize 方法的核心处理流程。
         if (candidateTime.Kind != DateTimeKind.Local && candidateTime.Kind != DateTimeKind.Unspecified) {
             normalizedTime = default;
             validationMessage = invalidKindMessage;

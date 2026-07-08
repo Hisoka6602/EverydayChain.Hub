@@ -3,7 +3,7 @@
 namespace EverydayChain.Hub.Domain.Enums;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncChangeOperationType 类型。
 /// </summary>
 public enum SyncChangeOperationType
 {

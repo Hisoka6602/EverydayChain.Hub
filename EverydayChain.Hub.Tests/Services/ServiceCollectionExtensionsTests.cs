@@ -11,7 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ServiceCollectionExtensionsTests 类型。
 /// </summary>
 public class ServiceCollectionExtensionsTests
 {

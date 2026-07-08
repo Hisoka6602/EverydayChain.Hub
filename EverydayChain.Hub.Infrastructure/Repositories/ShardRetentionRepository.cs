@@ -1,4 +1,4 @@
-﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Services;
 using Microsoft.Data.SqlClient;
@@ -10,7 +10,8 @@ using System.Text.RegularExpressions;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 提供保留期治理底层数据库操作。
+/// 既支持删除旧分表，也支持按时间列删除固定表中的旧数据行。
 /// </summary>
 public class ShardRetentionRepository(
     IOptions<ShardingOptions> shardingOptions,
@@ -18,15 +19,27 @@ public class ShardRetentionRepository(
     ILogger<ShardRetentionRepository> logger) : IShardRetentionRepository
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储保留期治理命令超时秒数。
     /// </summary>
     private const int RetentionCommandTimeoutSeconds = 30;
-    private static readonly Regex SqlIdentifierRegex = new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
+
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储安全 SQL 标识符校验规则。
+    /// </summary>
+    private static readonly Regex SqlIdentifierRegex = new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
+
+    /// <summary>
+    /// 存储分表配置。
     /// </summary>
     private readonly ShardingOptions _options = shardingOptions.Value;
 
+    /// <summary>
+    /// 为指定分表生成回滚脚本。
+    /// </summary>
+    /// <param name="logicalTableName">逻辑表名。</param>
+    /// <param name="physicalTableName">物理分表名。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>回滚脚本文本。</returns>
     public Task<string> GenerateRollbackScriptAsync(string logicalTableName, string physicalTableName, CancellationToken ct)
     {
         if (!IsSafeSqlIdentifier(_options.Schema) || !IsSafeSqlIdentifier(physicalTableName))
@@ -235,6 +248,13 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
         }, ct);
     }
 
+    /// <summary>
+    /// 删除指定旧分表。
+    /// </summary>
+    /// <param name="logicalTableName">逻辑表名。</param>
+    /// <param name="physicalTableName">物理分表名。</param>
+    /// <param name="rollbackScript">回滚脚本。</param>
+    /// <param name="ct">取消令牌。</param>
     public Task DropShardTableAsync(string logicalTableName, string physicalTableName, string rollbackScript, CancellationToken ct)
     {
         if (!IsSafeSqlIdentifier(_options.Schema) || !IsSafeSqlIdentifier(physicalTableName))
@@ -259,11 +279,135 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
         }, ct);
     }
 
+    /// <summary>
+    /// 统计固定表中早于阈值时间的旧数据行数量。
+    /// </summary>
+    /// <param name="tableName">固定表名。</param>
+    /// <param name="timeColumnName">时间列名。</param>
+    /// <param name="thresholdTimeLocal">本地时间阈值。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>旧数据行数量。</returns>
+    public Task<int> CountRowsBeforeAsync(string tableName, string timeColumnName, DateTime thresholdTimeLocal, CancellationToken ct)
+    {
+        ValidateSafeTableAndColumn(tableName, timeColumnName);
+
+        return dangerZoneExecutor.ExecuteAsync($"count-retention-rows-{tableName}", async token =>
+        {
+            var sql = $"""
+IF OBJECT_ID(N'[{_options.Schema}].[{tableName}]', N'U') IS NULL
+BEGIN
+    SELECT 0;
+END
+ELSE
+BEGIN
+    SELECT COUNT_BIG(1)
+    FROM [{_options.Schema}].[{tableName}]
+    WHERE [{timeColumnName}] < @thresholdTimeLocal;
+END
+""";
+
+            await using var connection = new SqlConnection(_options.ConnectionString);
+            await connection.OpenAsync(token);
+            await using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.CommandTimeout = RetentionCommandTimeoutSeconds;
+            command.Parameters.Add(new SqlParameter("@thresholdTimeLocal", thresholdTimeLocal));
+            var scalar = await command.ExecuteScalarAsync(token);
+            var rowCount = scalar is null or DBNull ? 0L : Convert.ToInt64(scalar);
+            return rowCount > int.MaxValue ? int.MaxValue : Convert.ToInt32(rowCount);
+        }, ct);
+    }
+
+    /// <summary>
+    /// 按时间列批量删除固定表中的旧数据行。
+    /// </summary>
+    /// <param name="tableName">固定表名。</param>
+    /// <param name="timeColumnName">时间列名。</param>
+    /// <param name="thresholdTimeLocal">本地时间阈值。</param>
+    /// <param name="batchSize">单批删除行数。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>实际删除的总行数。</returns>
+    public Task<int> DeleteRowsBeforeAsync(string tableName, string timeColumnName, DateTime thresholdTimeLocal, int batchSize, CancellationToken ct)
+    {
+        ValidateSafeTableAndColumn(tableName, timeColumnName);
+        var effectiveBatchSize = batchSize > 0 ? batchSize : 10000;
+
+        return dangerZoneExecutor.ExecuteAsync($"delete-retention-rows-{tableName}", async token =>
+        {
+            // 步骤：循环执行小批量删除，降低大表长事务与锁竞争风险。
+            var deleteSql = $"""
+IF OBJECT_ID(N'[{_options.Schema}].[{tableName}]', N'U') IS NULL
+BEGIN
+    SELECT 0;
+END
+ELSE
+BEGIN
+    DELETE TOP (@batchSize)
+    FROM [{_options.Schema}].[{tableName}]
+    WHERE [{timeColumnName}] < @thresholdTimeLocal;
+    SELECT @@ROWCOUNT;
+END
+""";
+
+            await using var connection = new SqlConnection(_options.ConnectionString);
+            await connection.OpenAsync(token);
+            var deletedRows = 0;
+            while (true)
+            {
+                token.ThrowIfCancellationRequested();
+                await using var command = connection.CreateCommand();
+                command.CommandText = deleteSql;
+                command.CommandTimeout = RetentionCommandTimeoutSeconds;
+                command.Parameters.Add(new SqlParameter("@batchSize", effectiveBatchSize));
+                command.Parameters.Add(new SqlParameter("@thresholdTimeLocal", thresholdTimeLocal));
+                var scalar = await command.ExecuteScalarAsync(token);
+                var affectedRows = scalar is null or DBNull ? 0 : Convert.ToInt32(scalar);
+                if (affectedRows <= 0)
+                {
+                    break;
+                }
+
+                deletedRows += affectedRows;
+                if (affectedRows < effectiveBatchSize)
+                {
+                    break;
+                }
+            }
+
+            return deletedRows;
+        }, ct);
+    }
+
+    /// <summary>
+    /// 校验表名与列名安全性。
+    /// </summary>
+    /// <param name="tableName">表名。</param>
+    /// <param name="timeColumnName">时间列名。</param>
+    private void ValidateSafeTableAndColumn(string tableName, string timeColumnName)
+    {
+        if (!IsSafeSqlIdentifier(_options.Schema) || !IsSafeSqlIdentifier(tableName) || !IsSafeSqlIdentifier(timeColumnName))
+        {
+            throw new InvalidOperationException($"固定表保留期参数不合法。Schema={_options.Schema}, Table={tableName}, TimeColumn={timeColumnName}");
+        }
+    }
+
+    /// <summary>
+    /// 判断 SQL 标识符是否安全。
+    /// </summary>
+    /// <param name="identifier">待校验标识符。</param>
+    /// <returns>安全时返回真。</returns>
     private static bool IsSafeSqlIdentifier(string identifier)
     {
         return !string.IsNullOrWhiteSpace(identifier) && SqlIdentifierRegex.IsMatch(identifier);
     }
 
+    /// <summary>
+    /// 创建元数据查询命令。
+    /// </summary>
+    /// <param name="connection">数据库连接。</param>
+    /// <param name="sql">查询脚本。</param>
+    /// <param name="tableName">表名。</param>
+    /// <returns>命令对象。</returns>
     private SqlCommand CreateMetadataCommand(SqlConnection connection, string sql, string tableName)
     {
         var command = connection.CreateCommand();
@@ -274,6 +418,11 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
         return command;
     }
 
+    /// <summary>
+    /// 构建列类型 SQL。
+    /// </summary>
+    /// <param name="column">列元数据。</param>
+    /// <returns>列类型 SQL。</returns>
     private static string BuildTypeSql(ColumnMetadata column)
     {
         var typeName = column.TypeName.ToLowerInvariant();
@@ -286,6 +435,11 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
         };
     }
 
+    /// <summary>
+    /// 获取 Unicode 类型长度 SQL。
+    /// </summary>
+    /// <param name="maxLength">最大长度。</param>
+    /// <returns>长度 SQL。</returns>
     private static string GetUnicodeLengthSql(short maxLength)
     {
         if (maxLength < 0)
@@ -296,14 +450,27 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
         return (maxLength / 2).ToString();
     }
 
+    /// <summary>
+    /// 获取普通类型长度 SQL。
+    /// </summary>
+    /// <param name="maxLength">最大长度。</param>
+    /// <returns>长度 SQL。</returns>
     private static string GetLengthSql(short maxLength)
     {
         return maxLength < 0 ? "MAX" : maxLength.ToString();
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 表示列元数据。
     /// </summary>
+    /// <param name="ColumnId">列序号。</param>
+    /// <param name="ColumnName">列名。</param>
+    /// <param name="TypeName">类型名。</param>
+    /// <param name="MaxLength">最大长度。</param>
+    /// <param name="NumericPrecision">数值精度。</param>
+    /// <param name="NumericScale">数值小数位。</param>
+    /// <param name="IsNullable">是否允许空。</param>
+    /// <param name="IsIdentity">是否自增。</param>
     private readonly record struct ColumnMetadata(
         int ColumnId,
         string ColumnName,
@@ -315,16 +482,30 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
         bool IsIdentity);
 
     /// <summary>
-    /// 定义当前类型。
+    /// 表示主键列元数据。
     /// </summary>
+    /// <param name="ConstraintName">约束名。</param>
+    /// <param name="ColumnName">列名。</param>
+    /// <param name="IsDescending">是否倒序。</param>
     private readonly record struct PrimaryKeyColumnMetadata(
         string ConstraintName,
         string ColumnName,
         bool IsDescending);
 
     /// <summary>
-    /// 定义当前类型。
+    /// 表示索引行元数据。
     /// </summary>
+    /// <param name="IndexName">索引名。</param>
+    /// <param name="IsUnique">是否唯一。</param>
+    /// <param name="TypeDesc">索引类型。</param>
+    /// <param name="FilterDefinition">过滤条件。</param>
+    /// <param name="FillFactor">填充因子。</param>
+    /// <param name="IsDisabled">是否禁用。</param>
+    /// <param name="KeyOrdinal">键序号。</param>
+    /// <param name="IndexColumnId">索引列序号。</param>
+    /// <param name="IsIncludedColumn">是否包含列。</param>
+    /// <param name="IsDescending">是否倒序。</param>
+    /// <param name="ColumnName">列名。</param>
     private readonly record struct IndexMetadataRow(
         string IndexName,
         bool IsUnique,
@@ -338,5 +519,3 @@ ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
         bool IsDescending,
         string ColumnName);
 }
-
-

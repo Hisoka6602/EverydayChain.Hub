@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ThrowingHubDbContextFactory 类型。
 /// </summary>
 public sealed class ThrowingHubDbContextFactory : IDbContextFactory<HubDbContext>
 {

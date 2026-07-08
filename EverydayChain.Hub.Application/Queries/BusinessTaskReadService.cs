@@ -10,24 +10,24 @@ using System.Diagnostics;
 namespace EverydayChain.Hub.Application.Queries;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskReadService 类型。
 /// </summary>
 public sealed class BusinessTaskReadService : IBusinessTaskReadService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _businessTaskRepository 字段。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
 
     private readonly BusinessTaskQueryPolicy _queryPolicy = new();
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _logger 字段。
     /// </summary>
     private readonly ILogger<BusinessTaskReadService> _logger;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 LargeSkipWarningThreshold 字段。
     /// </summary>
     private const int LargeSkipWarningThreshold = 10_000;
 
@@ -58,7 +58,7 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryCoreAsync 方法。
     /// </summary>
     private async Task<BusinessTaskQueryResult> QueryCoreAsync(
         BusinessTaskQueryRequest request,
@@ -66,7 +66,7 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
         bool onlyRecirculation,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryCoreAsync 方法的核心处理流程。
         if (request.EndTimeLocal <= request.StartTimeLocal)
         {
             return new BusinessTaskQueryResult

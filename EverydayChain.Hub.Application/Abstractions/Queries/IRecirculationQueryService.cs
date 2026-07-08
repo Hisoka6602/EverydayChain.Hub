@@ -3,17 +3,17 @@
 namespace EverydayChain.Hub.Application.Abstractions.Queries;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 IRecirculationQueryService 类型。
 /// </summary>
 public interface IRecirculationQueryService
 {
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QuerySummaryAsync 方法。
     /// </summary>
     Task<RecirculationSummaryQueryResult> QuerySummaryAsync(RecirculationSummaryQueryRequest request, CancellationToken cancellationToken);
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExportCsvAsync 方法。
     /// </summary>
     Task<string> ExportCsvAsync(RecirculationSummaryQueryRequest request, CancellationToken cancellationToken);
 }

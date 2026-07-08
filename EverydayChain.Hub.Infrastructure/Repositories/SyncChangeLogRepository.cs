@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncChangeLogRepository 类型。
 /// </summary>
 public class SyncChangeLogRepository(
     IDbContextFactory<HubDbContext> dbContextFactory,
@@ -19,7 +19,7 @@ public class SyncChangeLogRepository(
     ILogger<SyncChangeLogRepository> logger) : ISyncChangeLogRepository
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SyncChangeLogLogicalTable 字段。
     /// </summary>
     private const string SyncChangeLogLogicalTable = "sync_change_logs";
 
@@ -80,7 +80,7 @@ public class SyncChangeLogRepository(
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 StagedChangeLogEntity 类型。
     /// </summary>
     private readonly record struct StagedChangeLogEntity(string Suffix, SyncChangeLogEntity Entity);
 }

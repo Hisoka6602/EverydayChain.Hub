@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 DropLogRepository 类型。
 /// </summary>
 public class DropLogRepository(
     IDbContextFactory<HubDbContext> contextFactory,
@@ -16,7 +16,7 @@ public class DropLogRepository(
     IShardTableProvisioner shardTableProvisioner) : IDropLogRepository
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DropLogLogicalTable 字段。
     /// </summary>
     private const string DropLogLogicalTable = "drop_logs";
 

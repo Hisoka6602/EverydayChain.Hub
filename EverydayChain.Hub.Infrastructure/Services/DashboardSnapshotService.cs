@@ -12,62 +12,62 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 DashboardSnapshotService 类型。
 /// </summary>
 public sealed class DashboardSnapshotService : IDashboardSnapshotService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 BusinessTaskLogicalTable 字段。
     /// </summary>
     private const string BusinessTaskLogicalTable = "business_tasks";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 ScanLogLogicalTable 字段。
     /// </summary>
     private const string ScanLogLogicalTable = "scan_logs";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 LeaseKey 字段。
     /// </summary>
     private const string LeaseKey = "dashboard-snapshot-refresh";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 EmptyWaveCode 字段。
     /// </summary>
     private const string EmptyWaveCode = "未分波次";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _contextFactory 字段。
     /// </summary>
     private readonly IDbContextFactory<HubDbContext> _contextFactory;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _shardSuffixResolver 字段。
     /// </summary>
     private readonly IShardSuffixResolver _shardSuffixResolver;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _shardTableResolver 字段。
     /// </summary>
     private readonly IShardTableResolver _shardTableResolver;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _runtimeLeaseRepository 字段。
     /// </summary>
     private readonly IRuntimeLeaseRepository _runtimeLeaseRepository;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _options 字段。
     /// </summary>
     private readonly DashboardSnapshotOptions _options;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _shardingOptions 字段。
     /// </summary>
     private readonly ShardingOptions _shardingOptions;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _logger 字段。
     /// </summary>
     private readonly ILogger<DashboardSnapshotService> _logger;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _ownerId 字段。
     /// </summary>
     private readonly string _ownerId = $"{Environment.MachineName}:{Guid.NewGuid():N}";
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 DashboardSnapshotService 方法。
     /// </summary>
     public DashboardSnapshotService(
         IDbContextFactory<HubDbContext> contextFactory,
@@ -78,7 +78,7 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
         IOptions<ShardingOptions> shardingOptions,
         ILogger<DashboardSnapshotService> logger)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 NewGuid 方法的核心处理流程。
         _contextFactory = contextFactory;
         _shardSuffixResolver = shardSuffixResolver;
         _shardTableResolver = shardTableResolver;
@@ -196,7 +196,7 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 LoadDirtyTaskBucketsAsync 方法。
     /// </summary>
     private async Task<HashSet<DateTime>> LoadDirtyTaskBucketsAsync(
         DashboardSnapshotStateEntity state,
@@ -205,7 +205,7 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
         DateTime refreshTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 LoadDirtyTaskBucketsAsync 方法的核心处理流程。
         var buckets = new HashSet<DateTime>();
         var lastRefreshTimeLocal = state.LastRefreshTimeLocal ?? coverageStartLocal;
         var changedSinceLocal = lastRefreshTimeLocal.AddSeconds(-Math.Max(0, _options.RefreshOverlapSeconds));
@@ -236,7 +236,7 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 LoadDirtyScanBucketsAsync 方法。
     /// </summary>
     private async Task<HashSet<DateTime>> LoadDirtyScanBucketsAsync(
         DashboardSnapshotStateEntity state,
@@ -245,7 +245,7 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
         DateTime refreshTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 LoadDirtyScanBucketsAsync 方法的核心处理流程。
         var buckets = new HashSet<DateTime>();
         var lastRefreshTimeLocal = state.LastRefreshTimeLocal ?? coverageStartLocal;
         var changedSinceLocal = lastRefreshTimeLocal.AddSeconds(-Math.Max(0, _options.RefreshOverlapSeconds));
@@ -276,13 +276,13 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 LoadTaskSnapshotRowsAsync 方法。
     /// </summary>
     private async Task<List<DashboardTaskSnapshotEntity>> LoadTaskSnapshotRowsAsync(
         IReadOnlyList<SnapshotBucketRange> ranges,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 LoadTaskSnapshotRowsAsync 方法的核心处理流程。
         var rows = new List<DashboardTaskSnapshotEntity>();
         foreach (var range in ranges)
         {
@@ -355,13 +355,13 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 LoadScanSnapshotRowsAsync 方法。
     /// </summary>
     private async Task<List<DashboardScanSnapshotEntity>> LoadScanSnapshotRowsAsync(
         IReadOnlyList<SnapshotBucketRange> ranges,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 LoadScanSnapshotRowsAsync 方法的核心处理流程。
         var rows = new List<DashboardScanSnapshotEntity>();
         foreach (var range in ranges)
         {
@@ -403,7 +403,7 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
         IReadOnlyList<SnapshotBucketRange> ranges,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 LoadCurrentWaveSnapshotRowsAsync 方法的核心处理流程。
         var rows = new List<DashboardCurrentWaveSnapshotEntity>();
         foreach (var range in ranges)
         {
@@ -449,7 +449,7 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 PersistTaskSnapshotsAsync 方法。
     /// </summary>
     private async Task PersistTaskSnapshotsAsync(
         HashSet<DateTime> dirtyBuckets,
@@ -459,7 +459,7 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
         DateTime refreshTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 NormalizeOptionalText 方法的核心处理流程。
         using var scope = TableSuffixScope.Use(string.Empty);
         await using var db = await _contextFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -493,7 +493,7 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 PersistScanSnapshotsAsync 方法。
     /// </summary>
     private async Task PersistScanSnapshotsAsync(
         HashSet<DateTime> dirtyBuckets,
@@ -503,7 +503,7 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
         DateTime refreshTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 AddRange 方法的核心处理流程。
         using var scope = TableSuffixScope.Use(string.Empty);
         await using var db = await _contextFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -553,7 +553,7 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
         DateTime refreshTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 AddRange 方法的核心处理流程。
         using var scope = TableSuffixScope.Use(string.Empty);
         await using var db = await _contextFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -587,7 +587,7 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 UpsertSnapshotStateAsync 方法。
     /// </summary>
     private static async Task UpsertSnapshotStateAsync(
         HubDbContext db,
@@ -597,7 +597,7 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
         DateTime refreshTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 AddRange 方法的核心处理流程。
         var state = await db.DashboardSnapshotStates.FirstOrDefaultAsync(x => x.Id == source, ct);
         if (state is null)
         {
@@ -614,14 +614,14 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ListBusinessTaskSuffixesByCreatedRangeAsync 方法。
     /// </summary>
     private async Task<IReadOnlyList<string>> ListBusinessTaskSuffixesByCreatedRangeAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ListBusinessTaskSuffixesByCreatedRangeAsync 方法的核心处理流程。
         var availableSuffixes = await ListBusinessTaskSuffixesAsync(ct);
         if (availableSuffixes.Count == 0)
         {
@@ -660,14 +660,14 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ListScanLogSuffixesByScanRangeAsync 方法。
     /// </summary>
     private async Task<IReadOnlyList<string>> ListScanLogSuffixesByScanRangeAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ListScanLogSuffixesByScanRangeAsync 方法的核心处理流程。
         var tables = await _shardTableResolver.ListPhysicalTablesAsync(ScanLogLogicalTable, ct);
         var availableSuffixes = tables
             .Select(table => table[ScanLogLogicalTable.Length..])
@@ -744,150 +744,150 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 TaskSnapshotRow 类型。
     /// </summary>
     private sealed class TaskSnapshotRow
     {
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 MinuteOffset。
         /// </summary>
         public int MinuteOffset { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 WaveCode。
         /// </summary>
         public string WaveCode { get; set; } = string.Empty;
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 WaveRemark。
         /// </summary>
         public string? WaveRemark { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 ResolvedDockCode。
         /// </summary>
         public string ResolvedDockCode { get; set; } = string.Empty;
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 WorkingArea。
         /// </summary>
         public string? WorkingArea { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 SourceType。
         /// </summary>
         public BusinessTaskSourceType SourceType { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 Status。
         /// </summary>
         public BusinessTaskStatus Status { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 TotalCount。
         /// </summary>
         public int TotalCount { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 ScannedCount。
         /// </summary>
         public int ScannedCount { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 RecirculatedCount。
         /// </summary>
         public int RecirculatedCount { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 ExceptionCount。
         /// </summary>
         public int ExceptionCount { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 RequiredFeedbackCount。
         /// </summary>
         public int RequiredFeedbackCount { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 CompletedFeedbackCount。
         /// </summary>
         public int CompletedFeedbackCount { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 TotalVolumeMm3。
         /// </summary>
         public decimal TotalVolumeMm3 { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 TotalWeightGram。
         /// </summary>
         public decimal TotalWeightGram { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 EarliestCreatedTimeLocal。
         /// </summary>
         public DateTime EarliestCreatedTimeLocal { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 LatestUpdatedTimeLocal。
         /// </summary>
         public DateTime LatestUpdatedTimeLocal { get; set; }
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 ScanSnapshotRow 类型。
     /// </summary>
     private sealed class ScanSnapshotRow
     {
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 MinuteOffset。
         /// </summary>
         public int MinuteOffset { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 TotalScanCount。
         /// </summary>
         public int TotalScanCount { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 MatchedScanCount。
         /// </summary>
         public int MatchedScanCount { get; set; }
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 CurrentWaveSnapshotRow 类型。
     /// </summary>
     private sealed class CurrentWaveSnapshotRow
     {
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 MinuteOffset。
         /// </summary>
         public int MinuteOffset { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 ScannedAtLocal。
         /// </summary>
         public DateTime ScannedAtLocal { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 WaveCode。
         /// </summary>
         public string WaveCode { get; set; } = string.Empty;
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 WaveRemark。
         /// </summary>
         public string? WaveRemark { get; set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 Barcode。
         /// </summary>
         public string Barcode { get; set; } = string.Empty;
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 SnapshotBucketRange 类型。
     /// </summary>
     private readonly record struct SnapshotBucketRange(DateTime StartLocal, DateTime EndLocal);
 }

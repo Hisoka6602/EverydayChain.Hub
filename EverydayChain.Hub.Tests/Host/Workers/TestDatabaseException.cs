@@ -3,12 +3,12 @@
 namespace EverydayChain.Hub.Tests.Host.Workers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 TestDatabaseException 类型。
 /// </summary>
 public sealed class TestDatabaseException : DbException
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _isTransient 字段。
     /// </summary>
     private readonly bool _isTransient;
 
@@ -18,7 +18,7 @@ public sealed class TestDatabaseException : DbException
     }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 IsTransient。
     /// </summary>
     public override bool IsTransient => _isTransient;
 }

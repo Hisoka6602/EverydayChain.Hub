@@ -1,9 +1,9 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 namespace EverydayChain.Hub.SharedKernel.Utilities;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 LogicalTableNameNormalizer 类型。
 /// </summary>
 public static class LogicalTableNameNormalizer
 {

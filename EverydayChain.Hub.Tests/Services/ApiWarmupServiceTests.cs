@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ApiWarmupServiceTests 类型。
 /// </summary>
 public sealed class ApiWarmupServiceTests
 {
@@ -33,7 +33,7 @@ public sealed class ApiWarmupServiceTests
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 ThrowingGlobalDashboardQueryService 类型。
     /// </summary>
     private sealed class ThrowingGlobalDashboardQueryService : IGlobalDashboardQueryService
     {
@@ -44,12 +44,12 @@ public sealed class ApiWarmupServiceTests
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 RecordingDockDashboardQueryService 类型。
     /// </summary>
     private sealed class RecordingDockDashboardQueryService : IDockDashboardQueryService
     {
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 QueryCount。
         /// </summary>
         public int QueryCount { get; private set; }
 
@@ -61,32 +61,32 @@ public sealed class ApiWarmupServiceTests
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 RecordingWaveQueryService 类型。
     /// </summary>
     private sealed class RecordingWaveQueryService : IWaveQueryService
     {
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 CurrentQueryCount。
         /// </summary>
         public int CurrentQueryCount { get; private set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 OptionsQueryCount。
         /// </summary>
         public int OptionsQueryCount { get; private set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 SummaryQueryCount。
         /// </summary>
         public int SummaryQueryCount { get; private set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 ZonesQueryCount。
         /// </summary>
         public int ZonesQueryCount { get; private set; }
 
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 ListQueryCount。
         /// </summary>
         public int ListQueryCount { get; private set; }
 

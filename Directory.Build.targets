@@ -2,6 +2,7 @@
   <PropertyGroup>
     <CodeConventionValidatorScript>$(MSBuildThisFileDirectory)build\Validate-CodeConventions.ps1</CodeConventionValidatorScript>
     <TextCommentConventionValidatorScript>$(MSBuildThisFileDirectory)build\Validate-TextCommentConventions.ps1</TextCommentConventionValidatorScript>
+    <EnvironmentVariableUsageValidatorScript>$(MSBuildThisFileDirectory)build\Validate-NoEnvironmentVariableUsage.ps1</EnvironmentVariableUsageValidatorScript>
   </PropertyGroup>
 
   <Target Name="ValidateCodeConventions"
@@ -14,5 +15,11 @@
           BeforeTargets="CoreCompile"
           Condition="'$(MSBuildProjectName)' == 'EverydayChain.Hub.Host' and Exists('$(TextCommentConventionValidatorScript)') and '$(SkipCodeConventionValidation)' != 'true'">
     <Exec Command="powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File &quot;$(TextCommentConventionValidatorScript)&quot; -RepositoryRootDirectory &quot;$(MSBuildThisFileDirectory)&quot;" />
+  </Target>
+
+  <Target Name="ValidateRepositoryEnvironmentVariableUsage"
+          BeforeTargets="CoreCompile"
+          Condition="'$(MSBuildProjectName)' == 'EverydayChain.Hub.Host' and Exists('$(EnvironmentVariableUsageValidatorScript)') and '$(SkipCodeConventionValidation)' != 'true'">
+    <Exec Command="powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File &quot;$(EnvironmentVariableUsageValidatorScript)&quot; -RepositoryRootDirectory &quot;$(MSBuildThisFileDirectory)&quot;" />
   </Target>
 </Project>

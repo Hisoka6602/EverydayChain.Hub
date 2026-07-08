@@ -38,48 +38,48 @@ using EverydayChain.Hub.Infrastructure.Services.Sharding;
 namespace EverydayChain.Hub.Infrastructure.DependencyInjection;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ServiceCollectionExtensions 类型。
 /// </summary>
 public static class ServiceCollectionExtensions {
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SortingTaskTraceLogicalTable 字段。
     /// </summary>
     private const string SortingTaskTraceLogicalTable = "sorting_task_trace";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SyncBatchLogicalTable 字段。
     /// </summary>
     private const string SyncBatchLogicalTable = "sync_batches";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 BusinessTaskLogicalTable 字段。
     /// </summary>
     private const string BusinessTaskLogicalTable = "business_tasks";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 ScanLogLogicalTable 字段。
     /// </summary>
     private const string ScanLogLogicalTable = "scan_logs";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DropLogLogicalTable 字段。
     /// </summary>
     private const string DropLogLogicalTable = "drop_logs";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SyncChangeLogLogicalTable 字段。
     /// </summary>
     private const string SyncChangeLogLogicalTable = "sync_change_logs";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SyncDeletionLogLogicalTable 字段。
     /// </summary>
     private const string SyncDeletionLogLogicalTable = "sync_deletion_logs";
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 AddInfrastructure 方法。
     /// </summary>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 AddInfrastructure 方法的核心处理流程。
         services.Configure<ShardingOptions>(configuration.GetSection(ShardingOptions.SectionName));
         services.Configure<AutoTuneOptions>(configuration.GetSection(AutoTuneOptions.SectionName));
         services.Configure<DangerZoneOptions>(configuration.GetSection(DangerZoneOptions.SectionName));
@@ -119,12 +119,14 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IShardTableProvisioner, ShardTableProvisioner>();
         services.AddSingleton<IShardSchemaSynchronizer, ShardSchemaSynchronizer>();
         services.AddScoped<IAutoMigrationService, AutoMigrationService>();
+        services.AddSingleton<IDatabaseConnectivityService, DatabaseConnectivityService>();
         services.AddSingleton<IDashboardSnapshotService, DashboardSnapshotService>();
         services.AddSingleton<ISortingTaskTraceWriter, SortingTaskTraceWriter>();
         services.AddSingleton<ISyncTaskConfigRepository, SyncTaskConfigRepository>();
         services.AddSingleton<IShardTableResolver, ShardTableResolver>();
         services.AddSingleton<IShardRetentionRepository, ShardRetentionRepository>();
         services.AddSingleton<IRuntimeLeaseRepository, RuntimeLeaseRepository>();
+        services.AddSingleton<IRetentionCleanupAuditLogRepository, RetentionCleanupAuditLogRepository>();
         services.AddSingleton<IOracleSourceReader, OracleSourceReader>();
         services.AddSingleton<ISyncStagingRepository, SyncStagingRepository>();
         services.AddSingleton<ISyncUpsertRepository, SqlServerSyncUpsertRepository>();
@@ -139,9 +141,9 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<ISyncWindowCalculator, SyncWindowCalculator>();
         services.AddSingleton<IBusinessTaskMaterializer, BusinessTaskMaterializer>();
         services.AddSingleton<IBusinessTaskProjectionService, BusinessTaskProjectionService>();
-        services.AddSingleton<IBusinessTaskProjectionBackfillService, BusinessTaskProjectionBackfillService>();
         services.AddSingleton<IBarcodeParser, BarcodeParser>();
         services.AddSingleton<IBusinessTaskRepository, BusinessTaskRepository>();
+        services.AddSingleton<IWaveCleanupAuditLogRepository, WaveCleanupAuditLogRepository>();
         services.AddSingleton<IBusinessTaskSeedRepository, BusinessTaskSeedRepository>();
         services.AddSingleton<IScanMatchService, ScanMatchService>();
         services.AddSingleton<ITaskExecutionService, TaskExecutionService>();
@@ -154,7 +156,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IBusinessTaskSeedService, BusinessTaskSeedService>();
         services.AddSingleton<IGlobalDashboardQueryService>(sp =>
             /// <summary>
-            /// 执行当前方法。
+            /// 执行 GlobalDashboardQueryService 方法。
             /// </summary>
             new GlobalDashboardQueryService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
@@ -165,7 +167,7 @@ public static class ServiceCollectionExtensions {
                 queryCacheOptions));
         services.AddSingleton<IDockDashboardQueryService>(sp =>
             /// <summary>
-            /// 执行当前方法。
+            /// 执行 DockDashboardQueryService 方法。
             /// </summary>
             new DockDashboardQueryService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
@@ -173,7 +175,7 @@ public static class ServiceCollectionExtensions {
                 queryCacheOptions));
         services.AddSingleton<ISortingReportQueryService>(sp =>
             /// <summary>
-            /// 执行当前方法。
+            /// 执行 SortingReportQueryService 方法。
             /// </summary>
             new SortingReportQueryService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
@@ -182,7 +184,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IBoxTrackingQueryService, BoxTrackingQueryService>();
         services.AddSingleton<IWaveQueryService>(sp =>
             /// <summary>
-            /// 执行当前方法。
+            /// 执行 WaveQueryService 方法。
             /// </summary>
             new WaveQueryService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
@@ -191,12 +193,13 @@ public static class ServiceCollectionExtensions {
                 queryCacheOptions));
         services.AddSingleton<IRecirculationQueryService>(sp =>
             /// <summary>
-            /// 执行当前方法。
+            /// 执行 RecirculationQueryService 方法。
             /// </summary>
             new RecirculationQueryService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
                 sp.GetRequiredService<IMemoryCache>(),
                 queryCacheOptions));
+        services.AddSingleton<IRetentionCleanupQueryService, RetentionCleanupQueryService>();
         services.AddSingleton<IExportCatalogQueryService, ExportCatalogQueryService>();
         services.AddSingleton<IBusinessTaskReadService, BusinessTaskReadService>();
         services.AddSingleton<IDeletionExecutionService, DeletionExecutionService>();
@@ -206,7 +209,7 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IWmsOracleFeedbackGateway, OracleWmsFeedbackGateway>();
         services.AddSingleton<IWmsFeedbackService>(sp =>
             /// <summary>
-            /// 执行当前方法。
+            /// 执行 WmsFeedbackService 方法。
             /// </summary>
             new WmsFeedbackService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
@@ -216,15 +219,16 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IFeedbackCompensationService, FeedbackCompensationService>();
         services.AddSingleton<IWaveCleanupService>(sp =>
             /// <summary>
-            /// 执行当前方法。
+            /// 执行 WaveCleanupService 方法。
             /// </summary>
             new WaveCleanupService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<IWaveCleanupAuditLogRepository>(),
                 sp.GetRequiredService<IOptions<ExceptionRuleOptions>>().Value,
                 sp.GetRequiredService<ILogger<WaveCleanupService>>()));
         services.AddSingleton<IMultiLabelDecisionService>(sp =>
             /// <summary>
-            /// 执行当前方法。
+            /// 执行 MultiLabelDecisionService 方法。
             /// </summary>
             new MultiLabelDecisionService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
@@ -232,7 +236,7 @@ public static class ServiceCollectionExtensions {
                 sp.GetRequiredService<ILogger<MultiLabelDecisionService>>()));
         services.AddSingleton<IRecirculationService>(sp =>
             /// <summary>
-            /// 执行当前方法。
+            /// 执行 RecirculationService 方法。
             /// </summary>
             new RecirculationService(
                 sp.GetRequiredService<IBusinessTaskRepository>(),
@@ -243,10 +247,10 @@ public static class ServiceCollectionExtensions {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildManagedLogicalTables 方法。
     /// </summary>
     public static HashSet<string> BuildManagedLogicalTables(SyncJobOptions syncJobOptions) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildManagedLogicalTables 方法的核心处理流程。
         var managedTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         LogicalTableNameNormalizer.AddValidated(managedTables, SortingTaskTraceLogicalTable, "Sharding.SortingTaskTrace");
         LogicalTableNameNormalizer.AddValidated(managedTables, SyncBatchLogicalTable, "Sharding.SyncBatch");

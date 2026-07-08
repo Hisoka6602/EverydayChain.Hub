@@ -3,12 +3,12 @@
 namespace EverydayChain.Hub.Application.Abstractions.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ISyncWindowCalculator 类型。
 /// </summary>
 public interface ISyncWindowCalculator
 {
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 CalculateWindow 方法。
     /// </summary>
     SyncWindow CalculateWindow(SyncTableDefinition definition, SyncCheckpoint checkpoint, DateTime nowLocal);
 }

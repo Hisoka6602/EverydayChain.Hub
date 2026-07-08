@@ -6,7 +6,7 @@ using NLog;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BarcodeParser 类型。
 /// </summary>
 public sealed class BarcodeParser : IBarcodeParser
 {

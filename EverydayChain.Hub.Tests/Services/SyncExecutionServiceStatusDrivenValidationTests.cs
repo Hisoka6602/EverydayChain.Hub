@@ -10,12 +10,12 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncExecutionServiceStatusDrivenValidationTests 类型。
 /// </summary>
 public class SyncExecutionServiceStatusDrivenValidationTests
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 UnexpectedCallMessage 字段。
     /// </summary>
     private const string UnexpectedCallMessage = "此方法不应在配置校验测试路径中被调用。";
 
@@ -102,7 +102,7 @@ public class SyncExecutionServiceStatusDrivenValidationTests
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 NotInvokedOracleSourceReader 类型。
     /// </summary>
     private sealed class NotInvokedOracleSourceReader : IOracleSourceReader
     {
@@ -112,7 +112,7 @@ public class SyncExecutionServiceStatusDrivenValidationTests
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 NotInvokedSyncStagingRepository 类型。
     /// </summary>
     private sealed class NotInvokedSyncStagingRepository : ISyncStagingRepository
     {
@@ -122,7 +122,7 @@ public class SyncExecutionServiceStatusDrivenValidationTests
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 NotInvokedSyncUpsertRepository 类型。
     /// </summary>
     private sealed class NotInvokedSyncUpsertRepository : ISyncUpsertRepository
     {
@@ -132,7 +132,7 @@ public class SyncExecutionServiceStatusDrivenValidationTests
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 NotInvokedDeletionExecutionService 类型。
     /// </summary>
     private sealed class NotInvokedDeletionExecutionService : IDeletionExecutionService
     {
@@ -140,7 +140,7 @@ public class SyncExecutionServiceStatusDrivenValidationTests
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 NotInvokedSyncBatchRepository 类型。
     /// </summary>
     private sealed class NotInvokedSyncBatchRepository : ISyncBatchRepository
     {
@@ -153,7 +153,7 @@ public class SyncExecutionServiceStatusDrivenValidationTests
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 NotInvokedSyncChangeLogRepository 类型。
     /// </summary>
     private sealed class NotInvokedSyncChangeLogRepository : ISyncChangeLogRepository
     {
@@ -161,7 +161,7 @@ public class SyncExecutionServiceStatusDrivenValidationTests
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 NotInvokedSyncDeletionLogRepository 类型。
     /// </summary>
     private sealed class NotInvokedSyncDeletionLogRepository : ISyncDeletionLogRepository
     {
@@ -169,7 +169,7 @@ public class SyncExecutionServiceStatusDrivenValidationTests
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 NotInvokedSyncCheckpointRepository 类型。
     /// </summary>
     private sealed class NotInvokedSyncCheckpointRepository : ISyncCheckpointRepository
     {
@@ -178,7 +178,7 @@ public class SyncExecutionServiceStatusDrivenValidationTests
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 NotInvokedBusinessTaskStatusConsumeService 类型。
     /// </summary>
     private sealed class NotInvokedBusinessTaskStatusConsumeService : IBusinessTaskStatusConsumeService
     {

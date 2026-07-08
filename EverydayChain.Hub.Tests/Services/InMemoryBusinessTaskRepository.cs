@@ -7,27 +7,27 @@ using EverydayChain.Hub.Domain.Enums;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 InMemoryBusinessTaskRepository 类型。
 /// </summary>
 internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 EmptyWaveCode 字段。
     /// </summary>
     private const string EmptyWaveCode = "未分波次";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 EmptyDockCode 字段。
     /// </summary>
     private const string EmptyDockCode = "UNASSIGNED_DOCK";
 
     private readonly object _gate = new();
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _tasks 字段。
     /// </summary>
     private readonly List<BusinessTaskEntity> _tasks = [];
     private readonly BusinessTaskQueryPolicy _queryPolicy = new();
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _nextId 字段。
     /// </summary>
     private long _nextId = 1;
 
@@ -232,7 +232,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ClaimFeedbackBatchAsync 方法。
     /// </summary>
     public Task<IReadOnlyList<BusinessTaskEntity>> ClaimFeedbackBatchAsync(
         BusinessTaskFeedbackStatus sourceStatus,
@@ -241,7 +241,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
         TimeSpan staleAfter,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ClaimFeedbackBatchAsync 方法的核心处理流程。
         lock (_gate)
         {
             var staleCutoff = claimedTimeLocal - staleAfter;
@@ -265,7 +265,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ClaimFeedbackByTaskCodeAsync 方法。
     /// </summary>
     public Task<BusinessTaskEntity?> ClaimFeedbackByTaskCodeAsync(
         string taskCode,
@@ -273,7 +273,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
         TimeSpan staleAfter,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ClaimFeedbackByTaskCodeAsync 方法的核心处理流程。
         lock (_gate)
         {
             var staleCutoff = claimedTimeLocal - staleAfter;
@@ -334,7 +334,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BulkMarkExceptionByWaveCodeAsync 方法。
     /// </summary>
     public Task<int> BulkMarkExceptionByWaveCodeAsync(
         string waveCode,
@@ -343,7 +343,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
         DateTime updatedTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BulkMarkExceptionByWaveCodeAsync 方法的核心处理流程。
         lock (_gate)
         {
             var targets = _tasks
@@ -397,97 +397,6 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
                 .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal)
                 .OrderBy(x => x.CreatedTimeLocal)
                 .ToList();
-            return Task.FromResult(result);
-        }
-    }
-
-    /// <summary>
-    /// 执行当前方法。
-    /// </summary>
-    public Task<IReadOnlyList<BusinessTaskProjectionBackfillCandidate>> FindProjectionBackfillCandidatesAsync(
-        string sourceTableCode,
-        DateTime startTimeLocal,
-        DateTime endTimeLocal,
-        bool requireOrderId,
-        bool requireStoreId,
-        bool requireStoreName,
-        bool requireProductCode,
-        bool requirePickLocation,
-        int take,
-        CancellationToken ct)
-    {
-        // 步骤：按既定流程执行当前方法逻辑。
-        if (take <= 0
-            || (!requireOrderId && !requireStoreId && !requireStoreName && !requireProductCode && !requirePickLocation))
-        {
-            return Task.FromResult<IReadOnlyList<BusinessTaskProjectionBackfillCandidate>>([]);
-        }
-
-        lock (_gate)
-        {
-            IReadOnlyList<BusinessTaskProjectionBackfillCandidate> result = _tasks
-                .Where(task => task.CreatedTimeLocal >= startTimeLocal && task.CreatedTimeLocal < endTimeLocal)
-                .Where(task => string.Equals(task.SourceTableCode, sourceTableCode, StringComparison.OrdinalIgnoreCase))
-                .Where(task => !string.IsNullOrWhiteSpace(task.BusinessKey))
-                .Where(task =>
-                    (requireOrderId && string.IsNullOrWhiteSpace(task.OrderId))
-                    || (requireStoreId && string.IsNullOrWhiteSpace(task.StoreId))
-                    || (requireStoreName && string.IsNullOrWhiteSpace(task.StoreName))
-                    || (requireProductCode && string.IsNullOrWhiteSpace(task.ProductCode))
-                    || (requirePickLocation && string.IsNullOrWhiteSpace(task.PickLocation)))
-                .OrderBy(task => task.CreatedTimeLocal)
-                .ThenBy(task => task.Id)
-                .Take(take)
-                .Select(task => new BusinessTaskProjectionBackfillCandidate
-                {
-                    Id = task.Id,
-                    SourceTableCode = task.SourceTableCode,
-                    BusinessKey = task.BusinessKey,
-                    CreatedTimeLocal = task.CreatedTimeLocal
-                })
-                .ToList();
-            return Task.FromResult(result);
-        }
-    }
-
-    /// <summary>
-    /// 执行当前方法。
-    /// </summary>
-    public Task<BusinessTaskProjectionGapSummary> CountProjectionBackfillGapsAsync(
-        string sourceTableCode,
-        DateTime startTimeLocal,
-        DateTime endTimeLocal,
-        bool requireOrderId,
-        bool requireStoreId,
-        bool requireStoreName,
-        bool requireProductCode,
-        bool requirePickLocation,
-        CancellationToken ct)
-    {
-        // 步骤：按既定流程执行当前方法逻辑。
-        lock (_gate)
-        {
-            var tasks = _tasks
-                .Where(task => task.CreatedTimeLocal >= startTimeLocal && task.CreatedTimeLocal < endTimeLocal)
-                .Where(task => string.Equals(task.SourceTableCode, sourceTableCode, StringComparison.OrdinalIgnoreCase))
-                .Where(task => !string.IsNullOrWhiteSpace(task.BusinessKey))
-                .ToList();
-
-            var result = new BusinessTaskProjectionGapSummary
-            {
-                SourceTableCode = sourceTableCode,
-                MissingOrderIdCount = requireOrderId ? tasks.Count(task => string.IsNullOrWhiteSpace(task.OrderId)) : 0,
-                MissingStoreIdCount = requireStoreId ? tasks.Count(task => string.IsNullOrWhiteSpace(task.StoreId)) : 0,
-                MissingStoreNameCount = requireStoreName ? tasks.Count(task => string.IsNullOrWhiteSpace(task.StoreName)) : 0,
-                MissingProductCodeCount = requireProductCode ? tasks.Count(task => string.IsNullOrWhiteSpace(task.ProductCode)) : 0,
-                MissingPickLocationCount = requirePickLocation ? tasks.Count(task => string.IsNullOrWhiteSpace(task.PickLocation)) : 0
-            };
-            result.CandidateCount = tasks.Count(task =>
-                (requireOrderId && string.IsNullOrWhiteSpace(task.OrderId))
-                || (requireStoreId && string.IsNullOrWhiteSpace(task.StoreId))
-                || (requireStoreName && string.IsNullOrWhiteSpace(task.StoreName))
-                || (requireProductCode && string.IsNullOrWhiteSpace(task.ProductCode))
-                || (requirePickLocation && string.IsNullOrWhiteSpace(task.PickLocation)));
             return Task.FromResult(result);
         }
     }
@@ -610,7 +519,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ListWaveTaskStatsByWaveCodeAndCreatedTimeRangeAsync 方法。
     /// </summary>
     public Task<IReadOnlyList<BusinessTaskWaveTaskStatsRow>> ListWaveTaskStatsByWaveCodeAndCreatedTimeRangeAsync(
         DateTime startTimeLocal,
@@ -618,7 +527,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
         string waveCode,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ListWaveTaskStatsByWaveCodeAndCreatedTimeRangeAsync 方法的核心处理流程。
         if (string.IsNullOrWhiteSpace(waveCode))
         {
             return Task.FromResult<IReadOnlyList<BusinessTaskWaveTaskStatsRow>>([]);
@@ -647,7 +556,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 AggregateDockDashboardAsync 方法。
     /// </summary>
     public Task<IReadOnlyList<BusinessTaskDockAggregateRow>> AggregateDockDashboardAsync(
         DateTime startTimeLocal,
@@ -656,7 +565,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
         string? dockCode,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 AggregateDockDashboardAsync 方法的核心处理流程。
         lock (_gate)
         {
             var query = _tasks
@@ -694,7 +603,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 AggregateRecirculationSummaryAsync 方法。
     /// </summary>
     public Task<IReadOnlyList<BusinessTaskRecirculationAggregateRow>> AggregateRecirculationSummaryAsync(
         DateTime startTimeLocal,
@@ -702,7 +611,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
         string? chuteCode,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 AggregateRecirculationSummaryAsync 方法的核心处理流程。
         lock (_gate)
         {
             var query = _tasks
@@ -755,7 +664,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryByCursorConditionsAsync 方法。
     /// </summary>
     public Task<IReadOnlyList<BusinessTaskEntity>> QueryByCursorConditionsAsync(
         BusinessTaskSearchFilter filter,
@@ -764,7 +673,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
         int take,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryByCursorConditionsAsync 方法的核心处理流程。
         lock (_gate)
         {
             var query = BuildFilterQuery(filter)
@@ -787,7 +696,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryPageWithTotalCountByConditionsAsync 方法。
     /// </summary>
     public Task<(int TotalCount, IReadOnlyList<BusinessTaskEntity> Items)> QueryPageWithTotalCountByConditionsAsync(
         BusinessTaskSearchFilter filter,
@@ -795,7 +704,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
         int take,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryPageWithTotalCountByConditionsAsync 方法的核心处理流程。
         lock (_gate)
         {
             var query = BuildFilterQuery(filter)

@@ -1,23 +1,23 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Security;
 using System.Text;
 
 namespace EverydayChain.Hub.SharedKernel.Utilities;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SimpleXlsxBuilder 类型。
 /// </summary>
 public static class SimpleXlsxBuilder
 {
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildSingleSheet 方法。
     /// </summary>
     public static byte[] BuildSingleSheet(
         string sheetName,
         IReadOnlyList<string> headers,
         IReadOnlyList<IReadOnlyList<string?>> rows)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildSingleSheet 方法的核心处理流程。
         using var stream = new MemoryStream();
         using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
         {

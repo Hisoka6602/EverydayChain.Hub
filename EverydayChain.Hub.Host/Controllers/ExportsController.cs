@@ -8,15 +8,19 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 提供导出中心目录接口，用于返回前端可用的导出项清单、格式与对应端点信息。
 /// </summary>
 [ApiController]
 [Route("api/v1/exports")]
 public sealed class ExportsController(IExportCatalogQueryService exportCatalogQueryService) : QueryControllerBase
 {
     /// <summary>
-    /// 执行当前方法。
+    /// 查询导出中心目录，返回指定时间段内系统支持的导出项、下载格式与接口地址。
     /// </summary>
+    /// <param name="request">请求体查询条件，指定目录生成使用的时间范围。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>导出中心目录结果。</returns>
     [HttpPost("catalog")]
     [ProducesResponseType(typeof(ApiResponse<ExportCatalogResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<ExportCatalogResponse>), StatusCodes.Status400BadRequest)]
@@ -25,7 +29,7 @@ public sealed class ExportsController(IExportCatalogQueryService exportCatalogQu
         [FromQuery] ExportCatalogQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryCatalogAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,

@@ -1,17 +1,17 @@
 ﻿namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ISqlExecutionTuner 类型。
 /// </summary>
 public interface ISqlExecutionTuner
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 CurrentBatchSize。
     /// </summary>
     int CurrentBatchSize { get; }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 Record 方法。
     /// </summary>
     void Record(TimeSpan elapsed, bool success);
 }

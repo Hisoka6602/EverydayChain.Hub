@@ -3,7 +3,7 @@
 namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncExecutionContext 类型。
 /// </summary>
 public class SyncExecutionContext
 {
@@ -12,17 +12,17 @@ public class SyncExecutionContext
     public SyncCheckpoint Checkpoint { get; set; } = new();
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 Window。
     /// </summary>
     public SyncWindow Window { get; set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 BatchId。
     /// </summary>
     public string BatchId { get; set; } = string.Empty;
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 ParentBatchId。
     /// </summary>
     public string? ParentBatchId { get; set; }
 

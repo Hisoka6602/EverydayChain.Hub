@@ -19,7 +19,7 @@ using Newtonsoft.Json;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SqlServerSyncUpsertRepository 类型。
 /// </summary>
 public class SqlServerSyncUpsertRepository(
     IOptions<SyncJobOptions> syncJobOptions,
@@ -30,22 +30,22 @@ public class SqlServerSyncUpsertRepository(
     ILogger<SqlServerSyncUpsertRepository> logger) : ISyncUpsertRepository {
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SyncTargetStateTablePrefix 字段。
     /// </summary>
     private const string SyncTargetStateTablePrefix = "sync_target_state";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SyncTargetStateSchema 字段。
     /// </summary>
     private const string SyncTargetStateSchema = "dbo";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 StateMonthTokenLength 字段。
     /// </summary>
     private const int StateMonthTokenLength = 6;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 TempTableCleanupTimeoutSeconds 字段。
     /// </summary>
     private const int TempTableCleanupTimeoutSeconds = 5;
 
@@ -54,22 +54,22 @@ public class SqlServerSyncUpsertRepository(
     };
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _syncJobOptions 字段。
     /// </summary>
     private readonly SyncJobOptions _syncJobOptions = syncJobOptions.Value;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _shardingOptions 字段。
     /// </summary>
     private readonly ShardingOptions _shardingOptions = shardingOptions.Value;
 
     private readonly IReadOnlyDictionary<string, SyncTableOptions> _tableOptionsMap = BuildTableOptionsMap(syncJobOptions.Value);
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 MergeFromStagingAsync 方法。
     /// </summary>
     public Task<SyncMergeResult> MergeFromStagingAsync(SyncMergeRequest request, CancellationToken ct) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 MergeFromStagingAsync 方法的核心处理流程。
         if (request.UniqueKeys.Count == 0) {
             throw new InvalidOperationException($"同步表 {request.TableCode} 未配置 UniqueKeys，无法执行幂等合并。");
         }
@@ -81,10 +81,10 @@ public class SqlServerSyncUpsertRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ListTargetStateRowsAsync 方法。
     /// </summary>
     public Task<IReadOnlyList<SyncTargetStateRow>> ListTargetStateRowsAsync(string tableCode, CancellationToken ct) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ListTargetStateRowsAsync 方法的核心处理流程。
         return dangerZoneExecutor.ExecuteAsync(
             $"sqlserver-upsert-list-state-{tableCode}",
             token => ListTargetStateRowsCoreAsync(tableCode, token),
@@ -92,10 +92,10 @@ public class SqlServerSyncUpsertRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 DeleteByBusinessKeysAsync 方法。
     /// </summary>
     public Task<int> DeleteByBusinessKeysAsync(string tableCode, IReadOnlyList<string> businessKeys, DeletionPolicy deletionPolicy, CancellationToken ct) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 DeleteByBusinessKeysAsync 方法的核心处理流程。
         if (businessKeys.Count == 0 || deletionPolicy == DeletionPolicy.Disabled) {
             return Task.FromResult(0);
         }
@@ -107,10 +107,10 @@ public class SqlServerSyncUpsertRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 MergeCoreAsync 方法。
     /// </summary>
     protected virtual async Task<SyncMergeResult> MergeCoreAsync(SyncMergeRequest request, CancellationToken ct) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 MergeCoreAsync 方法的核心处理流程。
         if (request.UniqueKeys.Count == 0) {
             throw new InvalidOperationException($"同步表 {request.TableCode} 未配置 UniqueKeys，无法执行幂等合并。");
         }
@@ -230,16 +230,16 @@ public class SqlServerSyncUpsertRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ListTargetStateRowsCoreAsync 方法。
     /// </summary>
     protected virtual async Task<IReadOnlyList<SyncTargetStateRow>> ListTargetStateRowsCoreAsync(string tableCode, CancellationToken ct) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ListTargetStateRowsCoreAsync 方法的核心处理流程。
         var stateMap = new Dictionary<string, (SyncTargetStateRow State, DateTime UpdatedTimeLocal)>(StringComparer.OrdinalIgnoreCase);
         await using var connection = new SqlConnection(_shardingOptions.ConnectionString);
         await connection.OpenAsync(ct);
         var stateMonthToken = ResolveStateMonthToken(DateTime.Now);
         /// <summary>
-        /// 执行当前方法。
+        /// 执行 EnsureSyncTargetStateTableExistsAsync 方法。
         /// </summary>
         await EnsureSyncTargetStateTableExistsAsync(tableCode, stateMonthToken, connection, transaction: null, ct);
         var stateTables = await ListSyncStateTableFullNamesAsync(tableCode, connection, transaction: null, ct);
@@ -275,10 +275,10 @@ WHERE [TableCode]=@tableCode;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 DeleteByBusinessKeysCoreAsync 方法。
     /// </summary>
     protected virtual async Task<int> DeleteByBusinessKeysCoreAsync(string tableCode, IReadOnlyList<string> businessKeys, DeletionPolicy deletionPolicy, CancellationToken ct) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 DeleteByBusinessKeysCoreAsync 方法的核心处理流程。
         var tableOptions = ResolveTableOptions(tableCode);
         if (tableOptions.UniqueKeys.Count == 0) {
             throw new InvalidOperationException($"同步表 {tableCode} 未配置 UniqueKeys，无法执行删除。");
@@ -334,10 +334,10 @@ WHERE [TableCode]=@tableCode;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildMergeEntries 方法。
     /// </summary>
     private List<MergeEntry> BuildMergeEntries(SyncMergeRequest request, string targetLogicalTable) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildMergeEntries 方法的核心处理流程。
         var entries = new List<MergeEntry>(request.Rows.Count);
         foreach (var row in request.Rows) {
             var filteredRow = SyncColumnFilter.FilterExcludedColumns(row, request.NormalizedExcludedColumns);
@@ -360,7 +360,7 @@ WHERE [TableCode]=@tableCode;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 LoadStateMapAsync 方法。
     /// </summary>
     private async Task<Dictionary<string, PersistedState>> LoadStateMapAsync(
         SqlConnection connection,
@@ -368,7 +368,7 @@ WHERE [TableCode]=@tableCode;";
         string tableCode,
         IReadOnlyList<string> businessKeys,
         CancellationToken ct) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 LoadStateMapAsync 方法的核心处理流程。
         var stateMap = new Dictionary<string, PersistedState>(StringComparer.OrdinalIgnoreCase);
         if (businessKeys.Count == 0) {
             return stateMap;
@@ -377,7 +377,7 @@ WHERE [TableCode]=@tableCode;";
         var latestStateMap = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
         var stateTables = await ListSyncStateTableFullNamesAsync(tableCode, connection, transaction, ct);
         /// <summary>
-        /// 存储当前字段值。
+        /// 存储 chunkSize 字段。
         /// </summary>
         const int chunkSize = 900;
         foreach (var stateTable in stateTables) {
@@ -426,10 +426,10 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 EnsureSyncTargetStateTableExistsAsync 方法。
     /// </summary>
     private async Task EnsureSyncTargetStateTableExistsAsync(string tableCode, string stateMonthToken, SqlConnection connection, SqlTransaction? transaction, CancellationToken ct) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 EnsureSyncTargetStateTableExistsAsync 方法的核心处理流程。
         var fullName = GetSyncStateTableFullName(tableCode, stateMonthToken);
         var tableNameRaw = $"{SyncTargetStateTablePrefix}_{tableCode}_{stateMonthToken}";
         var pkName = EscapeIdentifier(BuildStateTableObjectName("PK", tableNameRaw));
@@ -459,15 +459,15 @@ END;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 GetBatchMergeSize 方法。
     /// </summary>
     private int GetBatchMergeSize() {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 GetBatchMergeSize 方法的核心处理流程。
         return Math.Clamp(_syncJobOptions.BatchMergeSize, 1, 5000);
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExecuteTargetMergeBatchesAsync 方法。
     /// </summary>
     private async Task ExecuteTargetMergeBatchesAsync(
         SqlConnection connection,
@@ -476,7 +476,7 @@ END;";
         IReadOnlyList<MergeEntry> entries,
         int batchMergeSize,
         CancellationToken ct) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 GetBatchMergeSize 方法的核心处理流程。
         if (entries.Count == 0) {
             return;
         }
@@ -499,7 +499,7 @@ END;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExecuteTargetMergeBatchAsync 方法。
     /// </summary>
     private async Task ExecuteTargetMergeBatchAsync(
         SqlConnection connection,
@@ -507,7 +507,7 @@ END;";
         IReadOnlyList<string> uniqueKeys,
         IReadOnlyList<MergeEntry> entries,
         CancellationToken ct) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 ExecuteTargetMergeBatchAsync 方法的核心处理流程。
         if (entries.Count == 0) {
             return;
         }
@@ -584,7 +584,7 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExecuteShardDeleteBatchesAsync 方法。
     /// </summary>
     private async Task ExecuteShardDeleteBatchesAsync(
         SqlConnection connection,
@@ -593,7 +593,7 @@ WHEN NOT MATCHED THEN
         IReadOnlyList<ShardDeleteEntry> entries,
         int batchMergeSize,
         CancellationToken ct) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 INSERT 方法的核心处理流程。
         if (entries.Count == 0) {
             return;
         }
@@ -620,7 +620,7 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExecuteShardDeleteBatchAsync 方法。
     /// </summary>
     private async Task ExecuteShardDeleteBatchAsync(
         SqlConnection connection,
@@ -628,7 +628,7 @@ WHEN NOT MATCHED THEN
         IReadOnlyList<string> uniqueKeys,
         IReadOnlyList<ShardDeleteEntry> entries,
         CancellationToken ct) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 ExecuteShardDeleteBatchAsync 方法的核心处理流程。
         if (entries.Count == 0) {
             return;
         }
@@ -692,7 +692,7 @@ INNER JOIN {tempTableName} AS source
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 UpsertStatesBatchAsync 方法。
     /// </summary>
     private async Task UpsertStatesBatchAsync(
         SqlConnection connection,
@@ -702,7 +702,7 @@ INNER JOIN {tempTableName} AS source
         IReadOnlyList<MergeEntry> entries,
         int batchMergeSize,
         CancellationToken ct) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 Join 方法的核心处理流程。
         if (entries.Count == 0) {
             return;
         }
@@ -790,10 +790,10 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveEntryColumnType 方法。
     /// </summary>
     private static Type ResolveEntryColumnType(IReadOnlyList<MergeEntry> entries, string column) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveEntryColumnType 方法的核心处理流程。
         foreach (var entry in entries) {
             if (!entry.Row.TryGetValue(column, out var rawValue) || rawValue is null) {
                 continue;
@@ -809,10 +809,10 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveBusinessKeyColumnType 方法。
     /// </summary>
     private static Type ResolveBusinessKeyColumnType(IReadOnlyList<IReadOnlyDictionary<string, object?>> parsedRows, string column) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveBusinessKeyColumnType 方法的核心处理流程。
         foreach (var parsedRow in parsedRows) {
             if (!parsedRow.TryGetValue(column, out var rawValue) || rawValue is null) {
                 continue;
@@ -828,10 +828,10 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 DropTempTableAsync 方法。
     /// </summary>
     private async Task DropTempTableAsync(SqlConnection connection, SqlTransaction transaction, string tempTableName) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 DropTempTableAsync 方法的核心处理流程。
         using var tempTableCleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(TempTableCleanupTimeoutSeconds));
         try {
             await using var dropCommand = connection.CreateCommand();
@@ -845,10 +845,10 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildColumnSignature 方法。
     /// </summary>
     private static string BuildColumnSignature(IEnumerable<string> columns) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildColumnSignature 方法的核心处理流程。
         var ordered = columns
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(column => column, StringComparer.OrdinalIgnoreCase)
@@ -857,13 +857,13 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 TrackLatestChangedEntry 方法。
     /// </summary>
     private static void TrackLatestChangedEntry(
         IDictionary<string, MergeEntry> latestChangedEntries,
         IList<string> changedBusinessKeysInOrder,
         MergeEntry entry) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 TrackLatestChangedEntry 方法的核心处理流程。
         if (!latestChangedEntries.ContainsKey(entry.BusinessKey)) {
             changedBusinessKeysInOrder.Add(entry.BusinessKey);
         }
@@ -872,12 +872,12 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildOrderedChangedEntries 方法。
     /// </summary>
     private static IReadOnlyList<MergeEntry> BuildOrderedChangedEntries(
         IReadOnlyList<string> changedBusinessKeysInOrder,
         IReadOnlyDictionary<string, MergeEntry> latestChangedEntries) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 BuildOrderedChangedEntries 方法的核心处理流程。
         if (changedBusinessKeysInOrder.Count == 0) {
             return Array.Empty<MergeEntry>();
         }
@@ -892,12 +892,12 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildShardSwitchDeletes 方法。
     /// </summary>
     private static IReadOnlyList<ShardDeleteEntry> BuildShardSwitchDeletes(
         IReadOnlyList<MergeEntry> changedEntries,
         IReadOnlyDictionary<string, PersistedState> initialStates) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 BuildShardSwitchDeletes 方法的核心处理流程。
         if (changedEntries.Count == 0 || initialStates.Count == 0) {
             return Array.Empty<ShardDeleteEntry>();
         }
@@ -922,10 +922,10 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行当前业务方法。
     /// </summary>
     private static T[] CreateBatch<T>(IReadOnlyList<T> source, int startIndex, int length) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行当前业务方法的核心处理流程。
         var batch = new T[length];
         for (var offset = 0; offset < length; offset++) {
             batch[offset] = source[startIndex + offset];
@@ -935,7 +935,7 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 UpsertTargetRowAsync 方法。
     /// </summary>
     private async Task UpsertTargetRowAsync(
         SqlConnection connection,
@@ -946,7 +946,7 @@ WHEN NOT MATCHED THEN
         IReadOnlyList<string> uniqueKeys,
         IReadOnlySet<string> uniqueKeySet,
         CancellationToken ct) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行当前业务方法的核心处理流程。
         var fullTableName = BuildTargetTableFullName(targetLogicalTable, shardSuffix);
         var orderedColumns = row.Keys
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -985,7 +985,7 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 DeleteTargetRowByBusinessKeyAsync 方法。
     /// </summary>
     private async Task DeleteTargetRowByBusinessKeyAsync(
         SqlConnection connection,
@@ -995,7 +995,7 @@ WHEN NOT MATCHED THEN
         IReadOnlyList<string> uniqueKeys,
         string businessKey,
         CancellationToken ct) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 INSERT 方法的核心处理流程。
         EnsureIdentifiersSafe(uniqueKeys);
         var keyValues = ParseBusinessKey(uniqueKeys, businessKey);
         var fullTableName = BuildTargetTableFullName(targetLogicalTable, shardSuffix);
@@ -1014,7 +1014,7 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 UpsertStateAsync 方法。
     /// </summary>
     private async Task UpsertStateAsync(
         SqlConnection connection,
@@ -1023,7 +1023,7 @@ WHEN NOT MATCHED THEN
         string stateMonthToken,
         MergeEntry entry,
         CancellationToken ct) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 Join 方法的核心处理流程。
         var nowLocal = DateTime.Now;
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
@@ -1065,7 +1065,7 @@ WHEN NOT MATCHED THEN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 MarkSoftDeletedStateAsync 方法。
     /// </summary>
     private async Task MarkSoftDeletedStateAsync(
         SqlConnection connection,
@@ -1073,7 +1073,7 @@ WHEN NOT MATCHED THEN
         string tableCode,
         string businessKey,
         CancellationToken ct) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 MarkSoftDeletedStateAsync 方法的核心处理流程。
         var stateTables = await ListSyncStateTableFullNamesAsync(tableCode, connection, transaction, ct);
         var nowLocal = DateTime.Now;
         foreach (var stateTable in stateTables) {
@@ -1095,7 +1095,7 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 DeleteStateAsync 方法。
     /// </summary>
     private async Task DeleteStateAsync(
         SqlConnection connection,
@@ -1103,7 +1103,7 @@ WHERE [TableCode]=@tableCode
         string tableCode,
         string businessKey,
         CancellationToken ct) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 DeleteStateAsync 方法的核心处理流程。
         var stateTables = await ListSyncStateTableFullNamesAsync(tableCode, connection, transaction, ct);
         foreach (var stateTable in stateTables) {
             await using var command = connection.CreateCommand();
@@ -1116,10 +1116,10 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveTableOptions 方法。
     /// </summary>
     private SyncTableOptions ResolveTableOptions(string tableCode) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveTableOptions 方法的核心处理流程。
         if (_tableOptionsMap.TryGetValue(tableCode, out var tableOptions)) {
             return tableOptions;
         }
@@ -1128,10 +1128,10 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveTargetLogicalTable 方法。
     /// </summary>
     private static string ResolveTargetLogicalTable(string tableCode, SyncTableOptions tableOptions) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveTargetLogicalTable 方法的核心处理流程。
         var targetLogicalTable = LogicalTableNameNormalizer.NormalizeOrNull(tableOptions.TargetLogicalTable)
             ?? throw new InvalidOperationException($"同步表 {tableCode} 未配置 TargetLogicalTable。");
         if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(targetLogicalTable)) {
@@ -1142,10 +1142,10 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildTableOptionsMap 方法。
     /// </summary>
     private static IReadOnlyDictionary<string, SyncTableOptions> BuildTableOptionsMap(SyncJobOptions options) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildTableOptionsMap 方法的核心处理流程。
         return (options.Tables ?? [])
             .Where(table => !string.IsNullOrWhiteSpace(table.TableCode))
             .GroupBy(table => table.TableCode, StringComparer.OrdinalIgnoreCase)
@@ -1153,10 +1153,10 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 GetDistinctBusinessKeys 方法。
     /// </summary>
     private static IReadOnlyList<string> GetDistinctBusinessKeys(IReadOnlyList<MergeEntry> entries) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 GetDistinctBusinessKeys 方法的核心处理流程。
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var result = new List<string>(entries.Count);
         foreach (var entry in entries) {
@@ -1169,10 +1169,10 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 GetDistinctBusinessKeys 方法。
     /// </summary>
     private static IReadOnlyList<string> GetDistinctBusinessKeys(IReadOnlyList<string> businessKeys) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 GetDistinctBusinessKeys 方法的核心处理流程。
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var result = new List<string>(businessKeys.Count);
         foreach (var businessKey in businessKeys) {
@@ -1189,10 +1189,10 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 GetSyncStateTableFullName 方法。
     /// </summary>
     internal static string GetSyncStateTableFullName(string tableCode, string stateMonthToken) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 GetSyncStateTableFullName 方法的核心处理流程。
         if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(tableCode)) {
             throw new InvalidOperationException("检测到非法 TableCode 标识符，仅允许字母、数字、下划线。");
         }
@@ -1206,23 +1206,23 @@ WHERE [TableCode]=@tableCode
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveStateMonthToken 方法。
     /// </summary>
     private static string ResolveStateMonthToken(DateTime localTime) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveStateMonthToken 方法的核心处理流程。
         var ensuredLocalTime = EnsureLocalDateTime(localTime, "状态分表时间");
         return ensuredLocalTime.ToString("yyyyMM", CultureInfo.InvariantCulture);
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ListSyncStateTableFullNamesAsync 方法。
     /// </summary>
     private static async Task<IReadOnlyList<string>> ListSyncStateTableFullNamesAsync(
         string tableCode,
         SqlConnection connection,
         SqlTransaction? transaction,
         CancellationToken ct) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 ListSyncStateTableFullNamesAsync 方法的核心处理流程。
         if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(tableCode)) {
             throw new InvalidOperationException("检测到非法 TableCode 标识符，仅允许字母、数字、下划线。");
         }
@@ -1261,10 +1261,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 IsValidStateMonthToken 方法。
     /// </summary>
     private static bool IsValidStateMonthToken(string stateMonthToken) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 IsValidStateMonthToken 方法的核心处理流程。
         if (string.IsNullOrWhiteSpace(stateMonthToken) || stateMonthToken.Length != StateMonthTokenLength) {
             return false;
         }
@@ -1284,10 +1284,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 EscapeLikePattern 方法。
     /// </summary>
     private static string EscapeLikePattern(string value) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 EscapeLikePattern 方法的核心处理流程。
         return value
             .Replace(@"\", @"\\", StringComparison.Ordinal)
             .Replace("%", @"\%", StringComparison.Ordinal)
@@ -1296,10 +1296,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildStateTableObjectName 方法。
     /// </summary>
     private static string BuildStateTableObjectName(string prefix, string tableNameRaw, string? tail = null) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildStateTableObjectName 方法的核心处理流程。
         var candidate = string.IsNullOrWhiteSpace(tail)
             ? $"{prefix}_{tableNameRaw}"
             : $"{prefix}_{tableNameRaw}_{tail}";
@@ -1314,19 +1314,19 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildTargetTableFullName 方法。
     /// </summary>
     private string BuildTargetTableFullName(string targetLogicalTable, string shardSuffix) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildTargetTableFullName 方法的核心处理流程。
         var physicalTable = $"{targetLogicalTable}{shardSuffix}";
         return $"[{EscapeIdentifier(_shardingOptions.Schema)}].[{EscapeIdentifier(physicalTable)}]";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveShardSuffix 方法。
     /// </summary>
     private string ResolveShardSuffix(DateTime? cursorLocal) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveShardSuffix 方法的核心处理流程。
         var nowLocal = DateTimeOffset.Now;
         var bootstrapSuffixes = AutoMigrationService.BuildBootstrapSuffixes(shardSuffixResolver, nowLocal, _shardingOptions.AutoCreateMonthsAhead);
         var effectiveCursorLocal = cursorLocal ?? nowLocal.LocalDateTime;
@@ -1340,10 +1340,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ParseBusinessKey 方法。
     /// </summary>
     private static IReadOnlyDictionary<string, object?> ParseBusinessKey(IReadOnlyList<string> uniqueKeys, string businessKey) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ParseBusinessKey 方法的核心处理流程。
         var values = businessKey.Split('|');
         if (values.Length != uniqueKeys.Count) {
             throw new InvalidOperationException($"业务键与 UniqueKeys 数量不匹配。BusinessKey={businessKey}, UniqueKeys={string.Join(",", uniqueKeys)}");
@@ -1366,10 +1366,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 IsTemporalUniqueKeyName 方法。
     /// </summary>
     private static bool IsTemporalUniqueKeyName(string uniqueKeyName) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 IsTemporalUniqueKeyName 方法的核心处理流程。
         return uniqueKeyName.EndsWith("TIME", StringComparison.OrdinalIgnoreCase)
                || uniqueKeyName.EndsWith("_TIME", StringComparison.OrdinalIgnoreCase)
                || uniqueKeyName.EndsWith("DATE", StringComparison.OrdinalIgnoreCase)
@@ -1377,10 +1377,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 EnsureUniqueKeysPresent 方法。
     /// </summary>
     private static void EnsureUniqueKeysPresent(IReadOnlyList<string> uniqueKeys, IReadOnlyDictionary<string, object?> row) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 EnsureUniqueKeysPresent 方法的核心处理流程。
         foreach (var uniqueKey in uniqueKeys) {
             if (!row.ContainsKey(uniqueKey)) {
                 throw new InvalidOperationException($"行数据缺少唯一键列：{uniqueKey}");
@@ -1389,10 +1389,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 EnsureIdentifiersSafe 方法。
     /// </summary>
     private static void EnsureIdentifiersSafe(IEnumerable<string> identifiers) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 EnsureIdentifiersSafe 方法的核心处理流程。
         foreach (var identifier in identifiers) {
             if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(identifier)) {
                 throw new InvalidOperationException($"检测到非法 SQL 标识符：{identifier}");
@@ -1401,10 +1401,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 EscapeIdentifier 方法。
     /// </summary>
     private static string EscapeIdentifier(string identifier) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 EscapeIdentifier 方法的核心处理流程。
         if (!LogicalTableNameNormalizer.IsSafeSqlIdentifier(identifier)) {
             throw new InvalidOperationException($"检测到非法 SQL 标识符：{identifier}");
         }
@@ -1413,10 +1413,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 IsPersistedStateEqual 方法。
     /// </summary>
     private static bool IsPersistedStateEqual(PersistedState persistedState, SyncTargetStateRow newState, string newShardSuffix) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 IsPersistedStateEqual 方法的核心处理流程。
         return string.Equals(persistedState.RowDigest, newState.RowDigest, StringComparison.Ordinal)
                && Nullable.Equals(persistedState.CursorLocal, newState.CursorLocal)
                && persistedState.IsSoftDeleted == newState.IsSoftDeleted
@@ -1425,10 +1425,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 UpdateLastCursor 方法。
     /// </summary>
     private static void UpdateLastCursor(SyncMergeResult result, DateTime? cursorLocal) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 UpdateLastCursor 方法的核心处理流程。
         if (!cursorLocal.HasValue) {
             return;
         }
@@ -1439,13 +1439,13 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildTargetStateRow 方法。
     /// </summary>
     private static SyncTargetStateRow BuildTargetStateRow(
         string businessKey,
         IReadOnlyDictionary<string, object?> row,
         string cursorColumn) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 BuildTargetStateRow 方法的核心处理流程。
         return new SyncTargetStateRow {
             BusinessKey = businessKey,
             RowDigest = ComputeRowDigestHash(row),
@@ -1456,10 +1456,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ComputeRowDigestHash 方法。
     /// </summary>
     private static string ComputeRowDigestHash(IReadOnlyDictionary<string, object?> row) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ComputeRowDigestHash 方法的核心处理流程。
         var sortedKeys = row.Keys.ToArray();
         Array.Sort(sortedKeys, StringComparer.OrdinalIgnoreCase);
         using var incrementalHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -1474,10 +1474,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 AppendLengthPrefixedUtf8 方法。
     /// </summary>
     private static void AppendLengthPrefixedUtf8(IncrementalHash incrementalHash, string value) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 AppendLengthPrefixedUtf8 方法的核心处理流程。
         var byteCount = Encoding.UTF8.GetByteCount(value);
         Span<byte> lengthPrefix = stackalloc byte[sizeof(int)];
         BinaryPrimitives.WriteInt32LittleEndian(lengthPrefix, byteCount);
@@ -1493,10 +1493,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ConvertDigestValueToStableText 方法。
     /// </summary>
     private static string ConvertDigestValueToStableText(object? value) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ConvertDigestValueToStableText 方法的核心处理流程。
         if (value is null) {
             return "null";
         }
@@ -1517,10 +1517,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 NormalizeDigestValue 方法。
     /// </summary>
     private static object? NormalizeDigestValue(object? value) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 NormalizeDigestValue 方法的核心处理流程。
         if (value is DateTime dateTime) {
             return EnsureLocalDateTime(dateTime, dateTime.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture))
                 .ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture);
@@ -1530,10 +1530,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ConvertToDbValue 方法。
     /// </summary>
     private static object ConvertToDbValue(object? value) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ConvertToDbValue 方法的核心处理流程。
         if (value is null) {
             return DBNull.Value;
         }
@@ -1550,10 +1550,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 TryGetCursorLocal 方法。
     /// </summary>
     private static DateTime? TryGetCursorLocal(IReadOnlyDictionary<string, object?> row, string cursorColumn) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 TryGetCursorLocal 方法的核心处理流程。
         if (string.IsNullOrWhiteSpace(cursorColumn)) {
             return null;
         }
@@ -1584,20 +1584,20 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 IsSoftDeleted 方法。
     /// </summary>
     private static bool IsSoftDeleted(IReadOnlyDictionary<string, object?> row) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 IsSoftDeleted 方法的核心处理流程。
         return row.TryGetValue(SyncColumnFilter.SoftDeleteFlagColumn, out var flagValue)
                && flagValue is bool flag
                && flag;
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 TryGetSoftDeletedTimeLocal 方法。
     /// </summary>
     private static DateTime? TryGetSoftDeletedTimeLocal(IReadOnlyDictionary<string, object?> row) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 TryGetSoftDeletedTimeLocal 方法的核心处理流程。
         if (!row.TryGetValue(SyncColumnFilter.SoftDeleteTimeColumn, out var timeValue) || timeValue is null) {
             return null;
         }
@@ -1624,10 +1624,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 EnsureLocalDateTime 方法。
     /// </summary>
     private static DateTime EnsureLocalDateTime(DateTime value, string? originalText) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 EnsureLocalDateTime 方法的核心处理流程。
         if (value.Kind == DateTimeKind.Unspecified) {
             return DateTime.SpecifyKind(value, DateTimeKind.Local);
         }
@@ -1640,10 +1640,10 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ContainsOffsetOrZulu 方法。
     /// </summary>
     private static bool ContainsOffsetOrZulu(string value) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ContainsOffsetOrZulu 方法的核心处理流程。
         if (value.EndsWith("Z", StringComparison.Ordinal)) {
             return true;
         }
@@ -1687,7 +1687,7 @@ ORDER BY t.[name] DESC;";
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 MergeEntry 类型。
     /// </summary>
     private readonly record struct MergeEntry(
         string BusinessKey,
@@ -1697,7 +1697,7 @@ ORDER BY t.[name] DESC;";
         SyncTargetStateRow State);
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 PersistedState 类型。
     /// </summary>
     private readonly record struct PersistedState(
         string BusinessKey,
@@ -1709,7 +1709,7 @@ ORDER BY t.[name] DESC;";
         string TargetLogicalTable);
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 TargetMergeGroupKey 类型。
     /// </summary>
     private readonly record struct TargetMergeGroupKey(
         string TargetLogicalTable,
@@ -1717,14 +1717,14 @@ ORDER BY t.[name] DESC;";
         string ColumnSignature);
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 TargetShardGroupKey 类型。
     /// </summary>
     private readonly record struct TargetShardGroupKey(
         string TargetLogicalTable,
         string ShardSuffix);
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 ShardDeleteEntry 类型。
     /// </summary>
     private readonly record struct ShardDeleteEntry(
         string TargetLogicalTable,

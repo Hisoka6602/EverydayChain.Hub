@@ -3,12 +3,12 @@
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 RecordingShardTableProvisioner 类型。
 /// </summary>
 public sealed class RecordingShardTableProvisioner : IShardTableProvisioner
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 EnsuredSuffixes。
     /// </summary>
     public List<string> EnsuredSuffixes { get; } = [];
 

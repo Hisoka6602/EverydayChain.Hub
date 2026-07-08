@@ -11,7 +11,7 @@ using EverydayChain.Hub.Application.Abstractions.Persistence;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 OracleSourceReader 类型。
 /// </summary>
 public class OracleSourceReader(
     IOptions<OracleOptions> oracleOptions,
@@ -19,32 +19,32 @@ public class OracleSourceReader(
     ILogger<OracleSourceReader> logger) : IOracleSourceReader {
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DefaultMaxPageSize 字段。
     /// </summary>
     private const int DefaultMaxPageSize = 5000;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DefaultCommandTimeoutSeconds 字段。
     /// </summary>
     private const int DefaultCommandTimeoutSeconds = 60;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 MaxBusinessKeyBatchSize 字段。
     /// </summary>
     private const int MaxBusinessKeyBatchSize = 500;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _options 字段。
     /// </summary>
     private readonly OracleOptions _options = oracleOptions.Value;
 
     private readonly string _effectiveConnectionString = BuildConnectionString(oracleOptions.Value);
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ReadIncrementalPageAsync 方法。
     /// </summary>
     public async Task<SyncReadResult> ReadIncrementalPageAsync(SyncReadRequest request, CancellationToken ct) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ReadIncrementalPageAsync 方法的核心处理流程。
         var sourceSchema = ResolveSourceSchema(request.SourceSchema);
         ValidateReadRequest(request, sourceSchema);
         var pageSize = ResolvePageSize(request.PageSize);
@@ -109,10 +109,10 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ReadByKeysAsync 方法。
     /// </summary>
     public async Task<IReadOnlySet<string>> ReadByKeysAsync(SyncKeyReadRequest request, CancellationToken ct) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ReadByKeysAsync 方法的核心处理流程。
         var sourceSchema = ResolveSourceSchema(request.SourceSchema);
         ValidateReadKeyRequest(request, sourceSchema);
         if (request.UniqueKeys.Count == 0) {
@@ -172,13 +172,13 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ReadRowsByBusinessKeysAsync 方法。
     /// </summary>
     public async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReadRowsByBusinessKeysAsync(
         OracleBusinessKeyRowReadRequest request,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ReadRowsByBusinessKeysAsync 方法的核心处理流程。
         var sourceSchema = ResolveSourceSchema(request.SourceSchema);
         var readPlan = ValidateRowReadRequest(request, sourceSchema);
         if (readPlan.BusinessKeys.Count == 0)
@@ -265,10 +265,10 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildReadPageSql 方法。
     /// </summary>
     private static string BuildReadPageSql(SyncReadRequest request, string sourceSchema) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildReadPageSql 方法的核心处理流程。
         var orderColumns = new List<string> { $"t.{request.CursorColumn}" };
         foreach (var key in request.UniqueKeys) {
             if (!string.IsNullOrWhiteSpace(key)) {
@@ -296,10 +296,10 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildReadKeysSql 方法。
     /// </summary>
     private static string BuildReadKeysSql(SyncKeyReadRequest request, string sourceSchema) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildReadKeysSql 方法的核心处理流程。
         var validUniqueKeys = request.UniqueKeys.Where(key => !string.IsNullOrWhiteSpace(key)).ToList();
         if (validUniqueKeys.Count == 0) {
             throw new InvalidOperationException($"表 {request.TableCode} 的 UniqueKeys 不能为空。");
@@ -315,7 +315,7 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildReadRowsByBusinessKeysSql 方法。
     /// </summary>
     private static string BuildReadRowsByBusinessKeysSql(
         string sourceSchema,
@@ -324,7 +324,7 @@ public class OracleSourceReader(
         string businessKeyColumn,
         IReadOnlyList<string> parameterNames)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildReadRowsByBusinessKeysSql 方法的核心处理流程。
         var selectColumns = string.Join(", ", columns.Select(column => $"t.{column}"));
         var parameterList = string.Join(", ", parameterNames.Select(name => $":{name}"));
         return $"""
@@ -335,10 +335,10 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ValidateReadRequest 方法。
     /// </summary>
     private void ValidateReadRequest(SyncReadRequest request, string sourceSchema) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ValidateReadRequest 方法的核心处理流程。
         ValidateConnectionOptions();
         EnsureReadOnlyRequest(sourceSchema, request.SourceTable, request.CursorColumn, request.UniqueKeys);
         if (request.PageNo <= 0) {
@@ -351,10 +351,10 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ValidateReadKeyRequest 方法。
     /// </summary>
     private void ValidateReadKeyRequest(SyncKeyReadRequest request, string sourceSchema) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ValidateReadKeyRequest 方法的核心处理流程。
         ValidateConnectionOptions();
         EnsureReadOnlyRequest(sourceSchema, request.SourceTable, request.CursorColumn, request.UniqueKeys);
     }
@@ -395,10 +395,10 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveSourceSchema 方法。
     /// </summary>
     private string ResolveSourceSchema(string sourceSchema) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveSourceSchema 方法的核心处理流程。
         if (!string.IsNullOrWhiteSpace(sourceSchema)) {
             return sourceSchema;
         }
@@ -407,28 +407,28 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ValidateConnectionOptions 方法。
     /// </summary>
     private void ValidateConnectionOptions() {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ValidateConnectionOptions 方法的核心处理流程。
         if (string.IsNullOrWhiteSpace(_effectiveConnectionString)) {
             throw new InvalidOperationException("Oracle.ConnectionString 不能为空。");
         }
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildConnectionString 方法。
     /// </summary>
     private static string BuildConnectionString(OracleOptions options) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildConnectionString 方法的核心处理流程。
         return OracleConnectionStringResolver.BuildEffectiveConnectionString(options);
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolvePageSize 方法。
     /// </summary>
     private int ResolvePageSize(int requestedPageSize) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolvePageSize 方法的核心处理流程。
         var maxPageSize = _options.MaxPageSize > 0 ? _options.MaxPageSize : DefaultMaxPageSize;
         if (requestedPageSize <= maxPageSize) {
             return requestedPageSize;
@@ -442,26 +442,26 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveCommandTimeout 方法。
     /// </summary>
     private int ResolveCommandTimeout() {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveCommandTimeout 方法的核心处理流程。
         return _options.CommandTimeoutSeconds > 0 ? _options.CommandTimeoutSeconds : DefaultCommandTimeoutSeconds;
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 IsNonRetryableOracleException 方法。
     /// </summary>
     private static bool IsNonRetryableOracleException(OracleException exception) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 IsNonRetryableOracleException 方法的核心处理流程。
         return exception.Number is 12154 or 12514;
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveSourceSchemaForLog 方法。
     /// </summary>
     private string ResolveSourceSchemaForLog(string sourceSchema) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveSourceSchemaForLog 方法的核心处理流程。
         if (!string.IsNullOrWhiteSpace(sourceSchema)) {
             return sourceSchema;
         }
@@ -470,10 +470,10 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 EnsureReadOnlyCommand 方法。
     /// </summary>
     private void EnsureReadOnlyCommand(OracleCommand command) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 EnsureReadOnlyCommand 方法的核心处理流程。
         if (!_options.ReadOnly) {
             return;
         }
@@ -485,14 +485,14 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 EnsureReadOnlyRequest 方法。
     /// </summary>
     private static void EnsureReadOnlyRequest(
         string sourceSchema,
         string sourceTable,
         string cursorColumn,
         IReadOnlyList<string> uniqueKeys) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 EnsureReadOnlyRequest 方法的核心处理流程。
         ValidateSafeIdentifier(sourceSchema, nameof(sourceSchema));
         ValidateSafeIdentifier(sourceTable, nameof(sourceTable));
         ValidateSafeIdentifier(cursorColumn, nameof(cursorColumn));
@@ -507,10 +507,10 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ValidateSafeIdentifier 方法。
     /// </summary>
     private static void ValidateSafeIdentifier(string identifier, string fieldName) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ValidateSafeIdentifier 方法的核心处理流程。
         if (string.IsNullOrWhiteSpace(identifier)) {
             throw new InvalidOperationException($"{fieldName} 不能为空。");
         }
@@ -521,7 +521,7 @@ public class OracleSourceReader(
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 OracleRowReadPlan 类型。
     /// </summary>
     private readonly record struct OracleRowReadPlan(
         IReadOnlyList<string> Columns,

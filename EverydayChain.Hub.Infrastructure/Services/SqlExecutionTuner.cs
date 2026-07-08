@@ -5,34 +5,39 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 根据执行耗时与失败率动态调整批量大小。
 /// </summary>
 public class SqlExecutionTuner : ISqlExecutionTuner
 {
+    /// <summary>
+    /// 存储统一小数精度位数。
+    /// </summary>
+    private const int FixedDecimalScale = 3;
+
     private readonly object _syncRoot = new();
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _options 字段。
     /// </summary>
     private readonly AutoTuneOptions _options;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _logger 字段。
     /// </summary>
     private readonly ILogger<SqlExecutionTuner> _logger;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _batchSize 字段。
     /// </summary>
     private int _batchSize;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _failureCount 字段。
     /// </summary>
     private int _failureCount;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _sampleCount 字段。
     /// </summary>
     private int _sampleCount;
 
@@ -74,8 +79,9 @@ public class SqlExecutionTuner : ISqlExecutionTuner
                 return;
             }
 
-            var failureRate = (double)_failureCount / _sampleCount;
-            var isSlow = elapsed.TotalMilliseconds > _options.SlowThresholdMilliseconds;
+            var failureRate = RoundFixedDecimal(_failureCount / (decimal)_sampleCount);
+            var elapsedMilliseconds = ConvertTimeSpanToMilliseconds(elapsed);
+            var isSlow = elapsedMilliseconds > _options.SlowThresholdMilliseconds;
             var old = _batchSize;
 
             if (failureRate > _options.FailureRateThreshold || isSlow)
@@ -88,11 +94,31 @@ public class SqlExecutionTuner : ISqlExecutionTuner
             }
 
             _logger.LogInformation("自动调谐: 批量大小 {OldBatch} -> {NewBatch}, failureRate={FailureRate}, elapsedMs={ElapsedMs}",
-                old, _batchSize, failureRate, elapsed.TotalMilliseconds);
+                old, _batchSize, failureRate, elapsedMilliseconds);
 
             _sampleCount = 0;
             _failureCount = 0;
         }
+    }
+
+    /// <summary>
+    /// 将 TimeSpan 转换为三位小数毫秒值。
+    /// </summary>
+    /// <param name="elapsed">待转换耗时。</param>
+    /// <returns>保留三位小数的毫秒值。</returns>
+    private static decimal ConvertTimeSpanToMilliseconds(TimeSpan elapsed)
+    {
+        return RoundFixedDecimal(elapsed.Ticks / (decimal)TimeSpan.TicksPerMillisecond);
+    }
+
+    /// <summary>
+    /// 将小数统一规整为三位定点精度。
+    /// </summary>
+    /// <param name="value">待规整的小数值。</param>
+    /// <returns>保留三位小数的结果。</returns>
+    private static decimal RoundFixedDecimal(decimal value)
+    {
+        return Math.Round(value, FixedDecimalScale, MidpointRounding.AwayFromZero);
     }
 }
 

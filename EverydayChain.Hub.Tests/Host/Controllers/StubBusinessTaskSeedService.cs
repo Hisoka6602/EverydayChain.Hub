@@ -4,12 +4,12 @@ using EverydayChain.Hub.Application.Models;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 StubBusinessTaskSeedService 类型。
 /// </summary>
 internal sealed class StubBusinessTaskSeedService : IBusinessTaskSeedService
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 LastCommand。
     /// </summary>
     public BusinessTaskSeedCommand? LastCommand { get; private set; }
 

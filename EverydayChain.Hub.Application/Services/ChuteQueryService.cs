@@ -6,16 +6,16 @@ using EverydayChain.Hub.Domain.Enums;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ChuteQueryService 类型。
 /// </summary>
 public sealed class ChuteQueryService : IChuteQueryService {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _businessTaskRepository 字段。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _barcodeParser 字段。
     /// </summary>
     private readonly IBarcodeParser _barcodeParser;
 
@@ -26,10 +26,10 @@ public sealed class ChuteQueryService : IChuteQueryService {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExecuteAsync 方法。
     /// </summary>
     public async Task<ChuteResolveApplicationResult> ExecuteAsync(ChuteResolveApplicationRequest request, CancellationToken cancellationToken) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExecuteAsync 方法的核心处理流程。
         var normalizedTaskCode = string.IsNullOrWhiteSpace(request.TaskCode) ? null : request.TaskCode.Trim();
         var normalizedBarcode = string.IsNullOrWhiteSpace(request.Barcode) ? null : request.Barcode.Trim();
 

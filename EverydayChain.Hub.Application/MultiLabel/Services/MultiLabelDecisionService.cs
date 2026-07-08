@@ -8,34 +8,34 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Application.MultiLabel.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 MultiLabelDecisionService 类型。
 /// </summary>
 public sealed class MultiLabelDecisionService : IMultiLabelDecisionService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _businessTaskRepository 字段。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _options 字段。
     /// </summary>
     private readonly ExceptionRuleOptions _options;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _logger 字段。
     /// </summary>
     private readonly ILogger<MultiLabelDecisionService> _logger;
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 MultiLabelDecisionService 方法。
     /// </summary>
     public MultiLabelDecisionService(
         IBusinessTaskRepository businessTaskRepository,
         ExceptionRuleOptions options,
         ILogger<MultiLabelDecisionService> logger)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 MultiLabelDecisionService 方法的核心处理流程。
         _businessTaskRepository = businessTaskRepository;
         _options = options;
         _logger = logger;
@@ -93,13 +93,13 @@ public sealed class MultiLabelDecisionService : IMultiLabelDecisionService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 DecideByFirst 方法。
     /// </summary>
     private static MultiLabelDecisionResult DecideByFirst(
         IReadOnlyList<Domain.Aggregates.BusinessTaskAggregate.BusinessTaskEntity> tasks,
         List<string> allTaskCodes)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 DecideByFirst 方法的核心处理流程。
         var selected = tasks.OrderBy(t => t.CreatedTimeLocal).First();
         var discarded = allTaskCodes.Where(c => c != selected.TaskCode).ToList();
         return new MultiLabelDecisionResult
@@ -114,13 +114,13 @@ public sealed class MultiLabelDecisionService : IMultiLabelDecisionService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 DecideByLatest 方法。
     /// </summary>
     private static MultiLabelDecisionResult DecideByLatest(
         IReadOnlyList<Domain.Aggregates.BusinessTaskAggregate.BusinessTaskEntity> tasks,
         List<string> allTaskCodes)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 DecideByLatest 方法的核心处理流程。
         var selected = tasks.OrderByDescending(t => t.CreatedTimeLocal).First();
         var discarded = allTaskCodes.Where(c => c != selected.TaskCode).ToList();
         return new MultiLabelDecisionResult

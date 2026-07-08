@@ -1,22 +1,22 @@
 ﻿namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 RecirculationSummaryRow 类型。
 /// </summary>
 public sealed class RecirculationSummaryRow
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 ChuteCode。
     /// </summary>
     public string ChuteCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 WaveCode。
     /// </summary>
     public string WaveCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 RecirculatedCount。
     /// </summary>
     public int RecirculatedCount { get; set; }
 }

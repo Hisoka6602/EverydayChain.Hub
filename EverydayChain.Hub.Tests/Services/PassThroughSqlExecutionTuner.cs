@@ -3,12 +3,12 @@
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 PassThroughSqlExecutionTuner 类型。
 /// </summary>
 public sealed class PassThroughSqlExecutionTuner : ISqlExecutionTuner
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 CurrentBatchSize。
     /// </summary>
     public int CurrentBatchSize => 100;
 

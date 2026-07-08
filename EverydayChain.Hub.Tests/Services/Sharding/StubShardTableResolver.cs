@@ -3,12 +3,12 @@
 namespace EverydayChain.Hub.Tests.Services.Sharding;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 StubShardTableResolver 类型。
 /// </summary>
 public sealed class StubShardTableResolver : IShardTableResolver
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _physicalTables 字段。
     /// </summary>
     private readonly IReadOnlyDictionary<string, IReadOnlyList<string>> _physicalTables;
 

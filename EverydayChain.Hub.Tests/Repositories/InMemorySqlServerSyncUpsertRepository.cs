@@ -11,12 +11,12 @@ using Newtonsoft.Json;
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 InMemorySqlServerSyncUpsertRepository 类型。
 /// </summary>
 public sealed class InMemorySqlServerSyncUpsertRepository : SqlServerSyncUpsertRepository
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _shardSuffixResolver 字段。
     /// </summary>
     private readonly IShardSuffixResolver _shardSuffixResolver;
 
@@ -25,12 +25,12 @@ public sealed class InMemorySqlServerSyncUpsertRepository : SqlServerSyncUpsertR
     private readonly HashSet<string> _shardRows = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 ShardMigrationDeleteCount。
     /// </summary>
     public int ShardMigrationDeleteCount { get; private set; }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 InMemorySqlServerSyncUpsertRepository 方法。
     /// </summary>
     public InMemorySqlServerSyncUpsertRepository(
         IOptions<SyncJobOptions> syncJobOptions,
@@ -41,7 +41,7 @@ public sealed class InMemorySqlServerSyncUpsertRepository : SqlServerSyncUpsertR
         ILogger<SqlServerSyncUpsertRepository> logger)
         : base(syncJobOptions, shardingOptions, shardSuffixResolver, shardTableProvisioner, dangerZoneExecutor, logger)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 base 方法的核心处理流程。
         _shardSuffixResolver = shardSuffixResolver;
     }
 
@@ -122,7 +122,7 @@ public sealed class InMemorySqlServerSyncUpsertRepository : SqlServerSyncUpsertR
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 InMemoryState 类型。
     /// </summary>
     private readonly record struct InMemoryState(string Digest, string ShardSuffix);
 }

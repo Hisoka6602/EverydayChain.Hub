@@ -1,17 +1,17 @@
-namespace EverydayChain.Hub.SharedKernel.Utilities;
+﻿namespace EverydayChain.Hub.SharedKernel.Utilities;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncColumnFilter 类型。
 /// </summary>
 public static class SyncColumnFilter
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SoftDeleteFlagColumn 字段。
     /// </summary>
     public const string SoftDeleteFlagColumn = "IsDeleted";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SoftDeleteTimeColumn 字段。
     /// </summary>
     public const string SoftDeleteTimeColumn = "DeletedTimeLocal";
 
@@ -22,13 +22,13 @@ public static class SyncColumnFilter
     };
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 FilterExcludedColumns 方法。
     /// </summary>
     public static IReadOnlyDictionary<string, object?> FilterExcludedColumns(
         IReadOnlyDictionary<string, object?> row,
         IReadOnlySet<string> normalizedExcludedColumns)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 FilterExcludedColumns 方法的核心处理流程。
         if (normalizedExcludedColumns.Count == 0)
         {
             return row;

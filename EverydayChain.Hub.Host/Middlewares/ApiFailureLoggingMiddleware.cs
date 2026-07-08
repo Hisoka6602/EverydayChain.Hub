@@ -7,53 +7,53 @@ using Newtonsoft.Json.Linq;
 namespace EverydayChain.Hub.Host.Middlewares;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ApiFailureLoggingMiddleware 类型。
 /// </summary>
 public sealed class ApiFailureLoggingMiddleware {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 MaxLoggedPayloadLength 字段。
     /// </summary>
     private const int MaxLoggedPayloadLength = 16384;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 Utf8WorstCaseBytesPerCharacter 字段。
     /// </summary>
     private const int Utf8WorstCaseBytesPerCharacter = 4;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 MaxCapturedResponseBytes 字段。
     /// </summary>
     private const int MaxCapturedResponseBytes = MaxLoggedPayloadLength * Utf8WorstCaseBytesPerCharacter;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 StreamReadBufferSize 字段。
     /// </summary>
     private const int StreamReadBufferSize = 1024;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 next 字段。
     /// </summary>
     private readonly RequestDelegate next;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 logger 字段。
     /// </summary>
     private readonly ILogger<ApiFailureLoggingMiddleware> logger;
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ApiFailureLoggingMiddleware 方法。
     /// </summary>
     public ApiFailureLoggingMiddleware(RequestDelegate next, ILogger<ApiFailureLoggingMiddleware> logger) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ApiFailureLoggingMiddleware 方法的核心处理流程。
         this.next = next;
         this.logger = logger;
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 InvokeAsync 方法。
     /// </summary>
     public async Task InvokeAsync(HttpContext context) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 InvokeAsync 方法的核心处理流程。
         if (!IsApiRequest(context.Request.Path)) {
             await next(context);
             return;
@@ -83,7 +83,7 @@ public sealed class ApiFailureLoggingMiddleware {
                 context.TraceIdentifier,
                 endpointName,
                 userAgent,
-                elapsedStopwatch.Elapsed.TotalMilliseconds,
+                ConvertElapsedMilliseconds(elapsedStopwatch.Elapsed),
                 requestBody);
             throw;
         }
@@ -102,7 +102,7 @@ public sealed class ApiFailureLoggingMiddleware {
                     context.TraceIdentifier,
                     endpointName,
                     userAgent,
-                    elapsedStopwatch.Elapsed.TotalMilliseconds,
+                    ConvertElapsedMilliseconds(elapsedStopwatch.Elapsed),
                     requestBody,
                     responseBody);
             }
@@ -110,18 +110,28 @@ public sealed class ApiFailureLoggingMiddleware {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 将请求耗时转换为三位小数的毫秒值。
+    /// </summary>
+    /// <param name="elapsed">请求累计耗时。</param>
+    /// <returns>保留三位小数的毫秒值。</returns>
+    private static decimal ConvertElapsedMilliseconds(TimeSpan elapsed) {
+        // 步骤：统一使用 Tick 换算毫秒，避免隐式浮点数。
+        return Math.Round(elapsed.Ticks / (decimal)TimeSpan.TicksPerMillisecond, 3, MidpointRounding.AwayFromZero);
+    }
+
+    /// <summary>
+    /// 执行 IsApiRequest 方法。
     /// </summary>
     private static bool IsApiRequest(PathString requestPath) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 IsApiRequest 方法的核心处理流程。
         return requestPath.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ShouldLogFailure 方法。
     /// </summary>
     private static bool ShouldLogFailure(int statusCode, string responseBody) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ShouldLogFailure 方法的核心处理流程。
         if (statusCode >= StatusCodes.Status400BadRequest) {
             return true;
         }
@@ -130,10 +140,10 @@ public sealed class ApiFailureLoggingMiddleware {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ContainsBusinessFailureFlag 方法。
     /// </summary>
     private static bool ContainsBusinessFailureFlag(string responseBody) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ContainsBusinessFailureFlag 方法的核心处理流程。
         if (string.IsNullOrWhiteSpace(responseBody)) {
             return false;
         }
@@ -156,10 +166,10 @@ public sealed class ApiFailureLoggingMiddleware {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 TryReadIsSuccessProperty 方法。
     /// </summary>
     private static bool TryReadIsSuccessProperty(JObject root, out bool isSuccess) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 TryReadIsSuccessProperty 方法的核心处理流程。
         isSuccess = false;
         var value = root.GetValue("isSuccess", StringComparison.OrdinalIgnoreCase);
         if (value?.Type == JTokenType.Boolean) {
@@ -171,10 +181,10 @@ public sealed class ApiFailureLoggingMiddleware {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ReadRequestBodyAsync 方法。
     /// </summary>
     private static async Task<string> ReadRequestBodyAsync(HttpRequest request, CancellationToken cancellationToken) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ReadRequestBodyAsync 方法的核心处理流程。
         if (request.ContentLength == 0 || request.Body == Stream.Null) {
             return string.Empty;
         }
@@ -190,10 +200,10 @@ public sealed class ApiFailureLoggingMiddleware {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ReadStreamAsync 方法。
     /// </summary>
     private static async Task<string> ReadStreamAsync(Stream stream, int maxCharacters, CancellationToken cancellationToken) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ReadStreamAsync 方法的核心处理流程。
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
         var buffer = new char[StreamReadBufferSize];
         var builder = new StringBuilder();
@@ -213,10 +223,10 @@ public sealed class ApiFailureLoggingMiddleware {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 TruncatePayload 方法。
     /// </summary>
     private static string TruncatePayload(string payload) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 TruncatePayload 方法的核心处理流程。
         if (string.IsNullOrEmpty(payload) || payload.Length <= MaxLoggedPayloadLength) {
             return payload;
         }
@@ -225,10 +235,10 @@ public sealed class ApiFailureLoggingMiddleware {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 SanitizeForLog 方法。
     /// </summary>
     private static string SanitizeForLog(string rawText) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 SanitizeForLog 方法的核心处理流程。
         if (string.IsNullOrEmpty(rawText)) {
             return rawText;
         }
@@ -237,10 +247,10 @@ public sealed class ApiFailureLoggingMiddleware {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 TryResetStreamPosition 方法。
     /// </summary>
     private static bool TryResetStreamPosition(Stream stream, long position) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 TryResetStreamPosition 方法的核心处理流程。
         if (!stream.CanSeek) {
             return false;
         }

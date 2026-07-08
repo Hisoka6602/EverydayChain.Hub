@@ -9,7 +9,7 @@ using Newtonsoft.Json;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 DeletionExecutionService 类型。
 /// </summary>
 public class DeletionExecutionService(
     ISyncDeletionRepository deletionRepository,

@@ -9,27 +9,27 @@ using System.Collections.Concurrent;
 namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 DangerZoneExecutor 类型。
 /// </summary>
 public class DangerZoneExecutor : IDangerZoneExecutor
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _defaultTimeoutSeconds 字段。
     /// </summary>
     private readonly int _defaultTimeoutSeconds;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _options 字段。
     /// </summary>
     private readonly DangerZoneOptions _options;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _pipelines 字段。
     /// </summary>
     private readonly ConcurrentDictionary<int, ResiliencePipeline> _pipelines = [];
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _logger 字段。
     /// </summary>
     private readonly ILogger<DangerZoneExecutor> _logger;
 
@@ -42,33 +42,33 @@ public class DangerZoneExecutor : IDangerZoneExecutor
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExecuteAsync 方法。
     /// </summary>
     public Task ExecuteAsync(
         string operationName,
         Func<CancellationToken, Task> action,
         CancellationToken cancellationToken = default,
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置业务相关属性。
         /// </summary>
         int? timeoutSecondsOverride = null) =>
         ExecuteWithLoggingAsync(operationName, action, timeoutSecondsOverride, cancellationToken);
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行当前业务方法。
     /// </summary>
     public Task<T> ExecuteAsync<T>(
         string operationName,
         Func<CancellationToken, Task<T>> action,
         CancellationToken cancellationToken = default,
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置业务相关属性。
         /// </summary>
         int? timeoutSecondsOverride = null) =>
         ExecuteWithLoggingAsync(operationName, action, timeoutSecondsOverride, cancellationToken);
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExecuteWithLoggingAsync 方法。
     /// </summary>
     private async Task ExecuteWithLoggingAsync(
         string operationName,
@@ -76,7 +76,7 @@ public class DangerZoneExecutor : IDangerZoneExecutor
         int? timeoutSecondsOverride,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExecuteWithLoggingAsync 方法的核心处理流程。
         var pipeline = GetPipeline(timeoutSecondsOverride);
         try
         {
@@ -113,7 +113,7 @@ public class DangerZoneExecutor : IDangerZoneExecutor
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行当前业务方法。
     /// </summary>
     private async Task<T> ExecuteWithLoggingAsync<T>(
         string operationName,
@@ -121,7 +121,7 @@ public class DangerZoneExecutor : IDangerZoneExecutor
         int? timeoutSecondsOverride,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行当前业务方法的核心处理流程。
         var pipeline = GetPipeline(timeoutSecondsOverride);
         try
         {
@@ -164,7 +164,7 @@ public class DangerZoneExecutor : IDangerZoneExecutor
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildPipeline 方法。
     /// </summary>
     private ResiliencePipeline BuildPipeline(int timeoutSeconds) =>
         new ResiliencePipelineBuilder()
@@ -179,7 +179,8 @@ public class DangerZoneExecutor : IDangerZoneExecutor
             .AddCircuitBreaker(new CircuitBreakerStrategyOptions
             {
                 ShouldHandle = new PredicateBuilder().Handle<Exception>(ex => ex is not NonRetryableDangerZoneException),
-                FailureRatio = _options.CircuitBreakerFailureRatio,
+                // 步骤：Polly 的第三方 API 仅接受 double，这里只在库调用边界执行一次转换，内部配置仍保持 decimal。
+                FailureRatio = decimal.ToDouble(_options.CircuitBreakerFailureRatio),
                 MinimumThroughput = _options.CircuitBreakerMinimumThroughput,
                 SamplingDuration = TimeSpan.FromMinutes(_options.CircuitBreakerSamplingDurationMinutes),
                 BreakDuration = TimeSpan.FromSeconds(_options.CircuitBreakerBreakDurationSeconds)

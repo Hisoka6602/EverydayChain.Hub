@@ -8,27 +8,27 @@ using Microsoft.Extensions.Caching.Memory;
 namespace EverydayChain.Hub.Application.Queries;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 DockDashboardQueryService 类型。
 /// </summary>
 public sealed class DockDashboardQueryService : IDockDashboardQueryService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 CacheKeyDateTimeFormat 字段。
     /// </summary>
     private const string CacheKeyDateTimeFormat = "yyyyMMddHHmmssfffffff";
     private const string NullCacheValue = "(null)";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _businessTaskRepository 字段。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
     private readonly BusinessTaskQueryPolicy _queryPolicy = new();
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _memoryCache 字段。
     /// </summary>
     private readonly IMemoryCache _memoryCache;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _queryCacheOptions 字段。
     /// </summary>
     private readonly QueryCacheOptions _queryCacheOptions;
 
@@ -38,14 +38,14 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 DockDashboardQueryService 方法。
     /// </summary>
     public DockDashboardQueryService(
         IBusinessTaskRepository businessTaskRepository,
         IMemoryCache memoryCache,
         QueryCacheOptions queryCacheOptions)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 DockDashboardQueryService 方法的核心处理流程。
         _businessTaskRepository = businessTaskRepository;
         _memoryCache = memoryCache;
         _queryCacheOptions = queryCacheOptions;
@@ -84,7 +84,7 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildResultAsync 方法。
     /// </summary>
     private async Task<DockDashboardQueryResult> BuildResultAsync(
         DateTime startTimeLocal,
@@ -92,7 +92,7 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
         string? selectedWaveCode,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildResultAsync 方法的核心处理流程。
         var waveOptions = await _businessTaskRepository.ListWaveCodesByCreatedTimeRangeAsync(startTimeLocal, endTimeLocal, cancellationToken);
         var effectiveSelectedWaveCode = selectedWaveCode;
         if (string.IsNullOrWhiteSpace(effectiveSelectedWaveCode))

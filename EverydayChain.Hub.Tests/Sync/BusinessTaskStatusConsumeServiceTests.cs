@@ -9,7 +9,7 @@ using EverydayChain.Hub.Tests.Sync.Fakes;
 namespace EverydayChain.Hub.Tests.Sync;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskStatusConsumeServiceTests 类型。
 /// </summary>
 public class BusinessTaskStatusConsumeServiceTests
 {
@@ -175,7 +175,7 @@ public class BusinessTaskStatusConsumeServiceTests
         var window = new SyncWindow(
             new DateTime(2026, 4, 20, 0, 0, 0, DateTimeKind.Local),
             /// <summary>
-            /// 执行当前方法。
+            /// 执行 DateTime 方法。
             /// </summary>
             new DateTime(2026, 4, 20, 23, 59, 59, DateTimeKind.Local));
 

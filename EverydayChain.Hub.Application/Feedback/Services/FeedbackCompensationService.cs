@@ -8,34 +8,34 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Application.Feedback.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 FeedbackCompensationService 类型。
 /// </summary>
 public sealed class FeedbackCompensationService : IFeedbackCompensationService
 {
     private static readonly TimeSpan ClaimStaleAfter = TimeSpan.FromMinutes(10);
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _businessTaskRepository 字段。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _oracleGateway 字段。
     /// </summary>
     private readonly IWmsOracleFeedbackGateway _oracleGateway;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _logger 字段。
     /// </summary>
     private readonly ILogger<FeedbackCompensationService> _logger;
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 FeedbackCompensationService 方法。
     /// </summary>
     public FeedbackCompensationService(
         IBusinessTaskRepository businessTaskRepository,
         IWmsOracleFeedbackGateway oracleGateway,
         ILogger<FeedbackCompensationService> logger)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 FeedbackCompensationService 方法的核心处理流程。
         _businessTaskRepository = businessTaskRepository;
         _oracleGateway = oracleGateway;
         _logger = logger;

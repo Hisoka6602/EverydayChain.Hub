@@ -1,4 +1,4 @@
-using EverydayChain.Hub.Host.Controllers;
+﻿using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using Microsoft.AspNetCore.Mvc;
@@ -7,17 +7,17 @@ using System.Text;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 DockDashboardControllerTests 类型。
 /// </summary>
 public sealed class DockDashboardControllerTests
 {
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryOverviewAsync_ShouldReturnOk_WhenRequestIsValid 方法。
     /// </summary>
     [Fact]
     public async Task QueryOverviewAsync_ShouldReturnOk_WhenRequestIsValid()
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryOverviewAsync_ShouldReturnOk_WhenRequestIsValid 方法的核心处理流程。
         var stubService = new StubDockDashboardQueryService();
         var controller = new DockDashboardController(stubService);
         var request = new DockDashboardQueryRequest
@@ -37,12 +37,12 @@ public sealed class DockDashboardControllerTests
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryOverviewAsync_ShouldReturnBadRequest_WhenTimeRangeInvalid 方法。
     /// </summary>
     [Fact]
     public async Task QueryOverviewAsync_ShouldReturnBadRequest_WhenTimeRangeInvalid()
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryOverviewAsync_ShouldReturnBadRequest_WhenTimeRangeInvalid 方法的核心处理流程。
         var controller = new DockDashboardController(new StubDockDashboardQueryService());
         var request = new DockDashboardQueryRequest
         {
@@ -55,12 +55,12 @@ public sealed class DockDashboardControllerTests
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryOverviewAsync_ShouldDefaultEndTimeToStartPlusOneDay_WhenOnlyStartTimeProvided 方法。
     /// </summary>
     [Fact]
     public async Task QueryOverviewAsync_ShouldDefaultEndTimeToStartPlusOneDay_WhenOnlyStartTimeProvided()
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryOverviewAsync_ShouldDefaultEndTimeToStartPlusOneDay_WhenOnlyStartTimeProvided 方法的核心处理流程。
         var stubService = new StubDockDashboardQueryService();
         var controller = new DockDashboardController(stubService);
         var startTime = DateTime.SpecifyKind(new DateTime(2026, 4, 19, 8, 0, 0), DateTimeKind.Local);
@@ -78,12 +78,12 @@ public sealed class DockDashboardControllerTests
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryOverviewAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull 方法。
     /// </summary>
     [Fact]
     public async Task QueryOverviewAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull()
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryOverviewAsync_ShouldUseQueryRequest_WhenBodyRequestIsNull 方法的核心处理流程。
         var stubService = new StubDockDashboardQueryService();
         var controller = new DockDashboardController(stubService);
         var queryRequest = new DockDashboardQueryRequest
@@ -103,12 +103,12 @@ public sealed class DockDashboardControllerTests
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExportCsvAsync_ShouldReturnFile_WhenRequestIsValid 方法。
     /// </summary>
     [Fact]
     public async Task ExportCsvAsync_ShouldReturnFile_WhenRequestIsValid()
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportCsvAsync_ShouldReturnFile_WhenRequestIsValid 方法的核心处理流程。
         var stubService = new StubDockDashboardQueryService();
         var controller = new DockDashboardController(stubService);
         var request = new DockDashboardQueryRequest
@@ -132,12 +132,12 @@ public sealed class DockDashboardControllerTests
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExportXlsxAsync_ShouldReturnFile_WhenRequestIsValid 方法。
     /// </summary>
     [Fact]
     public async Task ExportXlsxAsync_ShouldReturnFile_WhenRequestIsValid()
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportXlsxAsync_ShouldReturnFile_WhenRequestIsValid 方法的核心处理流程。
         var stubService = new StubDockDashboardQueryService();
         var controller = new DockDashboardController(stubService);
         var request = new DockDashboardQueryRequest

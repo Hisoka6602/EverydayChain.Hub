@@ -5,22 +5,22 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncWindowCalculator 类型。
 /// </summary>
 public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncWindowCalculator
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 InitialDstInvalidTimeJumpMinutes 字段。
     /// </summary>
     private const int InitialDstInvalidTimeJumpMinutes = 60;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SecondaryDstInvalidTimeJumpMinutes 字段。
     /// </summary>
     private const int SecondaryDstInvalidTimeJumpMinutes = 120;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 TertiaryDstInvalidTimeJumpMinutes 字段。
     /// </summary>
     private const int TertiaryDstInvalidTimeJumpMinutes = 180;
 

@@ -3,17 +3,17 @@
 namespace EverydayChain.Hub.Application.Queries;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskQueryPolicy 类型。
 /// </summary>
 internal sealed class BusinessTaskQueryPolicy
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 EmptyDockCode 字段。
     /// </summary>
     private const string EmptyDockCode = "未分配码头";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 RecirculationDockThreshold 字段。
     /// </summary>
     private const int RecirculationDockThreshold = 7;
 
@@ -67,7 +67,7 @@ internal sealed class BusinessTaskQueryPolicy
             return 0M;
         }
 
-        return Math.Round((decimal)numerator * 100M / denominator, 2, MidpointRounding.AwayFromZero);
+        return Math.Round((decimal)numerator * 100M / denominator, 3, MidpointRounding.AwayFromZero);
     }
 }
 

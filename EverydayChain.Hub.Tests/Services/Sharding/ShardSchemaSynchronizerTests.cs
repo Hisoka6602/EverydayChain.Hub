@@ -13,22 +13,22 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Tests.Services.Sharding;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ShardSchemaSynchronizerTests 类型。
 /// </summary>
 public class ShardSchemaSynchronizerTests
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 BusinessTaskLogicalTable 字段。
     /// </summary>
     private const string BusinessTaskLogicalTable = "business_tasks";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DropLogLogicalTable 字段。
     /// </summary>
     private const string DropLogLogicalTable = "drop_logs";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 TestConnectionString 字段。
     /// </summary>
     private const string TestConnectionString = "Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;";
 

@@ -8,18 +8,18 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ShardTableResolver 类型。
 /// </summary>
 public class ShardTableResolver(IOptions<ShardingOptions> shardingOptions) : IShardTableResolver
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 ResolveCommandTimeoutSeconds 字段。
     /// </summary>
     private const int ResolveCommandTimeoutSeconds = 15;
     private static readonly Regex SqlIdentifierRegex = new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
     private static readonly Regex ShardMonthRegex = new(@"_(\d{6})$", RegexOptions.Compiled);
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _options 字段。
     /// </summary>
     private readonly ShardingOptions _options = shardingOptions.Value;
 

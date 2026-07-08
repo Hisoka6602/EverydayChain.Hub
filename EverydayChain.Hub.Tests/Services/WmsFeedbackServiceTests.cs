@@ -11,7 +11,7 @@ using System.Reflection;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 WmsFeedbackServiceTests 类型。
 /// </summary>
 public sealed class WmsFeedbackServiceTests
 {
@@ -301,22 +301,22 @@ public sealed class WmsFeedbackServiceTests
 }
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 CapturingWmsOracleFeedbackGateway 类型。
 /// </summary>
 internal sealed class CapturingWmsOracleFeedbackGateway : IWmsOracleFeedbackGateway
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 CapturedTasks。
     /// </summary>
     public List<BusinessTaskEntity> CapturedTasks { get; } = [];
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 ThrowOnWrite。
     /// </summary>
     public bool ThrowOnWrite { get; set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 ReturnCount。
     /// </summary>
     public int? ReturnCount { get; set; }
 

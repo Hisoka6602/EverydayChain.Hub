@@ -1,7 +1,7 @@
 ﻿namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncReadResult 类型。
 /// </summary>
 public class SyncReadResult
 {

@@ -7,10 +7,13 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncTaskConfigRepositoryTests 类型。
 /// </summary>
 public class SyncTaskConfigRepositoryTests
 {
+    /// <summary>
+    /// 验证空白同步模式会回落为主键合并模式。
+    /// </summary>
     [Fact]
     public async Task GetByTableCodeAsync_WhenSyncModeIsBlank_ShouldDefaultToKeyedMerge()
     {
@@ -27,6 +30,9 @@ public class SyncTaskConfigRepositoryTests
         Assert.Null(definition.StatusConsumeProfile);
     }
 
+    /// <summary>
+    /// 验证状态驱动模式下显式 null 的待处理状态值会被保留为 null。
+    /// </summary>
     [Fact]
     public async Task GetByTableCodeAsync_WhenStatusDrivenAndPendingNull_ShouldKeepNullPendingValue()
     {
@@ -51,6 +57,9 @@ public class SyncTaskConfigRepositoryTests
         Assert.Equal("TASKPROCESS", definition.StatusConsumeProfile.StatusColumnName);
     }
 
+    /// <summary>
+    /// 验证待处理状态值包含前后空白时会被正确裁剪。
+    /// </summary>
     [Fact]
     public async Task GetByTableCodeAsync_WhenStatusDrivenAndPendingHasWhitespace_ShouldTrim()
     {
@@ -68,8 +77,11 @@ public class SyncTaskConfigRepositoryTests
         Assert.Equal("N", definition.StatusConsumeProfile!.PendingStatusValue);
     }
 
+    /// <summary>
+    /// 验证仅包含空白的待处理状态值会按 null 语义兼容处理。
+    /// </summary>
     [Fact]
-    public async Task GetByTableCodeAsync_WhenStatusDrivenAndPendingBecomesBlank_ShouldThrow()
+    public async Task GetByTableCodeAsync_WhenStatusDrivenAndPendingBecomesBlank_ShouldTreatAsNull()
     {
         var options = BuildOptions(table =>
         {
@@ -80,11 +92,14 @@ public class SyncTaskConfigRepositoryTests
         var logger = new TestLogger<SyncTaskConfigRepository>();
         var repository = new SyncTaskConfigRepository(Options.Create(options), logger);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => repository.GetByTableCodeAsync("T1", CancellationToken.None));
+        var definition = await repository.GetByTableCodeAsync("T1", CancellationToken.None);
 
-        Assert.Contains("PendingStatusValue", exception.Message);
+        Assert.Null(definition.StatusConsumeProfile!.PendingStatusValue);
     }
 
+    /// <summary>
+    /// 验证禁用远端回写时仍可正常构建状态消费配置。
+    /// </summary>
     [Fact]
     public async Task GetByTableCodeAsync_WhenStatusDrivenAndWriteBackDisabled_ShouldSucceedWithFalse()
     {
@@ -104,6 +119,9 @@ public class SyncTaskConfigRepositoryTests
         Assert.False(definition.StatusConsumeProfile!.ShouldWriteBackRemoteStatus);
     }
 
+    /// <summary>
+    /// 验证状态驱动模式下的回写审计列会被正确映射。
+    /// </summary>
     [Fact]
     public async Task GetByTableCodeAsync_WhenStatusDrivenAndAuditColumnsConfigured_ShouldMapAuditColumns()
     {
@@ -124,6 +142,9 @@ public class SyncTaskConfigRepositoryTests
         Assert.Equal("FINISH_BATCH_ID", definition.StatusConsumeProfile.WriteBackBatchIdColumnName);
     }
 
+    /// <summary>
+    /// 验证基础投影列会被正确映射。
+    /// </summary>
     [Fact]
     public async Task GetByTableCodeAsync_WhenProjectionColumnsConfigured_ShouldMapProjectionColumns()
     {
@@ -154,6 +175,9 @@ public class SyncTaskConfigRepositoryTests
         Assert.Null(definition.PickLocationColumn);
     }
 
+    /// <summary>
+    /// 验证扩展投影列会被正确映射。
+    /// </summary>
     [Fact]
     public async Task GetByTableCodeAsync_WhenExtendedProjectionColumnsConfigured_ShouldMapExtendedProjectionColumns()
     {
@@ -179,6 +203,11 @@ public class SyncTaskConfigRepositoryTests
         Assert.Equal("LOCATION", definition.PickLocationColumn);
     }
 
+    /// <summary>
+    /// 构建测试用同步配置。
+    /// </summary>
+    /// <param name="configureTable">用于覆盖单表配置的委托。</param>
+    /// <returns>测试用同步作业配置。</returns>
     private static SyncJobOptions BuildOptions(Action<SyncTableOptions>? configureTable = null)
     {
         var table = new SyncTableOptions

@@ -1,7 +1,7 @@
-namespace EverydayChain.Hub.SharedKernel.Utilities;
+﻿namespace EverydayChain.Hub.SharedKernel.Utilities;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 RuntimeStoragePathResolver 类型。
 /// </summary>
 public static class RuntimeStoragePathResolver
 {

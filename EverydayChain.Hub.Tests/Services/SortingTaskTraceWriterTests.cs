@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SortingTaskTraceWriterTests 类型。
 /// </summary>
 public class SortingTaskTraceWriterTests
 {

@@ -9,7 +9,7 @@ using SortingTaskTraceEntity = EverydayChain.Hub.Domain.Aggregates.SortingTaskTr
 namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SortingTaskTraceWriter 类型。
 /// </summary>
 public class SortingTaskTraceWriter(
     IDbContextFactory<HubDbContext> dbContextFactory,

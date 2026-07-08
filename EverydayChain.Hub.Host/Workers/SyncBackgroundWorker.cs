@@ -7,15 +7,16 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Host.Workers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncBackgroundWorker 类型。
 /// </summary>
 public class SyncBackgroundWorker(
     ISyncOrchestrator syncOrchestrator,
     IOptions<SyncJobOptions> syncJobOptions,
+    IHostApplicationLifetime hostApplicationLifetime,
     ILogger<SyncBackgroundWorker> logger) : BackgroundService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _syncJobOptions 字段。
     /// </summary>
     private readonly SyncJobOptions _syncJobOptions = syncJobOptions.Value;
 
@@ -25,14 +26,24 @@ public class SyncBackgroundWorker(
     private long _lastIterationTicks = Stopwatch.GetTimestamp();
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 WatchdogMinCheckIntervalSeconds 字段。
     /// </summary>
-    private const int WatchdogMinCheckIntervalSeconds = 30;
+    private const int WatchdogMinCheckIntervalSeconds = 1;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 WatchdogMaxCheckIntervalSeconds 字段。
     /// </summary>
     private const int WatchdogMaxCheckIntervalSeconds = 300;
+
+    /// <summary>
+    /// 存储看门狗告警抑制的最大 Tick 值。
+    /// </summary>
+    private const long MaxWatchdogSuppressionTicks = long.MaxValue;
+
+    /// <summary>
+    /// 存储是否已请求宿主停止。
+    /// </summary>
+    private int _stopRequested;
 
     /// <summary>
     /// 周期执行同步后台任务。
@@ -87,6 +98,8 @@ public class SyncBackgroundWorker(
     {
         var checkIntervalSeconds = Math.Clamp(watchdogTimeoutSeconds / 3, WatchdogMinCheckIntervalSeconds, WatchdogMaxCheckIntervalSeconds);
         var lastAlertTicks = 0L;
+        var watchdogThresholdTicks = (watchdogTimeoutSeconds + pollingIntervalSeconds) * Stopwatch.Frequency;
+        var checkIntervalTicks = checkIntervalSeconds * Stopwatch.Frequency;
 
         while (!ct.IsCancellationRequested)
         {
@@ -100,21 +113,26 @@ public class SyncBackgroundWorker(
             }
 
             var lastTicks = Interlocked.Read(ref _lastIterationTicks);
-            var elapsedSeconds = (Stopwatch.GetTimestamp() - lastTicks) / (double)Stopwatch.Frequency;
+            var elapsedTicks = Stopwatch.GetTimestamp() - lastTicks;
 
-            var threshold = (double)(watchdogTimeoutSeconds + pollingIntervalSeconds);
-            if (elapsedSeconds > threshold)
+            if (elapsedTicks > watchdogThresholdTicks)
             {
                 var timeSinceLastAlert = lastAlertTicks == 0L
-                    ? double.MaxValue
-                    : (Stopwatch.GetTimestamp() - lastAlertTicks) / (double)Stopwatch.Frequency;
-                if (timeSinceLastAlert >= checkIntervalSeconds)
+                    ? MaxWatchdogSuppressionTicks
+                    : Stopwatch.GetTimestamp() - lastAlertTicks;
+                if (timeSinceLastAlert >= checkIntervalTicks)
                 {
                     logger.LogCritical(
-                        "同步后台任务疑似卡死，已超过看门狗超时阈值，建议立即重启服务。ElapsedSeconds={ElapsedSeconds:F0}, WatchdogThresholdSeconds={WatchdogThresholdSeconds}",
-                        elapsedSeconds,
-                        threshold);
+                        "同步后台任务疑似卡死，已超过看门狗超时阈值，正在主动停止宿主以触发服务恢复。ElapsedSeconds={ElapsedSeconds}, WatchdogThresholdSeconds={WatchdogThresholdSeconds}",
+                        ConvertStopwatchTicksToSeconds(elapsedTicks),
+                        ConvertStopwatchTicksToSeconds(watchdogThresholdTicks));
                     lastAlertTicks = Stopwatch.GetTimestamp();
+                    if (Interlocked.CompareExchange(ref _stopRequested, 1, 0) == 0)
+                    {
+                        hostApplicationLifetime.StopApplication();
+                    }
+
+                    break;
                 }
             }
             else
@@ -156,7 +174,7 @@ public class SyncBackgroundWorker(
             if (result.FailureRate > 0)
             {
                 logger.LogError(
-                    "同步执行失败。TableCode={TableCode}, BatchId={BatchId}, FailureRate={FailureRate:F4}, FailureMessage={FailureMessage}",
+                    "同步执行失败。TableCode={TableCode}, BatchId={BatchId}, FailureRate={FailureRate:F3}, FailureMessage={FailureMessage}",
                     result.TableCode,
                     result.BatchId,
                     result.FailureRate,
@@ -165,7 +183,7 @@ public class SyncBackgroundWorker(
             }
 
             logger.LogInformation(
-                "同步执行完成。TableCode={TableCode}, BatchId={BatchId}, Read={ReadCount}, Insert={InsertCount}, Update={UpdateCount}, Delete={DeleteCount}, Skip={SkipCount}, LagMinutes={LagMinutes:F2}, BacklogMinutes={BacklogMinutes:F2}, Throughput={ThroughputRowsPerSecond:F2}, ElapsedMs={ElapsedMs}",
+                "同步执行完成。TableCode={TableCode}, BatchId={BatchId}, Read={ReadCount}, Insert={InsertCount}, Update={UpdateCount}, Delete={DeleteCount}, Skip={SkipCount}, LagMinutes={LagMinutes:F3}, BacklogMinutes={BacklogMinutes:F3}, Throughput={ThroughputRowsPerSecond:F3}, ElapsedMs={ElapsedMs}",
                 result.TableCode,
                 result.BatchId,
                 result.ReadCount,
@@ -176,7 +194,7 @@ public class SyncBackgroundWorker(
                 result.LagMinutes,
                 result.BacklogMinutes,
                 result.ThroughputRowsPerSecond,
-                result.Elapsed.TotalMilliseconds);
+                ConvertTimeSpanToMilliseconds(result.Elapsed));
         }
 
         sw.Stop();
@@ -186,8 +204,8 @@ public class SyncBackgroundWorker(
         var totalInsert = 0;
         var totalUpdate = 0;
         var totalDelete = 0;
-        var maxLagMinutes = 0d;
-        var maxBacklogMinutes = 0d;
+        var maxLagMinutes = 0.000M;
+        var maxBacklogMinutes = 0.000M;
         foreach (var r in results)
         {
             totalTables++;
@@ -201,11 +219,13 @@ public class SyncBackgroundWorker(
         }
 
         var successTables = totalTables - failedTables;
-        var overallFailureRate = totalTables > 0 ? (double)failedTables / totalTables : 0d;
+        var overallFailureRate = totalTables > 0
+            ? RoundFixedDecimal(failedTables / (decimal)totalTables)
+            : 0.000M;
         if (failedTables > 0)
         {
             logger.LogWarning(
-                "本轮同步存在失败表。TotalTables={TotalTables}, SuccessTables={SuccessTables}, FailedTables={FailedTables}, OverallFailureRate={OverallFailureRate:F4}, TotalRead={TotalRead}, TotalInsert={TotalInsert}, TotalUpdate={TotalUpdate}, TotalDelete={TotalDelete}, MaxLagMinutes={MaxLagMinutes:F2}, MaxBacklogMinutes={MaxBacklogMinutes:F2}, RoundElapsedMs={RoundElapsedMs}",
+                "本轮同步存在失败表。TotalTables={TotalTables}, SuccessTables={SuccessTables}, FailedTables={FailedTables}, OverallFailureRate={OverallFailureRate:F3}, TotalRead={TotalRead}, TotalInsert={TotalInsert}, TotalUpdate={TotalUpdate}, TotalDelete={TotalDelete}, MaxLagMinutes={MaxLagMinutes:F3}, MaxBacklogMinutes={MaxBacklogMinutes:F3}, RoundElapsedMs={RoundElapsedMs}",
                 totalTables,
                 successTables,
                 failedTables,
@@ -216,12 +236,12 @@ public class SyncBackgroundWorker(
                 totalDelete,
                 maxLagMinutes,
                 maxBacklogMinutes,
-                sw.ElapsedMilliseconds);
+                ConvertTimeSpanToMilliseconds(sw.Elapsed));
         }
         else
         {
             logger.LogInformation(
-                "本轮同步全部成功。TotalTables={TotalTables}, TotalRead={TotalRead}, TotalInsert={TotalInsert}, TotalUpdate={TotalUpdate}, TotalDelete={TotalDelete}, MaxLagMinutes={MaxLagMinutes:F2}, MaxBacklogMinutes={MaxBacklogMinutes:F2}, RoundElapsedMs={RoundElapsedMs}",
+                "本轮同步全部成功。TotalTables={TotalTables}, TotalRead={TotalRead}, TotalInsert={TotalInsert}, TotalUpdate={TotalUpdate}, TotalDelete={TotalDelete}, MaxLagMinutes={MaxLagMinutes:F3}, MaxBacklogMinutes={MaxBacklogMinutes:F3}, RoundElapsedMs={RoundElapsedMs}",
                 totalTables,
                 totalRead,
                 totalInsert,
@@ -229,9 +249,44 @@ public class SyncBackgroundWorker(
                 totalDelete,
                 maxLagMinutes,
                 maxBacklogMinutes,
-                sw.ElapsedMilliseconds);
+                ConvertTimeSpanToMilliseconds(sw.Elapsed));
         }
 
+    }
+
+    /// <summary>
+    /// 将 TimeSpan 统一换算为三位小数的毫秒值。
+    /// </summary>
+    /// <param name="elapsed">待换算的耗时。</param>
+    /// <returns>保留三位小数的毫秒值。</returns>
+    private static decimal ConvertTimeSpanToMilliseconds(TimeSpan elapsed)
+    {
+        return RoundFixedDecimal(elapsed.Ticks / (decimal)TimeSpan.TicksPerMillisecond);
+    }
+
+    /// <summary>
+    /// 将 Stopwatch 时间戳差值换算为三位小数的秒值。
+    /// </summary>
+    /// <param name="ticks">Stopwatch 时间戳差值。</param>
+    /// <returns>保留三位小数的秒值。</returns>
+    private static decimal ConvertStopwatchTicksToSeconds(long ticks)
+    {
+        if (ticks <= 0)
+        {
+            return 0.000M;
+        }
+
+        return RoundFixedDecimal(ticks / (decimal)Stopwatch.Frequency);
+    }
+
+    /// <summary>
+    /// 统一将统计类小数规整为三位定点精度。
+    /// </summary>
+    /// <param name="value">待规整的小数值。</param>
+    /// <returns>保留三位小数的结果。</returns>
+    private static decimal RoundFixedDecimal(decimal value)
+    {
+        return Math.Round(value, 3, MidpointRounding.AwayFromZero);
     }
 }
 

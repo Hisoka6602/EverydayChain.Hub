@@ -12,14 +12,14 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncTaskConfigRepository 类型。
 /// </summary>
 public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, ILogger<SyncTaskConfigRepository> logger) : ISyncTaskConfigRepository
 {
     private static readonly Regex UtcOrOffsetRegex = new(@"(?:Z|[+\-]\d{2}:\d{2}|[+\-]\d{4})\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _options 字段。
     /// </summary>
     private readonly SyncJobOptions _options = syncJobOptions.Value;
 
@@ -140,7 +140,13 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         return mode;
     }
 
-    private static RemoteStatusConsumeProfile? BuildStatusConsumeProfile(SyncTableOptions table, SyncMode syncMode)
+    /// <summary>
+    /// 构建状态驱动消费配置。
+    /// </summary>
+    /// <param name="table">同步表配置。</param>
+    /// <param name="syncMode">同步模式。</param>
+    /// <returns>状态驱动消费配置；非状态驱动模式时返回空。</returns>
+    private RemoteStatusConsumeProfile? BuildStatusConsumeProfile(SyncTableOptions table, SyncMode syncMode)
     {
         if (syncMode != SyncMode.StatusDriven)
         {
@@ -164,7 +170,11 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             pendingStatusValue = table.PendingStatusValue.Trim();
             if (pendingStatusValue.Length == 0)
             {
-                throw new InvalidOperationException($"Table {table.TableCode} has an invalid PendingStatusValue. Use null or a non-empty value.");
+                // 步骤：兼容配置绑定把显式 null 映射为空字符串的场景，按 null 语义处理并输出告警。
+                logger.LogWarning(
+                    "同步表配置检测到空白 PendingStatusValue，已按 null 语义处理。TableCode={TableCode}",
+                    table.TableCode);
+                pendingStatusValue = null;
             }
         }
 

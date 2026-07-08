@@ -96,6 +96,68 @@ function Test-GarbledText {
     return $false
 }
 
+function Test-PlaceholderComment {
+    param(
+        [AllowEmptyString()]
+        [string]$Text
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return $false
+    }
+
+    $normalizedText = $Text.Trim()
+    $placeholderPatterns = @(
+        '^定义当前类型。?$',
+        '^定义当前成员。?$',
+        '^执行当前方法。?$',
+        '^存储当前字段值。?$',
+        '^获取或设置当前属性值。?$',
+        '^步骤：按既定流程执行当前方法逻辑。?$'
+    )
+
+    foreach ($placeholderPattern in $placeholderPatterns) {
+        if ($normalizedText -match $placeholderPattern) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Test-GenericNameOnlyComment {
+    param(
+        [string]$FilePath,
+        [AllowEmptyString()]
+        [string]$Text
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return $false
+    }
+
+    if ($FilePath -notmatch 'EverydayChain\.Hub\.Host[\\/]+Contracts[\\/]') {
+        return $false
+    }
+
+    $normalizedText = $Text.Trim()
+    $weakPatterns = @(
+        '^定义\s+[A-Za-z_][A-Za-z0-9_<>,\?\s]*\s+类型。?$',
+        '^定义\s+[A-Za-z_][A-Za-z0-9_<>,\?\s]*\s+成员。?$',
+        '^执行\s+[A-Za-z_][A-Za-z0-9_<>,\?\s]*\s+方法。?$',
+        '^存储\s+[A-Za-z_][A-Za-z0-9_<>,\?\s]*\s+字段。?$',
+        '^获取或设置\s+[A-Za-z_][A-Za-z0-9_<>,\?\s]*。?$'
+    )
+
+    foreach ($weakPattern in $weakPatterns) {
+        if ($normalizedText -match $weakPattern) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
 function Get-SourceFiles {
     param(
         [string]$RootDirectory
@@ -450,6 +512,103 @@ function Test-UtcUsage {
     }
 }
 
+function Test-EnvironmentVariableUsage {
+    param(
+        [string]$FilePath,
+        [string[]]$Lines,
+        [pscustomobject]$CommentMetadata
+    )
+
+    $environmentVariablePatterns = @(
+        '\bEnvironment\s*\.\s*GetEnvironmentVariable\s*\(',
+        '\bEnvironment\s*\.\s*GetEnvironmentVariables\s*\(',
+        '\bEnvironment\s*\.\s*SetEnvironmentVariable\s*\(',
+        '\bEnvironment\s*\.\s*ExpandEnvironmentVariables\s*\(',
+        '\bAddEnvironmentVariables\s*\('
+    )
+
+    for ($lineIndex = 0; $lineIndex -lt $Lines.Length; $lineIndex++) {
+        $lineNumber = $lineIndex + 1
+        if ($CommentMetadata.AllCommentLines.Contains($lineNumber)) {
+            continue
+        }
+
+        $lineText = $Lines[$lineIndex]
+        foreach ($environmentVariablePattern in $environmentVariablePatterns) {
+            if ($lineText -match $environmentVariablePattern) {
+                Add-Violation -FilePath $FilePath -LineNumber $lineNumber -Message "Environment variable usage is forbidden. Use appsettings, User Secrets, or command-line arguments instead."
+                break
+            }
+        }
+    }
+}
+
+function Test-FixedDecimalRules {
+    param(
+        [string]$FilePath,
+        [string[]]$Lines,
+        [pscustomobject]$CommentMetadata
+    )
+
+    $floatingPointPatterns = @(
+        '\bdouble\b',
+        '\bfloat\b',
+        '\bSystem\.Double\b',
+        '\bSystem\.Single\b'
+    )
+
+    for ($lineIndex = 0; $lineIndex -lt $Lines.Length; $lineIndex++) {
+        $lineNumber = $lineIndex + 1
+        if ($CommentMetadata.AllCommentLines.Contains($lineNumber)) {
+            continue
+        }
+
+        $lineText = $Lines[$lineIndex]
+
+        foreach ($floatingPointPattern in $floatingPointPatterns) {
+            if ($lineText -match $floatingPointPattern) {
+                Add-Violation -FilePath $FilePath -LineNumber $lineNumber -Message "Floating-point types are forbidden. Use decimal with at most 3 fractional digits."
+                break
+            }
+        }
+
+        if ($lineText -match '\.TotalMilliseconds\b' -or $lineText -match '\.TotalSeconds\b' -or $lineText -match '\.TotalMinutes\b') {
+            Add-Violation -FilePath $FilePath -LineNumber $lineNumber -Message "TimeSpan floating-point accessors are forbidden. Convert from ticks to decimal instead."
+        }
+
+        if ($lineText -match 'Math\.Round\s*\(.*?,\s*(\d+)\s*,\s*MidpointRounding') {
+            $roundScale = [int]$Matches[1]
+            if ($roundScale -ne 3) {
+                Add-Violation -FilePath $FilePath -LineNumber $lineNumber -Message "Decimal rounding scale must be exactly 3."
+            }
+        }
+
+        $storeTypeMatches = [regex]::Matches($lineText, '(decimal|numeric)\s*\(\s*\d+\s*,\s*(\d+)\s*\)', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        foreach ($storeTypeMatch in $storeTypeMatches) {
+            $storeScale = [int]$storeTypeMatch.Groups[2].Value
+            if ($storeScale -ne 3) {
+                Add-Violation -FilePath $FilePath -LineNumber $lineNumber -Message "Decimal database precision must use scale 3."
+            }
+        }
+
+        $precisionMatches = [regex]::Matches($lineText, 'HasPrecision\s*\(\s*\d+\s*,\s*(\d+)\s*\)')
+        foreach ($precisionMatch in $precisionMatches) {
+            $precisionScale = [int]$precisionMatch.Groups[1].Value
+            if ($precisionScale -ne 3) {
+                Add-Violation -FilePath $FilePath -LineNumber $lineNumber -Message "Entity decimal precision must use scale 3."
+            }
+        }
+
+        $decimalLiteralMatches = [regex]::Matches($lineText, '\b\d+\.(\d+)M\b', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        foreach ($decimalLiteralMatch in $decimalLiteralMatches) {
+            $fractionalDigits = $decimalLiteralMatch.Groups[1].Value.Length
+            if ($fractionalDigits -gt 3) {
+                Add-Violation -FilePath $FilePath -LineNumber $lineNumber -Message "Decimal literals cannot exceed 3 fractional digits."
+            }
+        }
+    }
+}
+
 $sourceFiles = @(Get-SourceFiles -RootDirectory $ProjectDirectory)
 
 foreach ($sourceFile in $sourceFiles) {
@@ -477,9 +636,19 @@ foreach ($sourceFile in $sourceFiles) {
         if (Test-GarbledText -Text $commentValidationText) {
             Add-Violation -FilePath $filePath -LineNumber $commentLineNumber -Message "Comments contain garbled text."
         }
+
+        if (Test-PlaceholderComment -Text $commentValidationText) {
+            Add-Violation -FilePath $filePath -LineNumber $commentLineNumber -Message "Comments must be meaningful and cannot use placeholder text."
+        }
+
+        if (Test-GenericNameOnlyComment -FilePath $filePath -Text $commentValidationText) {
+            Add-Violation -FilePath $filePath -LineNumber $commentLineNumber -Message "Swagger contract comments must describe business meaning and cannot only repeat type or property names."
+        }
     }
 
     Test-UtcUsage -FilePath $filePath -Lines $lines
+    Test-EnvironmentVariableUsage -FilePath $filePath -Lines $lines -CommentMetadata $commentMetadata
+    Test-FixedDecimalRules -FilePath $filePath -Lines $lines -CommentMetadata $commentMetadata
 
     for ($lineIndex = 0; $lineIndex -lt $lines.Length; $lineIndex++) {
         $lineNumber = $lineIndex + 1

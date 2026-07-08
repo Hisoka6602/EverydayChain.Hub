@@ -9,7 +9,7 @@ using AppExportCatalogQueryRequest = EverydayChain.Hub.Application.Models.Export
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ExportsControllerTests 类型。
 /// </summary>
 public sealed class ExportsControllerTests
 {
@@ -36,12 +36,12 @@ public sealed class ExportsControllerTests
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 StubExportCatalogQueryService 类型。
     /// </summary>
     private sealed class StubExportCatalogQueryService : IExportCatalogQueryService
     {
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 LastRequest。
         /// </summary>
         public AppExportCatalogQueryRequest? LastRequest { get; private set; }
 

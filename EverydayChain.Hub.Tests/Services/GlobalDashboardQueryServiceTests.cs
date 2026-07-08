@@ -1,13 +1,10 @@
-﻿using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Queries;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
 
 namespace EverydayChain.Hub.Tests.Services;
 
-/// <summary>
-/// 定义当前类型。
-/// </summary>
 public sealed class GlobalDashboardQueryServiceTests
 {
     private static (GlobalDashboardQueryService Service, InMemoryBusinessTaskRepository Repository, InMemoryScanLogRepository ScanLogRepository) CreateService()
@@ -124,14 +121,14 @@ public sealed class GlobalDashboardQueryServiceTests
 
         Assert.Equal(3, result.TotalCount);
         Assert.Equal(1, result.UnsortedCount);
-        Assert.Equal(66.67M, result.TotalSortedProgressPercent);
+        Assert.Equal(66.667M, result.TotalSortedProgressPercent);
         Assert.Equal(1, result.FullCaseTotalCount);
         Assert.Equal(0, result.FullCaseUnsortedCount);
         Assert.Equal(100M, result.FullCaseSortedProgressPercent);
         Assert.Equal(2, result.SplitTotalCount);
         Assert.Equal(1, result.SplitUnsortedCount);
         Assert.Equal(50M, result.SplitSortedProgressPercent);
-        Assert.Equal(66.67M, result.RecognitionRatePercent);
+        Assert.Equal(66.667M, result.RecognitionRatePercent);
         Assert.Equal(1, result.RecirculatedCount);
         Assert.Equal(1, result.ExceptionCount);
         Assert.Equal(600M, result.TotalVolumeMm3);
@@ -141,4 +138,3 @@ public sealed class GlobalDashboardQueryServiceTests
         Assert.Contains(result.WaveSummaries, x => x.WaveCode == "未分波次" && x.TotalCount == 1 && x.UnsortedCount == 0);
     }
 }
-

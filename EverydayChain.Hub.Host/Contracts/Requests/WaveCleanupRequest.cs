@@ -3,11 +3,11 @@
 namespace EverydayChain.Hub.Host.Contracts.Requests;
 
 /// <summary>
-/// 定义当前类型。
+/// 表示波次清理请求参数。
 /// </summary>
 public sealed class WaveCleanupRequest {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 表示需要执行清理的目标波次号。
     /// </summary>
     [MaxLength(64)]
     public string WaveCode { get; set; } = string.Empty;

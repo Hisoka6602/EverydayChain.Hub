@@ -10,12 +10,12 @@ using System.Text.RegularExpressions;
 namespace EverydayChain.Hub.Host.Swagger;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskSeedTableSchemaFilter 类型。
 /// </summary>
 public sealed class BusinessTaskSeedTableSchemaFilter : ISchemaFilter
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 BusinessTaskTablePrefix 字段。
     /// </summary>
     private const string BusinessTaskTablePrefix = "business_tasks";
 
@@ -25,23 +25,23 @@ public sealed class BusinessTaskSeedTableSchemaFilter : ISchemaFilter
     private static readonly Regex BusinessTaskTableNameRegex = new("^business_tasks_(\\d{6})$", RegexOptions.Compiled);
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _shardTableResolver 字段。
     /// </summary>
     private readonly IShardTableResolver _shardTableResolver;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _logger 字段。
     /// </summary>
     private readonly ILogger<BusinessTaskSeedTableSchemaFilter> _logger;
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BusinessTaskSeedTableSchemaFilter 方法。
     /// </summary>
     public BusinessTaskSeedTableSchemaFilter(
         IShardTableResolver shardTableResolver,
         ILogger<BusinessTaskSeedTableSchemaFilter> logger)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BusinessTaskSeedTableSchemaFilter 方法的核心处理流程。
         _shardTableResolver = shardTableResolver;
         _logger = logger;
     }

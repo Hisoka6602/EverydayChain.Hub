@@ -10,37 +10,37 @@ using EverydayChain.Hub.Application.Utilities;
 namespace EverydayChain.Hub.Application.Queries;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 GlobalDashboardQueryService 类型。
 /// </summary>
 public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 CacheKeyDateTimeFormat 字段。
     /// </summary>
     private const string CacheKeyDateTimeFormat = "yyyyMMddHHmmssfffffff";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _businessTaskRepository 字段。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _scanLogRepository 字段。
     /// </summary>
     private readonly IScanLogRepository _scanLogRepository;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _syncBatchRepository 字段。
     /// </summary>
     private readonly ISyncBatchRepository _syncBatchRepository;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _syncTaskConfigRepository 字段。
     /// </summary>
     private readonly ISyncTaskConfigRepository _syncTaskConfigRepository;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _memoryCache 字段。
     /// </summary>
     private readonly IMemoryCache _memoryCache;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _queryCacheOptions 字段。
     /// </summary>
     private readonly QueryCacheOptions _queryCacheOptions;
 
@@ -56,7 +56,7 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 GlobalDashboardQueryService 方法。
     /// </summary>
     public GlobalDashboardQueryService(
         IBusinessTaskRepository businessTaskRepository,
@@ -66,7 +66,7 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
         IMemoryCache memoryCache,
         QueryCacheOptions queryCacheOptions)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 EmptySyncBatchRepository 方法的核心处理流程。
         _businessTaskRepository = businessTaskRepository;
         _scanLogRepository = scanLogRepository;
         _syncBatchRepository = syncBatchRepository;
@@ -99,14 +99,14 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildResultAsync 方法。
     /// </summary>
     private async Task<GlobalDashboardQueryResult> BuildResultAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildResultAsync 方法的核心处理流程。
         var waveRows = await _businessTaskRepository.AggregateWaveDashboardAsync(startTimeLocal, endTimeLocal, cancellationToken);
         var recognitionAggregate = await _scanLogRepository.AggregateRecognitionAsync(startTimeLocal, endTimeLocal, cancellationToken);
         var feedbackAggregate = await _businessTaskRepository.AggregateFeedbackAsync(startTimeLocal, endTimeLocal, cancellationToken);
@@ -184,7 +184,7 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
         }
 
         var sortedCount = totalCount - unsortedCount;
-        return Math.Round((decimal)sortedCount * 100M / totalCount, 2, MidpointRounding.AwayFromZero);
+        return Math.Round((decimal)sortedCount * 100M / totalCount, 3, MidpointRounding.AwayFromZero);
     }
 
     private static decimal CalculateRatePercent(int numerator, int denominator)
@@ -194,31 +194,31 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
             return 0M;
         }
 
-        return Math.Round((decimal)numerator * 100M / denominator, 2, MidpointRounding.AwayFromZero);
+        return Math.Round((decimal)numerator * 100M / denominator, 3, MidpointRounding.AwayFromZero);
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 EmptySyncBatchRepository 类型。
     /// </summary>
     private sealed class EmptySyncBatchRepository : ISyncBatchRepository
     {
         /// <summary>
-        /// 执行当前方法。
+        /// 执行 CreateBatchAsync 方法。
         /// </summary>
         public Task CreateBatchAsync(SyncBatch batch, CancellationToken ct) => Task.CompletedTask;
 
         /// <summary>
-        /// 执行当前方法。
+        /// 执行 MarkInProgressAsync 方法。
         /// </summary>
         public Task MarkInProgressAsync(string batchId, DateTime startedTimeLocal, CancellationToken ct) => Task.CompletedTask;
 
         /// <summary>
-        /// 执行当前方法。
+        /// 执行 CompleteBatchAsync 方法。
         /// </summary>
         public Task CompleteBatchAsync(SyncBatchResult result, DateTime completedTimeLocal, CancellationToken ct) => Task.CompletedTask;
 
         /// <summary>
-        /// 执行当前方法。
+        /// 执行 FailBatchAsync 方法。
         /// </summary>
         public Task FailBatchAsync(string batchId, string errorMessage, DateTime failedTimeLocal, CancellationToken ct) => Task.CompletedTask;
 
@@ -231,7 +231,7 @@ public sealed class GlobalDashboardQueryService : IGlobalDashboardQueryService
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 EmptySyncTaskConfigRepository 类型。
     /// </summary>
     private sealed class EmptySyncTaskConfigRepository : ISyncTaskConfigRepository
     {

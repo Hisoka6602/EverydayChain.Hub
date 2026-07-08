@@ -1,14 +1,18 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace EverydayChain.Hub.Infrastructure.Migrations
 {
     /// <summary>
-    /// 定义当前类型。
+    /// 新增看板快照表与运行时租约表。
     /// </summary>
     public partial class AddDashboardSnapshotsAndRuntimeLeases : Migration
     {
+        /// <summary>
+        /// 执行迁移升级。
+        /// </summary>
+        /// <param name="migrationBuilder">迁移构建器。</param>
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
@@ -141,6 +145,10 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
                 column: "ExpiresAtLocal");
         }
 
+        /// <summary>
+        /// 执行迁移回滚。
+        /// </summary>
+        /// <param name="migrationBuilder">迁移构建器。</param>
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
@@ -161,4 +169,3 @@ namespace EverydayChain.Hub.Infrastructure.Migrations
         }
     }
 }
-

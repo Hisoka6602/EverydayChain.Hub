@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskQueryControllerTests 类型。
 /// </summary>
 public sealed class BusinessTaskQueryControllerTests
 {

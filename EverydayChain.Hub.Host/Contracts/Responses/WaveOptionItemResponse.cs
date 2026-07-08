@@ -1,17 +1,17 @@
 ﻿namespace EverydayChain.Hub.Host.Contracts.Responses;
 
 /// <summary>
-/// 定义当前类型。
+/// 表示波次下拉选项中的单个候选波次。
 /// </summary>
 public sealed class WaveOptionItemResponse
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 表示波次号。
     /// </summary>
     public string WaveCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 表示波次备注。
     /// </summary>
     public string? WaveRemark { get; set; }
 }

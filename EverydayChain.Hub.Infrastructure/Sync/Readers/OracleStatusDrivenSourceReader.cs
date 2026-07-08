@@ -12,7 +12,7 @@ using EverydayChain.Hub.Application.Abstractions.Sync;
 namespace EverydayChain.Hub.Infrastructure.Sync.Readers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 OracleStatusDrivenSourceReader 类型。
 /// </summary>
 public class OracleStatusDrivenSourceReader(
     IOptions<OracleOptions> oracleOptions,
@@ -20,19 +20,19 @@ public class OracleStatusDrivenSourceReader(
     ILogger<OracleStatusDrivenSourceReader> logger) : IOracleStatusDrivenSourceReader {
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DefaultCommandTimeoutSeconds 字段。
     /// </summary>
     private const int DefaultCommandTimeoutSeconds = 60;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _options 字段。
     /// </summary>
     private readonly OracleOptions _options = oracleOptions.Value;
 
     private readonly string _effectiveConnectionString = BuildConnectionString(oracleOptions.Value);
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ReadPendingPageAsync 方法。
     /// </summary>
     public async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReadPendingPageAsync(
         SyncTableDefinition definition,
@@ -42,7 +42,7 @@ public class OracleStatusDrivenSourceReader(
         IReadOnlySet<string> normalizedExcludedColumns,
         SyncWindow window,
         CancellationToken ct) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 BuildConnectionString 方法的核心处理流程。
         EnsureSafeIdentifier(definition.SourceSchema, nameof(definition.SourceSchema));
         EnsureSafeIdentifier(definition.SourceTable, nameof(definition.SourceTable));
         EnsureSafeIdentifier(profile.StatusColumnName, nameof(profile.StatusColumnName));
@@ -66,7 +66,7 @@ public class OracleStatusDrivenSourceReader(
         return await dangerZoneExecutor.ExecuteAsync(
             $"OracleStatusDrivenRead:{definition.TableCode}:P{pageNo}",
             /// <summary>
-            /// 获取或设置当前属性值。
+            /// 获取或设置 token。
             /// </summary>
             async token => {
                 await using var connection = new OracleConnection(_effectiveConnectionString);
@@ -119,10 +119,10 @@ public class OracleStatusDrivenSourceReader(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildReadSql 方法。
     /// </summary>
     private static string BuildReadSql(SyncTableDefinition definition, RemoteStatusConsumeProfile profile, bool hasCursorFilter) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildReadSql 方法的核心处理流程。
         var statusPredicate = profile.PendingStatusValue is null
             ? $"{profile.StatusColumnName} IS NULL"
             : $"{profile.StatusColumnName} = :p_pendingStatus";
@@ -145,10 +145,10 @@ ORDER BY RN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolvePageSize 方法。
     /// </summary>
     private int ResolvePageSize(int requestedPageSize) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolvePageSize 方法的核心处理流程。
         var maxPageSize = _options.MaxPageSize > 0 ? _options.MaxPageSize : 5000;
         if (requestedPageSize <= maxPageSize) {
             return requestedPageSize;
@@ -159,18 +159,18 @@ ORDER BY RN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveCommandTimeout 方法。
     /// </summary>
     private int ResolveCommandTimeout() {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveCommandTimeout 方法的核心处理流程。
         return _options.CommandTimeoutSeconds > 0 ? _options.CommandTimeoutSeconds : DefaultCommandTimeoutSeconds;
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 EnsureReadOnlyCommand 方法。
     /// </summary>
     private void EnsureReadOnlyCommand(OracleCommand command) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 EnsureReadOnlyCommand 方法的核心处理流程。
         if (!_options.ReadOnly) {
             return;
         }
@@ -182,20 +182,20 @@ ORDER BY RN
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 EnsureSafeIdentifier 方法。
     /// </summary>
     private static void EnsureSafeIdentifier(string identifier, string fieldName) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 EnsureSafeIdentifier 方法的核心处理流程。
         if (string.IsNullOrWhiteSpace(identifier) || !identifier.All(ch => char.IsLetterOrDigit(ch) || ch == '_')) {
             throw new InvalidOperationException($"{fieldName} 包含非法字符，仅允许字母、数字、下划线。 ");
         }
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildConnectionString 方法。
     /// </summary>
     private static string BuildConnectionString(OracleOptions options) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildConnectionString 方法的核心处理流程。
         return OracleConnectionStringResolver.BuildEffectiveConnectionString(options);
     }
 }

@@ -16,7 +16,7 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Infrastructure.Services.Sharding;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ShardSchemaSynchronizer 类型。
 /// </summary>
 public class ShardSchemaSynchronizer(
     IOptions<ShardingOptions> options,
@@ -27,17 +27,17 @@ public class ShardSchemaSynchronizer(
     ILogger<ShardSchemaSynchronizer> logger) : IShardSchemaSynchronizer
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SchemaCommandTimeoutSeconds 字段。
     /// </summary>
     private const int SchemaCommandTimeoutSeconds = 30;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SynchronizeCommandTimeoutSeconds 字段。
     /// </summary>
     private const int SynchronizeCommandTimeoutSeconds = 30;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _options 字段。
     /// </summary>
     private readonly ShardingOptions _options = options.Value;
 
@@ -534,7 +534,7 @@ public class ShardSchemaSynchronizer(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 CreateMetadataConversionException 方法。
     /// </summary>
     private static InvalidOperationException CreateMetadataConversionException(
         DbDataReader reader,
@@ -543,7 +543,7 @@ public class ShardSchemaSynchronizer(
         string targetTypeName,
         Exception? innerException = null)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 CreateMetadataConversionException 方法的核心处理流程。
         return new InvalidOperationException(
             $"读取分表结构元数据失败：{GetFieldDescription(reader, ordinal)} 的字段值类型为 {rawValue.GetType().FullName}，无法转换为 {targetTypeName}。",
             innerException);
@@ -578,7 +578,7 @@ public class ShardSchemaSynchronizer(
         {
             string text => $"N'{text.Replace("'", "''", StringComparison.Ordinal)}'",
             bool booleanValue => booleanValue ? "1" : "0",
-            byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal => Convert.ToString(value, CultureInfo.InvariantCulture)!,
+            byte or sbyte or short or ushort or int or uint or long or ulong or decimal => Convert.ToString(value, CultureInfo.InvariantCulture)!,
             Guid guid => $"'{guid:D}'",
             DateTime dateTime => $"'{dateTime:yyyy-MM-dd HH:mm:ss.fffffff}'",
             DateTimeOffset dateTimeOffset => $"'{dateTimeOffset.LocalDateTime:yyyy-MM-dd HH:mm:ss.fffffff}'",
@@ -623,7 +623,7 @@ public class ShardSchemaSynchronizer(
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 PhysicalIndexRow 类型。
     /// </summary>
     private readonly record struct PhysicalIndexRow(string IndexName, bool IsUnique, int KeyOrdinal, string ColumnName);
 }

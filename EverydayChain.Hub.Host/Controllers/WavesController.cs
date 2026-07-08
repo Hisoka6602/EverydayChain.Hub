@@ -9,7 +9,7 @@ using System.Text;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 提供波次相关查询与导出接口，用于查看当前波次、波次选项、波次汇总、区域分布与明细列表。
 /// </summary>
 [ApiController]
 [Route("api/v1/waves")]
@@ -18,8 +18,12 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
     private static readonly UTF8Encoding Utf8EncodingWithBom = new(true);
 
     /// <summary>
-    /// 执行当前方法。
+    /// 查询当前自动识别波次，返回最近一次有效扫描对应的波次号、备注、条码与扫描时间。
     /// </summary>
+    /// <param name="request">请求体查询条件，指定自动识别使用的时间范围。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>当前自动识别波次结果。</returns>
     [HttpPost("current")]
     [ProducesResponseType(typeof(ApiResponse<CurrentWaveResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<CurrentWaveResponse>), StatusCodes.Status400BadRequest)]
@@ -28,7 +32,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         [FromQuery] CurrentWaveQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryCurrentAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -58,8 +62,12 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 查询波次下拉选项，返回指定时间范围内可供前端筛选的波次号与备注列表。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>波次选项结果。</returns>
     [HttpPost("options")]
     [ProducesResponseType(typeof(ApiResponse<WaveOptionsResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<WaveOptionsResponse>), StatusCodes.Status400BadRequest)]
@@ -68,7 +76,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         [FromQuery] WaveOptionsQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryOptionsAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -101,8 +109,12 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 查询单个波次汇总，返回该波次的总件量、待分拣量、进度、回流量与异常量。
     /// </summary>
+    /// <param name="request">请求体查询条件，需包含时间范围与波次号。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>波次汇总结果。</returns>
     [HttpPost("summary")]
     [ProducesResponseType(typeof(ApiResponse<WaveSummaryResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<WaveSummaryResponse>), StatusCodes.Status400BadRequest)]
@@ -111,7 +123,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         [FromQuery] WaveSummaryQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QuerySummaryAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -153,8 +165,12 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 查询波次分区汇总，返回该波次在各区域的总件量、待分拣量、进度、回流量与异常量。
     /// </summary>
+    /// <param name="request">请求体查询条件，需包含时间范围与波次号。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>波次分区汇总结果。</returns>
     [HttpPost("zones")]
     [ProducesResponseType(typeof(ApiResponse<WaveZoneResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<WaveZoneResponse>), StatusCodes.Status400BadRequest)]
@@ -163,7 +179,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         [FromQuery] WaveZoneQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryZonesAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -212,8 +228,12 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 导出波次分区汇总 CSV 文件，用于按区域核对波次进度与异常情况。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>CSV 文件流。</returns>
     [HttpPost("zones/export/csv")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -222,7 +242,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         [FromQuery] WaveZoneQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportZonesCsvAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -250,8 +270,12 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 查询波次列表，返回指定时间范围内各波次的总量、待分拣量、拆零占比、整件占比、回流量与异常量。
     /// </summary>
+    /// <param name="request">请求体查询条件，指定列表统计时间范围。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>波次列表结果。</returns>
     [HttpPost("list")]
     [ProducesResponseType(typeof(ApiResponse<WaveListResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<WaveListResponse>), StatusCodes.Status400BadRequest)]
@@ -260,7 +284,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         [FromQuery] WaveListQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryListAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -303,8 +327,12 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 导出波次列表 CSV 文件，便于批量核查多个波次的汇总状态。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>CSV 文件流。</returns>
     [HttpPost("list/export/csv")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -313,7 +341,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         [FromQuery] WaveListQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportListCsvAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -335,8 +363,12 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 导出波次列表 Excel 文件，便于人工筛选与离线分析。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>Excel 文件流。</returns>
     [HttpPost("list/export/xlsx")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -345,7 +377,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         [FromQuery] WaveListQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportListXlsxAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -387,8 +419,12 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 查询波次明细列表，返回指定波次下每条业务任务的条码、门店、商品、拣货位、格口与状态信息。
     /// </summary>
+    /// <param name="request">请求体查询条件，需包含时间范围与波次号。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>波次明细结果。</returns>
     [HttpPost("details")]
     [ProducesResponseType(typeof(ApiResponse<WaveDetailResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<WaveDetailResponse>), StatusCodes.Status400BadRequest)]
@@ -397,7 +433,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         [FromQuery] WaveDetailQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryDetailsAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -454,8 +490,12 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 导出波次明细 CSV 文件，适用于对单个波次逐件核查任务状态。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>CSV 文件流。</returns>
     [HttpPost("details/export/csv")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -464,7 +504,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         [FromQuery] WaveDetailQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportDetailsCsvAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -492,8 +532,12 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 导出波次明细 Excel 文件，适用于前端下载后做人工核对与留档。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>Excel 文件流。</returns>
     [HttpPost("details/export/xlsx")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -502,7 +546,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         [FromQuery] WaveDetailQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportDetailsXlsxAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -556,8 +600,12 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 导出波次分区汇总 Excel 文件，适用于区域级运营复盘。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>Excel 文件流。</returns>
     [HttpPost("zones/export/xlsx")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -566,7 +614,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         [FromQuery] WaveZoneQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportZonesXlsxAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,

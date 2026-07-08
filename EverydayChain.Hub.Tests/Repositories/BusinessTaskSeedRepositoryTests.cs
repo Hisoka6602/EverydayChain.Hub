@@ -5,7 +5,7 @@ using System.Reflection;
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskSeedRepositoryTests 类型。
 /// </summary>
 public sealed class BusinessTaskSeedRepositoryTests
 {
@@ -119,7 +119,7 @@ public sealed class BusinessTaskSeedRepositoryTests
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 InvokeBuildSuccessResult 方法。
     /// </summary>
     private static BusinessTaskSeedResult InvokeBuildSuccessResult(
         string targetTableName,
@@ -129,7 +129,7 @@ public sealed class BusinessTaskSeedRepositoryTests
         IReadOnlyList<string> insertedBarcodes,
         string message)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 NotNull 方法的核心处理流程。
         var method = typeof(BusinessTaskSeedRepository).GetMethod(
             "BuildSuccessResult",
             BindingFlags.NonPublic | BindingFlags.Static);

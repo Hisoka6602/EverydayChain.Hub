@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ApiWarmupService 类型。
 /// </summary>
 public sealed class ApiWarmupService(
     IGlobalDashboardQueryService globalDashboardQueryService,
@@ -17,23 +17,23 @@ public sealed class ApiWarmupService(
     ILogger<ApiWarmupService> logger) : IApiWarmupService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 WarmupWaveCode 字段。
     /// </summary>
     private const string WarmupWaveCode = "WARMUP";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 WarmupBarcode 字段。
     /// </summary>
     private const string WarmupBarcode = "WARMUP-BARCODE";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 WarmupTaskCode 字段。
     /// </summary>
     private const string WarmupTaskCode = "WARMUP-TASK";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 WarmupSourceTableCode 字段。
     /// </summary>
     private const string WarmupSourceTableCode = "WARMUP_SOURCE";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 WarmupBusinessKey 字段。
     /// </summary>
     private const string WarmupBusinessKey = "WARMUP_KEY";
 
@@ -98,7 +98,7 @@ public sealed class ApiWarmupService(
         await TryWarmupStepAsync(
             "高频仓储定位查询链路",
             /// <summary>
-            /// 执行当前方法。
+            /// 执行 async 方法。
             /// </summary>
             async () =>
             {

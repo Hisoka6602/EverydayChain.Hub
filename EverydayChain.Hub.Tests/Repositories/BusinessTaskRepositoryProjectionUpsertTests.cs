@@ -5,7 +5,7 @@ using EverydayChain.Hub.Tests.Services;
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskRepositoryProjectionUpsertTests 类型。
 /// </summary>
 public class BusinessTaskRepositoryProjectionUpsertTests
 {

@@ -1,4 +1,5 @@
-﻿using EverydayChain.Hub.Application.Abstractions.Services;
+using EverydayChain.Hub.Application.Abstractions.Infrastructure;
+using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using Microsoft.EntityFrameworkCore;
@@ -8,25 +9,28 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Host.Workers;
 
 /// <summary>
-/// 定义当前类型。
+/// 启动后异步执行接口预热任务。
 /// </summary>
 public sealed class ApiWarmupHostedService(
     IApiWarmupService apiWarmupService,
+    IDatabaseConnectivityService databaseConnectivityService,
     IDbContextFactory<HubDbContext> dbContextFactory,
     IShardSuffixResolver shardSuffixResolver,
     IHostApplicationLifetime hostApplicationLifetime,
     ILogger<ApiWarmupHostedService> logger) : IHostedService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储预热总超时秒数。
     /// </summary>
     private const int WarmupTimeoutSeconds = 90;
+
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储预热取消令牌源。
     /// </summary>
     private readonly CancellationTokenSource _warmupCancellationTokenSource = new();
+
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储当前预热任务。
     /// </summary>
     private Task? _warmupTask;
 
@@ -47,16 +51,32 @@ public sealed class ApiWarmupHostedService(
                     hostApplicationLifetime.ApplicationStopping,
                     _warmupCancellationTokenSource.Token,
                     warmupTimeoutCts.Token);
-                await TryWarmupStepAsync("EF模型与分表上下文缓存", async () => await WarmupDbContextCacheAsync(linkedWarmupCts.Token), linkedWarmupCts.Token);
-                await TryWarmupStepAsync("查询链路预热", async () => await apiWarmupService.WarmupAsync(linkedWarmupCts.Token), linkedWarmupCts.Token);
+
+                var snapshot = await databaseConnectivityService.GetSnapshotAsync(linkedWarmupCts.Token);
+                if (!snapshot.LocalSqlServer.IsAvailable)
+                {
+                    logger.LogWarning("启动预热已跳过：{Message}", snapshot.LocalSqlServer.Description);
+                    return;
+                }
+
+                await TryWarmupStepAsync(
+                    "EF 模型与分表上下文缓存",
+                    async () => await WarmupDbContextCacheAsync(linkedWarmupCts.Token),
+                    linkedWarmupCts.Token);
+                await TryWarmupStepAsync(
+                    "查询链路预热",
+                    async () => await apiWarmupService.WarmupAsync(linkedWarmupCts.Token),
+                    linkedWarmupCts.Token);
             }
             catch (OperationCanceledException)
             {
-                logger.LogWarning("启动预热执行已取消（超时 >{WarmupTimeoutSeconds}s 或宿主停止信号），已跳过剩余预热步骤。", WarmupTimeoutSeconds);
+                logger.LogWarning(
+                    "启动预热执行已取消（超时 >{WarmupTimeoutSeconds}s 或宿主停止信号），已跳过剩余预热步骤。",
+                    WarmupTimeoutSeconds);
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "启动预热执行失败，已降级跳过，不影响主机可用性。");
+                logger.LogWarning(ex, "启动预热执行失败，已降级跳过，不影响宿主可用性。");
             }
         });
 
@@ -79,9 +99,7 @@ public sealed class ApiWarmupHostedService(
 
     private async Task WarmupDbContextCacheAsync(CancellationToken cancellationToken)
     {
-        // 步骤：预热基础表上下文。
         await WarmupSingleDbContextAsync(string.Empty, cancellationToken);
-        // 步骤：预热当月分表上下文。
         await WarmupSingleDbContextAsync(shardSuffixResolver.ResolveLocal(DateTime.Now), cancellationToken);
     }
 
@@ -112,4 +130,3 @@ public sealed class ApiWarmupHostedService(
         }
     }
 }
-

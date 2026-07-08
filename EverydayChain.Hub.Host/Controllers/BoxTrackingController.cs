@@ -9,7 +9,8 @@ using System.Text;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 提供箱子追踪查询与导出接口，用于按时间范围回溯扫描条码的识别、匹配、落格与任务明细。
+/// 这里的箱号追踪延续前端页面命名，但查询主键实际使用扫描日志中的条码值，不改变既有分拣机联调语义。
 /// </summary>
 [ApiController]
 [Route("api/v1/box-tracking")]
@@ -18,8 +19,12 @@ public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQu
     private static readonly UTF8Encoding Utf8EncodingWithBom = new(true);
 
     /// <summary>
-    /// 执行当前方法。
+    /// 查询箱子追踪明细，返回指定时间段内的扫描条码记录、订单信息、门店信息、商品信息与落格状态。
     /// </summary>
+    /// <param name="request">请求体查询条件。字段名 boxId 沿用前端页面命名，但实际筛选的是扫描日志中的 Barcode。</param>
+    /// <param name="queryRequest">查询字符串查询条件，字段语义与请求体一致，便于在浏览器中直接调试接口。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>箱号追踪分页结果。</returns>
     [HttpPost("query")]
     [ProducesResponseType(typeof(ApiResponse<BoxTrackingResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<BoxTrackingResponse>), StatusCodes.Status400BadRequest)]
@@ -28,7 +33,7 @@ public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQu
         [FromQuery] BoxTrackingQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -55,8 +60,12 @@ public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQu
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 导出箱子追踪 CSV 文件，字段与箱子追踪明细列表一致，便于运营排查与离线核对。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>CSV 文件流。</returns>
     [HttpPost("export/csv")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -65,7 +74,7 @@ public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQu
         [FromQuery] BoxTrackingQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportCsvAsync 方法的核心处理流程。
         var rows = await QueryAllRowsAsync(request, queryRequest, cancellationToken);
         if (rows.Result is not null)
         {
@@ -78,8 +87,12 @@ public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQu
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 导出箱子追踪 Excel 文件，字段与箱子追踪明细列表一致，适合做人工筛选与二次分析。
     /// </summary>
+    /// <param name="request">请求体查询条件。</param>
+    /// <param name="queryRequest">查询字符串查询条件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>Excel 文件流。</returns>
     [HttpPost("export/xlsx")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -88,7 +101,7 @@ public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQu
         [FromQuery] BoxTrackingQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExportXlsxAsync 方法的核心处理流程。
         var rows = await QueryAllRowsAsync(request, queryRequest, cancellationToken);
         if (rows.Result is not null)
         {
@@ -118,14 +131,14 @@ public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQu
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryAllRowsAsync 方法。
     /// </summary>
     private async Task<(IReadOnlyList<EverydayChain.Hub.Application.Models.BoxTrackingItem>? Value, ActionResult? Result)> QueryAllRowsAsync(
         BoxTrackingQueryRequest? request,
         BoxTrackingQueryRequest? queryRequest,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryAllRowsAsync 方法的核心处理流程。
         var resolvedRequest = ResolveRequest(request, queryRequest);
         if (!LocalTimeRangeValidator.TryNormalizeRequiredRange(
                 resolvedRequest.StartTimeLocal,
@@ -142,14 +155,15 @@ public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQu
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildQueryRequest 方法。
     /// </summary>
     private static EverydayChain.Hub.Application.Models.BoxTrackingQueryRequest BuildQueryRequest(
         BoxTrackingQueryRequest request,
         DateTime normalizedStart,
         DateTime normalizedEnd)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildQueryRequest 方法的核心处理流程。
+        // 步骤：仅做字段转译，不改变 boxId 对应扫描日志 Barcode 的既有查询语义。
         return new EverydayChain.Hub.Application.Models.BoxTrackingQueryRequest
         {
             StartTimeLocal = normalizedStart,
@@ -198,6 +212,7 @@ public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQu
     private static string BuildCsv(IReadOnlyList<EverydayChain.Hub.Application.Models.BoxTrackingItem> items)
     {
         var builder = new StringBuilder();
+        // 步骤：导出列名继续沿用 BoxId，避免影响既有前端和人工使用习惯，但其值实际为扫描条码。
         builder.AppendLine("OrderId,BoxId,StoreId,StoreName,ProductCode,PickLocation,Scanner,ScannedAt,Chute,Status");
         foreach (var item in items)
         {

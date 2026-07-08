@@ -9,31 +9,31 @@ using System.Text;
 namespace EverydayChain.Hub.Application.Queries;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SortingReportQueryService 类型。
 /// </summary>
 public sealed class SortingReportQueryService : ISortingReportQueryService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 CacheKeyDateTimeFormat 字段。
     /// </summary>
     private const string CacheKeyDateTimeFormat = "yyyyMMddHHmmssfffffff";
 
     private const string NullCacheValue = "(null)";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _businessTaskRepository 字段。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
 
     private readonly BusinessTaskQueryPolicy _queryPolicy = new();
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _memoryCache 字段。
     /// </summary>
     private readonly IMemoryCache _memoryCache;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _queryCacheOptions 字段。
     /// </summary>
     private readonly QueryCacheOptions _queryCacheOptions;
 
@@ -43,14 +43,14 @@ public sealed class SortingReportQueryService : ISortingReportQueryService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 SortingReportQueryService 方法。
     /// </summary>
     public SortingReportQueryService(
         IBusinessTaskRepository businessTaskRepository,
         IMemoryCache memoryCache,
         QueryCacheOptions queryCacheOptions)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 SortingReportQueryService 方法的核心处理流程。
         _businessTaskRepository = businessTaskRepository;
         _memoryCache = memoryCache;
         _queryCacheOptions = queryCacheOptions;
@@ -89,7 +89,7 @@ public sealed class SortingReportQueryService : ISortingReportQueryService
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildResultAsync 方法。
     /// </summary>
     private async Task<SortingReportQueryResult> BuildResultAsync(
         DateTime startTimeLocal,
@@ -97,7 +97,7 @@ public sealed class SortingReportQueryService : ISortingReportQueryService
         string? selectedDockCode,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildResultAsync 方法的核心处理流程。
         var dockRows = await _businessTaskRepository.AggregateDockDashboardAsync(
             startTimeLocal,
             endTimeLocal,

@@ -12,7 +12,7 @@ using EverydayChain.Hub.Infrastructure.Services;
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SqlServerSyncUpsertRepositoryTests 类型。
 /// </summary>
 public class SqlServerSyncUpsertRepositoryTests
 {

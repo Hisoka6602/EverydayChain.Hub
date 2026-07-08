@@ -13,26 +13,26 @@ using System.Text.RegularExpressions;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskSeedRepository 类型。
 /// </summary>
 public sealed class BusinessTaskSeedRepository(
     IDbContextFactory<HubDbContext> dbContextFactory,
     IShardTableProvisioner shardTableProvisioner) : IBusinessTaskSeedRepository
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 BusinessTaskLogicalTable 字段。
     /// </summary>
     private const string BusinessTaskLogicalTable = "business_tasks";
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 ManualSeedSourceTableCode 字段。
     /// </summary>
     private const string ManualSeedSourceTableCode = "manual_seed";
 
     private static readonly Regex TargetTableNameRegex = new("^business_tasks_(\\d{6})$", RegexOptions.Compiled);
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 MaxInClauseBatchSize 字段。
     /// </summary>
     private const int MaxInClauseBatchSize = 2000;
 
@@ -112,14 +112,14 @@ public sealed class BusinessTaskSeedRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 FilterInsertBarcodes 方法。
     /// </summary>
     public static IReadOnlyList<string> FilterInsertBarcodes(
         IReadOnlyList<string> candidateBarcodes,
         ISet<string> existingManualSeedBusinessKeys,
         out IReadOnlyList<string> skippedBarcodes)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 FilterInsertBarcodes 方法的核心处理流程。
         var insertBarcodes = new List<string>(candidateBarcodes.Count);
         var skippedBarcodesList = new List<string>(candidateBarcodes.Count);
         foreach (var barcode in candidateBarcodes)
@@ -165,11 +165,11 @@ public sealed class BusinessTaskSeedRepository(
     private static uint ComputeFnv1aHash(string value)
     {
         /// <summary>
-        /// 存储当前字段值。
+        /// 存储 offsetBasis 字段。
         /// </summary>
         const uint offsetBasis = 2166136261;
         /// <summary>
-        /// 存储当前字段值。
+        /// 存储 prime 字段。
         /// </summary>
         const uint prime = 16777619;
         var hash = offsetBasis;
@@ -183,14 +183,14 @@ public sealed class BusinessTaskSeedRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 LoadExistingManualSeedKeysAsync 方法。
     /// </summary>
     private static async Task<List<string>> LoadExistingManualSeedKeysAsync(
         HubDbContext dbContext,
         IReadOnlyList<string> candidateBarcodes,
         CancellationToken cancellationToken)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 LoadExistingManualSeedKeysAsync 方法的核心处理流程。
         var existingManualSeedKeys = new List<string>(candidateBarcodes.Count);
         foreach (var barcodeBatch in SplitBarcodeBatches(candidateBarcodes, MaxInClauseBatchSize))
         {
@@ -240,7 +240,7 @@ public sealed class BusinessTaskSeedRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildSuccessResult 方法。
     /// </summary>
     private static BusinessTaskSeedResult BuildSuccessResult(
         string targetTableName,
@@ -250,7 +250,7 @@ public sealed class BusinessTaskSeedRepository(
         IReadOnlyList<string> insertedBarcodes,
         string message)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildFailResult 方法的核心处理流程。
         return new BusinessTaskSeedResult
         {
             IsSuccess = true,

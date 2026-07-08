@@ -7,20 +7,20 @@ using EverydayChain.Hub.Domain.Sync;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncDeletionRepository 类型。
 /// </summary>
 public class SyncDeletionRepository(IOracleSourceReader oracleSourceReader, ISyncUpsertRepository upsertRepository) : ISyncDeletionRepository
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 MissingSourceEvidenceMessage 字段。
     /// </summary>
     private const string MissingSourceEvidenceMessage = "窗口内源端未检索到该业务键。";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DefaultCompareSegmentSize 字段。
     /// </summary>
     private const int DefaultCompareSegmentSize = 20000;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DefaultCompareMaxParallelism 字段。
     /// </summary>
     private const int DefaultCompareMaxParallelism = 1;
     public async Task<IReadOnlyList<SyncDeletionCandidate>> DetectDeletedKeysAsync(SyncDeletionDetectRequest request, CancellationToken ct)

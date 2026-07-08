@@ -3,17 +3,17 @@
 namespace EverydayChain.Hub.Tests.Host.Workers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 TestRuntimeStorageGuard 类型。
 /// </summary>
 public sealed class TestRuntimeStorageGuard : IRuntimeStorageGuard
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 StartupHealthCheckCount。
     /// </summary>
     public int StartupHealthCheckCount { get; private set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 StartupExceptionToThrow。
     /// </summary>
     public Exception? StartupExceptionToThrow { get; init; }
 

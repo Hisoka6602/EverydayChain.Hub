@@ -13,7 +13,7 @@ using System.Linq.Expressions;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskRepository 类型。
 /// </summary>
 public class BusinessTaskRepository(
     IDbContextFactory<HubDbContext> contextFactory,
@@ -24,19 +24,19 @@ public class BusinessTaskRepository(
     IOptions<DashboardSnapshotOptions> dashboardSnapshotOptions) : IBusinessTaskRepository
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 BusinessTaskLogicalTable 字段。
     /// </summary>
     private const string BusinessTaskLogicalTable = "business_tasks";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 EmptyWaveCode 字段。
     /// </summary>
     private const string EmptyWaveCode = "未分波次";
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 EmptyDockCode 字段。
     /// </summary>
     private const string EmptyDockCode = "未分配码头";
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 task。
     /// </summary>
     private static readonly Expression<Func<BusinessTaskEntity, bool>> RecirculationByResolvedDockCodeExpression = task =>
         task.ResolvedDockCode != string.Empty
@@ -58,11 +58,11 @@ public class BusinessTaskRepository(
     });
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _shardingOptions 字段。
     /// </summary>
     private readonly ShardingOptions _shardingOptions = shardingOptions.Value;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _dashboardSnapshotOptions 字段。
     /// </summary>
     private readonly DashboardSnapshotOptions _dashboardSnapshotOptions = dashboardSnapshotOptions.Value;
 
@@ -156,7 +156,7 @@ public class BusinessTaskRepository(
     public async Task UpsertProjectionAsync(BusinessTaskEntity entity, CancellationToken ct)
     {
         /// <summary>
-        /// 执行当前方法。
+        /// 执行 UpsertProjectionBatchAsync 方法。
         /// </summary>
         await UpsertProjectionBatchAsync([entity], ct);
     }
@@ -335,7 +335,7 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ClaimFeedbackBatchAsync 方法。
     /// </summary>
     public async Task<IReadOnlyList<BusinessTaskEntity>> ClaimFeedbackBatchAsync(
         BusinessTaskFeedbackStatus sourceStatus,
@@ -344,7 +344,7 @@ public class BusinessTaskRepository(
         TimeSpan staleAfter,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ClaimFeedbackBatchAsync 方法的核心处理流程。
         if (maxCount <= 0)
         {
             return [];
@@ -376,7 +376,7 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ClaimFeedbackByTaskCodeAsync 方法。
     /// </summary>
     public async Task<BusinessTaskEntity?> ClaimFeedbackByTaskCodeAsync(
         string taskCode,
@@ -384,7 +384,7 @@ public class BusinessTaskRepository(
         TimeSpan staleAfter,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ClaimFeedbackByTaskCodeAsync 方法的核心处理流程。
         var candidate = await FindByTaskCodeAsync(taskCode, ct);
         if (candidate is null)
         {
@@ -425,7 +425,7 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BulkMarkExceptionByWaveCodeAsync 方法。
     /// </summary>
     public async Task<int> BulkMarkExceptionByWaveCodeAsync(
         string waveCode,
@@ -434,7 +434,7 @@ public class BusinessTaskRepository(
         DateTime updatedTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BulkMarkExceptionByWaveCodeAsync 方法的核心处理流程。
         var normalizedWaveCode = NormalizeOptionalText(waveCode);
         if (string.IsNullOrWhiteSpace(normalizedWaveCode))
         {
@@ -496,163 +496,6 @@ public class BusinessTaskRepository(
         var shardSuffixes = await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct);
         return await QueryAcrossSpecifiedShardsAsync(query => query
             .Where(x => x.CreatedTimeLocal >= startTimeLocal && x.CreatedTimeLocal < endTimeLocal), shardSuffixes, ct);
-    }
-
-    /// <summary>
-    /// 执行当前方法。
-    /// </summary>
-    public async Task<IReadOnlyList<BusinessTaskProjectionBackfillCandidate>> FindProjectionBackfillCandidatesAsync(
-        string sourceTableCode,
-        DateTime startTimeLocal,
-        DateTime endTimeLocal,
-        bool requireOrderId,
-        bool requireStoreId,
-        bool requireStoreName,
-        bool requireProductCode,
-        bool requirePickLocation,
-        int take,
-        CancellationToken ct)
-    {
-        // 步骤：按既定流程执行当前方法逻辑。
-        if (endTimeLocal <= startTimeLocal || take <= 0)
-        {
-            return Array.Empty<BusinessTaskProjectionBackfillCandidate>();
-        }
-
-        var normalizedSourceTableCode = NormalizeOptionalText(sourceTableCode);
-        if (string.IsNullOrWhiteSpace(normalizedSourceTableCode))
-        {
-            return Array.Empty<BusinessTaskProjectionBackfillCandidate>();
-        }
-
-        if (!requireOrderId && !requireStoreId && !requireStoreName && !requireProductCode && !requirePickLocation)
-        {
-            return Array.Empty<BusinessTaskProjectionBackfillCandidate>();
-        }
-
-        var suffixes = (await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct))
-            .OrderBy(suffix => suffix, StringComparer.Ordinal)
-            .ToList();
-        var candidates = new List<BusinessTaskProjectionBackfillCandidate>(take);
-        foreach (var suffix in suffixes)
-        {
-            var remainingTake = take - candidates.Count;
-            if (remainingTake <= 0)
-            {
-                break;
-            }
-
-            using var scope = TableSuffixScope.Use(suffix);
-            await using var db = await contextFactory.CreateDbContextAsync(ct);
-            var shardRows = await db.BusinessTasks
-                .AsNoTracking()
-                .Where(task =>
-                    task.CreatedTimeLocal >= startTimeLocal
-                    && task.CreatedTimeLocal < endTimeLocal
-                    && task.SourceTableCode == normalizedSourceTableCode
-                    && task.BusinessKey != null
-                    && task.BusinessKey != string.Empty
-                    && ((requireOrderId && (task.OrderId == null || task.OrderId == string.Empty))
-                        || (requireStoreId && (task.StoreId == null || task.StoreId == string.Empty))
-                        || (requireStoreName && (task.StoreName == null || task.StoreName == string.Empty))
-                        || (requireProductCode && (task.ProductCode == null || task.ProductCode == string.Empty))
-                        || (requirePickLocation && (task.PickLocation == null || task.PickLocation == string.Empty))))
-                .OrderBy(task => task.CreatedTimeLocal)
-                .ThenBy(task => task.Id)
-                .Select(task => new BusinessTaskProjectionBackfillCandidate
-                {
-                    Id = task.Id,
-                    SourceTableCode = task.SourceTableCode,
-                    BusinessKey = task.BusinessKey,
-                    CreatedTimeLocal = task.CreatedTimeLocal
-                })
-                .Take(remainingTake)
-                .ToListAsync(ct);
-            candidates.AddRange(shardRows);
-        }
-
-        return candidates;
-    }
-
-    /// <summary>
-    /// 执行当前方法。
-    /// </summary>
-    public async Task<BusinessTaskProjectionGapSummary> CountProjectionBackfillGapsAsync(
-        string sourceTableCode,
-        DateTime startTimeLocal,
-        DateTime endTimeLocal,
-        bool requireOrderId,
-        bool requireStoreId,
-        bool requireStoreName,
-        bool requireProductCode,
-        bool requirePickLocation,
-        CancellationToken ct)
-    {
-        // 步骤：按既定流程执行当前方法逻辑。
-        var summary = new BusinessTaskProjectionGapSummary
-        {
-            SourceTableCode = NormalizeOptionalText(sourceTableCode) ?? string.Empty
-        };
-        if (endTimeLocal <= startTimeLocal || string.IsNullOrWhiteSpace(summary.SourceTableCode))
-        {
-            return summary;
-        }
-
-        if (!requireOrderId && !requireStoreId && !requireStoreName && !requireProductCode && !requirePickLocation)
-        {
-            return summary;
-        }
-
-        var suffixes = (await ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(startTimeLocal, endTimeLocal, ct))
-            .OrderBy(suffix => suffix, StringComparer.Ordinal)
-            .ToList();
-        foreach (var suffix in suffixes)
-        {
-            using var scope = TableSuffixScope.Use(suffix);
-            await using var db = await contextFactory.CreateDbContextAsync(ct);
-            var baseQuery = db.BusinessTasks
-                .AsNoTracking()
-                .Where(task =>
-                    task.CreatedTimeLocal >= startTimeLocal
-                    && task.CreatedTimeLocal < endTimeLocal
-                    && task.SourceTableCode == summary.SourceTableCode
-                    && task.BusinessKey != null
-                    && task.BusinessKey != string.Empty);
-
-            if (requireOrderId)
-            {
-                summary.MissingOrderIdCount += await baseQuery.CountAsync(task => task.OrderId == null || task.OrderId == string.Empty, ct);
-            }
-
-            if (requireStoreId)
-            {
-                summary.MissingStoreIdCount += await baseQuery.CountAsync(task => task.StoreId == null || task.StoreId == string.Empty, ct);
-            }
-
-            if (requireStoreName)
-            {
-                summary.MissingStoreNameCount += await baseQuery.CountAsync(task => task.StoreName == null || task.StoreName == string.Empty, ct);
-            }
-
-            if (requireProductCode)
-            {
-                summary.MissingProductCodeCount += await baseQuery.CountAsync(task => task.ProductCode == null || task.ProductCode == string.Empty, ct);
-            }
-
-            if (requirePickLocation)
-            {
-                summary.MissingPickLocationCount += await baseQuery.CountAsync(task => task.PickLocation == null || task.PickLocation == string.Empty, ct);
-            }
-
-            summary.CandidateCount += await baseQuery.CountAsync(task =>
-                (requireOrderId && (task.OrderId == null || task.OrderId == string.Empty))
-                || (requireStoreId && (task.StoreId == null || task.StoreId == string.Empty))
-                || (requireStoreName && (task.StoreName == null || task.StoreName == string.Empty))
-                || (requireProductCode && (task.ProductCode == null || task.ProductCode == string.Empty))
-                || (requirePickLocation && (task.PickLocation == null || task.PickLocation == string.Empty)), ct);
-        }
-
-        return summary;
     }
 
     public async Task<BusinessTaskEntity?> FindLatestScannedWithWaveByCreatedTimeRangeAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
@@ -915,7 +758,7 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ListWaveTaskStatsByWaveCodeAndCreatedTimeRangeAsync 方法。
     /// </summary>
     public async Task<IReadOnlyList<BusinessTaskWaveTaskStatsRow>> ListWaveTaskStatsByWaveCodeAndCreatedTimeRangeAsync(
         DateTime startTimeLocal,
@@ -923,7 +766,7 @@ public class BusinessTaskRepository(
         string waveCode,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ListWaveTaskStatsByWaveCodeAndCreatedTimeRangeAsync 方法的核心处理流程。
         var normalizedWaveCode = NormalizeOptionalText(waveCode);
         if (endTimeLocal <= startTimeLocal || string.IsNullOrWhiteSpace(normalizedWaveCode))
         {
@@ -969,7 +812,7 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 AggregateDockDashboardAsync 方法。
     /// </summary>
     public async Task<IReadOnlyList<BusinessTaskDockAggregateRow>> AggregateDockDashboardAsync(
         DateTime startTimeLocal,
@@ -978,7 +821,7 @@ public class BusinessTaskRepository(
         string? dockCode,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 AggregateDockDashboardAsync 方法的核心处理流程。
         if (endTimeLocal <= startTimeLocal)
         {
             return Array.Empty<BusinessTaskDockAggregateRow>();
@@ -1063,7 +906,7 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 AggregateRecirculationSummaryAsync 方法。
     /// </summary>
     public async Task<IReadOnlyList<BusinessTaskRecirculationAggregateRow>> AggregateRecirculationSummaryAsync(
         DateTime startTimeLocal,
@@ -1071,7 +914,7 @@ public class BusinessTaskRepository(
         string? chuteCode,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 AggregateRecirculationSummaryAsync 方法的核心处理流程。
         if (endTimeLocal <= startTimeLocal)
         {
             return Array.Empty<BusinessTaskRecirculationAggregateRow>();
@@ -1147,7 +990,7 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryByQueryConditionsAsync 方法。
     /// </summary>
     public async Task<IReadOnlyList<BusinessTaskEntity>> QueryByQueryConditionsAsync(
         BusinessTaskSearchFilter filter,
@@ -1155,13 +998,13 @@ public class BusinessTaskRepository(
         int take,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryByQueryConditionsAsync 方法的核心处理流程。
         var pageResult = await QueryPageWithTotalCountByConditionsAsync(filter, skip, take, ct);
         return pageResult.Items;
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryPageWithTotalCountByConditionsAsync 方法。
     /// </summary>
     public async Task<(int TotalCount, IReadOnlyList<BusinessTaskEntity> Items)> QueryPageWithTotalCountByConditionsAsync(
         BusinessTaskSearchFilter filter,
@@ -1169,7 +1012,7 @@ public class BusinessTaskRepository(
         int take,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryPageWithTotalCountByConditionsAsync 方法的核心处理流程。
         if (filter.EndTimeLocal <= filter.StartTimeLocal || take <= 0)
         {
             return (0, Array.Empty<BusinessTaskEntity>());
@@ -1219,7 +1062,7 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryByCursorConditionsAsync 方法。
     /// </summary>
     public async Task<IReadOnlyList<BusinessTaskEntity>> QueryByCursorConditionsAsync(
         BusinessTaskSearchFilter filter,
@@ -1228,7 +1071,7 @@ public class BusinessTaskRepository(
         int take,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryByCursorConditionsAsync 方法的核心处理流程。
         if (filter.EndTimeLocal <= filter.StartTimeLocal || take <= 0)
         {
             return Array.Empty<BusinessTaskEntity>();
@@ -1269,13 +1112,13 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 FindFirstAcrossShardsAsync 方法。
     /// </summary>
     private async Task<BusinessTaskEntity?> FindFirstAcrossShardsAsync(
         Func<IQueryable<BusinessTaskEntity>, IQueryable<BusinessTaskEntity>> queryBuilder,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 FindFirstAcrossShardsAsync 方法的核心处理流程。
         foreach (var suffix in await ListShardSuffixesWithLegacyFallbackAsync(ct))
         {
             using var scope = TableSuffixScope.Use(suffix);
@@ -1291,26 +1134,26 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryAcrossShardsAsync 方法。
     /// </summary>
     private async Task<IReadOnlyList<BusinessTaskEntity>> QueryAcrossShardsAsync(
         Func<IQueryable<BusinessTaskEntity>, IQueryable<BusinessTaskEntity>> queryBuilder,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryAcrossShardsAsync 方法的核心处理流程。
         var suffixes = await ListShardSuffixesWithLegacyFallbackAsync(ct);
         return await QueryAcrossSpecifiedShardsAsync(queryBuilder, suffixes, ct);
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryAcrossSpecifiedShardsAsync 方法。
     /// </summary>
     private async Task<IReadOnlyList<BusinessTaskEntity>> QueryAcrossSpecifiedShardsAsync(
         Func<IQueryable<BusinessTaskEntity>, IQueryable<BusinessTaskEntity>> queryBuilder,
         IReadOnlyList<string> shardSuffixes,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryAcrossSpecifiedShardsAsync 方法的核心处理流程。
         if (shardSuffixes.Count == 0)
         {
             return Array.Empty<BusinessTaskEntity>();
@@ -1334,13 +1177,13 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildQueryBySearchFilter 方法。
     /// </summary>
     private static IQueryable<BusinessTaskEntity> BuildQueryBySearchFilter(
         IQueryable<BusinessTaskEntity> query,
         BusinessTaskSearchFilter filter)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildQueryBySearchFilter 方法的核心处理流程。
         var normalizedWaveCode = NormalizeOptionalText(filter.WaveCode);
         var normalizedBarcode = NormalizeOptionalText(filter.Barcode);
         var normalizedDockCode = NormalizeOptionalText(filter.DockCode);
@@ -1395,12 +1238,12 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 WaveOptionCandidate 类型。
     /// </summary>
     private readonly record struct WaveOptionCandidate(string? WaveRemark, DateTime UpdatedTimeLocal);
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 ShardWaveOptionAggregateRow 类型。
     /// </summary>
     private readonly record struct ShardWaveOptionAggregateRow(
         string WaveCode,
@@ -1408,7 +1251,7 @@ public class BusinessTaskRepository(
         DateTime UpdatedTimeLocal);
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 IsAlignedSnapshotRangeCoveredAsync 方法。
     /// </summary>
     private async Task<bool> IsAlignedSnapshotRangeCoveredAsync(
         DashboardSnapshotSource source,
@@ -1416,7 +1259,7 @@ public class BusinessTaskRepository(
         DateTime endTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 IsAlignedSnapshotRangeCoveredAsync 方法的核心处理流程。
         if (!_dashboardSnapshotOptions.Enabled || !_dashboardSnapshotOptions.PreferSnapshotQueries)
         {
             return false;
@@ -1437,14 +1280,14 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 AggregateWaveDashboardFromSnapshotsAsync 方法。
     /// </summary>
     private async Task<IReadOnlyList<BusinessTaskWaveAggregateRow>> AggregateWaveDashboardFromSnapshotsAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 AggregateWaveDashboardFromSnapshotsAsync 方法的核心处理流程。
         using var scope = TableSuffixScope.Use(string.Empty);
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         return await db.DashboardTaskSnapshots
@@ -1472,14 +1315,14 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 AggregateFeedbackFromSnapshotsAsync 方法。
     /// </summary>
     private async Task<BusinessTaskFeedbackAggregate> AggregateFeedbackFromSnapshotsAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 AggregateFeedbackFromSnapshotsAsync 方法的核心处理流程。
         using var scope = TableSuffixScope.Use(string.Empty);
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var aggregate = await db.DashboardTaskSnapshots
@@ -1496,14 +1339,14 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ListWaveCodesFromSnapshotsAsync 方法。
     /// </summary>
     private async Task<IReadOnlyList<string>> ListWaveCodesFromSnapshotsAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ListWaveCodesFromSnapshotsAsync 方法的核心处理流程。
         using var scope = TableSuffixScope.Use(string.Empty);
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         return await db.DashboardTaskSnapshots
@@ -1516,14 +1359,14 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ListWaveOptionsFromSnapshotsAsync 方法。
     /// </summary>
     private async Task<IReadOnlyList<BusinessTaskWaveOptionRow>> ListWaveOptionsFromSnapshotsAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ListWaveOptionsFromSnapshotsAsync 方法的核心处理流程。
         using var scope = TableSuffixScope.Use(string.Empty);
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var rows = await db.DashboardTaskSnapshots
@@ -1564,7 +1407,7 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 AggregateDockDashboardFromSnapshotsAsync 方法。
     /// </summary>
     private async Task<IReadOnlyList<BusinessTaskDockAggregateRow>> AggregateDockDashboardFromSnapshotsAsync(
         DateTime startTimeLocal,
@@ -1573,7 +1416,7 @@ public class BusinessTaskRepository(
         string? dockCode,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 AggregateDockDashboardFromSnapshotsAsync 方法的核心处理流程。
         var normalizedWaveCode = NormalizeOptionalText(waveCode);
         var normalizedDockCode = NormalizeOptionalText(dockCode);
         using var scope = TableSuffixScope.Use(string.Empty);
@@ -1612,7 +1455,7 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 AggregateRecirculationSummaryFromSnapshotsAsync 方法。
     /// </summary>
     private async Task<IReadOnlyList<BusinessTaskRecirculationAggregateRow>> AggregateRecirculationSummaryFromSnapshotsAsync(
         DateTime startTimeLocal,
@@ -1620,7 +1463,7 @@ public class BusinessTaskRepository(
         string? chuteCode,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 AggregateRecirculationSummaryFromSnapshotsAsync 方法的核心处理流程。
         var normalizedChuteCode = NormalizeOptionalText(chuteCode);
         using var scope = TableSuffixScope.Use(string.Empty);
         await using var db = await contextFactory.CreateDbContextAsync(ct);
@@ -1672,7 +1515,7 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 LoadProjectionExistingMapAsync 方法。
     /// </summary>
     private async Task<Dictionary<ProjectionKey, LoadedBusinessTask>> LoadProjectionExistingMapAsync(
         IEnumerable<ProjectionKey> keys,
@@ -1680,7 +1523,7 @@ public class BusinessTaskRepository(
         IReadOnlyList<string> businessKeys,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 LoadProjectionExistingMapAsync 方法的核心处理流程。
         var keySet = keys.ToHashSet();
         var existingByKey = new Dictionary<ProjectionKey, LoadedBusinessTask>();
         foreach (var suffix in await ListShardSuffixesWithLegacyFallbackAsync(ct))
@@ -1707,13 +1550,13 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 MergeWaveAggregateRows 方法。
     /// </summary>
     private static void MergeWaveAggregateRows(
         Dictionary<string, BusinessTaskWaveAggregateRow> target,
         IReadOnlyList<BusinessTaskWaveAggregateRow> rows)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 MergeWaveAggregateRows 方法的核心处理流程。
         foreach (var row in rows)
         {
             if (!target.TryGetValue(row.WaveCode, out var merged))
@@ -1745,13 +1588,13 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 MergeDockAggregateRows 方法。
     /// </summary>
     private static void MergeDockAggregateRows(
         Dictionary<string, BusinessTaskDockAggregateRow> target,
         IReadOnlyList<BusinessTaskDockAggregateRow> rows)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 MergeDockAggregateRows 方法的核心处理流程。
         foreach (var row in rows)
         {
             if (!target.TryGetValue(row.DockCode, out var merged))
@@ -1777,13 +1620,13 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 MergeRecirculationAggregateRows 方法。
     /// </summary>
     private static void MergeRecirculationAggregateRows(
         Dictionary<string, BusinessTaskRecirculationAggregateRow> target,
         IReadOnlyList<BusinessTaskRecirculationAggregateRow> rows)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 MergeRecirculationAggregateRows 方法的核心处理流程。
         foreach (var row in rows)
         {
             var key = $"{row.ChuteCode}||{row.WaveCode}";
@@ -1830,7 +1673,7 @@ public class BusinessTaskRepository(
         DateTime endTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 FindLatestScannedWithWaveFromSnapshotsAsync 方法的核心处理流程。
         using var scope = TableSuffixScope.Use(string.Empty);
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var snapshot = await db.DashboardCurrentWaveSnapshots
@@ -1858,14 +1701,14 @@ public class BusinessTaskRepository(
 
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 QueryTopAcrossShardsAsync 方法。
     /// </summary>
     private async Task<IReadOnlyList<BusinessTaskEntity>> QueryTopAcrossShardsAsync(
         Func<IQueryable<BusinessTaskEntity>, IQueryable<BusinessTaskEntity>> queryBuilder,
         int maxCount,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 QueryTopAcrossShardsAsync 方法的核心处理流程。
         if (maxCount <= 0)
         {
             return [];
@@ -1930,7 +1773,7 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 TryClaimFeedbackRowAsync 方法。
     /// </summary>
     private async Task<bool> TryClaimFeedbackRowAsync(
         long taskId,
@@ -1940,7 +1783,7 @@ public class BusinessTaskRepository(
         DateTime claimedTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 InvalidOperationException 方法的核心处理流程。
         var suffix = shardSuffixResolver.ResolveLocal(createdTimeLocal);
         using var scope = TableSuffixScope.Use(suffix);
         await using var db = await contextFactory.CreateDbContextAsync(ct);
@@ -1957,7 +1800,7 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 UpdateClaimedFeedbackBatchAsync 方法。
     /// </summary>
     private async Task<int> UpdateClaimedFeedbackBatchAsync(
         IReadOnlyCollection<long> ids,
@@ -1967,7 +1810,7 @@ public class BusinessTaskRepository(
         bool setFeedbackTime,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 SetProperty 方法的核心处理流程。
         if (ids.Count == 0)
         {
             return 0;
@@ -2025,14 +1868,14 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync 方法。
     /// </summary>
     private async Task<IReadOnlyList<string>> ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync(
         DateTime startTimeLocal,
         DateTime endTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ListShardSuffixesByCreatedTimeRangeWithLegacyFallbackAsync 方法的核心处理流程。
         var availableSuffixes = await ListShardSuffixesWithLegacyFallbackAsync(ct);
         if (availableSuffixes.Count == 0)
         {
@@ -2070,17 +1913,17 @@ public class BusinessTaskRepository(
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 LoadedBusinessTask 类型。
     /// </summary>
     private readonly record struct LoadedBusinessTask(string Suffix, BusinessTaskEntity Entity);
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 ProjectionUpdateTarget 类型。
     /// </summary>
     private readonly record struct ProjectionUpdateTarget(long Id, BusinessTaskEntity Incoming);
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 ProjectionKey 类型。
     /// </summary>
     private readonly record struct ProjectionKey(string SourceTableCode, string BusinessKey)
     {

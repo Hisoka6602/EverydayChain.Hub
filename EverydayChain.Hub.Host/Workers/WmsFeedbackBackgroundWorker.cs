@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Host.Workers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 WmsFeedbackBackgroundWorker 类型。
 /// </summary>
 public sealed class WmsFeedbackBackgroundWorker(
     IWmsFeedbackService wmsFeedbackService,
@@ -13,36 +13,36 @@ public sealed class WmsFeedbackBackgroundWorker(
     ILogger<WmsFeedbackBackgroundWorker> logger) : BackgroundService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SingleRunTimeoutSeconds 字段。
     /// </summary>
     private const int SingleRunTimeoutSeconds = 300;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DefaultPollingIntervalSeconds 字段。
     /// </summary>
     private const int DefaultPollingIntervalSeconds = 300;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 MinPollingIntervalSeconds 字段。
     /// </summary>
     private const int MinPollingIntervalSeconds = 1;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 MaxPollingIntervalSeconds 字段。
     /// </summary>
     private const int MaxPollingIntervalSeconds = 86400;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DefaultBatchSize 字段。
     /// </summary>
     private const int DefaultBatchSize = 100;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 MinBatchSize 字段。
     /// </summary>
     private const int MinBatchSize = 1;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 MaxBatchSize 字段。
     /// </summary>
     private const int MaxBatchSize = 1000;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _wmsFeedbackOptions 字段。
     /// </summary>
     private readonly WmsFeedbackOptions _wmsFeedbackOptions = wmsFeedbackOptions.Value;
 

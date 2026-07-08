@@ -5,16 +5,16 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace EverydayChain.Hub.Infrastructure.Persistence.EntityConfigurations;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 DashboardSnapshotStateEntityTypeConfiguration 类型。
 /// </summary>
 public sealed class DashboardSnapshotStateEntityTypeConfiguration : IEntityTypeConfiguration<DashboardSnapshotStateEntity>
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _tableName 字段。
     /// </summary>
     private readonly string _tableName;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _schema 字段。
     /// </summary>
     private readonly string _schema;
 

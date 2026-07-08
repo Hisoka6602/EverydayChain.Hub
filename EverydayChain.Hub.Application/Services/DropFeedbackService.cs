@@ -8,42 +8,42 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Application.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 DropFeedbackService 类型。
 /// </summary>
 public sealed class DropFeedbackService : IDropFeedbackService {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _businessTaskRepository 字段。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _dropLogRepository 字段。
     /// </summary>
     private readonly IDropLogRepository _dropLogRepository;
 
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _logger 字段。
     /// </summary>
     private readonly ILogger<DropFeedbackService> _logger;
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 DropFeedbackService 方法。
     /// </summary>
     public DropFeedbackService(
         IBusinessTaskRepository businessTaskRepository,
         IDropLogRepository dropLogRepository,
         ILogger<DropFeedbackService> logger) {
-            // 步骤：按既定流程执行当前方法逻辑。
+            // 步骤：执行 DropFeedbackService 方法的核心处理流程。
         _businessTaskRepository = businessTaskRepository;
         _dropLogRepository = dropLogRepository;
         _logger = logger;
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExecuteAsync 方法。
     /// </summary>
     public async Task<DropFeedbackApplicationResult> ExecuteAsync(DropFeedbackApplicationRequest request, CancellationToken cancellationToken) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExecuteAsync 方法的核心处理流程。
         var normalizedTaskCode = string.IsNullOrWhiteSpace(request.TaskCode) ? null : request.TaskCode.Trim();
         var normalizedBarcode = string.IsNullOrWhiteSpace(request.Barcode) ? null : request.Barcode.Trim();
         var normalizedActualChuteCode = string.IsNullOrWhiteSpace(request.ActualChuteCode) ? null : request.ActualChuteCode.Trim();
@@ -155,7 +155,7 @@ public sealed class DropFeedbackService : IDropFeedbackService {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 WriteDropLogSilentlyAsync 方法。
     /// </summary>
     private async Task WriteDropLogSilentlyAsync(
         long businessTaskId,
@@ -167,7 +167,7 @@ public sealed class DropFeedbackService : IDropFeedbackService {
         DateTime? dropTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 IsDropAllowedStatus 方法的核心处理流程。
         try
         {
             var log = new DropLogEntity

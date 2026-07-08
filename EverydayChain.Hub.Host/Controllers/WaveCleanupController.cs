@@ -1,4 +1,5 @@
-﻿using EverydayChain.Hub.Application.Abstractions.Queries;
+using EverydayChain.Hub.Application.Abstractions.Queries;
+using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.WaveCleanup.Abstractions;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
@@ -7,18 +8,19 @@ using Microsoft.AspNetCore.Mvc;
 namespace EverydayChain.Hub.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 提供波次清理查询、预演与执行接口。
 /// </summary>
 [ApiController]
 [Route("api/v1/wave-cleanup")]
 public sealed class WaveCleanupController : ControllerBase
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储波次清理服务。
     /// </summary>
     private readonly IWaveCleanupService _waveCleanupService;
+
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储波次查询服务。
     /// </summary>
     private readonly IWaveQueryService _waveQueryService;
 
@@ -104,8 +106,27 @@ public sealed class WaveCleanupController : ControllerBase
             return BadRequest(ApiResponse<WaveCleanupResponse>.Fail("波次号不能为空。"));
         }
 
-        var result = await _waveCleanupService.ExecuteByWaveCodeAsync(request.WaveCode.Trim(), cancellationToken);
+        var result = await _waveCleanupService.ExecuteByWaveCodeAsync(
+            request.WaveCode.Trim(),
+            BuildExecuteContext(),
+            cancellationToken);
         return Ok(ApiResponse<WaveCleanupResponse>.Success(BuildResponse(result), result.Message ?? string.Empty));
+    }
+
+    private WaveCleanupExecuteContext BuildExecuteContext()
+    {
+        var httpContext = HttpContext;
+        var request = httpContext?.Request;
+
+        return new WaveCleanupExecuteContext
+        {
+            TraceId = httpContext?.TraceIdentifier ?? string.Empty,
+            RequestPath = request?.Path.Value ?? string.Empty,
+            HttpMethod = request?.Method ?? string.Empty,
+            OperatorId = request is null ? string.Empty : request.Headers["X-Operator-Id"].ToString().Trim(),
+            ClientIp = httpContext?.Connection.RemoteIpAddress?.ToString() ?? string.Empty,
+            UserAgent = request is null ? string.Empty : request.Headers.UserAgent.ToString().Trim()
+        };
     }
 
     private static WaveCleanupResponse BuildResponse(WaveCleanupResult result)
@@ -118,4 +139,3 @@ public sealed class WaveCleanupController : ControllerBase
         };
     }
 }
-

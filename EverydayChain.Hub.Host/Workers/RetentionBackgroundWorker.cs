@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 namespace EverydayChain.Hub.Host.Workers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 RetentionBackgroundWorker 类型。
 /// </summary>
 public class RetentionBackgroundWorker(
     IRetentionExecutionService retentionExecutionService,
@@ -13,15 +13,27 @@ public class RetentionBackgroundWorker(
     ILogger<RetentionBackgroundWorker> logger) : BackgroundService
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SingleRunTimeoutSeconds 字段。
     /// </summary>
     private const int SingleRunTimeoutSeconds = 600;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 DefaultPollingIntervalSeconds 字段。
+    /// </summary>
+    private const int DefaultPollingIntervalSeconds = 3600;
+    /// <summary>
+    /// 存储 MinPollingIntervalSeconds 字段。
+    /// </summary>
+    private const int MinPollingIntervalSeconds = 1;
+    /// <summary>
+    /// 存储 MaxPollingIntervalSeconds 字段。
+    /// </summary>
+    private const int MaxPollingIntervalSeconds = 86400;
+    /// <summary>
+    /// 存储 _retentionJobOptions 字段。
     /// </summary>
     private readonly RetentionJobOptions _retentionJobOptions = retentionJobOptions.Value;
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 _dangerSwitchOffLogged 字段。
     /// </summary>
     private bool _dangerSwitchOffLogged;
 
@@ -38,7 +50,10 @@ public class RetentionBackgroundWorker(
             return;
         }
 
-        var pollingIntervalSeconds = _retentionJobOptions.PollingIntervalSeconds > 0 ? _retentionJobOptions.PollingIntervalSeconds : 3600;
+        var pollingCandidate = _retentionJobOptions.PollingIntervalSeconds > 0
+            ? _retentionJobOptions.PollingIntervalSeconds
+            : DefaultPollingIntervalSeconds;
+        var pollingIntervalSeconds = Math.Clamp(pollingCandidate, MinPollingIntervalSeconds, MaxPollingIntervalSeconds);
         while (!stoppingToken.IsCancellationRequested)
         {
             try

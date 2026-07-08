@@ -4,15 +4,15 @@ using EverydayChain.Hub.Domain.Options;
 namespace EverydayChain.Hub.Infrastructure.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 OracleConnectionStringResolver 类型。
 /// </summary>
 internal static class OracleConnectionStringResolver {
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 BuildEffectiveConnectionString 方法。
     /// </summary>
     public static string BuildEffectiveConnectionString(OracleOptions options) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 BuildEffectiveConnectionString 方法的核心处理流程。
         if (string.IsNullOrWhiteSpace(options.ConnectionString)) {
             throw new InvalidOperationException("Oracle.ConnectionString 不能为空。");
         }
@@ -31,10 +31,10 @@ internal static class OracleConnectionStringResolver {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 OverrideOracleDatabase 方法。
     /// </summary>
     private static string OverrideOracleDatabase(string dataSource, string database, string databaseMode) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 OverrideOracleDatabase 方法的核心处理流程。
         var trimmedDataSource = dataSource.Trim();
         var trimmedDatabase = database.Trim();
         var normalizedMode = NormalizeDatabaseMode(databaseMode);
@@ -65,10 +65,10 @@ internal static class OracleConnectionStringResolver {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 NormalizeDatabaseMode 方法。
     /// </summary>
     private static string NormalizeDatabaseMode(string databaseMode) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 NormalizeDatabaseMode 方法的核心处理流程。
         var mode = string.IsNullOrWhiteSpace(databaseMode) ? "Auto" : databaseMode.Trim();
         if (mode.Equals("Auto", StringComparison.OrdinalIgnoreCase)) {
             return "Auto";

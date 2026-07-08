@@ -10,7 +10,7 @@ using HostBoxTrackingQueryRequest = EverydayChain.Hub.Host.Contracts.Requests.Bo
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BoxTrackingControllerTests 类型。
 /// </summary>
 public sealed class BoxTrackingControllerTests
 {
@@ -43,12 +43,12 @@ public sealed class BoxTrackingControllerTests
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 StubBoxTrackingQueryService 类型。
     /// </summary>
     private sealed class StubBoxTrackingQueryService : IBoxTrackingQueryService
     {
         /// <summary>
-        /// 获取或设置当前属性值。
+        /// 获取或设置 LastRequest。
         /// </summary>
         public AppBoxTrackingQueryRequest? LastRequest { get; private set; }
 

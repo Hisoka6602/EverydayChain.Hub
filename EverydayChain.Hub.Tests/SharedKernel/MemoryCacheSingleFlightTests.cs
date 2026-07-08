@@ -5,7 +5,7 @@ using Microsoft.Extensions.Caching.Memory;
 namespace EverydayChain.Hub.Tests.SharedKernel;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 MemoryCacheSingleFlightTests 类型。
 /// </summary>
 public sealed class MemoryCacheSingleFlightTests
 {
@@ -22,7 +22,7 @@ public sealed class MemoryCacheSingleFlightTests
                 "key-1",
                 TimeSpan.FromSeconds(10),
                 /// <summary>
-                /// 获取或设置当前属性值。
+                /// 获取或设置 _。
                 /// </summary>
                 async _ =>
                 {
@@ -54,7 +54,7 @@ public sealed class MemoryCacheSingleFlightTests
             "key-2",
             TimeSpan.FromSeconds(10),
             /// <summary>
-            /// 获取或设置当前属性值。
+            /// 获取或设置 _。
             /// </summary>
             _ =>
             {
@@ -67,7 +67,7 @@ public sealed class MemoryCacheSingleFlightTests
             "key-2",
             TimeSpan.FromSeconds(10),
             /// <summary>
-            /// 获取或设置当前属性值。
+            /// 获取或设置 _。
             /// </summary>
             _ =>
             {

@@ -6,15 +6,15 @@ using Microsoft.AspNetCore.Mvc;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 ChuteControllerTests 类型。
 /// </summary>
 public sealed class ChuteControllerTests {
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveAsync_ShouldReturnBadRequest_WhenBarcodeIsEmpty 方法。
     /// </summary>
     [Fact]
     public async Task ResolveAsync_ShouldReturnBadRequest_WhenBarcodeIsEmpty() {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveAsync_ShouldReturnBadRequest_WhenBarcodeIsEmpty 方法的核心处理流程。
         var controller = new ChuteController(new StubChuteQueryService());
         var request = new ChuteResolveRequest {
             Barcode = string.Empty,
@@ -27,11 +27,11 @@ public sealed class ChuteControllerTests {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveAsync_ShouldReturnOk_WhenRequestIsValid 方法。
     /// </summary>
     [Fact]
     public async Task ResolveAsync_ShouldReturnOk_WhenRequestIsValid() {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveAsync_ShouldReturnOk_WhenRequestIsValid 方法的核心处理流程。
         var stubService = new StubChuteQueryService();
         var controller = new ChuteController(stubService);
         var request = new ChuteResolveRequest {
@@ -51,11 +51,11 @@ public sealed class ChuteControllerTests {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveAsync_ShouldTrimTaskCode_WhenTaskCodeHasPadding 方法。
     /// </summary>
     [Fact]
     public async Task ResolveAsync_ShouldTrimTaskCode_WhenTaskCodeHasPadding() {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveAsync_ShouldTrimTaskCode_WhenTaskCodeHasPadding 方法的核心处理流程。
         var stubService = new StubChuteQueryService();
         var controller = new ChuteController(stubService);
         var request = new ChuteResolveRequest {
@@ -70,11 +70,11 @@ public sealed class ChuteControllerTests {
     }
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ResolveAsync_ShouldUseEmptyTaskCode_WhenTaskCodeIsWhitespace 方法。
     /// </summary>
     [Fact]
     public async Task ResolveAsync_ShouldUseEmptyTaskCode_WhenTaskCodeIsWhitespace() {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ResolveAsync_ShouldUseEmptyTaskCode_WhenTaskCodeIsWhitespace 方法的核心处理流程。
         var stubService = new StubChuteQueryService();
         var controller = new ChuteController(stubService);
         var request = new ChuteResolveRequest {

@@ -6,12 +6,12 @@ using Microsoft.EntityFrameworkCore;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 RuntimeLeaseRepository 类型。
 /// </summary>
 public sealed class RuntimeLeaseRepository(IDbContextFactory<HubDbContext> dbContextFactory) : IRuntimeLeaseRepository
 {
     /// <summary>
-    /// 执行当前方法。
+    /// 尝试获取指定租约。
     /// </summary>
     public async Task<bool> TryAcquireAsync(
         string leaseKey,
@@ -20,7 +20,7 @@ public sealed class RuntimeLeaseRepository(IDbContextFactory<HubDbContext> dbCon
         DateTime expiresAtLocal,
         CancellationToken ct)
     {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 TryAcquireAsync 方法的核心处理流程。
         ArgumentException.ThrowIfNullOrWhiteSpace(leaseKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(ownerId);
 
@@ -32,6 +32,7 @@ public sealed class RuntimeLeaseRepository(IDbContextFactory<HubDbContext> dbCon
         }
 
         await using var command = connection.CreateCommand();
+        // 步骤：先尝试更新已过期租约，再在不存在时插入新租约，最后校验当前实例是否持有该租约。
         command.CommandText =
             """
             UPDATE [dbo].[runtime_leases]
@@ -72,8 +73,12 @@ public sealed class RuntimeLeaseRepository(IDbContextFactory<HubDbContext> dbCon
         return acquired is bool value && value;
     }
 
+    /// <summary>
+    /// 释放指定租约。
+    /// </summary>
     public async Task ReleaseAsync(string leaseKey, string ownerId, CancellationToken ct)
     {
+        // 步骤：仅删除当前实例自己持有的租约记录，避免误删其他实例的租约。
         ArgumentException.ThrowIfNullOrWhiteSpace(leaseKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(ownerId);
 

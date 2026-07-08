@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 DropFeedbackServiceTests 类型。
 /// </summary>
 public sealed class DropFeedbackServiceTests
 {

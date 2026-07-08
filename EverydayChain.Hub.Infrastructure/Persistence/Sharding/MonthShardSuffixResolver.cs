@@ -1,12 +1,12 @@
 ﻿namespace EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 MonthShardSuffixResolver 类型。
 /// </summary>
 public class MonthShardSuffixResolver : IShardSuffixResolver
 {
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 Resolve 方法。
     /// </summary>
     public string Resolve(DateTimeOffset timestamp) => $"_{timestamp:yyyyMM}";
 

@@ -4,21 +4,21 @@ using EverydayChain.Hub.Application.Models;
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 StubScanIngressService 类型。
 /// </summary>
 public sealed class StubScanIngressService : IScanIngressService {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 LastRequest。
     /// </summary>
     public ScanUploadApplicationRequest? LastRequest { get; private set; }
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 Requests。
     /// </summary>
     public List<ScanUploadApplicationRequest> Requests { get; } = [];
 
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 Result。
     /// </summary>
     public ScanUploadApplicationResult Result { get; set; } = new ScanUploadApplicationResult {
         IsAccepted = true,
@@ -29,10 +29,10 @@ public sealed class StubScanIngressService : IScanIngressService {
     };
 
     /// <summary>
-    /// 执行当前方法。
+    /// 执行 ExecuteAsync 方法。
     /// </summary>
     public Task<ScanUploadApplicationResult> ExecuteAsync(ScanUploadApplicationRequest request, CancellationToken cancellationToken) {
-        // 步骤：按既定流程执行当前方法逻辑。
+        // 步骤：执行 ExecuteAsync 方法的核心处理流程。
         LastRequest = request;
         Requests.Add(request);
         _ = cancellationToken;

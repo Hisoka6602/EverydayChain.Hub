@@ -3,12 +3,12 @@
 namespace EverydayChain.Hub.Application.Models;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 BusinessTaskProjectionResult 类型。
 /// </summary>
 public class BusinessTaskProjectionResult
 {
     /// <summary>
-    /// 获取或设置当前属性值。
+    /// 获取或设置 Entities。
     /// </summary>
     public IReadOnlyList<BusinessTaskEntity> Entities { get; set; } = [];
 }

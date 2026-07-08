@@ -3,7 +3,7 @@
 namespace EverydayChain.Hub.Tests.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncStagingRepositoryTests 类型。
 /// </summary>
 public class SyncStagingRepositoryTests
 {
@@ -13,7 +13,7 @@ public class SyncStagingRepositoryTests
         var repository = new SyncStagingRepository();
         var batchId = "batch-1";
         /// <summary>
-        /// 存储当前字段值。
+        /// 存储 pageNo 字段。
         /// </summary>
         const int pageNo = 1;
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows =

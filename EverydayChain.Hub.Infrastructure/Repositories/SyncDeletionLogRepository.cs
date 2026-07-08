@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace EverydayChain.Hub.Infrastructure.Repositories;
 
 /// <summary>
-/// 定义当前类型。
+/// 定义 SyncDeletionLogRepository 类型。
 /// </summary>
 public class SyncDeletionLogRepository(
     IDbContextFactory<HubDbContext> dbContextFactory,
@@ -19,7 +19,7 @@ public class SyncDeletionLogRepository(
     ILogger<SyncDeletionLogRepository> logger) : ISyncDeletionLogRepository
 {
     /// <summary>
-    /// 存储当前字段值。
+    /// 存储 SyncDeletionLogLogicalTable 字段。
     /// </summary>
     private const string SyncDeletionLogLogicalTable = "sync_deletion_logs";
 
@@ -81,7 +81,7 @@ public class SyncDeletionLogRepository(
     }
 
     /// <summary>
-    /// 定义当前类型。
+    /// 定义 StagedDeletionLogEntity 类型。
     /// </summary>
     private readonly record struct StagedDeletionLogEntity(string Suffix, SyncDeletionLogEntity Entity);
 }
