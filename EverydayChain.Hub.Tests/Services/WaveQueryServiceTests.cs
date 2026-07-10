@@ -110,7 +110,7 @@ public sealed class WaveQueryServiceTests
         Assert.Equal(1, item.SplitTotal);
         Assert.Equal(1, item.FullCaseTotal);
         Assert.Equal(start.AddMinutes(1), item.CreatedTimeLocal);
-        Assert.Equal("Sorting", item.Status);
+        Assert.Equal("分拣中", item.Status);
     }
 
     [Fact]
@@ -175,7 +175,7 @@ public sealed class WaveQueryServiceTests
         Assert.Equal("A-01-01", result.Items[0].PickLocation);
         Assert.Equal("8", result.Items[0].ChuteCode);
         Assert.True(result.Items[0].IsRecirculated);
-        Assert.Equal("FullCase", result.Items[0].SourceType);
+        Assert.Equal("整件", result.Items[0].SourceType);
         Assert.Equal("TASK-002", result.Items[1].TaskCode);
     }
 
@@ -224,6 +224,27 @@ public sealed class WaveQueryServiceTests
         }, CancellationToken.None);
 
         Assert.Equal(1, repository.FindByWaveCodeAndCreatedTimeRangeCallCount);
+    }
+
+    [Fact]
+    public async Task QueryCleanupWaveAsync_ShouldReturnCleanableWaves_WhenWaveCodeIsEmpty()
+    {
+        var repository = new InMemoryBusinessTaskRepository();
+        var service = new WaveQueryService(repository, NullLogger<WaveQueryService>.Instance);
+        var start = DateTime.SpecifyKind(new DateTime(2026, 7, 10, 8, 0, 0), DateTimeKind.Local);
+
+        await repository.SaveAsync(CreateWaveTask("TASK-001", "WAVE-CLEAN-001", BusinessTaskSourceType.Split, "1", BusinessTaskStatus.Created, start.AddMinutes(1)), CancellationToken.None);
+        await repository.SaveAsync(CreateWaveTask("TASK-002", "WAVE-CLEAN-001", BusinessTaskSourceType.FullCase, null, BusinessTaskStatus.Dropped, start.AddMinutes(2)), CancellationToken.None);
+        await repository.SaveAsync(CreateWaveTask("TASK-003", "WAVE-DONE-001", BusinessTaskSourceType.Split, "1", BusinessTaskStatus.Dropped, start.AddMinutes(3)), CancellationToken.None);
+        await repository.SaveAsync(CreateWaveTask("TASK-004", "WAVE-DONE-001", BusinessTaskSourceType.Split, "1", BusinessTaskStatus.Exception, start.AddMinutes(4)), CancellationToken.None);
+        await repository.SaveAsync(CreateWaveTask("TASK-005", "WAVE-FEEDBACK-001", BusinessTaskSourceType.FullCase, null, BusinessTaskStatus.FeedbackPending, start.AddMinutes(5)), CancellationToken.None);
+
+        var result = await service.QueryCleanupWaveAsync(string.Empty, CancellationToken.None);
+
+        Assert.Equal(2, result.Items.Count);
+        Assert.Contains(result.Items, item => item.WaveCode == "WAVE-CLEAN-001" && item.PackageTotal == 2 && item.SplitTotal == 1 && item.FullCaseTotal == 1);
+        Assert.Contains(result.Items, item => item.WaveCode == "WAVE-FEEDBACK-001" && item.PackageTotal == 1);
+        Assert.DoesNotContain(result.Items, item => item.WaveCode == "WAVE-DONE-001");
     }
 
     [Fact]

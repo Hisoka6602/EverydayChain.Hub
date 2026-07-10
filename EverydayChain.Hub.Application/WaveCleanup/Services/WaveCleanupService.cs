@@ -191,7 +191,7 @@ public sealed class WaveCleanupService : IWaveCleanupService
             foreach (var task in nonTerminalTasks)
             {
                 _logger.LogInformation(
-                    "[DryRun] 波次清理：任务 {TaskCode}（状态={Status}）将被标记为 {TargetStatus}。",
+                    "预演模式：波次清理任务 {TaskCode}（状态={Status}）将被标记为 {TargetStatus}。",
                     task.TaskCode, task.Status, targetStatus);
             }
 
@@ -200,7 +200,7 @@ public sealed class WaveCleanupService : IWaveCleanupService
                 IdentifiedCount = nonTerminalTasks.Count,
                 CleanedCount = 0,
                 IsDryRun = true,
-                Message = $"DryRun 模式：识别到 {nonTerminalTasks.Count} 个待清理任务，未执行实际变更。"
+                Message = $"预演模式：识别到 {nonTerminalTasks.Count} 个待清理任务，未执行实际变更。"
             };
         }
 

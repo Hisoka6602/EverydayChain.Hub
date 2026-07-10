@@ -58,7 +58,7 @@ public static class HealthReadinessResponseBuilder
                 HasStarted = false,
                 IsRunning = false,
                 IsCompleted = false,
-                Stage = "Unknown",
+                Stage = "未知",
                 Message = "启动预热状态不可用。"
             };
         }
@@ -68,10 +68,29 @@ public static class HealthReadinessResponseBuilder
             HasStarted = snapshot.HasStarted,
             IsRunning = snapshot.IsRunning,
             IsCompleted = snapshot.IsCompleted,
-            Stage = snapshot.Stage,
+            Stage = LocalizeWarmupStage(snapshot.Stage),
             Message = snapshot.Message,
             StartedAtLocal = snapshot.StartedAtLocal,
             CompletedAtLocal = snapshot.CompletedAtLocal
+        };
+    }
+
+    private static string LocalizeWarmupStage(string? stage)
+    {
+        return stage switch
+        {
+            "Pending" => "等待开始",
+            "Bootstrap" => "启动初始化",
+            "LocalSqlUnavailable" => "本地数据库不可用",
+            "DbContextWarmup" => "EF 模型预热",
+            "DashboardSnapshotWarmup" => "看板快照预热",
+            "QueryServiceWarmup" => "查询服务预热",
+            "WaitForApplicationStarted" => "等待 Web 宿主监听",
+            "HttpEndpointWarmup" => "HTTP 端点预热",
+            "Completed" => "已完成",
+            "Cancelled" => "已取消",
+            "Failed" => "失败",
+            _ => stage ?? string.Empty
         };
     }
 }

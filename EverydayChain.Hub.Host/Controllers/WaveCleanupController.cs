@@ -4,6 +4,7 @@ using EverydayChain.Hub.Application.WaveCleanup.Abstractions;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace EverydayChain.Hub.Host.Controllers;
 
@@ -44,14 +45,11 @@ public sealed class WaveCleanupController : ControllerBase
     [HttpPost("query")]
     [ProducesResponseType(typeof(ApiResponse<WaveCleanupQueryResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<WaveCleanupQueryResponse>), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<ApiResponse<WaveCleanupQueryResponse>>> QueryAsync([FromBody] WaveCleanupRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResponse<WaveCleanupQueryResponse>>> QueryAsync(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] WaveCleanupRequest? request,
+        CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.WaveCode))
-        {
-            return BadRequest(ApiResponse<WaveCleanupQueryResponse>.Fail("波次号不能为空。"));
-        }
-
-        var result = await _waveQueryService.QueryCleanupWaveAsync(request.WaveCode.Trim(), cancellationToken);
+        var result = await _waveQueryService.QueryCleanupWaveAsync(request?.WaveCode, cancellationToken);
         var response = new WaveCleanupQueryResponse
         {
             Items = result.Items

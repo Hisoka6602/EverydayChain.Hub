@@ -92,7 +92,7 @@ public sealed class SyncOrchestrator(
                     BatchId = string.Empty,
                     TableCode = definition.TableCode,
                     FailureRate = 1.000M,
-                    FailureMessage = "Table sync is already running."
+                    FailureMessage = "表同步正在执行中。"
                 };
             }
 
@@ -199,7 +199,7 @@ public sealed class SyncOrchestrator(
                     BatchId = string.Empty,
                     TableCode = item.definition.TableCode,
                     FailureRate = 1.000M,
-                    FailureMessage = "Single-table sync failed. See detailed logs."
+                    FailureMessage = "单表同步失败，请查看详细日志。"
                 };
             }
             finally
@@ -288,8 +288,8 @@ public sealed class SyncOrchestrator(
     {
         var baseMessage = failureDetail?.Trim() ?? string.Empty;
         var message = string.IsNullOrWhiteSpace(baseMessage)
-            ? "Single-table sync failed. See detailed logs."
-            : $"Single-table sync failed: {baseMessage}";
+            ? "单表同步失败，请查看详细日志。"
+            : $"单表同步失败：{baseMessage}";
 
         return message.Length <= 512
             ? message

@@ -558,6 +558,108 @@ public class BusinessTaskRepository(
             .ToList();
     }
 
+    public async Task<IReadOnlyList<BusinessTaskWaveAggregateRow>> AggregateCleanableWavesAsync(CancellationToken ct)
+    {
+        var suffixes = await ListShardSuffixesWithLegacyFallbackAsync(ct);
+        var accumulators = new Dictionary<string, CleanableWaveAccumulator>(StringComparer.OrdinalIgnoreCase);
+        foreach (var suffix in suffixes)
+        {
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            var shardRows = await db.BusinessTasks
+                .AsNoTracking()
+                .Where(task => task.NormalizedWaveCode != null)
+                .GroupBy(task => new
+                {
+                    task.NormalizedWaveCode,
+                    task.ResolvedDockCode
+                })
+                .Select(group => new
+                {
+                    WaveCode = group.Key.NormalizedWaveCode,
+                    group.Key.ResolvedDockCode,
+                    TotalCount = group.Count(),
+                    CleanableCount = group.Count(task => task.Status != BusinessTaskStatus.Dropped && task.Status != BusinessTaskStatus.Exception),
+                    UnsortedCount = group.Count(task => task.Status != BusinessTaskStatus.Dropped && task.Status != BusinessTaskStatus.FeedbackPending),
+                    FullCaseTotalCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase),
+                    FullCaseUnsortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase && task.Status != BusinessTaskStatus.Dropped && task.Status != BusinessTaskStatus.FeedbackPending),
+                    SplitTotalCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split),
+                    SplitUnsortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split && task.Status != BusinessTaskStatus.Dropped && task.Status != BusinessTaskStatus.FeedbackPending),
+                    RecognitionCount = group.Count(task => task.ScannedAtLocal != null),
+                    ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception),
+                    TotalVolumeMm3 = group.Sum(task => task.VolumeMm3 ?? 0M),
+                    TotalWeightGram = group.Sum(task => task.WeightGram ?? 0M),
+                    EarliestCreatedTimeLocal = group.Min(task => task.CreatedTimeLocal)
+                })
+                .ToListAsync(ct);
+            foreach (var row in shardRows)
+            {
+                if (string.IsNullOrWhiteSpace(row.WaveCode))
+                {
+                    continue;
+                }
+
+                var accumulator = GetCleanableWaveAccumulator(accumulators, row.WaveCode);
+                accumulator.CleanableCount += row.CleanableCount;
+                accumulator.Row.TotalCount += row.TotalCount;
+                accumulator.Row.CleanableCount += row.CleanableCount;
+                accumulator.Row.UnsortedCount += row.UnsortedCount;
+                accumulator.Row.FullCaseTotalCount += row.FullCaseTotalCount;
+                accumulator.Row.FullCaseUnsortedCount += row.FullCaseUnsortedCount;
+                accumulator.Row.SplitTotalCount += row.SplitTotalCount;
+                accumulator.Row.SplitUnsortedCount += row.SplitUnsortedCount;
+                accumulator.Row.RecognitionCount += row.RecognitionCount;
+                accumulator.Row.RecirculatedCount += IsRecirculatedResolvedDockCode(row.ResolvedDockCode) ? row.TotalCount : 0;
+                accumulator.Row.ExceptionCount += row.ExceptionCount;
+                accumulator.Row.TotalVolumeMm3 += row.TotalVolumeMm3;
+                accumulator.Row.TotalWeightGram += row.TotalWeightGram;
+                if (accumulator.Row.EarliestCreatedTimeLocal == default
+                    || row.EarliestCreatedTimeLocal < accumulator.Row.EarliestCreatedTimeLocal)
+                {
+                    accumulator.Row.EarliestCreatedTimeLocal = row.EarliestCreatedTimeLocal;
+                }
+            }
+
+            var remarkRows = await db.BusinessTasks
+                .AsNoTracking()
+                .Where(task => task.NormalizedWaveCode != null && task.WaveRemark != null && task.WaveRemark != string.Empty)
+                .GroupBy(task => new
+                {
+                    task.NormalizedWaveCode,
+                    task.WaveRemark
+                })
+                .Select(group => new
+                {
+                    WaveCode = group.Key.NormalizedWaveCode,
+                    group.Key.WaveRemark,
+                    UpdatedTimeLocal = group.Max(task => task.UpdatedTimeLocal)
+                })
+                .ToListAsync(ct);
+            foreach (var row in remarkRows)
+            {
+                if (string.IsNullOrWhiteSpace(row.WaveCode)
+                    || string.IsNullOrWhiteSpace(row.WaveRemark))
+                {
+                    continue;
+                }
+
+                var accumulator = GetCleanableWaveAccumulator(accumulators, row.WaveCode);
+                if (accumulator.RemarkUpdatedTimeLocal == default
+                    || row.UpdatedTimeLocal > accumulator.RemarkUpdatedTimeLocal)
+                {
+                    accumulator.Row.WaveRemark = row.WaveRemark.Trim();
+                    accumulator.RemarkUpdatedTimeLocal = row.UpdatedTimeLocal;
+                }
+            }
+        }
+
+        return accumulators.Values
+            .Where(accumulator => accumulator.CleanableCount > 0)
+            .Select(accumulator => accumulator.Row)
+            .OrderBy(row => row.WaveCode, StringComparer.Ordinal)
+            .ToList();
+    }
+
     public async Task<BusinessTaskFeedbackAggregate> AggregateFeedbackAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
     {
         if (endTimeLocal <= startTimeLocal)
@@ -1827,6 +1929,25 @@ public class BusinessTaskRepository(
         }
     }
 
+    private static CleanableWaveAccumulator GetCleanableWaveAccumulator(
+        Dictionary<string, CleanableWaveAccumulator> target,
+        string waveCode)
+    {
+        if (!target.TryGetValue(waveCode, out var accumulator))
+        {
+            accumulator = new CleanableWaveAccumulator
+            {
+                Row = new BusinessTaskWaveAggregateRow
+                {
+                    WaveCode = waveCode
+                }
+            };
+            target[waveCode] = accumulator;
+        }
+
+        return accumulator;
+    }
+
     private static void MergeWaveOptionCandidates(
         Dictionary<string, WaveOptionCandidate> target,
         IReadOnlyList<ShardWaveOptionAggregateRow> rows)
@@ -2190,6 +2311,24 @@ public class BusinessTaskRepository(
     /// 定义 LoadedBusinessTask 类型。
     /// </summary>
     private readonly record struct LoadedBusinessTask(string Suffix, BusinessTaskEntity Entity);
+
+    private sealed class CleanableWaveAccumulator
+    {
+        /// <summary>
+        /// 获取或设置 Row。
+        /// </summary>
+        public BusinessTaskWaveAggregateRow Row { get; init; } = new();
+
+        /// <summary>
+        /// 获取或设置 CleanableCount。
+        /// </summary>
+        public int CleanableCount { get; set; }
+
+        /// <summary>
+        /// 获取或设置 RemarkUpdatedTimeLocal。
+        /// </summary>
+        public DateTime RemarkUpdatedTimeLocal { get; set; }
+    }
 
     /// <summary>
     /// 定义 ProjectionUpdateTarget 类型。

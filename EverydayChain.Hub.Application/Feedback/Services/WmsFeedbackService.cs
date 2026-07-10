@@ -95,14 +95,14 @@ public sealed class WmsFeedbackService : IWmsFeedbackService
                 return result;
             }
 
-            result.FailureReason = $"Oracle write row count mismatch. WrittenRows={writtenRows}, ClaimedRows={claimedTasks.Count}.";
+            result.FailureReason = $"Oracle 回写行数不一致。已写入 {writtenRows} 行，已认领 {claimedTasks.Count} 行。";
             result.FailedCount = await _businessTaskRepository.FailClaimedFeedbackBatchAsync(taskIds, DateTime.Now, ct);
             _logger.LogError("Feedback batch failed because Oracle returned an unexpected row count. WrittenRows={WrittenRows}, ClaimedRows={ClaimedRows}", writtenRows, claimedTasks.Count);
             return result;
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
-            result.FailureReason = "Oracle feedback write failed.";
+            result.FailureReason = "Oracle 业务回写失败。";
             result.FailedCount = await _businessTaskRepository.FailClaimedFeedbackBatchAsync(taskIds, DateTime.Now, ct);
             _logger.LogError(ex, "Feedback batch execution failed after the tasks were claimed. ClaimedRows={ClaimedRows}", claimedTasks.Count);
             return result;

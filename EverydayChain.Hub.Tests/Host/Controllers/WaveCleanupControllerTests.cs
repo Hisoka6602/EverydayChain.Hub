@@ -109,7 +109,8 @@ public sealed class WaveCleanupControllerTests
     [Fact]
     public async Task QueryAsync_ShouldReturnOk_WhenWaveExists()
     {
-        var controller = new WaveCleanupController(new StubWaveCleanupService(), new StubWaveQueryService());
+        var stubQueryService = new StubWaveQueryService();
+        var controller = new WaveCleanupController(new StubWaveCleanupService(), stubQueryService);
         var request = new WaveCleanupRequest
         {
             WaveCode = "WAVE-001"
@@ -122,6 +123,41 @@ public sealed class WaveCleanupControllerTests
         Assert.True(response.IsSuccess);
         Assert.Single(response.Data!.Items);
         Assert.Equal("W1", response.Data.Items[0].WaveId);
+        Assert.Equal("WAVE-001", stubQueryService.LastCleanupWaveCode);
+    }
+
+    [Fact]
+    public async Task QueryAsync_ShouldReturnOk_WhenRequestIsNull()
+    {
+        var stubQueryService = new StubWaveQueryService();
+        var controller = new WaveCleanupController(new StubWaveCleanupService(), stubQueryService);
+
+        var actionResult = await controller.QueryAsync(null, CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+        var response = Assert.IsType<ApiResponse<WaveCleanupQueryResponse>>(okResult.Value);
+
+        Assert.True(response.IsSuccess);
+        Assert.Single(response.Data!.Items);
+        Assert.Null(stubQueryService.LastCleanupWaveCode);
+    }
+
+    [Fact]
+    public async Task QueryAsync_ShouldReturnOk_WhenWaveCodeIsEmpty()
+    {
+        var stubQueryService = new StubWaveQueryService();
+        var controller = new WaveCleanupController(new StubWaveCleanupService(), stubQueryService);
+        var request = new WaveCleanupRequest
+        {
+            WaveCode = string.Empty
+        };
+
+        var actionResult = await controller.QueryAsync(request, CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+        var response = Assert.IsType<ApiResponse<WaveCleanupQueryResponse>>(okResult.Value);
+
+        Assert.True(response.IsSuccess);
+        Assert.Single(response.Data!.Items);
+        Assert.Equal(string.Empty, stubQueryService.LastCleanupWaveCode);
     }
 
     private static HttpContext CreateHttpContext()

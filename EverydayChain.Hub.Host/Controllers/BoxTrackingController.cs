@@ -47,16 +47,16 @@ public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQu
 
         if (resolvedRequest.PageNumber < 1 || resolvedRequest.PageNumber > 100000)
         {
-            return BadRequest(ApiResponse<BoxTrackingResponse>.Fail("PageNumber must be between 1 and 100000."));
+            return BadRequest(ApiResponse<BoxTrackingResponse>.Fail("页码范围必须在 1 到 100000 之间。"));
         }
 
         if (resolvedRequest.PageSize < 1 || resolvedRequest.PageSize > 1000)
         {
-            return BadRequest(ApiResponse<BoxTrackingResponse>.Fail("PageSize must be between 1 and 1000."));
+            return BadRequest(ApiResponse<BoxTrackingResponse>.Fail("页大小范围必须在 1 到 1000 之间。"));
         }
 
         var result = await boxTrackingQueryService.QueryAsync(BuildQueryRequest(resolvedRequest, normalizedStart, normalizedEnd), cancellationToken);
-        return Ok(ApiResponse<BoxTrackingResponse>.Success(BuildResponse(result), "Box tracking query succeeded."));
+        return Ok(ApiResponse<BoxTrackingResponse>.Success(BuildResponse(result), "箱号追踪查询成功。"));
     }
 
     /// <summary>
@@ -109,8 +109,8 @@ public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQu
         }
 
         var content = SimpleXlsxBuilder.BuildSingleSheet(
-            "BoxTracking",
-            ["OrderId", "BoxId", "StoreId", "StoreName", "ProductCode", "PickLocation", "Scanner", "ScannedAt", "Chute", "Status"],
+            "箱号追踪",
+            ["订单号", "箱号", "门店号", "门店名称", "商品编码", "拣货位", "扫描设备", "扫描时间", "格口", "状态"],
             rows.Value!
                 .Select(item => (IReadOnlyList<string?>)
                 [
@@ -212,8 +212,8 @@ public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQu
     private static string BuildCsv(IReadOnlyList<EverydayChain.Hub.Application.Models.BoxTrackingItem> items)
     {
         var builder = new StringBuilder();
-        // 步骤：导出列名继续沿用 BoxId，避免影响既有前端和人工使用习惯，但其值实际为扫描条码。
-        builder.AppendLine("OrderId,BoxId,StoreId,StoreName,ProductCode,PickLocation,Scanner,ScannedAt,Chute,Status");
+        // 步骤：导出列名使用中文展示，但“箱号”列值仍对应扫描日志 Barcode。
+        builder.AppendLine("订单号,箱号,门店号,门店名称,商品编码,拣货位,扫描设备,扫描时间,格口,状态");
         foreach (var item in items)
         {
             builder.AppendLine(string.Join(",",

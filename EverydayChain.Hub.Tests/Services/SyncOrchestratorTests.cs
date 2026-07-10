@@ -34,7 +34,7 @@ public sealed class SyncOrchestratorTests
 
         var result = await orchestrator.RunTableSyncAsync("WmsPickToWcs", CancellationToken.None);
 
-        Assert.Equal("Table sync is already running.", result.FailureMessage);
+        Assert.Equal("表同步正在执行中。", result.FailureMessage);
         Assert.NotNull(runtimeLeaseRepository.CapturedOwnerId);
         Assert.True(RuntimeLeaseOwnerId.TryParse(runtimeLeaseRepository.CapturedOwnerId, out var descriptor));
         Assert.Equal(Environment.ProcessId, descriptor.ProcessId);
@@ -61,7 +61,7 @@ public sealed class SyncOrchestratorTests
 
         Assert.Equal("WmsPickToWcs", result.TableCode);
         Assert.Equal(1.000M, result.FailureRate);
-        Assert.Equal("Single-table sync failed: Oracle is unavailable.", result.FailureMessage);
+        Assert.Equal("单表同步失败：Oracle is unavailable.", result.FailureMessage);
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public sealed class SyncOrchestratorTests
         Assert.Null(runtimeLeaseRepository.CapturedOwnerId);
         Assert.Equal("WmsPickToWcs", result.TableCode);
         Assert.Equal(1.000M, result.FailureRate);
-        Assert.Contains("Single-table sync failed:", result.FailureMessage, StringComparison.Ordinal);
+        Assert.Contains("单表同步失败：", result.FailureMessage, StringComparison.Ordinal);
         Assert.Contains("Oracle", result.FailureMessage, StringComparison.Ordinal);
     }
 

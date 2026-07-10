@@ -43,12 +43,12 @@ public sealed class RetentionCleanupController(IRetentionCleanupQueryService ret
 
         if (resolvedRequest.PageNumber < 1 || resolvedRequest.PageNumber > 100000)
         {
-            return BadRequest(ApiResponse<RetentionCleanupAuditQueryResponse>.Fail("PageNumber must be between 1 and 100000."));
+            return BadRequest(ApiResponse<RetentionCleanupAuditQueryResponse>.Fail("页码范围必须在 1 到 100000 之间。"));
         }
 
         if (resolvedRequest.PageSize < 1 || resolvedRequest.PageSize > 1000)
         {
-            return BadRequest(ApiResponse<RetentionCleanupAuditQueryResponse>.Fail("PageSize must be between 1 and 1000."));
+            return BadRequest(ApiResponse<RetentionCleanupAuditQueryResponse>.Fail("页大小范围必须在 1 到 1000 之间。"));
         }
 
         var result = await retentionCleanupQueryService.QueryAsync(
@@ -65,7 +65,7 @@ public sealed class RetentionCleanupController(IRetentionCleanupQueryService ret
             },
             cancellationToken);
 
-        return Ok(ApiResponse<RetentionCleanupAuditQueryResponse>.Success(BuildResponse(result), "Retention cleanup audit query succeeded."));
+        return Ok(ApiResponse<RetentionCleanupAuditQueryResponse>.Success(BuildResponse(result), "保留期清理审计查询成功。"));
     }
 
     /// <summary>
@@ -92,7 +92,7 @@ public sealed class RetentionCleanupController(IRetentionCleanupQueryService ret
                     KeepMonths = item.KeepMonths,
                     IsDryRun = item.IsDryRun,
                     AllowDelete = item.AllowDelete,
-                    ExecutionStage = item.ExecutionStage,
+                    ExecutionStage = LocalizeExecutionStage(item.ExecutionStage),
                     ScannedCount = item.ScannedCount,
                     CandidateCount = item.CandidateCount,
                     DeletedCount = item.DeletedCount,
@@ -103,6 +103,17 @@ public sealed class RetentionCleanupController(IRetentionCleanupQueryService ret
                     CompletedTimeLocal = item.CompletedTimeLocal
                 })
                 .ToList()
+        };
+    }
+
+    private static string LocalizeExecutionStage(string? executionStage)
+    {
+        return executionStage switch
+        {
+            "Started" => "已开始",
+            "Completed" => "已完成",
+            "Failed" => "失败",
+            _ => executionStage ?? string.Empty
         };
     }
 }

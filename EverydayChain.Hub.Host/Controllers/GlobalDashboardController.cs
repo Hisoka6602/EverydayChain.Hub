@@ -63,7 +63,7 @@ public sealed class GlobalDashboardController : QueryControllerBase
         }
 
         var result = await _globalDashboardQueryService.QueryAsync(resolvedRequest!, cancellationToken);
-        return Ok(ApiResponse<GlobalDashboardResponse>.Success(BuildResponse(result), "Dashboard overview query succeeded."));
+        return Ok(ApiResponse<GlobalDashboardResponse>.Success(BuildResponse(result), "总看板查询成功。"));
     }
 
     /// <summary>
@@ -115,7 +115,7 @@ public sealed class GlobalDashboardController : QueryControllerBase
 
         var result = await _globalDashboardQueryService.QueryAsync(resolvedRequest!, cancellationToken);
         var rows = BuildTabularRows(result);
-        var content = SimpleXlsxBuilder.BuildSingleSheet("DashboardOverview", ["Metric", "Value"], rows);
+        var content = SimpleXlsxBuilder.BuildSingleSheet("总看板", ["指标", "值"], rows);
         var fileName = $"dashboard-overview-{DateTimeOffset.Now.LocalDateTime:yyyyMMddHHmmss}.xlsx";
         return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
     }
@@ -150,7 +150,7 @@ public sealed class GlobalDashboardController : QueryControllerBase
                 {
                     BatchId = item.BatchId,
                     TableCode = item.TableCode,
-                    Status = string.IsNullOrWhiteSpace(item.FailureMessage) ? "Completed" : "Failed",
+                    Status = string.IsNullOrWhiteSpace(item.FailureMessage) ? "完成" : "失败",
                     ReadCount = item.ReadCount,
                     InsertCount = item.InsertCount,
                     UpdateCount = item.UpdateCount,
@@ -160,7 +160,7 @@ public sealed class GlobalDashboardController : QueryControllerBase
                 })
                 .ToList()
         };
-        return Ok(ApiResponse<ManualSyncResponse>.Success(response, "Manual sync completed."));
+        return Ok(ApiResponse<ManualSyncResponse>.Success(response, "手工同步完成。"));
     }
 
     /// <summary>
@@ -232,7 +232,7 @@ public sealed class GlobalDashboardController : QueryControllerBase
     private static string BuildCsv(EverydayChain.Hub.Application.Models.GlobalDashboardQueryResult result)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("Metric,Value");
+        builder.AppendLine("指标,值");
         foreach (var row in BuildTabularRows(result))
         {
             builder.AppendLine($"{EscapeCsvField(row[0])},{EscapeCsvField(row[1])}");
@@ -245,23 +245,23 @@ public sealed class GlobalDashboardController : QueryControllerBase
     {
         return
         [
-            ["TotalCount", result.TotalCount.ToString()],
-            ["UnsortedCount", result.UnsortedCount.ToString()],
-            ["TotalSortedProgressPercent", result.TotalSortedProgressPercent.ToString("0.##")],
-            ["FullCaseTotalCount", result.FullCaseTotalCount.ToString()],
-            ["FullCaseUnsortedCount", result.FullCaseUnsortedCount.ToString()],
-            ["FullCaseSortedProgressPercent", result.FullCaseSortedProgressPercent.ToString("0.##")],
-            ["SplitTotalCount", result.SplitTotalCount.ToString()],
-            ["SplitUnsortedCount", result.SplitUnsortedCount.ToString()],
-            ["SplitSortedProgressPercent", result.SplitSortedProgressPercent.ToString("0.##")],
-            ["RecognitionRatePercent", result.RecognitionRatePercent.ToString("0.##")],
-            ["RecirculatedCount", result.RecirculatedCount.ToString()],
-            ["ExceptionCount", result.ExceptionCount.ToString()],
-            ["TotalVolumeMm3", result.TotalVolumeMm3.ToString("0.##")],
-            ["TotalWeightGram", result.TotalWeightGram.ToString("0.##")],
-            ["LatestSyncTimeLocal", result.LatestSyncTimeLocal?.ToString("yyyy-MM-dd HH:mm:ss")],
-            ["DataDownloadProgressPercent", result.DataDownloadProgressPercent.ToString("0.##")],
-            ["DataWritebackProgressPercent", result.DataWritebackProgressPercent.ToString("0.##")]
+            ["总件数", result.TotalCount.ToString()],
+            ["待分拣数", result.UnsortedCount.ToString()],
+            ["总分拣进度百分比", result.TotalSortedProgressPercent.ToString("0.##")],
+            ["整件总数", result.FullCaseTotalCount.ToString()],
+            ["整件待分拣数", result.FullCaseUnsortedCount.ToString()],
+            ["整件分拣进度百分比", result.FullCaseSortedProgressPercent.ToString("0.##")],
+            ["拆零总数", result.SplitTotalCount.ToString()],
+            ["拆零待分拣数", result.SplitUnsortedCount.ToString()],
+            ["拆零分拣进度百分比", result.SplitSortedProgressPercent.ToString("0.##")],
+            ["读码率百分比", result.RecognitionRatePercent.ToString("0.##")],
+            ["回流数", result.RecirculatedCount.ToString()],
+            ["异常数", result.ExceptionCount.ToString()],
+            ["总体积(mm3)", result.TotalVolumeMm3.ToString("0.##")],
+            ["总重量(g)", result.TotalWeightGram.ToString("0.##")],
+            ["最新同步时间", result.LatestSyncTimeLocal?.ToString("yyyy-MM-dd HH:mm:ss")],
+            ["数据下载进度百分比", result.DataDownloadProgressPercent.ToString("0.##")],
+            ["数据回写进度百分比", result.DataWritebackProgressPercent.ToString("0.##")]
         ];
     }
 
@@ -301,7 +301,7 @@ public sealed class GlobalDashboardController : QueryControllerBase
             {
                 BatchId = string.Empty,
                 TableCode = tableCode,
-                FailureMessage = "Sync orchestrator was not configured."
+                FailureMessage = "同步编排服务未配置。"
             });
         }
 

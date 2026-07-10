@@ -130,6 +130,11 @@ public interface IBusinessTaskRepository
     Task<IReadOnlyList<BusinessTaskWaveAggregateRow>> AggregateWaveDashboardAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct);
 
     /// <summary>
+    /// 执行 AggregateCleanableWavesAsync 方法。
+    /// </summary>
+    Task<IReadOnlyList<BusinessTaskWaveAggregateRow>> AggregateCleanableWavesAsync(CancellationToken ct);
+
+    /// <summary>
     /// 执行 AggregateFeedbackAsync 方法。
     /// </summary>
     Task<BusinessTaskFeedbackAggregate> AggregateFeedbackAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct);

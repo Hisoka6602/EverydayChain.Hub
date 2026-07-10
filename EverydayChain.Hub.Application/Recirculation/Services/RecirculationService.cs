@@ -84,14 +84,14 @@ public sealed class RecirculationService : IRecirculationService
         if (_options.DryRun)
         {
             _logger.LogInformation(
-                "[DryRun] 回流规则：任务 {TaskCode} 将被标记为回流（IsRecirculated=true）。",
+                "预演模式：回流规则任务 {TaskCode} 将被标记为回流（IsRecirculated=true）。",
                 task.TaskCode);
             return new RecirculationDecisionResult
             {
                 ShouldRecirculate = true,
                 ScanRetryCount = retryCount,
                 RecommendedStatus = BusinessTaskStatus.Exception,
-                Reason = $"[DryRun] {reason}"
+                Reason = $"预演模式：{reason}"
             };
         }
 

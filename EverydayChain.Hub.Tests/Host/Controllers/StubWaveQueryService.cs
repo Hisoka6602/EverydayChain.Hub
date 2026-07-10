@@ -38,6 +38,11 @@ internal sealed class StubWaveQueryService : IWaveQueryService
     /// </summary>
     public WaveDetailQueryRequest? LastDetailRequest { get; private set; }
 
+    /// <summary>
+    /// 获取或设置 LastCleanupWaveCode。
+    /// </summary>
+    public string? LastCleanupWaveCode { get; private set; }
+
     public CurrentWaveQueryResult CurrentResult { get; set; } = new()
     {
         StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local),
@@ -82,7 +87,7 @@ internal sealed class StubWaveQueryService : IWaveQueryService
             new WaveZoneSummary
             {
                 ZoneCode = "SplitZone1",
-                ZoneName = "Split Zone 1",
+                ZoneName = "拆零区1",
                 TotalCount = 1,
                 UnsortedCount = 0,
                 SortedProgressPercent = 100M,
@@ -111,7 +116,7 @@ internal sealed class StubWaveQueryService : IWaveQueryService
                 RecirculatedCount = 3,
                 ExceptionCount = 1,
                 CreatedTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 8, 0, 0), DateTimeKind.Local),
-                Status = "Sorting"
+                Status = "分拣中"
             }
         ]
     };
@@ -128,7 +133,7 @@ internal sealed class StubWaveQueryService : IWaveQueryService
                 SplitTotal = 6,
                 FullCaseTotal = 4,
                 CreatedTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 8, 0, 0), DateTimeKind.Local),
-                Status = "Sorting"
+                Status = "分拣中"
             }
         ]
     };
@@ -146,7 +151,7 @@ internal sealed class StubWaveQueryService : IWaveQueryService
                 TaskCode = "TASK-001",
                 WaveCode = "W1",
                 WaveRemark = "Remark1",
-                SourceType = "FullCase",
+                SourceType = "整件",
                 WorkingArea = "1",
                 Barcode = "BC-001",
                 OrderId = "ORDER-001",
@@ -155,7 +160,7 @@ internal sealed class StubWaveQueryService : IWaveQueryService
                 ProductCode = "SKU-001",
                 PickLocation = "A-01-01",
                 ChuteCode = "8",
-                Status = "Scanned",
+                Status = "已扫描",
                 IsRecirculated = true,
                 IsException = false,
                 ScannedAtLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 8, 30, 0), DateTimeKind.Local),
@@ -198,17 +203,18 @@ internal sealed class StubWaveQueryService : IWaveQueryService
     public Task<string> ExportZonesCsvAsync(WaveZoneQueryRequest request, CancellationToken cancellationToken)
     {
         LastZoneRequest = request;
-        return Task.FromResult("ZoneName,TotalCount,PendingCount,ProgressPercent,RecirculatedCount,ExceptionCount\r\nSplit Zone 1,1,0,100,0,0\r\n");
+        return Task.FromResult("区域名称,总数,待分拣数,进度百分比,回流数,异常数\r\n拆零区1,1,0,100,0,0\r\n");
     }
 
     public Task<string> ExportListCsvAsync(WaveListQueryRequest request, CancellationToken cancellationToken)
     {
         LastListRequest = request;
-        return Task.FromResult("WaveId,Remark,PackageTotal,UnsortedCount,SplitTotal,FullTotal,SplitRatioPercent,FullRatioPercent,RecirculatedCount,ExceptionCount,CreatedAt,Status\r\nW1,Remark1,10,2,6,4,60,40,3,1,2026-04-20 08:00:00,Sorting\r\n");
+        return Task.FromResult("波次号,备注,包裹总数,待分拣数,拆零总数,整件总数,拆零占比百分比,整件占比百分比,回流数,异常数,创建时间,状态\r\nW1,Remark1,10,2,6,4,60,40,3,1,2026-04-20 08:00:00,分拣中\r\n");
     }
 
-    public Task<WaveCleanupQueryResult> QueryCleanupWaveAsync(string waveCode, CancellationToken cancellationToken)
+    public Task<WaveCleanupQueryResult> QueryCleanupWaveAsync(string? waveCode, CancellationToken cancellationToken)
     {
+        LastCleanupWaveCode = waveCode;
         return Task.FromResult(CleanupResult);
     }
 
@@ -221,7 +227,7 @@ internal sealed class StubWaveQueryService : IWaveQueryService
     public Task<string> ExportDetailsCsvAsync(WaveDetailQueryRequest request, CancellationToken cancellationToken)
     {
         LastDetailRequest = request;
-        return Task.FromResult("TaskCode,WaveCode,WaveRemark,SourceType,WorkingArea,Barcode,OrderId,StoreId,StoreName,ProductCode,PickLocation,ChuteCode,Status,IsRecirculated,IsException,ScannedAt,CreatedAt,UpdatedAt\r\nTASK-001,W1,Remark1,FullCase,1,BC-001,ORDER-001,STORE-001,Store 1,SKU-001,A-01-01,8,Scanned,True,False,2026-04-20 08:30:00,2026-04-20 08:00:00,2026-04-20 08:35:00\r\n");
+        return Task.FromResult("任务编码,波次号,波次备注,来源类型,作业区域,条码,订单号,门店号,门店名称,商品编码,拣货位,格口,状态,是否回流,是否异常,扫描时间,创建时间,更新时间\r\nTASK-001,W1,Remark1,整件,1,BC-001,ORDER-001,STORE-001,Store 1,SKU-001,A-01-01,8,已扫描,是,否,2026-04-20 08:30:00,2026-04-20 08:00:00,2026-04-20 08:35:00\r\n");
     }
 }
 

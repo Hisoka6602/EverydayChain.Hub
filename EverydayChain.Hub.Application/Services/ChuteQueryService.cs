@@ -119,7 +119,7 @@ public sealed class ChuteQueryService : IChuteQueryService
                 IsResolved = false,
                 TaskCode = task.TaskCode,
                 ChuteCode = string.Empty,
-                Message = $"任务 [{task.TaskCode}] 当前状态 [{task.Status}] 不允许请求格口，仅已扫描或已落格任务可查询格口。"
+                Message = $"任务 [{task.TaskCode}] 当前状态 [{ChineseDisplayText.ForTaskStatus(task.Status)}] 不允许请求格口，仅已扫描或已落格任务可查询格口。"
             };
         }
 

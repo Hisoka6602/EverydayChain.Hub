@@ -379,7 +379,7 @@ public sealed class ExceptionRuleTests
         var result = await service.EvaluateAsync(task.Id, CancellationToken.None);
 
         Assert.True(result.ShouldRecirculate);
-        Assert.Contains("DryRun", result.Reason);
+        Assert.Contains("预演模式", result.Reason);
 
         var notUpdated = await repo.FindByTaskCodeAsync("T1", CancellationToken.None);
         Assert.False(notUpdated!.IsRecirculated);

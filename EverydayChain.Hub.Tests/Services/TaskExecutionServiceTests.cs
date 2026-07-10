@@ -64,7 +64,7 @@ public sealed class TaskExecutionServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("TASK-001", result.TaskCode);
-        Assert.Equal(nameof(BusinessTaskStatus.Scanned), result.TaskStatus);
+        Assert.Equal("已扫描", result.TaskStatus);
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public sealed class TaskExecutionServiceTests
         var result = await service.MarkScannedAsync(request, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(nameof(BusinessTaskStatus.Scanned), result.TaskStatus);
+        Assert.Equal("已扫描", result.TaskStatus);
 
         var updatedTask = await repo.FindByTaskCodeAsync("TASK-002", CancellationToken.None);
         Assert.NotNull(updatedTask);

@@ -338,25 +338,25 @@ public sealed class BoxTrackingQueryService : IBoxTrackingQueryService
     {
         if (!log.IsMatched)
         {
-            return "Unmatched";
+            return "未匹配";
         }
 
         if (task is null)
         {
-            return "Matched";
+            return "已匹配";
         }
 
         if (task.IsException || task.Status == BusinessTaskStatus.Exception)
         {
-            return "ExceptionPending";
+            return "异常待处理";
         }
 
         if (task.IsRecirculated || _queryPolicy.IsRecirculatedByResolvedDockCode(task.ResolvedDockCode))
         {
-            return "RecirculationRescan";
+            return "回流复扫";
         }
 
-        return "Scanned";
+        return "已扫描";
     }
 
     /// <summary>

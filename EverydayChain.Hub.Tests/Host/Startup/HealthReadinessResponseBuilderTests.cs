@@ -42,7 +42,7 @@ public sealed class HealthReadinessResponseBuilderTests
         Assert.True(readiness.Response.Data.AllDatabasesAvailable);
         Assert.True(readiness.Response.Data.Oracle.IsAvailable);
         Assert.True(readiness.Response.Data.ApiWarmup.IsCompleted);
-        Assert.Equal("Completed", readiness.Response.Data.ApiWarmup.Stage);
+        Assert.Equal("已完成", readiness.Response.Data.ApiWarmup.Stage);
     }
 
     [Fact]

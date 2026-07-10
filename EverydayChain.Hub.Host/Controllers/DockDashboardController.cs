@@ -137,8 +137,8 @@ public sealed class DockDashboardController : QueryControllerBase
         }
 
         var content = SimpleXlsxBuilder.BuildSingleSheet(
-            "DockDashboard",
-            ["DockCode", "SplitUnsortedCount", "FullCaseUnsortedCount", "RecirculatedCount", "ExceptionCount", "SortedCount", "SortedProgressPercent"],
+            "码头看板",
+            ["码头号", "拆零待分拣数", "整件待分拣数", "回流数", "异常数", "已分拣数", "分拣进度百分比"],
             queryResult.Value!.DockSummaries
                 .Select(summary => (IReadOnlyList<string?>)
                 [
@@ -187,7 +187,7 @@ public sealed class DockDashboardController : QueryControllerBase
     {
         // 步骤：执行 BuildCsv 方法的核心处理流程。
         var builder = new StringBuilder();
-        builder.AppendLine("DockCode,SplitUnsortedCount,FullCaseUnsortedCount,RecirculatedCount,ExceptionCount,SortedCount,SortedProgressPercent");
+        builder.AppendLine("码头号,拆零待分拣数,整件待分拣数,回流数,异常数,已分拣数,分拣进度百分比");
         foreach (var summary in result.DockSummaries)
         {
             builder.AppendLine(string.Join(",",

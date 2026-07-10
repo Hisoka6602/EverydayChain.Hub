@@ -22,12 +22,12 @@ public sealed class ScanController : ControllerBase {
     /// <summary>
     /// 存储 UnresolvableChuteMessage 字段。
     /// </summary>
-    private const string UnresolvableChuteMessage = "扫描 barcodes 内不能包含无法解析格口的条码。";
+    private const string UnresolvableChuteMessage = "扫描条码列表内不能包含无法解析格口的条码。";
 
     /// <summary>
     /// 存储 MultipleChutesMessage 字段。
     /// </summary>
-    private const string MultipleChutesMessage = "扫描 barcodes 不能包含多个格口的条码。";
+    private const string MultipleChutesMessage = "扫描条码列表不能包含多个格口的条码。";
 
     /// <summary>
     /// 存储 MultiBarcodeFallbackMeasurementValue 字段。

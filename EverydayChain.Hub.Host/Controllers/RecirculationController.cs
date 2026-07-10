@@ -68,7 +68,7 @@ public sealed class RecirculationController(
                 })
                 .ToList()
         };
-        return Ok(ApiResponse<RecirculationSummaryResponse>.Success(response, "Recirculation summary query succeeded."));
+        return Ok(ApiResponse<RecirculationSummaryResponse>.Success(response, "回流汇总查询成功。"));
     }
 
     /// <summary>
@@ -107,7 +107,7 @@ public sealed class RecirculationController(
             LastId = resolvedRequest.LastId
         }, cancellationToken);
 
-        return Ok(ApiResponse<BusinessTaskQueryResponse>.Success(BuildBusinessTaskResponse(result), "Recirculation detail query succeeded."));
+        return Ok(ApiResponse<BusinessTaskQueryResponse>.Success(BuildBusinessTaskResponse(result), "回流明细查询成功。"));
     }
 
     /// <summary>
@@ -183,8 +183,8 @@ public sealed class RecirculationController(
             SortOrder = resolvedRequest.SortOrder
         }, cancellationToken);
         var content = SimpleXlsxBuilder.BuildSingleSheet(
-            "RecirculationSummary",
-            ["Chute", "WaveCode", "RecirculatedCount"],
+            "回流汇总",
+            ["格口", "波次号", "回流数"],
             result.Rows
                 .Select(row => (IReadOnlyList<string?>)
                 [
@@ -258,25 +258,25 @@ public sealed class RecirculationController(
 
         if (request.PageNumber < 1 || request.PageNumber > 100000)
         {
-            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("PageNumber must be between 1 and 100000."));
+            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("页码范围必须在 1 到 100000 之间。"));
             return false;
         }
 
         if (request.PageSize < 1 || request.PageSize > 1000)
         {
-            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("PageSize must be between 1 and 1000."));
+            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("页大小范围必须在 1 到 1000 之间。"));
             return false;
         }
 
         if (request.LastCreatedTimeLocal.HasValue != request.LastId.HasValue)
         {
-            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("LastCreatedTimeLocal and LastId must be provided together."));
+            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("游标分页参数 LastCreatedTimeLocal 与 LastId 必须同时传入或同时为空。"));
             return false;
         }
 
         if (request.LastId.HasValue && request.LastId.Value <= 0)
         {
-            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("LastId must be greater than 0."));
+            validationResult = BadRequest(ApiResponse<BusinessTaskQueryResponse>.Fail("游标分页参数 LastId 必须大于 0。"));
             return false;
         }
 

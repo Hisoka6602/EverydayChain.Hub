@@ -50,7 +50,7 @@ public class RetentionExecutionServiceTests
 
         var summary = await service.ExecuteRetentionCleanupAsync(CancellationToken.None);
 
-        Assert.Contains("DryRun=1", summary, StringComparison.Ordinal);
+        Assert.Contains("预演 1 项", summary, StringComparison.Ordinal);
         Assert.Equal(["scan_logs"], resolver.QueriedLogicalTables);
         Assert.Contains(logger.Logs, entry => entry.Level == Microsoft.Extensions.Logging.LogLevel.Warning
             && entry.Message.Contains("日志表保留期配置非法", StringComparison.Ordinal));
@@ -97,7 +97,7 @@ public class RetentionExecutionServiceTests
 
         var summary = await service.ExecuteRetentionCleanupAsync(CancellationToken.None);
 
-        Assert.Contains("Scanned=1", summary, StringComparison.Ordinal);
+        Assert.Contains("扫描 1 个目标", summary, StringComparison.Ordinal);
         Assert.Single(resolver.QueriedLogicalTables);
         Assert.Equal("scan_logs", resolver.QueriedLogicalTables[0]);
     }
@@ -182,7 +182,7 @@ public class RetentionExecutionServiceTests
 
         var summary = await service.ExecuteRetentionCleanupAsync(CancellationToken.None);
 
-        Assert.Contains("Deleted=5", summary, StringComparison.Ordinal);
+        Assert.Contains("删除 5 项", summary, StringComparison.Ordinal);
         Assert.Equal(1, retentionRepository.CountRowsBeforeCallCount);
         Assert.Equal(1, retentionRepository.DeleteRowsBeforeCallCount);
         Assert.Single(retentionAuditLogRepository.Items);

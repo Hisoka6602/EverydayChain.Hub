@@ -1,6 +1,7 @@
 ﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Application.Utilities;
 using EverydayChain.Hub.Domain.Aggregates.ScanLogAggregate;
 using EverydayChain.Hub.Domain.Enums;
 using Microsoft.Extensions.Logging;
@@ -78,7 +79,7 @@ public sealed class TaskExecutionService : ITaskExecutionService
         {
             var nowLocal = DateTime.Now;
             await _businessTaskRepository.IncrementScanRetryAsync(task.Id, task.CreatedTimeLocal, nowLocal, ct);
-            var reason = $"Task status [{task.Status}] does not allow a scan transition.";
+            var reason = $"任务状态 [{ChineseDisplayText.ForTaskStatus(task.Status)}] 不允许扫描流转。";
             await WriteScanLogSilentlyAsync(
                 businessTaskId: task.Id,
                 taskCode: task.TaskCode,
@@ -94,7 +95,7 @@ public sealed class TaskExecutionService : ITaskExecutionService
                 IsSuccess = false,
                 TaskId = task.Id,
                 TaskCode = task.TaskCode,
-                TaskStatus = task.Status.ToString(),
+                TaskStatus = ChineseDisplayText.ForTaskStatus(task.Status),
                 FailureReason = reason
             };
         }
@@ -127,8 +128,8 @@ public sealed class TaskExecutionService : ITaskExecutionService
                 await _businessTaskRepository.IncrementScanRetryAsync(currentTask.Id, currentTask.CreatedTimeLocal, now, ct);
             }
 
-            var currentStatus = currentTask?.Status.ToString() ?? task.Status.ToString();
-            var reason = $"Task status [{currentStatus}] does not allow a scan transition.";
+            var currentStatus = ChineseDisplayText.ForTaskStatus(currentTask?.Status ?? task.Status);
+            var reason = $"任务状态 [{currentStatus}] 不允许扫描流转。";
             await WriteScanLogSilentlyAsync(
                 businessTaskId: task.Id,
                 taskCode: task.TaskCode,
@@ -165,7 +166,7 @@ public sealed class TaskExecutionService : ITaskExecutionService
             IsSuccess = true,
             TaskId = task.Id,
             TaskCode = task.TaskCode,
-            TaskStatus = BusinessTaskStatus.Scanned.ToString()
+            TaskStatus = ChineseDisplayText.ForTaskStatus(BusinessTaskStatus.Scanned)
         };
     }
 

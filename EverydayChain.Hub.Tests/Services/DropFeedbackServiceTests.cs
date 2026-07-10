@@ -53,7 +53,7 @@ public sealed class DropFeedbackServiceTests
         var result = await service.ExecuteAsync(request, CancellationToken.None);
 
         Assert.False(result.IsAccepted);
-        Assert.Equal("TaskNotFound", result.FailureReason);
+        Assert.Equal("未找到任务", result.FailureReason);
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public sealed class DropFeedbackServiceTests
         var result = await service.ExecuteAsync(request, CancellationToken.None);
 
         Assert.False(result.IsAccepted);
-        Assert.Equal("BarcodeMismatch", result.FailureReason);
+        Assert.Equal("条码不一致", result.FailureReason);
     }
 
     [Fact]
@@ -112,7 +112,7 @@ public sealed class DropFeedbackServiceTests
         var result = await service.ExecuteAsync(request, CancellationToken.None);
 
         Assert.False(result.IsAccepted);
-        Assert.Equal("InvalidTaskStatus", result.FailureReason);
+        Assert.Equal("任务状态不允许落格回传", result.FailureReason);
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public sealed class DropFeedbackServiceTests
 
         Assert.True(result.IsAccepted);
         Assert.Equal("TASK-003", result.TaskCode);
-        Assert.Equal(nameof(BusinessTaskStatus.Dropped), result.Status);
+        Assert.Equal("已落格", result.Status);
 
         var updated = await repo.FindByTaskCodeAsync("TASK-003", CancellationToken.None);
         Assert.NotNull(updated);
@@ -220,7 +220,7 @@ public sealed class DropFeedbackServiceTests
 
         Assert.True(result.IsAccepted);
         Assert.Equal("TASK-004", result.TaskCode);
-        Assert.Equal(nameof(BusinessTaskStatus.Exception), result.Status);
+        Assert.Equal("异常", result.Status);
 
         var updated = await repo.FindByTaskCodeAsync("TASK-004", CancellationToken.None);
         Assert.NotNull(updated);

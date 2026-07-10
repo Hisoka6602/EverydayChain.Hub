@@ -78,7 +78,7 @@ public class RetentionExecutionService(
         if (!acquired)
         {
             logger.LogWarning("保留期治理跳过执行，原因是已有其他实例持有运行租约。LeaseKey={LeaseKey}", RetentionLeaseKey);
-            return "RetentionCleanup跳过，已有其他实例正在执行。";
+            return "保留期清理已跳过，已有其他实例正在执行。";
         }
 
         var batchId = Guid.NewGuid().ToString("N");
@@ -144,7 +144,7 @@ public class RetentionExecutionService(
             await runtimeLeaseRepository.ReleaseAsync(RetentionLeaseKey, _leaseOwnerId, CancellationToken.None);
         }
 
-        var summary = $"RetentionCleanup完成。Scanned={scannedCount}, Deleted={deletedCount}, DryRun={dryRunCount}, Failed={failedCount}";
+        var summary = $"保留期清理完成。扫描 {scannedCount} 个目标，删除 {deletedCount} 项，预演 {dryRunCount} 项，失败 {failedCount} 项。";
         logger.LogInformation(
             "保留期清理完成。Scanned={Scanned}, Deleted={Deleted}, DryRun={DryRun}, Failed={Failed}, BatchId={BatchId}",
             scannedCount,

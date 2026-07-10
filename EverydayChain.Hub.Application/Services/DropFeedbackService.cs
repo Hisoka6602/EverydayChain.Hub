@@ -1,6 +1,7 @@
 ﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Application.Utilities;
 using EverydayChain.Hub.Domain.Aggregates.DropLogAggregate;
 using EverydayChain.Hub.Domain.Enums;
 using Microsoft.Extensions.Logging;
@@ -71,7 +72,7 @@ public sealed class DropFeedbackService : IDropFeedbackService {
         if (task == null) {
             return new DropFeedbackApplicationResult {
                 IsAccepted = false,
-                FailureReason = "TaskNotFound",
+                FailureReason = "未找到任务",
                 Message = $"未找到任务编码 [{normalizedTaskCode}] 或条码 [{normalizedBarcode}] 对应的业务任务。"
             };
         }
@@ -82,8 +83,8 @@ public sealed class DropFeedbackService : IDropFeedbackService {
             return new DropFeedbackApplicationResult {
                 IsAccepted = false,
                 TaskCode = task.TaskCode,
-                Status = task.Status.ToString(),
-                FailureReason = "BarcodeMismatch",
+                Status = ChineseDisplayText.ForTaskStatus(task.Status),
+                FailureReason = "条码不一致",
                 Message = $"提供的条码 [{normalizedBarcode}] 与任务 [{task.TaskCode}] 关联条码不一致。"
             };
         }
@@ -92,9 +93,9 @@ public sealed class DropFeedbackService : IDropFeedbackService {
             return new DropFeedbackApplicationResult {
                 IsAccepted = false,
                 TaskCode = task.TaskCode,
-                Status = task.Status.ToString(),
-                FailureReason = "InvalidTaskStatus",
-                Message = $"任务 [{task.TaskCode}] 当前状态 [{task.Status}] 不允许落格回传。"
+                Status = ChineseDisplayText.ForTaskStatus(task.Status),
+                FailureReason = "任务状态不允许落格回传",
+                Message = $"任务 [{task.TaskCode}] 当前状态 [{ChineseDisplayText.ForTaskStatus(task.Status)}] 不允许落格回传。"
             };
         }
 
@@ -104,8 +105,8 @@ public sealed class DropFeedbackService : IDropFeedbackService {
                 {
                     IsAccepted = false,
                     TaskCode = task.TaskCode,
-                    Status = task.Status.ToString(),
-                    FailureReason = "ActualChuteCodeRequired",
+                    Status = ChineseDisplayText.ForTaskStatus(task.Status),
+                    FailureReason = "实际落格编码不能为空",
                     Message = $"任务 [{task.TaskCode}] 落格成功回传时 ActualChuteCode 不能为空白。"
                 };
             }
@@ -140,10 +141,10 @@ public sealed class DropFeedbackService : IDropFeedbackService {
         return new DropFeedbackApplicationResult {
             IsAccepted = true,
             TaskCode = task.TaskCode,
-            Status = task.Status.ToString(),
+            Status = ChineseDisplayText.ForTaskStatus(task.Status),
             Message = request.IsSuccess
-                ? $"任务 [{task.TaskCode}] 落格成功，已推进到 {task.Status}。"
-                : $"任务 [{task.TaskCode}] 落格异常，已推进到 {task.Status}。"
+                ? $"任务 [{task.TaskCode}] 落格成功，已推进到 {ChineseDisplayText.ForTaskStatus(task.Status)}。"
+                : $"任务 [{task.TaskCode}] 落格异常，已推进到 {ChineseDisplayText.ForTaskStatus(task.Status)}。"
         };
     }
 

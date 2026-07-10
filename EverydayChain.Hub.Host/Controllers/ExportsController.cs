@@ -64,7 +64,7 @@ public sealed class ExportsController(IExportCatalogQueryService exportCatalogQu
                 })
                 .ToList()
         };
-        return Ok(ApiResponse<ExportCatalogResponse>.Success(response, "Export catalog query succeeded."));
+        return Ok(ApiResponse<ExportCatalogResponse>.Success(response, "导出目录查询成功。"));
     }
 }
 

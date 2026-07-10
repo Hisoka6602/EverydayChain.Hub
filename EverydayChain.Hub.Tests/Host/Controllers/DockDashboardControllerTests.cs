@@ -127,7 +127,7 @@ public sealed class DockDashboardControllerTests
         Assert.Equal(0xBB, fileResult.FileContents[1]);
         Assert.Equal(0xBF, fileResult.FileContents[2]);
         var csvText = Encoding.UTF8.GetString(fileResult.FileContents);
-        Assert.Contains("DockCode,SplitUnsortedCount,FullCaseUnsortedCount,RecirculatedCount,ExceptionCount,SortedCount,SortedProgressPercent", csvText);
+        Assert.Contains("码头号,拆零待分拣数,整件待分拣数,回流数,异常数,已分拣数,分拣进度百分比", csvText);
         Assert.Contains("7,1,2,3,1,4,50", csvText);
     }
 

@@ -71,7 +71,7 @@ public sealed class BoxTrackingQueryServiceTests
         Assert.Equal("LOC-001", item.PickLocation);
         Assert.Equal("SCN-01", item.Scanner);
         Assert.Equal("B-07", item.Chute);
-        Assert.Equal("Scanned", item.Status);
+        Assert.Equal("已扫描", item.Status);
     }
 
     [Fact]

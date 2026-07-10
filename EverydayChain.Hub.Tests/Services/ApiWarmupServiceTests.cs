@@ -214,7 +214,7 @@ public sealed class ApiWarmupServiceTests
             return Task.FromResult(string.Empty);
         }
 
-        public Task<WaveCleanupQueryResult> QueryCleanupWaveAsync(string waveCode, CancellationToken cancellationToken)
+        public Task<WaveCleanupQueryResult> QueryCleanupWaveAsync(string? waveCode, CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref _cleanupQueryCount);
             return Task.FromResult(new WaveCleanupQueryResult());

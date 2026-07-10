@@ -96,7 +96,7 @@ public sealed class RecirculationQueryService : IRecirculationQueryService
     {
         var result = await QuerySummaryAsync(request, cancellationToken);
         var builder = new StringBuilder();
-        builder.AppendLine("Chute,WaveNo,Reflow");
+        builder.AppendLine("格口,波次号,回流数");
         foreach (var row in result.Rows)
         {
             builder.AppendLine($"{EscapeCsvField(row.ChuteCode)},{EscapeCsvField(row.WaveCode)},{row.RecirculatedCount}");

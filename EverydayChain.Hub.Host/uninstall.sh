@@ -25,14 +25,14 @@ ensure_systemctl() {
 }
 
 print_dry_run() {
-    echo "[DryRun] service_name=${service_name}"
-    echo "[DryRun] service_unit_path=${service_unit_path}"
-    echo "[DryRun] systemctl stop \"${service_name}\""
-    echo "[DryRun] systemctl disable \"${service_name}\""
-    echo "[DryRun] remove systemd unit: ${service_unit_path}"
-    echo "[DryRun] systemctl daemon-reload"
-    echo "[DryRun] systemctl reset-failed \"${service_name}\""
-    echo "[DryRun] keep environment file: ${service_env_file}"
+    echo "[预演模式] service_name=${service_name}"
+    echo "[预演模式] service_unit_path=${service_unit_path}"
+    echo "[预演模式] 执行 systemctl stop \"${service_name}\""
+    echo "[预演模式] 执行 systemctl disable \"${service_name}\""
+    echo "[预演模式] 删除 systemd 单元文件：${service_unit_path}"
+    echo "[预演模式] 执行 systemctl daemon-reload"
+    echo "[预演模式] 执行 systemctl reset-failed \"${service_name}\""
+    echo "[预演模式] 保留环境变量文件：${service_env_file}"
 }
 
 while (($# > 0)); do
@@ -41,7 +41,7 @@ while (($# > 0)); do
             dry_run=1
             ;;
         *)
-            echo "[ERROR] Unsupported argument: $1" >&2
+            echo "[错误] 不支持的参数：$1" >&2
             exit 1
             ;;
     esac

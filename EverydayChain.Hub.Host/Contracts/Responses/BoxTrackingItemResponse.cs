@@ -64,8 +64,8 @@ public sealed class BoxTrackingItemResponse
     public string? Chute { get; set; }
 
     /// <summary>
-    /// 表示箱子追踪页的状态码。
-    /// 当前返回值为 Scanned、RecirculationRescan、ExceptionPending、Matched、Unmatched 等代码文案。
+    /// 表示箱子追踪页的状态文案。
+    /// 当前返回值为“已扫描”“回流复扫”“异常待处理”“已匹配”“未匹配”等中文文案。
     /// </summary>
     public string Status { get; set; } = string.Empty;
 

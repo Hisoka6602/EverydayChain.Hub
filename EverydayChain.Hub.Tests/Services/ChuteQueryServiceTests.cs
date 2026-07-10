@@ -56,7 +56,7 @@ public sealed class ChuteQueryServiceTests
 
         Assert.False(result.IsResolved);
         Assert.Equal("TASK-001", result.TaskCode);
-        Assert.Contains("Created", result.Message);
+        Assert.Contains("已创建", result.Message);
     }
 
     [Fact]

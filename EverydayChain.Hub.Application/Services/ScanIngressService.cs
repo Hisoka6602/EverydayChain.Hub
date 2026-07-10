@@ -1,6 +1,7 @@
 ﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Application.Utilities;
 using EverydayChain.Hub.Domain.Aggregates.ScanLogAggregate;
 using EverydayChain.Hub.Domain.Enums;
 using Microsoft.Extensions.Logging;
@@ -50,7 +51,7 @@ public sealed class ScanIngressService : IScanIngressService {
     public async Task<ScanUploadApplicationResult> ExecuteAsync(ScanUploadApplicationRequest request, CancellationToken cancellationToken) {
         // 步骤：执行 ExecuteAsync 方法的核心处理流程。
         var parseResult = _barcodeParser.Parse(request.Barcode);
-        var barcodeType = parseResult.BarcodeType.ToString();
+        var barcodeType = ChineseDisplayText.ForBarcodeType(parseResult.BarcodeType);
         if (!parseResult.IsValid) {
             await WriteScanLogSilentlyAsync(
                 request.Barcode,
@@ -91,7 +92,7 @@ public sealed class ScanIngressService : IScanIngressService {
                 IsAccepted = false,
                 TaskCode = execResult.TaskCode,
                 BarcodeType = barcodeType,
-                FailureReason = "TaskNotMatchedOrInvalidState",
+                FailureReason = "任务未匹配或状态不允许流转",
                 Message = execResult.FailureReason
             };
         }
@@ -111,9 +112,9 @@ public sealed class ScanIngressService : IScanIngressService {
     private static string ConvertFailureReasonToCode(BarcodeParseFailureReason failureReason) {
         // 步骤：执行 ConvertFailureReasonToCode 方法的核心处理流程。
         return failureReason switch {
-            BarcodeParseFailureReason.InvalidBarcode => nameof(BarcodeParseFailureReason.InvalidBarcode),
-            BarcodeParseFailureReason.UnsupportedBarcodeType => nameof(BarcodeParseFailureReason.UnsupportedBarcodeType),
-            BarcodeParseFailureReason.ParseError => nameof(BarcodeParseFailureReason.ParseError),
+            BarcodeParseFailureReason.InvalidBarcode => ChineseDisplayText.ForBarcodeParseFailureReason(BarcodeParseFailureReason.InvalidBarcode),
+            BarcodeParseFailureReason.UnsupportedBarcodeType => ChineseDisplayText.ForBarcodeParseFailureReason(BarcodeParseFailureReason.UnsupportedBarcodeType),
+            BarcodeParseFailureReason.ParseError => ChineseDisplayText.ForBarcodeParseFailureReason(BarcodeParseFailureReason.ParseError),
             _ => string.Empty
         };
     }

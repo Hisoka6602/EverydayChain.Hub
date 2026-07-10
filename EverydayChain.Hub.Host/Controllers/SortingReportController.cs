@@ -150,8 +150,8 @@ public sealed class SortingReportController : QueryControllerBase
         }, cancellationToken);
 
         var content = SimpleXlsxBuilder.BuildSingleSheet(
-            "SortingReport",
-            ["DockCode", "SplitTotalCount", "FullCaseTotalCount", "SplitSortedCount", "FullCaseSortedCount", "RecirculatedCount", "ExceptionCount"],
+            "分拣报表",
+            ["码头号", "拆零总数", "整件总数", "拆零分拣数", "整件分拣数", "回流数", "异常数"],
             result.Rows
                 .Select(row => (IReadOnlyList<string?>)
                 [

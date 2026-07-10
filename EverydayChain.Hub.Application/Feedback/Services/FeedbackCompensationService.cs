@@ -47,7 +47,7 @@ public sealed class FeedbackCompensationService : IFeedbackCompensationService
         {
             return new FeedbackCompensationResult
             {
-                FailureReason = "Task code cannot be empty.",
+                FailureReason = "任务编码不能为空。",
                 FailedCount = 1
             };
         }
@@ -106,14 +106,14 @@ public sealed class FeedbackCompensationService : IFeedbackCompensationService
                 return result;
             }
 
-            result.FailureReason = $"Oracle write row count mismatch. WrittenRows={writtenRows}, ClaimedRows={tasks.Count}.";
+            result.FailureReason = $"Oracle 回写行数不一致。已写入 {writtenRows} 行，已认领 {tasks.Count} 行。";
             result.FailedCount = await _businessTaskRepository.FailClaimedFeedbackBatchAsync(taskIds, DateTime.Now, ct);
             _logger.LogError("Feedback compensation failed because Oracle returned an unexpected row count. WrittenRows={WrittenRows}, ClaimedRows={ClaimedRows}", writtenRows, tasks.Count);
             return result;
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
-            result.FailureReason = "Oracle feedback retry failed.";
+            result.FailureReason = "Oracle 业务回写重试失败。";
             result.FailedCount = await _businessTaskRepository.FailClaimedFeedbackBatchAsync(taskIds, DateTime.Now, ct);
             _logger.LogError(ex, "Feedback compensation execution failed after the tasks were claimed. ClaimedRows={ClaimedRows}", tasks.Count);
             return result;

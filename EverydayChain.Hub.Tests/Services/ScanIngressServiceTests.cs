@@ -39,8 +39,8 @@ public sealed class ScanIngressServiceTests
         var result = await service.ExecuteAsync(request, CancellationToken.None);
 
         Assert.False(result.IsAccepted);
-        Assert.Equal("Unknown", result.BarcodeType);
-        Assert.Equal("InvalidBarcode", result.FailureReason);
+        Assert.Equal("未知条码", result.BarcodeType);
+        Assert.Equal("无效条码", result.FailureReason);
         Assert.Single(scanLogRepository.Logs);
         Assert.False(scanLogRepository.Logs[0].IsMatched);
     }
@@ -59,8 +59,8 @@ public sealed class ScanIngressServiceTests
         var result = await service.ExecuteAsync(request, CancellationToken.None);
 
         Assert.False(result.IsAccepted);
-        Assert.Equal("Split", result.BarcodeType);
-        Assert.Equal("TaskNotMatchedOrInvalidState", result.FailureReason);
+        Assert.Equal("拆零条码", result.BarcodeType);
+        Assert.Equal("任务未匹配或状态不允许流转", result.FailureReason);
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public sealed class ScanIngressServiceTests
         var result = await service.ExecuteAsync(request, CancellationToken.None);
 
         Assert.True(result.IsAccepted);
-        Assert.Equal("Split", result.BarcodeType);
+        Assert.Equal("拆零条码", result.BarcodeType);
         Assert.Equal(string.Empty, result.FailureReason);
         Assert.Equal("TASK-001", result.TaskCode);
     }

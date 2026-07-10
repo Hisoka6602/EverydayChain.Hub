@@ -45,7 +45,7 @@ public interface IWaveQueryService
     /// <summary>
     /// 执行 QueryCleanupWaveAsync 方法。
     /// </summary>
-    Task<WaveCleanupQueryResult> QueryCleanupWaveAsync(string waveCode, CancellationToken cancellationToken);
+    Task<WaveCleanupQueryResult> QueryCleanupWaveAsync(string? waveCode, CancellationToken cancellationToken);
 
     /// <summary>
     /// 执行 QueryDetailsAsync 方法。

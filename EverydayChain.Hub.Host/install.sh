@@ -139,23 +139,23 @@ print_dry_run() {
     local exec_start_command
     exec_start_command="$(build_exec_start_command)"
 
-    echo "[DryRun] service_name=${service_name}"
-    echo "[DryRun] service_description=${service_description}"
-    echo "[DryRun] service_user=${service_user}"
-    echo "[DryRun] service_group=${service_group}"
-    echo "[DryRun] service_unit_path=${service_unit_path}"
-    echo "[DryRun] service_env_file=${service_env_file}"
-    echo "[DryRun] working_directory=${working_directory}"
-    echo "[DryRun] exec_start=${exec_start_command}"
-    echo "[DryRun] create or keep environment file: ${service_env_file}"
-    echo "[DryRun] ensure runtime directories: ${script_dir}/logs, ${script_dir}/data"
-    echo "[DryRun] write systemd unit: ${service_unit_path}"
-    echo "[DryRun] systemctl daemon-reload"
-    echo "[DryRun] systemctl enable \"${service_name}\""
+    echo "[预演模式] service_name=${service_name}"
+    echo "[预演模式] service_description=${service_description}"
+    echo "[预演模式] service_user=${service_user}"
+    echo "[预演模式] service_group=${service_group}"
+    echo "[预演模式] service_unit_path=${service_unit_path}"
+    echo "[预演模式] service_env_file=${service_env_file}"
+    echo "[预演模式] working_directory=${working_directory}"
+    echo "[预演模式] exec_start=${exec_start_command}"
+    echo "[预演模式] 创建或保留环境变量文件：${service_env_file}"
+    echo "[预演模式] 确保运行目录存在：${script_dir}/logs, ${script_dir}/data"
+    echo "[预演模式] 写入 systemd 单元文件：${service_unit_path}"
+    echo "[预演模式] 执行 systemctl daemon-reload"
+    echo "[预演模式] 执行 systemctl enable \"${service_name}\""
     if [[ "${skip_start}" == "1" ]]; then
-        echo "[DryRun] skip service start"
+        echo "[预演模式] 跳过服务启动"
     else
-        echo "[DryRun] systemctl restart \"${service_name}\""
+        echo "[预演模式] 执行 systemctl restart \"${service_name}\""
     fi
 }
 
@@ -168,7 +168,7 @@ while (($# > 0)); do
             skip_start=1
             ;;
         *)
-            echo "[ERROR] Unsupported argument: $1" >&2
+            echo "[错误] 不支持的参数：$1" >&2
             exit 1
             ;;
     esac

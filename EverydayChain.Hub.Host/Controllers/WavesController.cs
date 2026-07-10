@@ -1,6 +1,7 @@
 ﻿using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
+using EverydayChain.Hub.Application.Utilities;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
@@ -58,7 +59,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
             Barcode = result.Barcode,
             ScanTimeLocal = result.ScanTimeLocal
         };
-        return Ok(ApiResponse<CurrentWaveResponse>.Success(response, "Current wave query succeeded."));
+        return Ok(ApiResponse<CurrentWaveResponse>.Success(response, "当前波次查询成功。"));
     }
 
     /// <summary>
@@ -105,7 +106,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
                 })
                 .ToList()
         };
-        return Ok(ApiResponse<WaveOptionsResponse>.Success(response, "Wave options query succeeded."));
+        return Ok(ApiResponse<WaveOptionsResponse>.Success(response, "波次选项查询成功。"));
     }
 
     /// <summary>
@@ -137,7 +138,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
 
         if (string.IsNullOrWhiteSpace(resolvedRequest.WaveCode))
         {
-            return BadRequest(ApiResponse<WaveSummaryResponse>.Fail("WaveCode cannot be empty."));
+            return BadRequest(ApiResponse<WaveSummaryResponse>.Fail("波次号不能为空。"));
         }
 
         var result = await waveQueryService.QuerySummaryAsync(new EverydayChain.Hub.Application.Models.WaveSummaryQueryRequest
@@ -148,7 +149,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         }, cancellationToken);
         if (result is null)
         {
-            return BadRequest(ApiResponse<WaveSummaryResponse>.Fail($"Wave [{resolvedRequest.WaveCode.Trim()}] was not found in the selected range."));
+            return BadRequest(ApiResponse<WaveSummaryResponse>.Fail($"未在所选时间范围内找到波次 [{resolvedRequest.WaveCode.Trim()}]。"));
         }
 
         var response = new WaveSummaryResponse
@@ -161,7 +162,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
             RecirculatedCount = result.RecirculatedCount,
             ExceptionCount = result.ExceptionCount
         };
-        return Ok(ApiResponse<WaveSummaryResponse>.Success(response, "Wave summary query succeeded."));
+        return Ok(ApiResponse<WaveSummaryResponse>.Success(response, "波次汇总查询成功。"));
     }
 
     /// <summary>
@@ -193,7 +194,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
 
         if (string.IsNullOrWhiteSpace(resolvedRequest.WaveCode))
         {
-            return BadRequest(ApiResponse<WaveZoneResponse>.Fail("WaveCode cannot be empty."));
+            return BadRequest(ApiResponse<WaveZoneResponse>.Fail("波次号不能为空。"));
         }
 
         var result = await waveQueryService.QueryZonesAsync(new EverydayChain.Hub.Application.Models.WaveZoneQueryRequest
@@ -204,7 +205,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         }, cancellationToken);
         if (result is null)
         {
-            return BadRequest(ApiResponse<WaveZoneResponse>.Fail($"Wave [{resolvedRequest.WaveCode.Trim()}] was not found in the selected range."));
+            return BadRequest(ApiResponse<WaveZoneResponse>.Fail($"未在所选时间范围内找到波次 [{resolvedRequest.WaveCode.Trim()}]。"));
         }
 
         var response = new WaveZoneResponse
@@ -224,7 +225,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
                 })
                 .ToList()
         };
-        return Ok(ApiResponse<WaveZoneResponse>.Success(response, "Wave zone query succeeded."));
+        return Ok(ApiResponse<WaveZoneResponse>.Success(response, "波次分区查询成功。"));
     }
 
     /// <summary>
@@ -256,7 +257,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
 
         if (string.IsNullOrWhiteSpace(resolvedRequest.WaveCode))
         {
-            return BadRequest(ApiResponse<object>.Fail("WaveCode cannot be empty."));
+            return BadRequest(ApiResponse<object>.Fail("波次号不能为空。"));
         }
 
         var csvContent = await waveQueryService.ExportZonesCsvAsync(new EverydayChain.Hub.Application.Models.WaveZoneQueryRequest
@@ -323,7 +324,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
                 })
                 .ToList()
         };
-        return Ok(ApiResponse<WaveListResponse>.Success(response, "Wave list query succeeded."));
+        return Ok(ApiResponse<WaveListResponse>.Success(response, "波次列表查询成功。"));
     }
 
     /// <summary>
@@ -395,8 +396,8 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
             EndTimeLocal = normalizedEnd
         }, cancellationToken);
         var content = SimpleXlsxBuilder.BuildSingleSheet(
-            "WaveList",
-            ["WaveId", "Remark", "PackageTotal", "UnsortedCount", "SplitTotal", "FullTotal", "SplitRatioPercent", "FullRatioPercent", "RecirculatedCount", "ExceptionCount", "CreatedAt", "Status"],
+            "波次列表",
+            ["波次号", "备注", "包裹总数", "待分拣数", "拆零总数", "整件总数", "拆零占比百分比", "整件占比百分比", "回流数", "异常数", "创建时间", "状态"],
             result.Items
                 .Select(item => (IReadOnlyList<string?>)
                 [
@@ -447,7 +448,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
 
         if (string.IsNullOrWhiteSpace(resolvedRequest.WaveCode))
         {
-            return BadRequest(ApiResponse<WaveDetailResponse>.Fail("WaveCode cannot be empty."));
+            return BadRequest(ApiResponse<WaveDetailResponse>.Fail("波次号不能为空。"));
         }
 
         var result = await waveQueryService.QueryDetailsAsync(new EverydayChain.Hub.Application.Models.WaveDetailQueryRequest
@@ -486,7 +487,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
                 })
                 .ToList()
         };
-        return Ok(ApiResponse<WaveDetailResponse>.Success(response, "Wave detail query succeeded."));
+        return Ok(ApiResponse<WaveDetailResponse>.Success(response, "波次明细查询成功。"));
     }
 
     /// <summary>
@@ -518,7 +519,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
 
         if (string.IsNullOrWhiteSpace(resolvedRequest.WaveCode))
         {
-            return BadRequest(ApiResponse<object>.Fail("WaveCode cannot be empty."));
+            return BadRequest(ApiResponse<object>.Fail("波次号不能为空。"));
         }
 
         var csvContent = await waveQueryService.ExportDetailsCsvAsync(new EverydayChain.Hub.Application.Models.WaveDetailQueryRequest
@@ -560,7 +561,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
 
         if (string.IsNullOrWhiteSpace(resolvedRequest.WaveCode))
         {
-            return BadRequest(ApiResponse<object>.Fail("WaveCode cannot be empty."));
+            return BadRequest(ApiResponse<object>.Fail("波次号不能为空。"));
         }
 
         var result = await waveQueryService.QueryDetailsAsync(new EverydayChain.Hub.Application.Models.WaveDetailQueryRequest
@@ -570,8 +571,8 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
             WaveCode = resolvedRequest.WaveCode.Trim()
         }, cancellationToken);
         var content = SimpleXlsxBuilder.BuildSingleSheet(
-            "WaveDetail",
-            ["TaskCode", "WaveCode", "WaveRemark", "SourceType", "WorkingArea", "Barcode", "OrderId", "StoreId", "StoreName", "ProductCode", "PickLocation", "ChuteCode", "Status", "IsRecirculated", "IsException", "ScannedAt", "CreatedAt", "UpdatedAt"],
+            "波次明细",
+            ["任务编码", "波次号", "波次备注", "来源类型", "作业区域", "条码", "订单号", "门店号", "门店名称", "商品编码", "拣货位", "格口", "状态", "是否回流", "是否异常", "扫描时间", "创建时间", "更新时间"],
             result.Items
                 .Select(item => (IReadOnlyList<string?>)
                 [
@@ -588,8 +589,8 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
                     item.PickLocation,
                     item.ChuteCode,
                     item.Status,
-                    item.IsRecirculated.ToString(),
-                    item.IsException.ToString(),
+                    ChineseDisplayText.YesNo(item.IsRecirculated),
+                    ChineseDisplayText.YesNo(item.IsException),
                     item.ScannedAtLocal?.ToString("yyyy-MM-dd HH:mm:ss"),
                     item.CreatedTimeLocal.ToString("yyyy-MM-dd HH:mm:ss"),
                     item.UpdatedTimeLocal.ToString("yyyy-MM-dd HH:mm:ss")
@@ -628,7 +629,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
 
         if (string.IsNullOrWhiteSpace(resolvedRequest.WaveCode))
         {
-            return BadRequest(ApiResponse<object>.Fail("WaveCode cannot be empty."));
+            return BadRequest(ApiResponse<object>.Fail("波次号不能为空。"));
         }
 
         var result = await waveQueryService.QueryZonesAsync(new EverydayChain.Hub.Application.Models.WaveZoneQueryRequest
@@ -639,8 +640,8 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         }, cancellationToken);
         var zones = result?.Zones ?? [];
         var content = SimpleXlsxBuilder.BuildSingleSheet(
-            "WaveZones",
-            ["ZoneName", "TotalCount", "PendingCount", "ProgressPercent", "RecirculatedCount", "ExceptionCount"],
+            "波次分区",
+            ["区域名称", "总数", "待分拣数", "进度百分比", "回流数", "异常数"],
             zones
                 .Select(zone => (IReadOnlyList<string?>)
                 [

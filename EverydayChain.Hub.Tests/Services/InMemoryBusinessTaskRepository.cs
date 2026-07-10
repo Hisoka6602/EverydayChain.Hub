@@ -478,6 +478,66 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
         }
     }
 
+    public Task<IReadOnlyList<BusinessTaskWaveAggregateRow>> AggregateCleanableWavesAsync(CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            var latestRemarks = _tasks
+                .Where(task => !string.IsNullOrWhiteSpace(task.WaveCode) && !string.IsNullOrWhiteSpace(task.WaveRemark))
+                .GroupBy(task => NormalizeWaveCode(task.WaveCode), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group
+                        .OrderByDescending(task => task.UpdatedTimeLocal)
+                        .Select(task => task.WaveRemark!.Trim())
+                        .FirstOrDefault(),
+                    StringComparer.OrdinalIgnoreCase);
+
+            IReadOnlyList<BusinessTaskWaveAggregateRow> result = _tasks
+                .Where(task => !string.IsNullOrWhiteSpace(task.WaveCode))
+                .GroupBy(task => NormalizeWaveCode(task.WaveCode), StringComparer.OrdinalIgnoreCase)
+                .Select(group => new
+                {
+                    WaveCode = group.Key,
+                    CleanableCount = group.Count(IsCleanableWaveTask),
+                    TotalCount = group.Count(),
+                    UnsortedCount = group.Count(task => !IsSorted(task)),
+                    FullCaseTotalCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase),
+                    FullCaseUnsortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.FullCase && !IsSorted(task)),
+                    SplitTotalCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split),
+                    SplitUnsortedCount = group.Count(task => task.SourceType == BusinessTaskSourceType.Split && !IsSorted(task)),
+                    RecognitionCount = group.Count(task => task.ScannedAtLocal.HasValue),
+                    RecirculatedCount = group.Count(task => task.IsRecirculated || _queryPolicy.IsRecirculatedByResolvedDockCode(task.ResolvedDockCode)),
+                    ExceptionCount = group.Count(task => task.IsException || task.Status == BusinessTaskStatus.Exception),
+                    TotalVolumeMm3 = group.Sum(task => task.VolumeMm3 ?? 0M),
+                    TotalWeightGram = group.Sum(task => task.WeightGram ?? 0M),
+                    EarliestCreatedTimeLocal = group.Min(task => task.CreatedTimeLocal)
+                })
+                .Where(row => row.CleanableCount > 0)
+                .Select(row => new BusinessTaskWaveAggregateRow
+                {
+                    WaveCode = row.WaveCode,
+                    WaveRemark = latestRemarks.TryGetValue(row.WaveCode, out var waveRemark) ? waveRemark : null,
+                    TotalCount = row.TotalCount,
+                    CleanableCount = row.CleanableCount,
+                    UnsortedCount = row.UnsortedCount,
+                    FullCaseTotalCount = row.FullCaseTotalCount,
+                    FullCaseUnsortedCount = row.FullCaseUnsortedCount,
+                    SplitTotalCount = row.SplitTotalCount,
+                    SplitUnsortedCount = row.SplitUnsortedCount,
+                    RecognitionCount = row.RecognitionCount,
+                    RecirculatedCount = row.RecirculatedCount,
+                    ExceptionCount = row.ExceptionCount,
+                    TotalVolumeMm3 = row.TotalVolumeMm3,
+                    TotalWeightGram = row.TotalWeightGram,
+                    EarliestCreatedTimeLocal = row.EarliestCreatedTimeLocal
+                })
+                .OrderBy(row => row.WaveCode, StringComparer.Ordinal)
+                .ToList();
+            return Task.FromResult(result);
+        }
+    }
+
     public Task<BusinessTaskFeedbackAggregate> AggregateFeedbackAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
     {
         lock (_gate)
@@ -808,6 +868,11 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     private static bool IsSorted(BusinessTaskEntity task)
     {
         return task.Status == BusinessTaskStatus.Dropped || task.Status == BusinessTaskStatus.FeedbackPending;
+    }
+
+    private static bool IsCleanableWaveTask(BusinessTaskEntity task)
+    {
+        return task.Status != BusinessTaskStatus.Dropped && task.Status != BusinessTaskStatus.Exception;
     }
 
     private static string NormalizeWaveCode(string? waveCode)

@@ -202,7 +202,7 @@ public sealed class WaveQueryService : IWaveQueryService
     {
         var result = await QueryZonesAsync(request, cancellationToken);
         var builder = new StringBuilder();
-        builder.AppendLine("ZoneName,TotalCount,PendingCount,ProgressPercent,RecirculatedCount,ExceptionCount");
+        builder.AppendLine("区域名称,总数,待分拣数,进度百分比,回流数,异常数");
         if (result is null)
         {
             return builder.ToString();
@@ -249,7 +249,7 @@ public sealed class WaveQueryService : IWaveQueryService
     {
         var result = await QueryListAsync(request, cancellationToken);
         var builder = new StringBuilder();
-        builder.AppendLine("WaveId,Remark,PackageTotal,UnsortedCount,SplitTotal,FullTotal,SplitRatioPercent,FullRatioPercent,RecirculatedCount,ExceptionCount,CreatedAt,Status");
+        builder.AppendLine("波次号,备注,包裹总数,待分拣数,拆零总数,整件总数,拆零占比百分比,整件占比百分比,回流数,异常数,创建时间,状态");
         foreach (var item in result.Items)
         {
             builder.AppendLine(string.Join(",",
@@ -270,11 +270,16 @@ public sealed class WaveQueryService : IWaveQueryService
         return builder.ToString();
     }
 
-    public async Task<WaveCleanupQueryResult> QueryCleanupWaveAsync(string waveCode, CancellationToken cancellationToken)
+    public async Task<WaveCleanupQueryResult> QueryCleanupWaveAsync(string? waveCode, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(waveCode))
         {
-            return new WaveCleanupQueryResult();
+            return await GetCachedAsync(
+                "wave-cleanup:all",
+                _queryCacheOptions.WaveCleanupSeconds,
+                () => BuildCleanableWavesAsync(cancellationToken),
+                new WaveCleanupQueryResult(),
+                cancellationToken);
         }
 
         var normalizedWaveCode = waveCode.Trim();
@@ -345,7 +350,7 @@ public sealed class WaveQueryService : IWaveQueryService
                 TaskCode = task.TaskCode,
                 WaveCode = NormalizeOptionalText(task.WaveCode) ?? task.WaveCode ?? string.Empty,
                 WaveRemark = NormalizeOptionalText(task.WaveRemark),
-                SourceType = task.SourceType.ToString(),
+                SourceType = ChineseDisplayText.ForSourceType(task.SourceType),
                 WorkingArea = NormalizeOptionalText(task.WorkingArea),
                 Barcode = NormalizeOptionalText(task.Barcode),
                 OrderId = NormalizeOptionalText(task.OrderId),
@@ -354,7 +359,7 @@ public sealed class WaveQueryService : IWaveQueryService
                 ProductCode = NormalizeOptionalText(task.ProductCode),
                 PickLocation = NormalizeOptionalText(task.PickLocation),
                 ChuteCode = ResolveChuteCode(task),
-                Status = task.Status.ToString(),
+                Status = ChineseDisplayText.ForTaskStatus(task.Status),
                 IsRecirculated = task.IsRecirculated || _queryPolicy.IsRecirculatedByResolvedDockCode(task.ResolvedDockCode),
                 IsException = task.IsException || task.Status == BusinessTaskStatus.Exception,
                 ScannedAtLocal = task.ScannedAtLocal,
@@ -369,7 +374,7 @@ public sealed class WaveQueryService : IWaveQueryService
     {
         var result = await QueryDetailsAsync(request, cancellationToken);
         var builder = new StringBuilder();
-        builder.AppendLine("TaskCode,WaveCode,WaveRemark,SourceType,WorkingArea,Barcode,OrderId,StoreId,StoreName,ProductCode,PickLocation,ChuteCode,Status,IsRecirculated,IsException,ScannedAt,CreatedAt,UpdatedAt");
+        builder.AppendLine("任务编码,波次号,波次备注,来源类型,作业区域,条码,订单号,门店号,门店名称,商品编码,拣货位,格口,状态,是否回流,是否异常,扫描时间,创建时间,更新时间");
         foreach (var item in result.Items)
         {
             builder.AppendLine(string.Join(",",
@@ -386,8 +391,8 @@ public sealed class WaveQueryService : IWaveQueryService
                 EscapeCsvField(item.PickLocation ?? string.Empty),
                 EscapeCsvField(item.ChuteCode ?? string.Empty),
                 EscapeCsvField(item.Status),
-                item.IsRecirculated,
-                item.IsException,
+                ChineseDisplayText.YesNo(item.IsRecirculated),
+                ChineseDisplayText.YesNo(item.IsException),
                 item.ScannedAtLocal?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
                 item.CreatedTimeLocal.ToString("yyyy-MM-dd HH:mm:ss"),
                 item.UpdatedTimeLocal.ToString("yyyy-MM-dd HH:mm:ss")));
@@ -681,15 +686,15 @@ public sealed class WaveQueryService : IWaveQueryService
     {
         if (row.ExceptionCount > 0)
         {
-            return "ExceptionPending";
+            return "异常待处理";
         }
 
         if (row.UnsortedCount > 0)
         {
-            return "Sorting";
+            return "分拣中";
         }
 
-        return "Completed";
+        return "已完成";
     }
 
     private static string? NormalizeOptionalText(string? value)
@@ -720,11 +725,11 @@ public sealed class WaveQueryService : IWaveQueryService
     {
         return new Dictionary<string, ZoneAccumulator>(StringComparer.Ordinal)
         {
-            [SplitZone1Code] = new ZoneAccumulator(SplitZone1Code, "Split Zone 1"),
-            [SplitZone2Code] = new ZoneAccumulator(SplitZone2Code, "Split Zone 2"),
-            [SplitZone3Code] = new ZoneAccumulator(SplitZone3Code, "Split Zone 3"),
-            [SplitZone4Code] = new ZoneAccumulator(SplitZone4Code, "Split Zone 4"),
-            [FullCaseCode] = new ZoneAccumulator(FullCaseCode, "Full Case")
+            [SplitZone1Code] = new ZoneAccumulator(SplitZone1Code, "拆零区1"),
+            [SplitZone2Code] = new ZoneAccumulator(SplitZone2Code, "拆零区2"),
+            [SplitZone3Code] = new ZoneAccumulator(SplitZone3Code, "拆零区3"),
+            [SplitZone4Code] = new ZoneAccumulator(SplitZone4Code, "拆零区4"),
+            [FullCaseCode] = new ZoneAccumulator(FullCaseCode, "整件区")
         };
     }
 
@@ -757,6 +762,27 @@ public sealed class WaveQueryService : IWaveQueryService
         }
 
         return LogAndSkipInvalidWorkingArea(task);
+    }
+
+    private async Task<WaveCleanupQueryResult> BuildCleanableWavesAsync(CancellationToken cancellationToken)
+    {
+        var rows = await _businessTaskRepository.AggregateCleanableWavesAsync(cancellationToken);
+        return new WaveCleanupQueryResult
+        {
+            Items = rows
+                .OrderBy(row => row.WaveCode, StringComparer.Ordinal)
+                .Select(row => new WaveCleanupWaveItem
+                {
+                    WaveCode = row.WaveCode,
+                    WaveRemark = row.WaveRemark,
+                    PackageTotal = row.TotalCount,
+                    SplitTotal = row.SplitTotalCount,
+                    FullCaseTotal = row.FullCaseTotalCount,
+                    CreatedTimeLocal = row.EarliestCreatedTimeLocal,
+                    Status = ResolveWaveStatus(row)
+                })
+                .ToList()
+        };
     }
 
     private string? LogAndSkipInvalidWorkingArea(BusinessTaskWaveTaskStatsRow task)

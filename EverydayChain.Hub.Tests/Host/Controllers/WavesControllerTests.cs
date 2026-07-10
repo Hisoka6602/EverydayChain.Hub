@@ -80,7 +80,7 @@ public sealed class WavesControllerTests
                 new EverydayChain.Hub.Application.Models.WaveZoneSummary
                 {
                     ZoneCode = "SplitZone1",
-                    ZoneName = "Split Zone 1",
+                    ZoneName = "拆零区1",
                     TotalCount = 0,
                     UnsortedCount = 0,
                     SortedProgressPercent = 0M,
@@ -90,7 +90,7 @@ public sealed class WavesControllerTests
                 new EverydayChain.Hub.Application.Models.WaveZoneSummary
                 {
                     ZoneCode = "FullCase",
-                    ZoneName = "Full Case",
+                    ZoneName = "整件区",
                     TotalCount = 0,
                     UnsortedCount = 0,
                     SortedProgressPercent = 0M,
@@ -139,7 +139,7 @@ public sealed class WavesControllerTests
         Assert.Equal(2, response.Data.Items[0].UnsortedCount);
         Assert.Equal(60M, response.Data.Items[0].SplitRatioPercent);
         Assert.Equal(3, response.Data.Items[0].RecirculatedCount);
-        Assert.Equal("Sorting", response.Data.Items[0].Status);
+        Assert.Equal("分拣中", response.Data.Items[0].Status);
         Assert.NotNull(stubService.LastListRequest);
     }
 

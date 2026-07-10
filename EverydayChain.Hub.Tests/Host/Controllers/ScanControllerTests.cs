@@ -356,7 +356,7 @@ public sealed class ScanControllerTests {
         var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(badRequestResult.Value);
 
         Assert.False(response.IsSuccess);
-        Assert.Equal("扫描 barcodes 不能包含多个格口的条码。", response.Message);
+        Assert.Equal("扫描条码列表不能包含多个格口的条码。", response.Message);
         Assert.Empty(stubService.Requests);
     }
 
@@ -379,7 +379,7 @@ public sealed class ScanControllerTests {
         var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(badRequestResult.Value);
 
         Assert.False(response.IsSuccess);
-        Assert.Equal("扫描 barcodes 内不能包含无法解析格口的条码。", response.Message);
+        Assert.Equal("扫描条码列表内不能包含无法解析格口的条码。", response.Message);
         Assert.Empty(stubService.Requests);
     }
 
@@ -421,7 +421,7 @@ public sealed class ScanControllerTests {
         var response = Assert.IsType<ApiResponse<IReadOnlyList<ScanUploadResponse>>>(badRequestResult.Value);
 
         Assert.False(response.IsSuccess);
-        Assert.Equal("扫描 barcodes 不能包含多个格口的条码。", response.Message);
+        Assert.Equal("扫描条码列表不能包含多个格口的条码。", response.Message);
         Assert.Empty(stubService.Requests);
     }
 }

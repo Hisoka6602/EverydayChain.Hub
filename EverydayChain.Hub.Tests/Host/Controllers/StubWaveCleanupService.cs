@@ -33,7 +33,7 @@ internal sealed class StubWaveCleanupService : IWaveCleanupService
         IdentifiedCount = 3,
         CleanedCount = 0,
         IsDryRun = true,
-        Message = "DryRun 模式：识别到 3 个待清理任务，未执行实际变更。"
+        Message = "预演模式：识别到 3 个待清理任务，未执行实际变更。"
     };
 
     /// <summary>
