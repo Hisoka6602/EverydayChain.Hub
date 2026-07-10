@@ -4,17 +4,16 @@ using EverydayChain.Hub.Application.Queries;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Aggregates.ScanLogAggregate;
 using EverydayChain.Hub.Domain.Enums;
+using EverydayChain.Hub.Domain.Options;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace EverydayChain.Hub.Tests.Services;
 
 /// <summary>
-/// 验证箱子追踪查询服务。
+/// 验证箱号追踪查询服务。
 /// </summary>
 public sealed class BoxTrackingQueryServiceTests
 {
-    /// <summary>
-    /// 验证箱子追踪查询能够返回完整扫描轨迹行。
-    /// </summary>
     [Fact]
     public async Task QueryAsync_ShouldReturnScanTraceRows()
     {
@@ -75,9 +74,6 @@ public sealed class BoxTrackingQueryServiceTests
         Assert.Equal("Scanned", item.Status);
     }
 
-    /// <summary>
-    /// 验证箱子追踪查询能够按 chute 过滤。
-    /// </summary>
     [Fact]
     public async Task QueryAsync_ShouldFilterByChuteCode()
     {
@@ -121,9 +117,6 @@ public sealed class BoxTrackingQueryServiceTests
         Assert.Empty(result.Items);
     }
 
-    /// <summary>
-    /// 验证无任务级筛选时会命中数据库分页路径。
-    /// </summary>
     [Fact]
     public async Task QueryAsync_WithoutTaskLevelFilters_ShouldUseDatabasePagingPath()
     {
@@ -154,37 +147,126 @@ public sealed class BoxTrackingQueryServiceTests
         Assert.Equal(0, scanLogRepository.QueryRangeCallCount);
     }
 
+    [Fact]
+    public async Task QueryAsync_ShouldReusePageCacheWithinSameTimeBucket()
+    {
+        var businessTaskRepository = new InMemoryBusinessTaskRepository();
+        var scanLogRepository = new InMemoryScanLogRepository();
+        var service = new BoxTrackingQueryService(
+            scanLogRepository,
+            businessTaskRepository,
+            new MemoryCache(new MemoryCacheOptions()),
+            new QueryCacheOptions
+            {
+                Enabled = true,
+                AggregateTimeBucketSeconds = 30,
+                BoxTrackingSeconds = 10
+            });
+        var start = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local);
+        var end = start.AddHours(1);
+
+        await scanLogRepository.SaveAsync(new ScanLogEntity
+        {
+            Barcode = "BOX-CACHE-001",
+            DeviceCode = "SCN-CACHE-01",
+            IsMatched = false,
+            ScanTimeLocal = start.AddMinutes(10),
+            CreatedTimeLocal = start.AddMinutes(10)
+        }, CancellationToken.None);
+
+        _ = await service.QueryAsync(new BoxTrackingQueryRequest
+        {
+            StartTimeLocal = start.AddSeconds(5),
+            EndTimeLocal = end.AddSeconds(5),
+            BoxId = "BOX-CACHE-001",
+            PageNumber = 1,
+            PageSize = 20
+        }, CancellationToken.None);
+
+        _ = await service.QueryAsync(new BoxTrackingQueryRequest
+        {
+            StartTimeLocal = start.AddSeconds(20),
+            EndTimeLocal = end.AddSeconds(20),
+            BoxId = "BOX-CACHE-001",
+            PageNumber = 1,
+            PageSize = 20
+        }, CancellationToken.None);
+
+        Assert.Equal(1, scanLogRepository.QueryPageCallCount);
+    }
+
+    [Fact]
+    public async Task QueryAllAsync_ShouldReuseRangeCacheWithinSameTimeBucket()
+    {
+        var businessTaskRepository = new InMemoryBusinessTaskRepository();
+        var scanLogRepository = new InMemoryScanLogRepository();
+        var service = new BoxTrackingQueryService(
+            scanLogRepository,
+            businessTaskRepository,
+            new MemoryCache(new MemoryCacheOptions()),
+            new QueryCacheOptions
+            {
+                Enabled = true,
+                AggregateTimeBucketSeconds = 30,
+                BoxTrackingSeconds = 10
+            });
+        var start = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local);
+        var end = start.AddHours(1);
+
+        await scanLogRepository.SaveAsync(new ScanLogEntity
+        {
+            Barcode = "BOX-CACHE-ALL-001",
+            DeviceCode = "SCN-CACHE-ALL-01",
+            IsMatched = false,
+            ScanTimeLocal = start.AddMinutes(10),
+            CreatedTimeLocal = start.AddMinutes(10)
+        }, CancellationToken.None);
+
+        _ = await service.QueryAllAsync(new BoxTrackingQueryRequest
+        {
+            StartTimeLocal = start.AddSeconds(5),
+            EndTimeLocal = end.AddSeconds(5),
+            BoxId = "BOX-CACHE-ALL-001"
+        }, CancellationToken.None);
+
+        _ = await service.QueryAllAsync(new BoxTrackingQueryRequest
+        {
+            StartTimeLocal = start.AddSeconds(20),
+            EndTimeLocal = end.AddSeconds(20),
+            BoxId = "BOX-CACHE-ALL-001"
+        }, CancellationToken.None);
+
+        Assert.Equal(1, scanLogRepository.QueryRangeCallCount);
+    }
+
     /// <summary>
     /// 记录分页路径是否被命中的扫描日志仓储探针。
     /// </summary>
     private sealed class ProbeScanLogRepository : IScanLogRepository
     {
         /// <summary>
-        /// 存储扫描日志集合。
+        /// 存储 _logs 字段。
         /// </summary>
         private readonly List<ScanLogEntity> _logs = [];
 
         /// <summary>
-        /// 存储自增主键值。
+        /// 存储 _nextId 字段。
         /// </summary>
         private long _nextId = 1;
 
         /// <summary>
-        /// 获取分页查询调用次数。
+        /// 获取或设置 QueryPageCallCount。
         /// </summary>
         public int QueryPageCallCount { get; private set; }
 
         /// <summary>
-        /// 获取范围查询调用次数。
+        /// 获取或设置 QueryRangeCallCount。
         /// </summary>
         public int QueryRangeCallCount { get; private set; }
 
         /// <summary>
         /// 保存扫描日志。
         /// </summary>
-        /// <param name="entity">扫描日志实体。</param>
-        /// <param name="ct">取消令牌。</param>
-        /// <returns>异步任务。</returns>
         public Task SaveAsync(ScanLogEntity entity, CancellationToken ct)
         {
             entity.Id = _nextId++;
@@ -192,27 +274,14 @@ public sealed class BoxTrackingQueryServiceTests
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// 聚合识别率统计。
-        /// </summary>
-        /// <param name="startTimeLocal">开始时间。</param>
-        /// <param name="endTimeLocal">结束时间。</param>
-        /// <param name="ct">取消令牌。</param>
-        /// <returns>识别率统计结果。</returns>
         public Task<ScanLogRecognitionAggregate> AggregateRecognitionAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
         {
             return Task.FromResult(new ScanLogRecognitionAggregate());
         }
 
         /// <summary>
-        /// 执行范围查询。
+        /// 查询扫描日志范围结果。
         /// </summary>
-        /// <param name="startTimeLocal">开始时间。</param>
-        /// <param name="endTimeLocal">结束时间。</param>
-        /// <param name="barcode">条码。</param>
-        /// <param name="deviceCode">设备号。</param>
-        /// <param name="ct">取消令牌。</param>
-        /// <returns>范围查询结果。</returns>
         public Task<IReadOnlyList<ScanLogEntity>> QueryRangeAsync(
             DateTime startTimeLocal,
             DateTime endTimeLocal,
@@ -225,16 +294,8 @@ public sealed class BoxTrackingQueryServiceTests
         }
 
         /// <summary>
-        /// 执行分页查询。
+        /// 查询扫描日志分页结果。
         /// </summary>
-        /// <param name="startTimeLocal">开始时间。</param>
-        /// <param name="endTimeLocal">结束时间。</param>
-        /// <param name="barcode">条码。</param>
-        /// <param name="deviceCode">设备号。</param>
-        /// <param name="skip">跳过条数。</param>
-        /// <param name="take">获取条数。</param>
-        /// <param name="ct">取消令牌。</param>
-        /// <returns>分页查询结果。</returns>
         public Task<(int TotalCount, IReadOnlyList<ScanLogEntity> Items)> QueryPageAsync(
             DateTime startTimeLocal,
             DateTime endTimeLocal,
@@ -244,6 +305,7 @@ public sealed class BoxTrackingQueryServiceTests
             int take,
             CancellationToken ct)
         {
+            // 步骤：累计调用次数并返回当前探针仓储中的分页结果。
             QueryPageCallCount++;
             IReadOnlyList<ScanLogEntity> items = _logs.Skip(skip).Take(take).ToList();
             return Task.FromResult((_logs.Count, items));

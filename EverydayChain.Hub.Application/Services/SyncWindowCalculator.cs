@@ -41,6 +41,18 @@ public class SyncWindowCalculator(ILogger<SyncWindowCalculator> logger) : ISyncW
             windowEndLocal = windowStartLocal;
         }
 
+        logger.LogInformation(
+            "同步窗口已计算。TableCode={TableCode}, StartTimeLocal={StartTimeLocal}, CheckpointCursorLocal={CheckpointCursorLocal}, CheckpointSuccessTimeLocal={CheckpointSuccessTimeLocal}, NowLocal={NowLocal}, EffectiveNowLocal={EffectiveNowLocal}, MaxLagMinutes={MaxLagMinutes}, WindowStartLocal={WindowStartLocal}, WindowEndLocal={WindowEndLocal}",
+            definition.TableCode,
+            definition.StartTimeLocal,
+            checkpoint.LastSuccessCursorLocal,
+            checkpoint.LastSuccessTimeLocal,
+            normalizedNowLocal,
+            effectiveNowLocal,
+            definition.MaxLagMinutes,
+            windowStartLocal,
+            windowEndLocal);
+
         return new SyncWindow(windowStartLocal, windowEndLocal);
     }
 

@@ -41,6 +41,16 @@ public class BusinessTaskStatusConsumeService(
         var result = new RemoteStatusConsumeResult();
         var pageNo = 1;
         var shouldUseFixedFirstPage = profile.ShouldWriteBackRemoteStatus;
+        logger.LogInformation(
+            "业务任务状态驱动消费开始。TableCode={TableCode}, BatchId={BatchId}, FixedFirstPageMode={FixedFirstPageMode}, StatusBatchSize={StatusBatchSize}, IgnorePendingStatusValue={IgnorePendingStatusValue}, ShouldWriteBackRemoteStatus={ShouldWriteBackRemoteStatus}, WindowStartLocal={WindowStartLocal}, WindowEndLocal={WindowEndLocal}",
+            definition.TableCode,
+            batchId,
+            shouldUseFixedFirstPage,
+            profile.BatchSize,
+            profile.IgnorePendingStatusValue,
+            profile.ShouldWriteBackRemoteStatus,
+            window.WindowStartLocal,
+            window.WindowEndLocal);
         while (!ct.IsCancellationRequested)
         {
             var currentPageNo = shouldUseFixedFirstPage ? 1 : pageNo;
@@ -54,6 +64,15 @@ public class BusinessTaskStatusConsumeService(
                 ct);
             if (rows.Count == 0)
             {
+                logger.LogInformation(
+                    "业务任务状态驱动消费页读取为空。TableCode={TableCode}, BatchId={BatchId}, PageNo={PageNo}, FixedFirstPageMode={FixedFirstPageMode}, ReadCountSoFar={ReadCountSoFar}, AppendCountSoFar={AppendCountSoFar}, WriteBackCountSoFar={WriteBackCountSoFar}",
+                    definition.TableCode,
+                    batchId,
+                    currentPageNo,
+                    shouldUseFixedFirstPage,
+                    result.ReadCount,
+                    result.AppendCount,
+                    result.WriteBackCount);
                 break;
             }
 

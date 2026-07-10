@@ -62,7 +62,30 @@ public class OracleStatusDrivenSourceReader(
         var effectivePageSize = ResolvePageSize(pageSize);
         var offset = (pageNo - 1) * effectivePageSize;
         var limit = offset + effectivePageSize;
+        var whereClause = BuildWhereClause(definition, profile, hasCursorFilter);
+        var statusPredicateMode = ResolveStatusPredicateMode(profile);
+        var windowStartLocal = hasCursorFilter ? window.WindowStartLocal : (DateTime?)null;
+        var windowEndLocal = hasCursorFilter ? window.WindowEndLocal : (DateTime?)null;
         var sql = BuildReadSql(definition, profile, hasCursorFilter);
+        logger.LogInformation(
+            "Oracle 状态驱动读取计划。TableCode={TableCode}, SourceSchema={SourceSchema}, SourceTable={SourceTable}, PageNo={PageNo}, RequestedPageSize={RequestedPageSize}, EffectivePageSize={EffectivePageSize}, Offset={Offset}, Limit={Limit}, HasCursorFilter={HasCursorFilter}, WindowStartLocal={WindowStartLocal}, WindowEndLocal={WindowEndLocal}, StatusPredicateMode={StatusPredicateMode}, PendingStatusValue={PendingStatusValue}, IgnorePendingStatusValue={IgnorePendingStatusValue}, ShouldWriteBackRemoteStatus={ShouldWriteBackRemoteStatus}, OracleReadOnly={OracleReadOnly}, WhereClause={WhereClause}",
+            definition.TableCode,
+            definition.SourceSchema,
+            definition.SourceTable,
+            pageNo,
+            pageSize,
+            effectivePageSize,
+            offset,
+            limit,
+            hasCursorFilter,
+            windowStartLocal,
+            windowEndLocal,
+            statusPredicateMode,
+            profile.PendingStatusValue,
+            profile.IgnorePendingStatusValue,
+            profile.ShouldWriteBackRemoteStatus,
+            _options.ReadOnly,
+            whereClause);
         return await dangerZoneExecutor.ExecuteAsync(
             $"OracleStatusDrivenRead:{definition.TableCode}:P{pageNo}",
             /// <summary>
@@ -77,7 +100,7 @@ public class OracleStatusDrivenSourceReader(
                 command.CommandText = sql;
                 command.Parameters.Add("p_offset", OracleDbType.Int32, offset, ParameterDirection.Input);
                 command.Parameters.Add("p_limit", OracleDbType.Int32, limit, ParameterDirection.Input);
-                if (profile.PendingStatusValue is not null) {
+                if (!profile.IgnorePendingStatusValue && profile.PendingStatusValue is not null) {
                     command.Parameters.Add("p_pendingStatus", OracleDbType.Varchar2, profile.PendingStatusValue, ParameterDirection.Input);
                 }
 
@@ -113,6 +136,15 @@ public class OracleStatusDrivenSourceReader(
                     rows.Add(filtered);
                 }
 
+                logger.LogInformation(
+                    "Oracle 状态驱动读取完成。TableCode={TableCode}, SourceSchema={SourceSchema}, SourceTable={SourceTable}, PageNo={PageNo}, RowCount={RowCount}, StatusPredicateMode={StatusPredicateMode}, HasCursorFilter={HasCursorFilter}",
+                    definition.TableCode,
+                    definition.SourceSchema,
+                    definition.SourceTable,
+                    pageNo,
+                    rows.Count,
+                    statusPredicateMode,
+                    hasCursorFilter);
                 return (IReadOnlyList<IReadOnlyDictionary<string, object?>>)rows;
             },
             ct);
@@ -122,13 +154,12 @@ public class OracleStatusDrivenSourceReader(
     /// 执行 BuildReadSql 方法。
     /// </summary>
     private static string BuildReadSql(SyncTableDefinition definition, RemoteStatusConsumeProfile profile, bool hasCursorFilter) {
-        // 步骤：执行 BuildReadSql 方法的核心处理流程。
-        var statusPredicate = profile.PendingStatusValue is null
-            ? $"{profile.StatusColumnName} IS NULL"
-            : $"{profile.StatusColumnName} = :p_pendingStatus";
-        var cursorPredicate = hasCursorFilter
-            ? $" AND {definition.CursorColumn} >= :p_windowStart AND {definition.CursorColumn} <= :p_windowEnd"
-            : string.Empty;
+        var whereClause = BuildWhereClause(definition, profile, hasCursorFilter);
+        return BuildReadSql(definition, whereClause);
+    }
+
+    private static string BuildReadSql(SyncTableDefinition definition, string whereClause)
+    {
         return $"""
 SELECT *
 FROM (
@@ -137,11 +168,46 @@ FROM (
         ROWID AS "__RowId",
         ROW_NUMBER() OVER (ORDER BY ROWID) AS RN
     FROM {definition.SourceSchema}.{definition.SourceTable} t
-    WHERE {statusPredicate}{cursorPredicate}
+    WHERE {whereClause}
 )
 WHERE RN > :p_offset AND RN <= :p_limit
 ORDER BY RN
 """;
+    }
+
+    private static string BuildWhereClause(SyncTableDefinition definition, RemoteStatusConsumeProfile profile, bool hasCursorFilter)
+    {
+        // 步骤：执行 BuildReadSql 方法的核心处理流程。
+        var statusPredicate = profile.IgnorePendingStatusValue
+            ? string.Empty
+            : profile.PendingStatusValue is null
+                ? $"{profile.StatusColumnName} IS NULL"
+                : $"{profile.StatusColumnName} = :p_pendingStatus";
+        var cursorPredicate = hasCursorFilter
+            ? $"{definition.CursorColumn} >= :p_windowStart AND {definition.CursorColumn} <= :p_windowEnd"
+            : string.Empty;
+        var predicates = new List<string>(2);
+        if (!string.IsNullOrWhiteSpace(statusPredicate))
+        {
+            predicates.Add(statusPredicate);
+        }
+
+        if (!string.IsNullOrWhiteSpace(cursorPredicate))
+        {
+            predicates.Add(cursorPredicate);
+        }
+
+        return predicates.Count == 0 ? "1 = 1" : string.Join(" AND ", predicates);
+    }
+
+    private static string ResolveStatusPredicateMode(RemoteStatusConsumeProfile profile)
+    {
+        if (profile.IgnorePendingStatusValue)
+        {
+            return "Ignore";
+        }
+
+        return profile.PendingStatusValue is null ? "IsNull" : "Equals";
     }
 
     /// <summary>

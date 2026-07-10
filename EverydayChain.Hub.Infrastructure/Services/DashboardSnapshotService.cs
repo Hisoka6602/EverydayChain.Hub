@@ -3,6 +3,7 @@ using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Domain.Aggregates.DashboardSnapshotAggregate;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.SharedKernel.Utilities;
 using EverydayChain.Hub.Infrastructure.Persistence;
 using EverydayChain.Hub.Infrastructure.Persistence.Sharding;
 using Microsoft.EntityFrameworkCore;
@@ -32,6 +33,10 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
     /// 存储 EmptyWaveCode 字段。
     /// </summary>
     private const string EmptyWaveCode = "未分波次";
+    /// <summary>
+    /// 存储回流码头阈值。
+    /// </summary>
+    private const int RecirculationDockThreshold = 7;
 
     /// <summary>
     /// 存储 _contextFactory 字段。
@@ -64,7 +69,7 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
     /// <summary>
     /// 存储 _ownerId 字段。
     /// </summary>
-    private readonly string _ownerId = $"{Environment.MachineName}:{Guid.NewGuid():N}";
+    private readonly string _ownerId = RuntimeLeaseOwnerId.Create();
 
     /// <summary>
     /// 执行 DashboardSnapshotService 方法。
@@ -314,10 +319,7 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
                         Status = group.Key.Status,
                         TotalCount = group.Count(),
                         ScannedCount = group.Count(x => x.ScannedAtLocal != null),
-                        RecirculatedCount = group.Count(x =>
-                            x.ResolvedDockCode != string.Empty
-                            && !EF.Functions.Like(x.ResolvedDockCode, "%[^0-9]%")
-                            && Convert.ToInt32(x.ResolvedDockCode) > 7),
+                        RecirculatedCount = 0,
                         ExceptionCount = group.Count(x => x.IsException || x.Status == BusinessTaskStatus.Exception),
                         RequiredFeedbackCount = group.Count(x => x.FeedbackStatus != BusinessTaskFeedbackStatus.NotRequired),
                         CompletedFeedbackCount = group.Count(x => x.FeedbackStatus == BusinessTaskFeedbackStatus.Completed),
@@ -339,7 +341,7 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
                     Status = row.Status,
                     TotalCount = row.TotalCount,
                     ScannedCount = row.ScannedCount,
-                    RecirculatedCount = row.RecirculatedCount,
+                    RecirculatedCount = IsRecirculatedResolvedDockCode(row.ResolvedDockCode) ? row.TotalCount : 0,
                     ExceptionCount = row.ExceptionCount,
                     RequiredFeedbackCount = row.RequiredFeedbackCount,
                     CompletedFeedbackCount = row.CompletedFeedbackCount,
@@ -411,32 +413,100 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
             {
                 using var scope = TableSuffixScope.Use(suffix);
                 await using var db = await _contextFactory.CreateDbContextAsync(ct);
-                var shardRows = await db.BusinessTasks
+                var candidateRows = db.BusinessTasks
                     .AsNoTracking()
                     .Where(x => x.CreatedTimeLocal >= range.StartLocal && x.CreatedTimeLocal < range.EndLocal)
                     .Where(x => x.ScannedAtLocal != null && x.NormalizedWaveCode != null)
-                    .GroupBy(x => EF.Functions.DateDiffMinute(range.StartLocal, x.CreatedTimeLocal))
-                    .Select(group => group
-                        .OrderByDescending(x => x.ScannedAtLocal)
-                        .ThenByDescending(x => x.UpdatedTimeLocal)
-                        .ThenByDescending(x => x.Id)
-                        .Select(x => new CurrentWaveSnapshotRow
+                    .Select(x => new
+                    {
+                        MinuteOffset = EF.Functions.DateDiffMinute(range.StartLocal, x.CreatedTimeLocal),
+                        x.Id,
+                        ScannedAtLocal = x.ScannedAtLocal!.Value,
+                        x.UpdatedTimeLocal,
+                        WaveCode = x.NormalizedWaveCode!,
+                        x.WaveRemark,
+                        Barcode = x.Barcode ?? string.Empty
+                    });
+                var latestScannedRows = candidateRows
+                    .GroupBy(x => x.MinuteOffset)
+                    .Select(group => new
+                    {
+                        MinuteOffset = group.Key,
+                        ScannedAtLocal = group.Max(x => x.ScannedAtLocal)
+                    });
+                var latestUpdatedRows = candidateRows
+                    .Join(
+                        latestScannedRows,
+                        candidate => new { candidate.MinuteOffset, candidate.ScannedAtLocal },
+                        latest => new { latest.MinuteOffset, latest.ScannedAtLocal },
+                        (candidate, latest) => candidate)
+                    .GroupBy(x => new { x.MinuteOffset, x.ScannedAtLocal })
+                    .Select(group => new
+                    {
+                        group.Key.MinuteOffset,
+                        group.Key.ScannedAtLocal,
+                        UpdatedTimeLocal = group.Max(x => x.UpdatedTimeLocal)
+                    });
+                var latestIdRows = candidateRows
+                    .Join(
+                        latestUpdatedRows,
+                        candidate => new
                         {
-                            MinuteOffset = group.Key,
-                            ScannedAtLocal = x.ScannedAtLocal!.Value,
-                            WaveCode = x.NormalizedWaveCode!,
-                            WaveRemark = x.WaveRemark,
-                            Barcode = x.Barcode ?? string.Empty
+                            candidate.MinuteOffset,
+                            candidate.ScannedAtLocal,
+                            candidate.UpdatedTimeLocal
+                        },
+                        latest => new
+                        {
+                            latest.MinuteOffset,
+                            latest.ScannedAtLocal,
+                            latest.UpdatedTimeLocal
+                        },
+                        (candidate, latest) => candidate)
+                    .GroupBy(x => new
+                    {
+                        x.MinuteOffset,
+                        x.ScannedAtLocal,
+                        x.UpdatedTimeLocal
+                    })
+                    .Select(group => new
+                    {
+                        group.Key.MinuteOffset,
+                        group.Key.ScannedAtLocal,
+                        group.Key.UpdatedTimeLocal,
+                        Id = group.Max(x => x.Id)
+                    });
+                var shardRows = await candidateRows
+                    .Join(
+                        latestIdRows,
+                        candidate => new
+                        {
+                            candidate.MinuteOffset,
+                            candidate.ScannedAtLocal,
+                            candidate.UpdatedTimeLocal,
+                            candidate.Id
+                        },
+                        latest => new
+                        {
+                            latest.MinuteOffset,
+                            latest.ScannedAtLocal,
+                            latest.UpdatedTimeLocal,
+                            latest.Id
+                        },
+                        (candidate, latest) => new CurrentWaveSnapshotRow
+                        {
+                            MinuteOffset = candidate.MinuteOffset,
+                            ScannedAtLocal = candidate.ScannedAtLocal,
+                            WaveCode = candidate.WaveCode,
+                            WaveRemark = candidate.WaveRemark,
+                            Barcode = candidate.Barcode
                         })
-                        .FirstOrDefault())
-                    .Where(x => x != null)
                     .ToListAsync(ct);
 
                 rows.AddRange(shardRows
-                    .Where(row => row is not null)
                     .Select(row => new DashboardCurrentWaveSnapshotEntity
                     {
-                        BucketStartLocal = range.StartLocal.AddMinutes(row!.MinuteOffset),
+                        BucketStartLocal = range.StartLocal.AddMinutes(row.MinuteOffset),
                         ScannedAtLocal = row.ScannedAtLocal,
                         WaveCode = row.WaveCode,
                         WaveRemark = NormalizeOptionalText(row.WaveRemark),
@@ -459,11 +529,112 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
         DateTime refreshTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：执行 NormalizeOptionalText 方法的核心处理流程。
-        using var scope = TableSuffixScope.Use(string.Empty);
-        await using var db = await _contextFactory.CreateDbContextAsync(ct);
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await ExecuteSnapshotPersistenceAsync(
+            db => PersistTaskSnapshotRowsAsync(
+                db,
+                dirtyBuckets,
+                rows,
+                coverageStartLocal,
+                coverageEndLocal,
+                refreshTimeLocal,
+                ct),
+            ct);
+    }
 
+    /// <summary>
+    /// 执行 PersistScanSnapshotsAsync 方法。
+    /// </summary>
+    private async Task PersistScanSnapshotsAsync(
+        HashSet<DateTime> dirtyBuckets,
+        IReadOnlyList<DashboardScanSnapshotEntity> rows,
+        DateTime coverageStartLocal,
+        DateTime coverageEndLocal,
+        DateTime refreshTimeLocal,
+        CancellationToken ct)
+    {
+        await ExecuteSnapshotPersistenceAsync(
+            db => PersistScanSnapshotRowsAsync(
+                db,
+                dirtyBuckets,
+                rows,
+                coverageStartLocal,
+                coverageEndLocal,
+                refreshTimeLocal,
+                ct),
+            ct);
+    }
+
+    /// <summary>
+    /// 持久化当前波次分钟快照。
+    /// </summary>
+    /// <param name="dirtyBuckets">脏桶集合。</param>
+    /// <param name="rows">当前波次快照行集合。</param>
+    /// <param name="coverageStartLocal">覆盖开始时间。</param>
+    /// <param name="coverageEndLocal">覆盖结束时间。</param>
+    /// <param name="refreshTimeLocal">刷新时间。</param>
+    /// <param name="ct">取消令牌。</param>
+    private async Task PersistCurrentWaveSnapshotsAsync(
+        HashSet<DateTime> dirtyBuckets,
+        IReadOnlyList<DashboardCurrentWaveSnapshotEntity> rows,
+        DateTime coverageStartLocal,
+        DateTime coverageEndLocal,
+        DateTime refreshTimeLocal,
+        CancellationToken ct)
+    {
+        await ExecuteSnapshotPersistenceAsync(
+            db => PersistCurrentWaveSnapshotRowsAsync(
+                db,
+                dirtyBuckets,
+                rows,
+                coverageStartLocal,
+                coverageEndLocal,
+                refreshTimeLocal,
+                ct),
+            ct);
+    }
+
+    /// <summary>
+    /// 在可重试执行策略中持久化快照数据。
+    /// </summary>
+    /// <param name="action">单次持久化操作。</param>
+    /// <param name="ct">取消令牌。</param>
+    private async Task ExecuteSnapshotPersistenceAsync(
+        Func<HubDbContext, Task> action,
+        CancellationToken ct)
+    {
+        // 步骤：使用执行策略包裹显式事务，避免与 SQL Server 重试策略冲突。
+        using var scope = TableSuffixScope.Use(string.Empty);
+        await using var strategyContext = await _contextFactory.CreateDbContextAsync(ct);
+        var executionStrategy = strategyContext.Database.CreateExecutionStrategy();
+        await executionStrategy.ExecuteAsync(async () =>
+        {
+            await using var db = await _contextFactory.CreateDbContextAsync(ct);
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            await action(db);
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        });
+    }
+
+    /// <summary>
+    /// 将业务任务分钟快照写入数据库。
+    /// </summary>
+    /// <param name="db">数据库上下文。</param>
+    /// <param name="dirtyBuckets">脏桶集合。</param>
+    /// <param name="rows">待写入快照行。</param>
+    /// <param name="coverageStartLocal">覆盖开始时间。</param>
+    /// <param name="coverageEndLocal">覆盖结束时间。</param>
+    /// <param name="refreshTimeLocal">刷新时间。</param>
+    /// <param name="ct">取消令牌。</param>
+    private static async Task PersistTaskSnapshotRowsAsync(
+        HubDbContext db,
+        HashSet<DateTime> dirtyBuckets,
+        IReadOnlyList<DashboardTaskSnapshotEntity> rows,
+        DateTime coverageStartLocal,
+        DateTime coverageEndLocal,
+        DateTime refreshTimeLocal,
+        CancellationToken ct)
+    {
         await db.DashboardTaskSnapshots
             .Where(x => x.BucketStartLocal < coverageStartLocal || x.BucketStartLocal >= coverageEndLocal)
             .ExecuteDeleteAsync(ct);
@@ -487,15 +658,20 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
             coverageEndLocal,
             refreshTimeLocal,
             ct);
-
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
     }
 
     /// <summary>
-    /// 执行 PersistScanSnapshotsAsync 方法。
+    /// 将扫描分钟快照写入数据库。
     /// </summary>
-    private async Task PersistScanSnapshotsAsync(
+    /// <param name="db">数据库上下文。</param>
+    /// <param name="dirtyBuckets">脏桶集合。</param>
+    /// <param name="rows">待写入快照行。</param>
+    /// <param name="coverageStartLocal">覆盖开始时间。</param>
+    /// <param name="coverageEndLocal">覆盖结束时间。</param>
+    /// <param name="refreshTimeLocal">刷新时间。</param>
+    /// <param name="ct">取消令牌。</param>
+    private static async Task PersistScanSnapshotRowsAsync(
+        HubDbContext db,
         HashSet<DateTime> dirtyBuckets,
         IReadOnlyList<DashboardScanSnapshotEntity> rows,
         DateTime coverageStartLocal,
@@ -503,11 +679,6 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
         DateTime refreshTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：执行 AddRange 方法的核心处理流程。
-        using var scope = TableSuffixScope.Use(string.Empty);
-        await using var db = await _contextFactory.CreateDbContextAsync(ct);
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-
         await db.DashboardScanSnapshots
             .Where(x => x.BucketStartLocal < coverageStartLocal || x.BucketStartLocal >= coverageEndLocal)
             .ExecuteDeleteAsync(ct);
@@ -531,21 +702,20 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
             coverageEndLocal,
             refreshTimeLocal,
             ct);
-
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
     }
 
     /// <summary>
-    /// 持久化当前波次分钟快照。
+    /// 将当前波次分钟快照写入数据库。
     /// </summary>
+    /// <param name="db">数据库上下文。</param>
     /// <param name="dirtyBuckets">脏桶集合。</param>
-    /// <param name="rows">当前波次快照行集合。</param>
+    /// <param name="rows">待写入快照行。</param>
     /// <param name="coverageStartLocal">覆盖开始时间。</param>
     /// <param name="coverageEndLocal">覆盖结束时间。</param>
     /// <param name="refreshTimeLocal">刷新时间。</param>
     /// <param name="ct">取消令牌。</param>
-    private async Task PersistCurrentWaveSnapshotsAsync(
+    private static async Task PersistCurrentWaveSnapshotRowsAsync(
+        HubDbContext db,
         HashSet<DateTime> dirtyBuckets,
         IReadOnlyList<DashboardCurrentWaveSnapshotEntity> rows,
         DateTime coverageStartLocal,
@@ -553,11 +723,6 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
         DateTime refreshTimeLocal,
         CancellationToken ct)
     {
-        // 步骤：执行 AddRange 方法的核心处理流程。
-        using var scope = TableSuffixScope.Use(string.Empty);
-        await using var db = await _contextFactory.CreateDbContextAsync(ct);
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-
         await db.DashboardCurrentWaveSnapshots
             .Where(x => x.BucketStartLocal < coverageStartLocal || x.BucketStartLocal >= coverageEndLocal)
             .ExecuteDeleteAsync(ct);
@@ -581,9 +746,6 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
             coverageEndLocal,
             refreshTimeLocal,
             ct);
-
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
     }
 
     /// <summary>
@@ -741,6 +903,22 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
     private static string? NormalizeOptionalText(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    /// <summary>
+    /// 判断已解析码头字符串是否符合回流码头规则。
+    /// </summary>
+    /// <param name="resolvedDockCode">已解析码头字符串。</param>
+    /// <returns>符合回流规则时返回真。</returns>
+    private static bool IsRecirculatedResolvedDockCode(string? resolvedDockCode)
+    {
+        if (string.IsNullOrWhiteSpace(resolvedDockCode))
+        {
+            return false;
+        }
+
+        return int.TryParse(resolvedDockCode.Trim(), out var dockNumber)
+            && dockNumber > RecirculationDockThreshold;
     }
 
     /// <summary>

@@ -1,7 +1,10 @@
-﻿using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Queries;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
+using EverydayChain.Hub.Domain.Options;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EverydayChain.Hub.Tests.Services;
 
@@ -333,5 +336,140 @@ public sealed class BusinessTaskReadServiceTests
         Assert.Equal(1, result.TotalCount);
         Assert.Single(result.Items);
     }
-}
 
+    [Fact]
+    public async Task QueryTasksAsync_ShouldReuseCachedPageResult_ForRepeatedSameRequest()
+    {
+        var repository = new InMemoryBusinessTaskRepository();
+        var service = new BusinessTaskReadService(
+            repository,
+            NullLogger<BusinessTaskReadService>.Instance,
+            new MemoryCache(new MemoryCacheOptions()),
+            new QueryCacheOptions
+            {
+                Enabled = true,
+                BusinessTaskQuerySeconds = 10
+            });
+        var start = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 0, 0, 0), DateTimeKind.Local);
+        var end = start.AddDays(1);
+
+        await repository.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "CACHE-1",
+            SourceTableCode = "SRC",
+            SourceType = BusinessTaskSourceType.Split,
+            BusinessKey = "CACHE-1",
+            Barcode = "BC-CACHE-1",
+            TargetChuteCode = "7",
+            Status = BusinessTaskStatus.Created,
+            CreatedTimeLocal = start.AddHours(1),
+            UpdatedTimeLocal = start.AddHours(1)
+        }, CancellationToken.None);
+
+        var request = new BusinessTaskQueryRequest
+        {
+            StartTimeLocal = start,
+            EndTimeLocal = end,
+            PageNumber = 1,
+            PageSize = 10
+        };
+
+        _ = await service.QueryTasksAsync(request, CancellationToken.None);
+        _ = await service.QueryTasksAsync(request, CancellationToken.None);
+
+        Assert.Equal(1, repository.QueryPageWithTotalCountCallCount);
+    }
+
+    [Fact]
+    public async Task QueryTasksAsync_ShouldReuseCachedPageResult_WithinSameTimeBucket()
+    {
+        var repository = new InMemoryBusinessTaskRepository();
+        var service = new BusinessTaskReadService(
+            repository,
+            NullLogger<BusinessTaskReadService>.Instance,
+            new MemoryCache(new MemoryCacheOptions()),
+            new QueryCacheOptions
+            {
+                Enabled = true,
+                AggregateTimeBucketSeconds = 30,
+                BusinessTaskQuerySeconds = 10
+            });
+        var start = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 0, 0, 0), DateTimeKind.Local);
+        var end = start.AddDays(1);
+
+        await repository.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "CACHE-BUCKET-1",
+            SourceTableCode = "SRC",
+            SourceType = BusinessTaskSourceType.Split,
+            BusinessKey = "CACHE-BUCKET-1",
+            Barcode = "BC-CACHE-BUCKET-1",
+            TargetChuteCode = "7",
+            Status = BusinessTaskStatus.Created,
+            CreatedTimeLocal = start.AddHours(1),
+            UpdatedTimeLocal = start.AddHours(1)
+        }, CancellationToken.None);
+
+        _ = await service.QueryTasksAsync(new BusinessTaskQueryRequest
+        {
+            StartTimeLocal = start.AddSeconds(5),
+            EndTimeLocal = end.AddSeconds(5),
+            PageNumber = 1,
+            PageSize = 10
+        }, CancellationToken.None);
+
+        _ = await service.QueryTasksAsync(new BusinessTaskQueryRequest
+        {
+            StartTimeLocal = start.AddSeconds(20),
+            EndTimeLocal = end.AddSeconds(20),
+            PageNumber = 1,
+            PageSize = 10
+        }, CancellationToken.None);
+
+        Assert.Equal(1, repository.QueryPageWithTotalCountCallCount);
+    }
+
+    [Fact]
+    public async Task QueryTasksAsync_ShouldBypassCache_ForCursorPaging()
+    {
+        var repository = new InMemoryBusinessTaskRepository();
+        var service = new BusinessTaskReadService(
+            repository,
+            NullLogger<BusinessTaskReadService>.Instance,
+            new MemoryCache(new MemoryCacheOptions()),
+            new QueryCacheOptions
+            {
+                Enabled = true,
+                BusinessTaskQuerySeconds = 10
+            });
+        var start = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 0, 0, 0), DateTimeKind.Local);
+        var end = start.AddDays(1);
+
+        await repository.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "CURSOR-1",
+            SourceTableCode = "SRC",
+            SourceType = BusinessTaskSourceType.Split,
+            BusinessKey = "CURSOR-1",
+            Barcode = "BC-CURSOR-1",
+            TargetChuteCode = "7",
+            Status = BusinessTaskStatus.Created,
+            CreatedTimeLocal = start.AddHours(1),
+            UpdatedTimeLocal = start.AddHours(1)
+        }, CancellationToken.None);
+
+        var request = new BusinessTaskQueryRequest
+        {
+            StartTimeLocal = start,
+            EndTimeLocal = end,
+            PageSize = 10,
+            LastCreatedTimeLocal = end,
+            LastId = long.MaxValue
+        };
+
+        _ = await service.QueryTasksAsync(request, CancellationToken.None);
+        _ = await service.QueryTasksAsync(request, CancellationToken.None);
+
+        Assert.Equal(2, repository.QueryByCursorConditionsCallCount);
+    }
+}

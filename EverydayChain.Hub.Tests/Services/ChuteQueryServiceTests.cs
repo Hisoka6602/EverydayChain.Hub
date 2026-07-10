@@ -1,7 +1,9 @@
-﻿using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Services;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
+using EverydayChain.Hub.Domain.Options;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace EverydayChain.Hub.Tests.Services;
 
@@ -182,5 +184,43 @@ public sealed class ChuteQueryServiceTests
         Assert.Equal("TASK-006", result.TaskCode);
         Assert.Equal("6", result.ChuteCode);
     }
-}
 
+    [Fact]
+    public async Task ExecuteAsync_ShouldReuseResolvedResultCache()
+    {
+        var repository = new InMemoryBusinessTaskRepository();
+        var service = new ChuteQueryService(
+            repository,
+            new BarcodeParser(),
+            new MemoryCache(new MemoryCacheOptions()),
+            new QueryCacheOptions
+            {
+                Enabled = true,
+                ChuteResolveSeconds = 10
+            });
+        var now = new DateTime(2026, 4, 18, 10, 0, 0, DateTimeKind.Local);
+
+        await repository.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "TASK-CACHE-001",
+            SourceTableCode = "WMS",
+            BusinessKey = "K-CACHE-1",
+            Barcode = "021103013145",
+            Status = BusinessTaskStatus.Scanned,
+            CreatedTimeLocal = now,
+            UpdatedTimeLocal = now
+        }, CancellationToken.None);
+
+        _ = await service.ExecuteAsync(new ChuteResolveApplicationRequest
+        {
+            Barcode = "021103013145"
+        }, CancellationToken.None);
+
+        _ = await service.ExecuteAsync(new ChuteResolveApplicationRequest
+        {
+            Barcode = "021103013145"
+        }, CancellationToken.None);
+
+        Assert.Equal(1, repository.FindByBarcodeCallCount);
+    }
+}

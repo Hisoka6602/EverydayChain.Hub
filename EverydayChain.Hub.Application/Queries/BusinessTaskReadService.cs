@@ -1,8 +1,11 @@
-﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Application.Utilities;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
+using EverydayChain.Hub.Domain.Options;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics;
@@ -15,6 +18,15 @@ namespace EverydayChain.Hub.Application.Queries;
 public sealed class BusinessTaskReadService : IBusinessTaskReadService
 {
     /// <summary>
+    /// 存储 CacheKeyDateTimeFormat 字段。
+    /// </summary>
+    private const string CacheKeyDateTimeFormat = "yyyyMMddHHmmssfffffff";
+    /// <summary>
+    /// 存储 NullCacheValue 字段。
+    /// </summary>
+    private const string NullCacheValue = "_";
+
+    /// <summary>
     /// 存储 _businessTaskRepository 字段。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
@@ -25,6 +37,14 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
     /// 存储 _logger 字段。
     /// </summary>
     private readonly ILogger<BusinessTaskReadService> _logger;
+    /// <summary>
+    /// 存储 _memoryCache 字段。
+    /// </summary>
+    private readonly IMemoryCache _memoryCache;
+    /// <summary>
+    /// 存储 _queryCacheOptions 字段。
+    /// </summary>
+    private readonly QueryCacheOptions _queryCacheOptions;
 
     /// <summary>
     /// 存储 LargeSkipWarningThreshold 字段。
@@ -32,14 +52,33 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
     private const int LargeSkipWarningThreshold = 10_000;
 
     public BusinessTaskReadService(IBusinessTaskRepository businessTaskRepository)
-        : this(businessTaskRepository, NullLogger<BusinessTaskReadService>.Instance)
+        : this(
+            businessTaskRepository,
+            NullLogger<BusinessTaskReadService>.Instance,
+            new MemoryCache(new MemoryCacheOptions()),
+            new QueryCacheOptions())
     {
     }
 
     public BusinessTaskReadService(IBusinessTaskRepository businessTaskRepository, ILogger<BusinessTaskReadService> logger)
+        : this(
+            businessTaskRepository,
+            logger,
+            new MemoryCache(new MemoryCacheOptions()),
+            new QueryCacheOptions())
+    {
+    }
+
+    public BusinessTaskReadService(
+        IBusinessTaskRepository businessTaskRepository,
+        ILogger<BusinessTaskReadService> logger,
+        IMemoryCache memoryCache,
+        QueryCacheOptions queryCacheOptions)
     {
         _businessTaskRepository = businessTaskRepository;
         _logger = logger;
+        _memoryCache = memoryCache;
+        _queryCacheOptions = queryCacheOptions;
     }
 
     public Task<BusinessTaskQueryResult> QueryTasksAsync(BusinessTaskQueryRequest request, CancellationToken cancellationToken)
@@ -116,6 +155,36 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
         }
 
         var skip = (pageNumber - 1) * pageSize;
+        if (_queryCacheOptions.Enabled)
+        {
+            var cacheKey = BuildPageCacheKey(
+                onlyRecirculation ? "recirculations" : onlyException ? "exceptions" : "tasks",
+                filter,
+                pageNumber,
+                pageSize);
+            var ttlSeconds = ResolvePageCacheSeconds(onlyException, onlyRecirculation);
+            var cached = await MemoryCacheSingleFlight.GetOrCreateAsync(
+                _memoryCache,
+                cacheKey,
+                TimeSpan.FromSeconds(Math.Clamp(ttlSeconds, 1, 60)),
+                _ => ExecutePageNumberQueryAsync(filter, pageNumber, pageSize, skip, CancellationToken.None),
+                cancellationToken);
+            if (cached is not null)
+            {
+                return cached;
+            }
+        }
+
+        return await ExecutePageNumberQueryAsync(filter, pageNumber, pageSize, skip, cancellationToken);
+    }
+
+    private async Task<BusinessTaskQueryResult> ExecutePageNumberQueryAsync(
+        BusinessTaskSearchFilter filter,
+        int pageNumber,
+        int pageSize,
+        int skip,
+        CancellationToken cancellationToken)
+    {
         var stopwatch = Stopwatch.StartNew();
         var pageResult = await _businessTaskRepository.QueryPageWithTotalCountByConditionsAsync(filter, skip, pageSize, cancellationToken);
         stopwatch.Stop();
@@ -139,6 +208,49 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
             PaginationMode = "PageNumber",
             Items = items
         };
+    }
+
+    private string BuildPageCacheKey(
+        string queryKind,
+        BusinessTaskSearchFilter filter,
+        int pageNumber,
+        int pageSize)
+    {
+        var normalizedStartTime = QueryCacheTimeBucket.Normalize(filter.StartTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var normalizedEndTime = QueryCacheTimeBucket.Normalize(filter.EndTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        return string.Join(':',
+            "business-task",
+            queryKind,
+            normalizedStartTime.ToString(CacheKeyDateTimeFormat),
+            normalizedEndTime.ToString(CacheKeyDateTimeFormat),
+            NormalizeCacheSegment(filter.WaveCode),
+            NormalizeCacheSegment(filter.Barcode),
+            NormalizeCacheSegment(filter.DockCode),
+            NormalizeCacheSegment(filter.ChuteCode),
+            pageNumber,
+            pageSize);
+    }
+
+    private int ResolvePageCacheSeconds(bool onlyException, bool onlyRecirculation)
+    {
+        if (onlyRecirculation)
+        {
+            return _queryCacheOptions.BusinessTaskRecirculationSeconds;
+        }
+
+        if (onlyException)
+        {
+            return _queryCacheOptions.BusinessTaskExceptionSeconds;
+        }
+
+        return _queryCacheOptions.BusinessTaskQuerySeconds;
+    }
+
+    private static string NormalizeCacheSegment(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? NullCacheValue
+            : value.Trim();
     }
 
     private static string? NormalizeOptionalValue(string? value)
@@ -169,4 +281,3 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
         };
     }
 }
-

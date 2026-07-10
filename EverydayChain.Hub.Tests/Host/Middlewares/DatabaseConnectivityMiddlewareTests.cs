@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EverydayChain.Hub.Tests.Host.Middlewares;
 
 /// <summary>
-/// 定义 DatabaseConnectivityMiddlewareTests 类型。
+/// 数据库连通性中间件测试。
 /// </summary>
 public sealed class DatabaseConnectivityMiddlewareTests
 {
@@ -17,7 +17,7 @@ public sealed class DatabaseConnectivityMiddlewareTests
     {
         var databaseConnectivityService = new StubDatabaseConnectivityService
         {
-            Snapshot = CreateLocalSqlUnavailableSnapshot()
+            LocalSqlServerState = CreateUnavailableLocalSqlServerState()
         };
         var nextCalled = false;
         var middleware = new DatabaseConnectivityMiddleware(
@@ -37,6 +37,8 @@ public sealed class DatabaseConnectivityMiddlewareTests
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, context.Response.StatusCode);
         Assert.Contains("数据库连接不可用", responseBody, StringComparison.Ordinal);
         Assert.Contains("本地 MSSQL 无法连接", responseBody, StringComparison.Ordinal);
+        Assert.Equal(1, databaseConnectivityService.GetLocalSqlServerStateCount);
+        Assert.Equal(0, databaseConnectivityService.GetSnapshotCount);
     }
 
     [Fact]
@@ -44,6 +46,7 @@ public sealed class DatabaseConnectivityMiddlewareTests
     {
         var databaseConnectivityService = new StubDatabaseConnectivityService
         {
+            LocalSqlServerState = CreateAvailableLocalSqlServerState(),
             Snapshot = CreateOracleUnavailableSnapshot()
         };
         var nextCalled = false;
@@ -62,6 +65,8 @@ public sealed class DatabaseConnectivityMiddlewareTests
 
         Assert.True(nextCalled);
         Assert.Equal(StatusCodes.Status204NoContent, context.Response.StatusCode);
+        Assert.Equal(1, databaseConnectivityService.GetLocalSqlServerStateCount);
+        Assert.Equal(0, databaseConnectivityService.GetSnapshotCount);
     }
 
     [Fact]
@@ -69,6 +74,7 @@ public sealed class DatabaseConnectivityMiddlewareTests
     {
         var databaseConnectivityService = new StubDatabaseConnectivityService
         {
+            LocalSqlServerState = CreateAvailableLocalSqlServerState(),
             Snapshot = CreateAvailableSnapshot(),
             RefreshedSnapshot = CreateOracleUnavailableSnapshot(),
             TreatAllExceptionsAsConnectivityException = true
@@ -84,6 +90,8 @@ public sealed class DatabaseConnectivityMiddlewareTests
 
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, context.Response.StatusCode);
         Assert.Contains("远端 Oracle 无法连接", responseBody, StringComparison.Ordinal);
+        Assert.Equal(1, databaseConnectivityService.GetLocalSqlServerStateCount);
+        Assert.Equal(1, databaseConnectivityService.RefreshSnapshotCount);
     }
 
     private static DefaultHttpContext CreateContext(string path)
@@ -107,32 +115,7 @@ public sealed class DatabaseConnectivityMiddlewareTests
         return new DatabaseConnectivitySnapshot
         {
             CheckedAtLocal = DateTime.Now,
-            LocalSqlServer = new DatabaseEndpointConnectivityState
-            {
-                DatabaseName = "本地 MSSQL",
-                IsAvailable = true,
-                Description = "本地 MSSQL 连接正常"
-            },
-            Oracle = new DatabaseEndpointConnectivityState
-            {
-                DatabaseName = "远端 Oracle",
-                IsAvailable = true,
-                Description = "远端 Oracle 连接正常"
-            }
-        };
-    }
-
-    private static DatabaseConnectivitySnapshot CreateLocalSqlUnavailableSnapshot()
-    {
-        return new DatabaseConnectivitySnapshot
-        {
-            CheckedAtLocal = DateTime.Now,
-            LocalSqlServer = new DatabaseEndpointConnectivityState
-            {
-                DatabaseName = "本地 MSSQL",
-                IsAvailable = false,
-                Description = "本地 MSSQL 无法连接（连接探测超时）"
-            },
+            LocalSqlServer = CreateAvailableLocalSqlServerState(),
             Oracle = new DatabaseEndpointConnectivityState
             {
                 DatabaseName = "远端 Oracle",
@@ -147,12 +130,7 @@ public sealed class DatabaseConnectivityMiddlewareTests
         return new DatabaseConnectivitySnapshot
         {
             CheckedAtLocal = DateTime.Now,
-            LocalSqlServer = new DatabaseEndpointConnectivityState
-            {
-                DatabaseName = "本地 MSSQL",
-                IsAvailable = true,
-                Description = "本地 MSSQL 连接正常"
-            },
+            LocalSqlServer = CreateAvailableLocalSqlServerState(),
             Oracle = new DatabaseEndpointConnectivityState
             {
                 DatabaseName = "远端 Oracle",
@@ -162,18 +140,43 @@ public sealed class DatabaseConnectivityMiddlewareTests
         };
     }
 
+    private static DatabaseEndpointConnectivityState CreateAvailableLocalSqlServerState()
+    {
+        return new DatabaseEndpointConnectivityState
+        {
+            DatabaseName = "本地 MSSQL",
+            IsAvailable = true,
+            Description = "本地 MSSQL 连接正常"
+        };
+    }
+
+    private static DatabaseEndpointConnectivityState CreateUnavailableLocalSqlServerState()
+    {
+        return new DatabaseEndpointConnectivityState
+        {
+            DatabaseName = "本地 MSSQL",
+            IsAvailable = false,
+            Description = "本地 MSSQL 无法连接（连接探测超时）"
+        };
+    }
+
     /// <summary>
-    /// 定义数据库连通性测试桩。
+    /// 数据库连通性测试桩。
     /// </summary>
     private sealed class StubDatabaseConnectivityService : IDatabaseConnectivityService
     {
         /// <summary>
-        /// 获取或设置当前快照。
+        /// 获取或设置快速本地 MSSQL 状态。
+        /// </summary>
+        public DatabaseEndpointConnectivityState LocalSqlServerState { get; set; } = CreateAvailableLocalSqlServerState();
+
+        /// <summary>
+        /// 获取或设置当前返回的数据库连通性快照。
         /// </summary>
         public DatabaseConnectivitySnapshot Snapshot { get; set; } = CreateAvailableSnapshot();
 
         /// <summary>
-        /// 获取或设置刷新后的快照。
+        /// 获取或设置刷新后的数据库连通性快照。
         /// </summary>
         public DatabaseConnectivitySnapshot? RefreshedSnapshot { get; set; }
 
@@ -183,30 +186,43 @@ public sealed class DatabaseConnectivityMiddlewareTests
         public bool TreatAllExceptionsAsConnectivityException { get; set; }
 
         /// <summary>
-        /// 获取数据库连通性快照。
+        /// 获取完整快照次数。
         /// </summary>
-        /// <param name="cancellationToken">取消令牌。</param>
-        /// <returns>数据库连通性快照。</returns>
+        public int GetSnapshotCount { get; private set; }
+
+        /// <summary>
+        /// 获取本地 MSSQL 快速状态次数。
+        /// </summary>
+        public int GetLocalSqlServerStateCount { get; private set; }
+
+        /// <summary>
+        /// 获取完整快照刷新次数。
+        /// </summary>
+        public int RefreshSnapshotCount { get; private set; }
+
         public Task<DatabaseConnectivitySnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
         {
+            GetSnapshotCount++;
             return Task.FromResult(Snapshot);
         }
 
-        /// <summary>
-        /// 强制刷新数据库连通性快照。
-        /// </summary>
-        /// <param name="cancellationToken">取消令牌。</param>
-        /// <returns>数据库连通性快照。</returns>
         public Task<DatabaseConnectivitySnapshot> RefreshSnapshotAsync(CancellationToken cancellationToken)
         {
+            RefreshSnapshotCount++;
             return Task.FromResult(RefreshedSnapshot ?? Snapshot);
         }
 
-        /// <summary>
-        /// 判断异常是否属于数据库连接类异常。
-        /// </summary>
-        /// <param name="exception">待识别异常。</param>
-        /// <returns>属于数据库连接类异常时返回 <c>true</c>，否则返回 <c>false</c>。</returns>
+        public Task<DatabaseEndpointConnectivityState> GetLocalSqlServerStateAsync(CancellationToken cancellationToken)
+        {
+            GetLocalSqlServerStateCount++;
+            return Task.FromResult(LocalSqlServerState);
+        }
+
+        public Task<DatabaseEndpointConnectivityState> RefreshLocalSqlServerStateAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(LocalSqlServerState);
+        }
+
         public bool IsDatabaseConnectivityException(Exception exception)
         {
             return TreatAllExceptionsAsConnectivityException;

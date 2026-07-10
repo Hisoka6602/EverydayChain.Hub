@@ -50,7 +50,7 @@ public class RetentionExecutionService(
     /// <summary>
     /// 存储当前实例的租约持有者标识。
     /// </summary>
-    private readonly string _leaseOwnerId = $"{Environment.MachineName}:{Environment.ProcessId}:{Guid.NewGuid():N}";
+    private readonly string _leaseOwnerId = RuntimeLeaseOwnerId.Create();
 
     /// <summary>
     /// 执行一轮保留期治理。

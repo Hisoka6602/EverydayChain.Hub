@@ -1,6 +1,7 @@
 ﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Services;
 using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.Domain.Runtime;
 using EverydayChain.Hub.Domain.Sync;
 
 namespace EverydayChain.Hub.Tests.Services;
@@ -367,6 +368,17 @@ public class RetentionExecutionServiceTests
         {
             TryAcquireCallCount++;
             return Task.FromResult(TryAcquireResult);
+        }
+
+        /// <summary>
+        /// 模拟读取指定租约快照。
+        /// </summary>
+        /// <param name="leaseKey">租约键。</param>
+        /// <param name="ct">取消令牌。</param>
+        /// <returns>测试场景固定返回空快照。</returns>
+        public Task<RuntimeLeaseSnapshot?> GetAsync(string leaseKey, CancellationToken ct)
+        {
+            return Task.FromResult<RuntimeLeaseSnapshot?>(null);
         }
 
         /// <summary>

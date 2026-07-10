@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
+using EverydayChain.Hub.Application.Abstractions.Infrastructure;
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
@@ -20,6 +21,7 @@ public sealed class SyncOrchestrator(
     IRuntimeLeaseRepository runtimeLeaseRepository,
     ISyncWindowCalculator windowCalculator,
     ISyncExecutionService executionService,
+    IDatabaseConnectivityService databaseConnectivityService,
     IOptions<SyncJobOptions> syncJobOptions,
     ILogger<SyncOrchestrator> logger) : ISyncOrchestrator
 {
@@ -27,6 +29,7 @@ public sealed class SyncOrchestrator(
     /// 存储 DefaultParallelTablesSafetyCap 字段。
     /// </summary>
     private const int DefaultParallelTablesSafetyCap = 4;
+
     /// <summary>
     /// 存储 _syncJobOptions 字段。
     /// </summary>
@@ -37,6 +40,12 @@ public sealed class SyncOrchestrator(
         try
         {
             var definition = await configRepository.GetByTableCodeAsync(tableCode, ct);
+            var connectivityFailureResult = await TryBuildConnectivityFailureResultAsync(definition.TableCode, ct);
+            if (connectivityFailureResult is not null)
+            {
+                return connectivityFailureResult;
+            }
+
             var checkpoint = await checkpointRepository.GetAsync(tableCode, ct);
             var window = windowCalculator.CalculateWindow(definition, checkpoint, DateTime.Now);
             var parentBatchId = !string.IsNullOrWhiteSpace(checkpoint.LastError)
@@ -53,7 +62,7 @@ public sealed class SyncOrchestrator(
             };
 
             var leaseKey = $"sync-table:{definition.TableCode.Trim()}";
-            var leaseOwnerId = context.BatchId;
+            var leaseOwnerId = RuntimeLeaseOwnerId.Create();
             var acquiredTimeLocal = DateTime.Now;
             var leaseSeconds = Math.Clamp(_syncJobOptions.TableLeaseSeconds > 0 ? _syncJobOptions.TableLeaseSeconds : 900, 30, 86400);
             if (!await runtimeLeaseRepository.TryAcquireAsync(
@@ -63,7 +72,21 @@ public sealed class SyncOrchestrator(
                     acquiredTimeLocal.AddSeconds(leaseSeconds),
                     ct))
             {
-                logger.LogWarning("Skipped table sync because another execution still owns the lease. TableCode={TableCode}", definition.TableCode);
+                var activeLease = await runtimeLeaseRepository.GetAsync(leaseKey, ct);
+                if (activeLease is null)
+                {
+                    logger.LogWarning("Skipped table sync because another execution still owns the lease. TableCode={TableCode}", definition.TableCode);
+                }
+                else
+                {
+                    logger.LogWarning(
+                        "Skipped table sync because another execution still owns the lease. TableCode={TableCode}, LeaseOwnerId={LeaseOwnerId}, LeaseAcquiredTimeLocal={LeaseAcquiredTimeLocal}, LeaseExpiresAtLocal={LeaseExpiresAtLocal}",
+                        definition.TableCode,
+                        activeLease.OwnerId,
+                        activeLease.AcquiredTimeLocal,
+                        activeLease.ExpiresAtLocal);
+                }
+
                 return new SyncBatchResult
                 {
                     BatchId = string.Empty,
@@ -82,10 +105,14 @@ public sealed class SyncOrchestrator(
                 await runtimeLeaseRepository.ReleaseAsync(leaseKey, leaseOwnerId, CancellationToken.None);
             }
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Sync orchestration failed. TableCode={TableCode}", tableCode);
-            throw;
+            return BuildSingleTableFailureResult(tableCode, ex);
         }
     }
 
@@ -97,6 +124,14 @@ public sealed class SyncOrchestrator(
             .ThenBy(x => x.TableCode, StringComparer.OrdinalIgnoreCase)
             .Select((definition, index) => (definition, index))
             .ToList();
+        var connectivityFailureResults = await TryBuildConnectivityFailureResultsAsync(
+            orderedDefinitions.Select(item => item.definition).ToList(),
+            ct);
+        if (connectivityFailureResults is not null)
+        {
+            return connectivityFailureResults;
+        }
+
         var maxParallelTables = await configRepository.GetMaxParallelTablesAsync(ct);
         var effectiveParallelTables = ResolveEffectiveParallelTables(maxParallelTables, orderedDefinitions.Count);
         logger.LogInformation(
@@ -115,10 +150,20 @@ public sealed class SyncOrchestrator(
 
         if (orderedDefinitions.Count > 1 && effectiveParallelTables == 1)
         {
-            logger.LogWarning(
-                "Current sync parallelism is 1, so enabled tables will run serially. ConfiguredMaxParallelTables={ConfiguredMaxParallelTables}, EnabledTables={EnabledTables}",
-                maxParallelTables,
-                orderedDefinitions.Count);
+            if (maxParallelTables == 1)
+            {
+                logger.LogInformation(
+                    "Current sync parallelism is explicitly configured as 1, so enabled tables will run serially. ConfiguredMaxParallelTables={ConfiguredMaxParallelTables}, EnabledTables={EnabledTables}",
+                    maxParallelTables,
+                    orderedDefinitions.Count);
+            }
+            else
+            {
+                logger.LogWarning(
+                    "Current sync parallelism is 1, so enabled tables will run serially. ConfiguredMaxParallelTables={ConfiguredMaxParallelTables}, EnabledTables={EnabledTables}",
+                    maxParallelTables,
+                    orderedDefinitions.Count);
+            }
         }
 
         var results = new SyncBatchResult[orderedDefinitions.Count];
@@ -181,5 +226,73 @@ public sealed class SyncOrchestrator(
 
         return Math.Min(configuredMaxParallelTables, enabledTableCount);
     }
-}
 
+    private async Task<SyncBatchResult?> TryBuildConnectivityFailureResultAsync(string tableCode, CancellationToken ct)
+    {
+        var snapshot = await databaseConnectivityService.GetSnapshotAsync(ct);
+        if (snapshot.IsAvailable)
+        {
+            return null;
+        }
+
+        var userMessage = snapshot.BuildUserMessage();
+        logger.LogWarning(
+            "Skipping table sync because required databases are unavailable. TableCode={TableCode}, Message={Message}",
+            tableCode,
+            userMessage);
+        return BuildSingleTableFailureResult(tableCode, userMessage);
+    }
+
+    private async Task<IReadOnlyList<SyncBatchResult>?> TryBuildConnectivityFailureResultsAsync(
+        IReadOnlyList<SyncTableDefinition> definitions,
+        CancellationToken ct)
+    {
+        if (definitions.Count == 0)
+        {
+            return null;
+        }
+
+        var snapshot = await databaseConnectivityService.GetSnapshotAsync(ct);
+        if (snapshot.IsAvailable)
+        {
+            return null;
+        }
+
+        var userMessage = snapshot.BuildUserMessage();
+        logger.LogWarning(
+            "Skipping all enabled table sync because required databases are unavailable. EnabledTables={EnabledTables}, Message={Message}",
+            definitions.Count,
+            userMessage);
+        return definitions
+            .Select(definition => BuildSingleTableFailureResult(definition.TableCode, userMessage))
+            .ToList();
+    }
+
+    private static SyncBatchResult BuildSingleTableFailureResult(string tableCode, Exception exception)
+    {
+        return BuildSingleTableFailureResult(tableCode, exception.GetBaseException().Message);
+    }
+
+    private static SyncBatchResult BuildSingleTableFailureResult(string tableCode, string failureDetail)
+    {
+        return new SyncBatchResult
+        {
+            BatchId = string.Empty,
+            TableCode = tableCode,
+            FailureRate = 1.000M,
+            FailureMessage = BuildFailureMessage(failureDetail)
+        };
+    }
+
+    private static string BuildFailureMessage(string? failureDetail)
+    {
+        var baseMessage = failureDetail?.Trim() ?? string.Empty;
+        var message = string.IsNullOrWhiteSpace(baseMessage)
+            ? "Single-table sync failed. See detailed logs."
+            : $"Single-table sync failed: {baseMessage}";
+
+        return message.Length <= 512
+            ? message
+            : message[..512];
+    }
+}

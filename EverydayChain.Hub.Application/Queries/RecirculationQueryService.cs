@@ -73,8 +73,10 @@ public sealed class RecirculationQueryService : IRecirculationQueryService
             return emptyResult;
         }
 
+        var normalizedStartTime = QueryCacheTimeBucket.Normalize(request.StartTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var normalizedEndTime = QueryCacheTimeBucket.Normalize(request.EndTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
         var cacheKey =
-            $"recirculation-summary:{request.StartTimeLocal.ToString(CacheKeyDateTimeFormat)}:{request.EndTimeLocal.ToString(CacheKeyDateTimeFormat)}:{selectedChuteCode ?? NullCacheValue}:{sortOrder}";
+            $"recirculation-summary:{normalizedStartTime.ToString(CacheKeyDateTimeFormat)}:{normalizedEndTime.ToString(CacheKeyDateTimeFormat)}:{selectedChuteCode ?? NullCacheValue}:{sortOrder}";
         if (_queryCacheOptions.Enabled)
         {
             var ttl = Math.Clamp(_queryCacheOptions.RecirculationSummarySeconds, 1, 60);

@@ -2,6 +2,8 @@
 using EverydayChain.Hub.Application.Queries;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Enums;
+using EverydayChain.Hub.Domain.Options;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EverydayChain.Hub.Tests.Services;
@@ -175,6 +177,111 @@ public sealed class WaveQueryServiceTests
         Assert.True(result.Items[0].IsRecirculated);
         Assert.Equal("FullCase", result.Items[0].SourceType);
         Assert.Equal("TASK-002", result.Items[1].TaskCode);
+    }
+
+    [Fact]
+    public async Task QueryDetailsAsync_ShouldReuseCacheWithinSameTimeBucket()
+    {
+        var repository = new InMemoryBusinessTaskRepository();
+        var service = new WaveQueryService(
+            repository,
+            NullLogger<WaveQueryService>.Instance,
+            new MemoryCache(new MemoryCacheOptions()),
+            new QueryCacheOptions
+            {
+                Enabled = true,
+                AggregateTimeBucketSeconds = 30,
+                WaveDetailSeconds = 10
+            });
+        var start = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local);
+        var end = start.AddDays(1);
+
+        await repository.SaveAsync(new BusinessTaskEntity
+        {
+            TaskCode = "TASK-CACHE-001",
+            SourceTableCode = "SRC",
+            SourceType = BusinessTaskSourceType.FullCase,
+            BusinessKey = "KEY-CACHE-001",
+            Barcode = "BC-CACHE-001",
+            WaveCode = "WAVE-CACHE-001",
+            Status = BusinessTaskStatus.Scanned,
+            CreatedTimeLocal = start.AddMinutes(1),
+            UpdatedTimeLocal = start.AddMinutes(1)
+        }, CancellationToken.None);
+
+        _ = await service.QueryDetailsAsync(new WaveDetailQueryRequest
+        {
+            StartTimeLocal = start.AddSeconds(5),
+            EndTimeLocal = end.AddSeconds(5),
+            WaveCode = "WAVE-CACHE-001"
+        }, CancellationToken.None);
+
+        _ = await service.QueryDetailsAsync(new WaveDetailQueryRequest
+        {
+            StartTimeLocal = start.AddSeconds(20),
+            EndTimeLocal = end.AddSeconds(20),
+            WaveCode = "WAVE-CACHE-001"
+        }, CancellationToken.None);
+
+        Assert.Equal(1, repository.FindByWaveCodeAndCreatedTimeRangeCallCount);
+    }
+
+    [Fact]
+    public async Task QueryZonesAsync_ShouldSupportAlphanumericWorkingAreaAliases()
+    {
+        var repository = new InMemoryBusinessTaskRepository();
+        var service = new WaveQueryService(repository, NullLogger<WaveQueryService>.Instance);
+        var start = DateTime.SpecifyKind(new DateTime(2026, 7, 9, 0, 0, 0), DateTimeKind.Local);
+        var end = start.AddDays(1);
+
+        await repository.SaveAsync(CreateWaveTask("TASK-001", "N26071500", BusinessTaskSourceType.Split, "1", BusinessTaskStatus.Created, start.AddMinutes(1)), CancellationToken.None);
+        await repository.SaveAsync(CreateWaveTask("TASK-002", "N26071500", BusinessTaskSourceType.Split, "YA2", BusinessTaskStatus.Dropped, start.AddMinutes(2)), CancellationToken.None);
+        await repository.SaveAsync(CreateWaveTask("TASK-003", "N26071500", BusinessTaskSourceType.Split, "YB1", BusinessTaskStatus.Created, start.AddMinutes(3)), CancellationToken.None);
+        await repository.SaveAsync(CreateWaveTask("TASK-004", "N26071500", BusinessTaskSourceType.Split, "YB2", BusinessTaskStatus.Exception, start.AddMinutes(4)), CancellationToken.None);
+        await repository.SaveAsync(CreateWaveTask("TASK-005", "N26071500", BusinessTaskSourceType.FullCase, null, BusinessTaskStatus.Dropped, start.AddMinutes(5)), CancellationToken.None);
+
+        var result = await service.QueryZonesAsync(new WaveZoneQueryRequest
+        {
+            StartTimeLocal = start,
+            EndTimeLocal = end,
+            WaveCode = "N26071500"
+        }, CancellationToken.None);
+
+        Assert.NotNull(result);
+        var zoneMap = result!.Zones.ToDictionary(item => item.ZoneCode, StringComparer.Ordinal);
+        Assert.Equal(1, zoneMap["SplitZone1"].TotalCount);
+        Assert.Equal(1, zoneMap["SplitZone1"].UnsortedCount);
+        Assert.Equal(1, zoneMap["SplitZone2"].TotalCount);
+        Assert.Equal(0, zoneMap["SplitZone2"].UnsortedCount);
+        Assert.Equal(1, zoneMap["SplitZone3"].TotalCount);
+        Assert.Equal(1, zoneMap["SplitZone3"].UnsortedCount);
+        Assert.Equal(1, zoneMap["SplitZone4"].TotalCount);
+        Assert.Equal(1, zoneMap["SplitZone4"].ExceptionCount);
+        Assert.Equal(1, zoneMap["FullCase"].TotalCount);
+        Assert.Equal(0, zoneMap["FullCase"].UnsortedCount);
+    }
+
+    private static BusinessTaskEntity CreateWaveTask(
+        string taskCode,
+        string waveCode,
+        BusinessTaskSourceType sourceType,
+        string? workingArea,
+        BusinessTaskStatus status,
+        DateTime createdTimeLocal)
+    {
+        return new BusinessTaskEntity
+        {
+            TaskCode = taskCode,
+            SourceTableCode = "SRC",
+            SourceType = sourceType,
+            BusinessKey = taskCode,
+            WaveCode = waveCode,
+            WaveRemark = "Wave Remark",
+            WorkingArea = workingArea,
+            Status = status,
+            CreatedTimeLocal = createdTimeLocal,
+            UpdatedTimeLocal = createdTimeLocal
+        };
     }
 }
 

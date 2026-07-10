@@ -498,7 +498,9 @@
     ├── nlog.config
     ├── appsettings.json
     ├── install.bat
-    └── uninstall.bat
+    ├── install.sh
+    ├── uninstall.bat
+    └── uninstall.sh
 ```
 
 ## 各层级与各文件作用说明（逐项）
@@ -530,6 +532,7 @@
 - `docs/联调证据/PR08-PR10-20260417-R1/02-报表导出核对记录.md`：PR-09 报表查询与 CSV 导出核对记录，固化查询/导出口径一致性与格式验证结果。
 - `docs/联调证据/PR08-PR10-20260417-R1/03-业务筛选回归记录.md`：PR-10 业务任务、异常件、回流查询筛选回归记录，归档分页与筛选条件自动化回归结果。
 - `docs/联调证据/PR08-PR10-20260417-R1/04-旧实现删除清单.md`：PR-08~PR-10 覆盖关系与旧实现删除盘点，明确无重复旧实现待删除的结论与后续门禁要求。
+- `docs/Linux部署说明.md`：Linux `systemd` 部署说明，覆盖发布目录要求、`install.sh` / `uninstall.sh` 用法、环境切换、日志治理与常见问题排查。
 - `监控告警规则基线清单.md`：监控告警规则基线文档，定义日志关键字告警、指标阈值告警与演练留档验收口径，用于补齐稳定性清单剩余交付项。
 - `年度维护清单.md`：月度/季度/年度例行巡检项标准化清单，包含磁盘治理、日志审查、数据一致性、配置审核、灾难恢复演练、容量规划、安全审计等条目及快速异常处理参考表。
 - `值班处置手册.md`：日常值班与告警应急处置手册，覆盖 9 类告警的处置步骤（卡死检测、磁盘不足、内存水位、整轮超时、熔断、检查点损坏、快照损坏、归档失败、进程停止），定义 P0~P3 优先级与升级规则，含处置记录与演练记录模板。
@@ -773,7 +776,9 @@
 - `AutoMigrationService.cs`：应用启动迁移入口，自动创建缺失数据库、识别并执行待迁移项，并串联主表迁移、启动期分表预建与历史分表结构同步。
 - `appsettings.json`：主配置样例，移除分表逻辑表名静态配置，统一由 `SyncJob.Tables.TargetLogicalTable` 提供。
 - `install.bat`：Windows 服务安装脚本，将 Host 程序注册为 Windows Service，配置开机自启、失败自动恢复策略（5 秒×3 次，含非崩溃退出），需以管理员身份运行。
+- `install.sh`：Linux `systemd` 安装脚本，将 Host 程序注册为 `everydaychain-hub` 服务，自动生成环境文件、创建 `logs/` 与 `data/` 目录，未显式指定环境时会按 `appsettings.ReadOnlySync.json` 是否存在自动选择 `ReadOnlySync` 或 `Production`，并支持 `--dry-run`、`--skip-start`。
 - `uninstall.bat`：Windows 服务卸载脚本，停止并删除已注册的 Windows Service，需以管理员身份运行。
+- `uninstall.sh`：Linux `systemd` 卸载脚本，停止并移除 `everydaychain-hub` 服务单元，保留发布目录、日志目录、数据目录与环境文件，避免误删运行现场。
 - `Properties/launchSettings.json`：本地开发启动配置，设定 `DOTNET_ENVIRONMENT=Development` 环境变量，供 `dotnet run` 与 IDE 调试使用。
 
 ### Oracle 配置速查（针对 `SELECT * FROM WMS_USER_431.IDX_PICKTOLIGHT_CARTON1`）

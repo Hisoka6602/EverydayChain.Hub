@@ -13,6 +13,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using EverydayChain.Hub.Infrastructure.DependencyInjection;
 using EverydayChain.Hub.Host.Swagger;
+using EverydayChain.Hub.Host.Services;
 
 // 存储默认的请求参数校验失败提示。
 const string DefaultValidationFailureMessage = "请求参数校验失败。";
@@ -31,12 +32,15 @@ var builderOptions = new WebApplicationOptions
     EnvironmentName = environmentName
 };
 var builder = WebApplication.CreateBuilder(builderOptions);
+var environmentConfigFileName = $"appsettings.{builder.Environment.EnvironmentName}.json";
+var environmentConfigFilePath = Path.Combine(builder.Environment.ContentRootPath, environmentConfigFileName);
+var readOnlySyncConfigFileName = "appsettings.ReadOnlySync.json";
+var readOnlySyncConfigFilePath = Path.Combine(builder.Environment.ContentRootPath, readOnlySyncConfigFileName);
 builder.Configuration.Sources.Clear();
 builder.Configuration
     .SetBasePath(builder.Environment.ContentRootPath)
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
-    .AddJsonFile("appsettings.ReadOnlySync.json", optional: true, reloadOnChange: true)
+    .AddJsonFile(environmentConfigFileName, optional: true, reloadOnChange: true)
     .AddUserSecrets<Program>(optional: true);
 if (args.Length > 0)
 {
@@ -44,12 +48,52 @@ if (args.Length > 0)
 }
 StartupConfigurationValidator.Validate(builder.Configuration);
 var logger = NLog.LogManager.GetCurrentClassLogger();
+var oracleSection = builder.Configuration.GetSection(OracleOptions.SectionName);
+var oracleOptions = oracleSection.Get<OracleOptions>() ?? new OracleOptions();
+var syncJobSection = builder.Configuration.GetSection(SyncJobOptions.SectionName);
+var syncJobOptions = syncJobSection.Get<SyncJobOptions>() ?? new SyncJobOptions();
+var wmsFeedbackSection = builder.Configuration.GetSection(WmsFeedbackOptions.SectionName);
+var wmsFeedbackOptions = wmsFeedbackSection.Get<WmsFeedbackOptions>() ?? new WmsFeedbackOptions();
+var feedbackCompensationSection = builder.Configuration.GetSection(FeedbackCompensationJobOptions.SectionName);
+var feedbackCompensationOptions = feedbackCompensationSection.Get<FeedbackCompensationJobOptions>() ?? new FeedbackCompensationJobOptions();
+var environmentConfigFileExists = File.Exists(environmentConfigFilePath);
+var readOnlySyncConfigFileExists = File.Exists(readOnlySyncConfigFilePath);
+logger.Info(
+    "应用启动配置摘要。EnvironmentName={EnvironmentName}, ContentRootPath={ContentRootPath}, EnvironmentConfigFile={EnvironmentConfigFile}, EnvironmentConfigFileExists={EnvironmentConfigFileExists}, ReadOnlySyncConfigFileExists={ReadOnlySyncConfigFileExists}, OracleReadOnly={OracleReadOnly}, OracleDatabase={OracleDatabase}, OracleDatabaseMode={OracleDatabaseMode}, SyncEnabledTableCount={SyncEnabledTableCount}, WmsFeedbackEnabled={WmsFeedbackEnabled}, FeedbackCompensationEnabled={FeedbackCompensationEnabled}",
+    builder.Environment.EnvironmentName,
+    builder.Environment.ContentRootPath,
+    environmentConfigFileName,
+    environmentConfigFileExists,
+    readOnlySyncConfigFileExists,
+    oracleOptions.ReadOnly,
+    oracleOptions.Database,
+    oracleOptions.DatabaseMode,
+    syncJobOptions.Tables.Count(table => table.Enabled),
+    wmsFeedbackOptions.Enabled,
+    feedbackCompensationOptions.Enabled);
+foreach (var warningMessage in StartupEnvironmentDiagnostics.GetWarnings(builder.Environment.EnvironmentName, readOnlySyncConfigFileExists))
+{
+    logger.Warn(
+        "启动环境保护提示。WarningMessage={WarningMessage}, CurrentEnvironment={CurrentEnvironment}, ReadOnlySyncConfigFile={ReadOnlySyncConfigFile}, SuggestedLaunchProfile={SuggestedLaunchProfile}, SuggestedArgs={SuggestedArgs}",
+        warningMessage,
+        builder.Environment.EnvironmentName,
+        readOnlySyncConfigFileName,
+        "EverydayChain.Hub.Host.ReadOnlySync",
+        "--environment ReadOnlySync");
+}
 var webEndpointSection = builder.Configuration.GetSection(WebEndpointOptions.SectionName);
 var webEndpointOptions = webEndpointSection.Get<WebEndpointOptions>() ?? new WebEndpointOptions();
 if (!webEndpointSection.Exists())
 {
     logger.Warn("WebEndpoint 配置节缺失，已使用默认配置。");
 }
+builder.Services.Configure<WebEndpointOptions>(webEndpointSection);
+var logCleanupSection = builder.Configuration.GetSection(LogCleanupOptions.SectionName);
+if (!logCleanupSection.Exists())
+{
+    logger.Warn("LogCleanup 配置节缺失，已使用默认配置。");
+}
+builder.Services.Configure<LogCleanupOptions>(logCleanupSection);
 
 if (!string.IsNullOrWhiteSpace(webEndpointOptions.Url)) {
     builder.WebHost.UseUrls(webEndpointOptions.Url.Trim());
@@ -73,6 +117,13 @@ builder.Logging.AddNLog();
 builder.Services.Configure<HostOptions>(options =>
 {
     options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost;
+});
+builder.Services.AddSingleton<IDiskSpaceProbe, DriveInfoDiskSpaceProbe>();
+builder.Services.AddSingleton<LogFileMaintenanceService>();
+builder.Services.AddSingleton<IApiWarmupState, ApiWarmupState>();
+builder.Services.AddHttpClient<IApiEndpointWarmupService, ApiEndpointWarmupService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(Math.Min(requestTimeoutSeconds, 30));
 });
 var efCoreOptsSection = builder.Configuration.GetSection(EfCoreOptions.SectionName);
 var efCoreOpts = efCoreOptsSection.Get<EfCoreOptions>() ?? new EfCoreOptions();
@@ -124,6 +175,8 @@ builder.Services.AddSwaggerGen(options => {
     }
     options.SchemaFilter<BusinessTaskSeedTableSchemaFilter>();
 });
+builder.Services.AddHostedService<LogCleanupStartupGuardHostedService>();
+builder.Services.AddHostedService<LogCleanupHostedService>();
 builder.Services.AddHostedService<AutoMigrationHostedService>();
 builder.Services.AddHostedService<ApiWarmupHostedService>();
 builder.Services.AddHostedService<SyncBackgroundWorker>();
@@ -199,34 +252,11 @@ app.MapGet("/health/live", () =>
         checkedAtLocal = DateTime.Now
     }, "服务存活。"));
 });
-app.MapGet("/health/ready", async (IDatabaseConnectivityService databaseConnectivityService, HttpContext httpContext) =>
+app.MapGet("/health/ready", async (IDatabaseConnectivityService databaseConnectivityService, IApiWarmupState apiWarmupState, HttpContext httpContext) =>
 {
     var snapshot = await databaseConnectivityService.GetSnapshotAsync(httpContext.RequestAborted);
-    var payload = new
-    {
-        canServeApiRequests = snapshot.LocalSqlServer.IsAvailable,
-        allDatabasesAvailable = snapshot.IsAvailable,
-        checkedAtLocal = snapshot.CheckedAtLocal,
-        localSqlServer = new
-        {
-            isAvailable = snapshot.LocalSqlServer.IsAvailable,
-            description = snapshot.LocalSqlServer.Description
-        },
-        oracle = new
-        {
-            isAvailable = snapshot.Oracle.IsAvailable,
-            description = snapshot.Oracle.Description
-        }
-    };
-
-    if (snapshot.LocalSqlServer.IsAvailable)
-    {
-        return Results.Json(ApiResponse<object>.Success(payload, "服务就绪。"));
-    }
-
-    return Results.Json(
-        ApiResponse<object>.Fail(snapshot.BuildUserMessage(), payload),
-        statusCode: StatusCodes.Status503ServiceUnavailable);
+    var readiness = HealthReadinessResponseBuilder.Build(snapshot, apiWarmupState.GetSnapshot());
+    return Results.Json(readiness.Response, statusCode: readiness.StatusCode);
 });
 app.MapControllers();
 try {

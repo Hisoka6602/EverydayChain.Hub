@@ -1,3 +1,5 @@
+using EverydayChain.Hub.Domain.Runtime;
+
 namespace EverydayChain.Hub.Application.Abstractions.Persistence;
 
 /// <summary>
@@ -20,6 +22,14 @@ public interface IRuntimeLeaseRepository
         DateTime acquiredTimeLocal,
         DateTime expiresAtLocal,
         CancellationToken ct);
+
+    /// <summary>
+    /// 读取指定租约当前快照。
+    /// </summary>
+    /// <param name="leaseKey">租约键。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>租约存在时返回快照；否则返回 <see langword="null"/>。</returns>
+    Task<RuntimeLeaseSnapshot?> GetAsync(string leaseKey, CancellationToken ct);
 
     /// <summary>
     /// 释放指定租约。

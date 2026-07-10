@@ -68,7 +68,9 @@ public sealed class SortingReportQueryService : ISortingReportQueryService
         }
 
         var selectedDockCode = string.IsNullOrWhiteSpace(request.DockCode) ? null : request.DockCode.Trim();
-        var cacheKey = $"sorting-report:{request.StartTimeLocal.ToString(CacheKeyDateTimeFormat)}:{request.EndTimeLocal.ToString(CacheKeyDateTimeFormat)}:{selectedDockCode ?? NullCacheValue}";
+        var normalizedStartTime = QueryCacheTimeBucket.Normalize(request.StartTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var normalizedEndTime = QueryCacheTimeBucket.Normalize(request.EndTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var cacheKey = $"sorting-report:{normalizedStartTime.ToString(CacheKeyDateTimeFormat)}:{normalizedEndTime.ToString(CacheKeyDateTimeFormat)}:{selectedDockCode ?? NullCacheValue}";
         if (_queryCacheOptions.Enabled)
         {
             var ttl = Math.Clamp(_queryCacheOptions.SortingReportSeconds, 1, 120);

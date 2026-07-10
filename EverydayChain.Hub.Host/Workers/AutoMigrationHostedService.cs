@@ -46,12 +46,12 @@ public class AutoMigrationHostedService(
             currentStage = "数据库可达性预检阶段";
             using var connectivityCheckCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             connectivityCheckCts.CancelAfter(TimeSpan.FromSeconds(StartupStageTimeoutSeconds));
-            var connectivitySnapshot = await databaseConnectivityService.GetSnapshotAsync(connectivityCheckCts.Token);
-            if (!connectivitySnapshot.LocalSqlServer.IsAvailable)
+            var localSqlServerState = await databaseConnectivityService.GetLocalSqlServerStateAsync(connectivityCheckCts.Token);
+            if (!localSqlServerState.IsAvailable)
             {
                 logger.LogWarning(
                     "本地 MSSQL 连通性预检未通过：{Description}。将继续尝试自动迁移，以覆盖目标数据库缺失等可自愈场景。",
-                    connectivitySnapshot.LocalSqlServer.Description);
+                    localSqlServerState.Description);
             }
 
             using var scope = scopeFactory.CreateScope();
@@ -64,7 +64,7 @@ public class AutoMigrationHostedService(
             currentStage = "数据库连通性刷新阶段";
             using var connectivityRefreshCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             connectivityRefreshCts.CancelAfter(TimeSpan.FromSeconds(StartupStageTimeoutSeconds));
-            await databaseConnectivityService.RefreshSnapshotAsync(connectivityRefreshCts.Token);
+            await databaseConnectivityService.RefreshLocalSqlServerStateAsync(connectivityRefreshCts.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {

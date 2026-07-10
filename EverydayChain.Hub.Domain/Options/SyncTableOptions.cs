@@ -90,6 +90,11 @@ public class SyncTableOptions
     public string? PendingStatusValue { get; set; } = "N";
 
     /// <summary>
+    /// 获取或设置 IgnorePendingStatusValue。
+    /// </summary>
+    public bool IgnorePendingStatusValue { get; set; }
+
+    /// <summary>
     /// 获取或设置 CompletedStatusValue。
     /// </summary>
     public string CompletedStatusValue { get; set; } = "Y";

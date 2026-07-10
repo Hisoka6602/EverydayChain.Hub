@@ -47,45 +47,21 @@ public class ScanLogRepository(
             return new ScanLogRecognitionAggregate();
         }
 
-        if (await IsAlignedSnapshotRangeCoveredAsync(startTimeLocal, endTimeLocal, ct))
+        var snapshotPlan = await TryBuildSnapshotQueryPlanAsync(startTimeLocal, endTimeLocal, ct);
+        if (snapshotPlan is null)
         {
-            using var snapshotScope = TableSuffixScope.Use(string.Empty);
-            await using var snapshotDb = await contextFactory.CreateDbContextAsync(ct);
-            var snapshotAggregate = await snapshotDb.DashboardScanSnapshots
-                .AsNoTracking()
-                .Where(x => x.BucketStartLocal >= startTimeLocal && x.BucketStartLocal < endTimeLocal)
-                .GroupBy(_ => 1)
-                .Select(group => new ScanLogRecognitionAggregate
-                {
-                    TotalScanCount = group.Sum(x => x.TotalScanCount),
-                    MatchedScanCount = group.Sum(x => x.MatchedScanCount)
-                })
-                .FirstOrDefaultAsync(ct);
-            return snapshotAggregate ?? new ScanLogRecognitionAggregate();
+            return await AggregateRecognitionFromBaseTablesAsync(startTimeLocal, endTimeLocal, ct);
         }
 
-        var aggregate = new ScanLogRecognitionAggregate();
-        foreach (var suffix in await ListShardSuffixesByScanTimeRangeAsync(startTimeLocal, endTimeLocal, ct))
+        var aggregate = await AggregateRecognitionFromSnapshotsAsync(
+            snapshotPlan.SnapshotRange.StartLocal,
+            snapshotPlan.SnapshotRange.EndLocal,
+            ct);
+        foreach (var range in snapshotPlan.BaseTableRanges)
         {
-            using var scope = TableSuffixScope.Use(suffix);
-            await using var db = await contextFactory.CreateDbContextAsync(ct);
-            var shardAggregate = await db.ScanLogs
-                .AsNoTracking()
-                .Where(x => x.ScanTimeLocal >= startTimeLocal && x.ScanTimeLocal < endTimeLocal)
-                .GroupBy(_ => 1)
-                .Select(group => new ScanLogRecognitionAggregate
-                {
-                    TotalScanCount = group.Count(),
-                    MatchedScanCount = group.Count(x => x.IsMatched)
-                })
-                .FirstOrDefaultAsync(ct);
-            if (shardAggregate is null)
-            {
-                continue;
-            }
-
-            aggregate.TotalScanCount += shardAggregate.TotalScanCount;
-            aggregate.MatchedScanCount += shardAggregate.MatchedScanCount;
+            var edgeAggregate = await AggregateRecognitionFromBaseTablesAsync(range.StartLocal, range.EndLocal, ct);
+            aggregate.TotalScanCount += edgeAggregate.TotalScanCount;
+            aggregate.MatchedScanCount += edgeAggregate.MatchedScanCount;
         }
 
         return aggregate;
@@ -270,16 +246,14 @@ public class ScanLogRepository(
         return availableSuffixes.Where(targetSuffixes.Contains).ToList();
     }
 
-    private async Task<bool> IsAlignedSnapshotRangeCoveredAsync(DateTime startTimeLocal, DateTime endTimeLocal, CancellationToken ct)
+    private async Task<SnapshotQueryPlan?> TryBuildSnapshotQueryPlanAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        CancellationToken ct)
     {
         if (!_dashboardSnapshotOptions.Enabled || !_dashboardSnapshotOptions.PreferSnapshotQueries)
         {
-            return false;
-        }
-
-        if (!IsMinuteAligned(startTimeLocal) || !IsMinuteAligned(endTimeLocal))
-        {
-            return false;
+            return null;
         }
 
         using var scope = TableSuffixScope.Use(string.Empty);
@@ -287,15 +261,63 @@ public class ScanLogRepository(
         var state = await db.DashboardSnapshotStates
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == DashboardSnapshotSource.ScanLog, ct);
-        return state?.CoverageStartLocal <= startTimeLocal
-            && state.CoverageEndLocal >= endTimeLocal;
+        return SnapshotQueryPlanBuilder.Build(
+            startTimeLocal,
+            endTimeLocal,
+            state?.CoverageStartLocal,
+            state?.CoverageEndLocal);
     }
 
-    private static bool IsMinuteAligned(DateTime value)
+    private async Task<ScanLogRecognitionAggregate> AggregateRecognitionFromSnapshotsAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        CancellationToken ct)
     {
-        return value.Second == 0
-            && value.Millisecond == 0
-            && value.Ticks % TimeSpan.TicksPerSecond == 0;
+        using var snapshotScope = TableSuffixScope.Use(string.Empty);
+        await using var snapshotDb = await contextFactory.CreateDbContextAsync(ct);
+        var snapshotAggregate = await snapshotDb.DashboardScanSnapshots
+            .AsNoTracking()
+            .Where(x => x.BucketStartLocal >= startTimeLocal && x.BucketStartLocal < endTimeLocal)
+            .GroupBy(_ => 1)
+            .Select(group => new ScanLogRecognitionAggregate
+            {
+                TotalScanCount = group.Sum(x => x.TotalScanCount),
+                MatchedScanCount = group.Sum(x => x.MatchedScanCount)
+            })
+            .SingleOrDefaultAsync(ct);
+        return snapshotAggregate ?? new ScanLogRecognitionAggregate();
+    }
+
+    private async Task<ScanLogRecognitionAggregate> AggregateRecognitionFromBaseTablesAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        CancellationToken ct)
+    {
+        var aggregate = new ScanLogRecognitionAggregate();
+        foreach (var suffix in await ListShardSuffixesByScanTimeRangeAsync(startTimeLocal, endTimeLocal, ct))
+        {
+            using var scope = TableSuffixScope.Use(suffix);
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            var shardAggregate = await db.ScanLogs
+                .AsNoTracking()
+                .Where(x => x.ScanTimeLocal >= startTimeLocal && x.ScanTimeLocal < endTimeLocal)
+                .GroupBy(_ => 1)
+                .Select(group => new ScanLogRecognitionAggregate
+                {
+                    TotalScanCount = group.Count(),
+                    MatchedScanCount = group.Count(x => x.IsMatched)
+                })
+                .SingleOrDefaultAsync(ct);
+            if (shardAggregate is null)
+            {
+                continue;
+            }
+
+            aggregate.TotalScanCount += shardAggregate.TotalScanCount;
+            aggregate.MatchedScanCount += shardAggregate.MatchedScanCount;
+        }
+
+        return aggregate;
     }
 }
 

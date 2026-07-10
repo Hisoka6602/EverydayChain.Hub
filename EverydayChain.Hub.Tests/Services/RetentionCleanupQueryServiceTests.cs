@@ -1,6 +1,8 @@
 using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Application.Queries;
 using EverydayChain.Hub.Domain.Aggregates.AuditLogs;
+using EverydayChain.Hub.Domain.Options;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace EverydayChain.Hub.Tests.Services;
 
@@ -9,13 +11,9 @@ namespace EverydayChain.Hub.Tests.Services;
 /// </summary>
 public sealed class RetentionCleanupQueryServiceTests
 {
-    /// <summary>
-    /// 查询时应规范化筛选参数并返回映射结果。
-    /// </summary>
     [Fact]
     public async Task QueryAsync_ShouldNormalizeFiltersAndMapItems()
     {
-        // 步骤：准备两条不同逻辑表的审计记录，验证查询服务只返回命中的一条并回填默认分页值。
         var repository = new InMemoryRetentionCleanupAuditLogRepository();
         repository.Items.Add(new RetentionCleanupAuditLogEntity
         {
@@ -79,5 +77,62 @@ public sealed class RetentionCleanupQueryServiceTests
         Assert.Equal("AUDIT-001", result.Items[0].Id);
         Assert.Equal("scan_logs", result.Items[0].LogicalTableName);
         Assert.Equal("Completed", result.Items[0].ExecutionStage);
+    }
+
+    [Fact]
+    public async Task QueryAsync_ShouldReuseCacheWithinSameTimeBucket()
+    {
+        var repository = new InMemoryRetentionCleanupAuditLogRepository();
+        repository.Items.Add(new RetentionCleanupAuditLogEntity
+        {
+            Id = "AUDIT-CACHE-001",
+            BatchId = "BATCH-CACHE-001",
+            TargetCode = "scan_logs-retention",
+            LogicalTableName = "scan_logs",
+            RetentionMode = "DropShards",
+            TimeColumnName = string.Empty,
+            KeepMonths = 3,
+            IsDryRun = false,
+            AllowDelete = true,
+            ThresholdTimeLocal = new DateTime(2026, 4, 1, 0, 0, 0),
+            ExecutionStage = "Completed",
+            ScannedCount = 5,
+            CandidateCount = 2,
+            DeletedCount = 2,
+            Message = "缓存复用测试",
+            InstanceId = "host-cache-1",
+            StartedTimeLocal = new DateTime(2026, 7, 7, 1, 5, 0),
+            CompletedTimeLocal = new DateTime(2026, 7, 7, 1, 5, 2)
+        });
+
+        var service = new RetentionCleanupQueryService(
+            repository,
+            new MemoryCache(new MemoryCacheOptions()),
+            new QueryCacheOptions
+            {
+                Enabled = true,
+                AggregateTimeBucketSeconds = 30,
+                RetentionCleanupSeconds = 10
+            });
+
+        _ = await service.QueryAsync(new RetentionCleanupAuditQueryRequest
+        {
+            StartTimeLocal = new DateTime(2026, 7, 7, 1, 0, 5),
+            EndTimeLocal = new DateTime(2026, 7, 7, 2, 0, 5),
+            LogicalTableName = "scan_logs",
+            PageNumber = 1,
+            PageSize = 20
+        }, CancellationToken.None);
+
+        _ = await service.QueryAsync(new RetentionCleanupAuditQueryRequest
+        {
+            StartTimeLocal = new DateTime(2026, 7, 7, 1, 0, 20),
+            EndTimeLocal = new DateTime(2026, 7, 7, 2, 0, 20),
+            LogicalTableName = "scan_logs",
+            PageNumber = 1,
+            PageSize = 20
+        }, CancellationToken.None);
+
+        Assert.Equal(1, repository.QueryCallCount);
     }
 }

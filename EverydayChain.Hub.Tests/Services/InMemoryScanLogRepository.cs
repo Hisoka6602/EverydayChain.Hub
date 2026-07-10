@@ -10,6 +10,16 @@ namespace EverydayChain.Hub.Tests.Services;
 internal sealed class InMemoryScanLogRepository : IScanLogRepository
 {
     /// <summary>
+    /// 获取或设置 QueryRangeCallCount。
+    /// </summary>
+    public int QueryRangeCallCount { get; private set; }
+
+    /// <summary>
+    /// 获取或设置 QueryPageCallCount。
+    /// </summary>
+    public int QueryPageCallCount { get; private set; }
+
+    /// <summary>
     /// 获取或设置 Logs。
     /// </summary>
     public List<ScanLogEntity> Logs { get; } = [];
@@ -50,6 +60,7 @@ internal sealed class InMemoryScanLogRepository : IScanLogRepository
         string? deviceCode,
         CancellationToken ct)
     {
+        QueryRangeCallCount++;
         // 步骤：执行 QueryRangeAsync 方法的核心处理流程。
         var normalizedBarcode = string.IsNullOrWhiteSpace(barcode) ? null : barcode.Trim();
         var normalizedDeviceCode = string.IsNullOrWhiteSpace(deviceCode) ? null : deviceCode.Trim();
@@ -75,6 +86,7 @@ internal sealed class InMemoryScanLogRepository : IScanLogRepository
         int take,
         CancellationToken ct)
     {
+        QueryPageCallCount++;
         // 步骤：执行 QueryPageAsync 方法的核心处理流程。
         var normalizedBarcode = string.IsNullOrWhiteSpace(barcode) ? null : barcode.Trim();
         var normalizedDeviceCode = string.IsNullOrWhiteSpace(deviceCode) ? null : deviceCode.Trim();

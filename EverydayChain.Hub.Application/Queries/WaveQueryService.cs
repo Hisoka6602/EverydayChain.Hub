@@ -54,6 +54,23 @@ public sealed class WaveQueryService : IWaveQueryService
         FullCaseCode
     ];
 
+    private static readonly IReadOnlyDictionary<string, string> SplitWorkingAreaZoneMap =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["1"] = SplitZone1Code,
+            ["YA1"] = SplitZone1Code,
+            ["A1"] = SplitZone1Code,
+            ["2"] = SplitZone2Code,
+            ["YA2"] = SplitZone2Code,
+            ["A2"] = SplitZone2Code,
+            ["3"] = SplitZone3Code,
+            ["YB1"] = SplitZone3Code,
+            ["B1"] = SplitZone3Code,
+            ["4"] = SplitZone4Code,
+            ["YB2"] = SplitZone4Code,
+            ["B2"] = SplitZone4Code
+        };
+
     /// <summary>
     /// 存储 _businessTaskRepository 字段。
     /// </summary>
@@ -109,7 +126,9 @@ public sealed class WaveQueryService : IWaveQueryService
             return emptyResult;
         }
 
-        var cacheKey = $"wave-current:{request.StartTimeLocal.ToString(CacheKeyDateTimeFormat)}:{request.EndTimeLocal.ToString(CacheKeyDateTimeFormat)}";
+        var normalizedStartTime = QueryCacheTimeBucket.Normalize(request.StartTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var normalizedEndTime = QueryCacheTimeBucket.Normalize(request.EndTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var cacheKey = $"wave-current:{normalizedStartTime.ToString(CacheKeyDateTimeFormat)}:{normalizedEndTime.ToString(CacheKeyDateTimeFormat)}";
         return await GetCachedAsync(
             cacheKey,
             _queryCacheOptions.CurrentWaveSeconds,
@@ -130,7 +149,9 @@ public sealed class WaveQueryService : IWaveQueryService
             return emptyResult;
         }
 
-        var cacheKey = $"wave-options:{request.StartTimeLocal.ToString(CacheKeyDateTimeFormat)}:{request.EndTimeLocal.ToString(CacheKeyDateTimeFormat)}";
+        var normalizedStartTime = QueryCacheTimeBucket.Normalize(request.StartTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var normalizedEndTime = QueryCacheTimeBucket.Normalize(request.EndTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var cacheKey = $"wave-options:{normalizedStartTime.ToString(CacheKeyDateTimeFormat)}:{normalizedEndTime.ToString(CacheKeyDateTimeFormat)}";
         return await GetCachedAsync(
             cacheKey,
             _queryCacheOptions.WaveOptionsSeconds,
@@ -147,7 +168,9 @@ public sealed class WaveQueryService : IWaveQueryService
         }
 
         var normalizedWaveCode = request.WaveCode.Trim();
-        var cacheKey = $"wave-summary:{request.StartTimeLocal.ToString(CacheKeyDateTimeFormat)}:{request.EndTimeLocal.ToString(CacheKeyDateTimeFormat)}:{normalizedWaveCode}";
+        var normalizedStartTime = QueryCacheTimeBucket.Normalize(request.StartTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var normalizedEndTime = QueryCacheTimeBucket.Normalize(request.EndTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var cacheKey = $"wave-summary:{normalizedStartTime.ToString(CacheKeyDateTimeFormat)}:{normalizedEndTime.ToString(CacheKeyDateTimeFormat)}:{normalizedWaveCode}";
         return await GetCachedAsync<WaveSummaryQueryResult?>(
             cacheKey,
             _queryCacheOptions.WaveSummarySeconds,
@@ -164,7 +187,9 @@ public sealed class WaveQueryService : IWaveQueryService
         }
 
         var normalizedWaveCode = request.WaveCode.Trim();
-        var cacheKey = $"wave-zones:{request.StartTimeLocal.ToString(CacheKeyDateTimeFormat)}:{request.EndTimeLocal.ToString(CacheKeyDateTimeFormat)}:{normalizedWaveCode}";
+        var normalizedStartTime = QueryCacheTimeBucket.Normalize(request.StartTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var normalizedEndTime = QueryCacheTimeBucket.Normalize(request.EndTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var cacheKey = $"wave-zones:{normalizedStartTime.ToString(CacheKeyDateTimeFormat)}:{normalizedEndTime.ToString(CacheKeyDateTimeFormat)}:{normalizedWaveCode}";
         return await GetCachedAsync<WaveZoneQueryResult?>(
             cacheKey,
             _queryCacheOptions.WaveZoneSeconds,
@@ -209,7 +234,9 @@ public sealed class WaveQueryService : IWaveQueryService
             return emptyResult;
         }
 
-        var cacheKey = $"wave-list:{request.StartTimeLocal.ToString(CacheKeyDateTimeFormat)}:{request.EndTimeLocal.ToString(CacheKeyDateTimeFormat)}";
+        var normalizedStartTime = QueryCacheTimeBucket.Normalize(request.StartTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var normalizedEndTime = QueryCacheTimeBucket.Normalize(request.EndTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var cacheKey = $"wave-list:{normalizedStartTime.ToString(CacheKeyDateTimeFormat)}:{normalizedEndTime.ToString(CacheKeyDateTimeFormat)}";
         return await GetCachedAsync(
             cacheKey,
             _queryCacheOptions.WaveListSeconds,
@@ -262,21 +289,45 @@ public sealed class WaveQueryService : IWaveQueryService
 
     public async Task<WaveDetailQueryResult> QueryDetailsAsync(WaveDetailQueryRequest request, CancellationToken cancellationToken)
     {
+        var normalizedWaveCode = request.WaveCode.Trim();
+        var emptyResult = new WaveDetailQueryResult
+        {
+            StartTimeLocal = request.StartTimeLocal,
+            EndTimeLocal = request.EndTimeLocal,
+            WaveCode = normalizedWaveCode
+        };
+        if (request.EndTimeLocal <= request.StartTimeLocal || string.IsNullOrWhiteSpace(request.WaveCode))
+        {
+            return emptyResult;
+        }
+
+        var normalizedStartTime = QueryCacheTimeBucket.Normalize(request.StartTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var normalizedEndTime = QueryCacheTimeBucket.Normalize(request.EndTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var cacheKey = $"wave-details:{normalizedStartTime.ToString(CacheKeyDateTimeFormat)}:{normalizedEndTime.ToString(CacheKeyDateTimeFormat)}:{normalizedWaveCode}";
+        return await GetCachedAsync(
+            cacheKey,
+            _queryCacheOptions.WaveDetailSeconds,
+            () => BuildDetailsAsync(request, normalizedWaveCode, cancellationToken),
+            emptyResult,
+            cancellationToken);
+    }
+
+    private async Task<WaveDetailQueryResult> BuildDetailsAsync(
+        WaveDetailQueryRequest request,
+        string normalizedWaveCode,
+        CancellationToken cancellationToken)
+    {
         var result = new WaveDetailQueryResult
         {
             StartTimeLocal = request.StartTimeLocal,
             EndTimeLocal = request.EndTimeLocal,
-            WaveCode = request.WaveCode.Trim()
+            WaveCode = normalizedWaveCode
         };
-        if (request.EndTimeLocal <= request.StartTimeLocal || string.IsNullOrWhiteSpace(request.WaveCode))
-        {
-            return result;
-        }
 
         var tasks = await _businessTaskRepository.FindByWaveCodeAndCreatedTimeRangeAsync(
             request.StartTimeLocal,
             request.EndTimeLocal,
-            request.WaveCode.Trim(),
+            normalizedWaveCode,
             cancellationToken);
 
         result.WaveRemark = tasks
@@ -699,36 +750,38 @@ public sealed class WaveQueryService : IWaveQueryService
             return null;
         }
 
-        if (!int.TryParse(task.WorkingArea.Trim(), out var workingArea))
+        var normalizedWorkingArea = NormalizeWorkingAreaKey(task.WorkingArea);
+        if (SplitWorkingAreaZoneMap.TryGetValue(normalizedWorkingArea, out var zoneCode))
         {
-            _logger.LogWarning(
-                "Wave zone statistics skipped a split task because WorkingArea is invalid. TaskCode={TaskCode}, WaveCode={WaveCode}, SourceType={SourceType}, WorkingArea={WorkingArea}",
-                task.TaskCode,
-                task.WaveCode,
-                task.SourceType,
-                task.WorkingArea);
-            return null;
+            return zoneCode;
         }
 
-        return workingArea switch
-        {
-            1 => SplitZone1Code,
-            2 => SplitZone2Code,
-            3 => SplitZone3Code,
-            4 => SplitZone4Code,
-            _ => LogAndSkipInvalidWorkingArea(task)
-        };
+        return LogAndSkipInvalidWorkingArea(task);
     }
 
     private string? LogAndSkipInvalidWorkingArea(BusinessTaskWaveTaskStatsRow task)
     {
         _logger.LogWarning(
-            "Wave zone statistics skipped a split task because WorkingArea is out of range. TaskCode={TaskCode}, WaveCode={WaveCode}, SourceType={SourceType}, WorkingArea={WorkingArea}",
+            "Wave zone statistics skipped a split task because WorkingArea is invalid. TaskCode={TaskCode}, WaveCode={WaveCode}, SourceType={SourceType}, WorkingArea={WorkingArea}",
             task.TaskCode,
             task.WaveCode,
             task.SourceType,
             task.WorkingArea);
         return null;
+    }
+
+    private static string NormalizeWorkingAreaKey(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+        foreach (var ch in value)
+        {
+            if (char.IsLetterOrDigit(ch))
+            {
+                builder.Append(char.ToUpperInvariant(ch));
+            }
+        }
+
+        return builder.ToString();
     }
 
     private static string EscapeCsvField(string value)

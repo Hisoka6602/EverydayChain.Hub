@@ -21,6 +21,7 @@ public static class StartupConfigurationValidator
     {
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
         EnsureConnectionStringConfigured(shardingOptions.ConnectionString, $"{ShardingOptions.SectionName}.ConnectionString");
+        EnsureLogCleanupOptionsConfigured(configuration);
 
         if (!IsOracleConnectionRequired(configuration))
         {
@@ -69,6 +70,19 @@ public static class StartupConfigurationValidator
         if (connectionString.Contains(PlaceholderToken, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException($"{configurationPath} 仍是占位值。请通过环境变量、User Secrets 或部署配置覆盖默认占位字符串。");
+        }
+    }
+    /// <summary>
+    /// 校验日志清理配置是否合法。
+    /// </summary>
+    /// <param name="configuration">应用配置。</param>
+    private static void EnsureLogCleanupOptionsConfigured(IConfiguration configuration)
+    {
+        var options = configuration.GetSection(LogCleanupOptions.SectionName).Get<LogCleanupOptions>() ?? new LogCleanupOptions();
+        var validationErrors = options.Validate();
+        if (validationErrors.Count > 0)
+        {
+            throw new InvalidOperationException(string.Join(" ", validationErrors));
         }
     }
 }

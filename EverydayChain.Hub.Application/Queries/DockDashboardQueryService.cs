@@ -68,7 +68,9 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
             return await BuildResultAsync(request.StartTimeLocal, request.EndTimeLocal, selectedWaveCode, cancellationToken);
         }
 
-        var cacheKey = $"dock-dashboard:{request.StartTimeLocal.ToString(CacheKeyDateTimeFormat)}:{request.EndTimeLocal.ToString(CacheKeyDateTimeFormat)}:{selectedWaveCode ?? NullCacheValue}";
+        var normalizedStartTime = QueryCacheTimeBucket.Normalize(request.StartTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var normalizedEndTime = QueryCacheTimeBucket.Normalize(request.EndTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var cacheKey = $"dock-dashboard:{normalizedStartTime.ToString(CacheKeyDateTimeFormat)}:{normalizedEndTime.ToString(CacheKeyDateTimeFormat)}:{selectedWaveCode ?? NullCacheValue}";
         var ttl = Math.Clamp(_queryCacheOptions.DockDashboardSeconds, 1, 60);
         var cached = await MemoryCacheSingleFlight.GetOrCreateAsync(
             _memoryCache,

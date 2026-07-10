@@ -27,7 +27,6 @@ public class DesignTimeHubDbContextFactory : IDesignTimeDbContextFactory<HubDbCo
             .SetBasePath(hostProjectDirectory)
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
             .AddJsonFile($"appsettings.{environmentName}.json", optional: true, reloadOnChange: false)
-            .AddJsonFile("appsettings.ReadOnlySync.json", optional: true, reloadOnChange: false)
             .Build();
 
         var optionsBuilder = new DbContextOptionsBuilder<HubDbContext>();

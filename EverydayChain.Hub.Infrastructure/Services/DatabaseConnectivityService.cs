@@ -22,22 +22,22 @@ public sealed class DatabaseConnectivityService(
     ILogger<DatabaseConnectivityService> logger) : IDatabaseConnectivityService
 {
     /// <summary>
-    /// 存储连通性快照缓存秒数。
+    /// 快照缓存秒数。
     /// </summary>
     private const int ProbeCacheSeconds = 5;
 
     /// <summary>
-    /// 存储单次探测超时秒数。
+    /// 单次探测超时秒数。
     /// </summary>
     private const int ProbeTimeoutSeconds = 5;
 
     /// <summary>
-    /// 存储本地数据库名称。
+    /// 本地数据库名称。
     /// </summary>
     private const string LocalSqlServerName = "本地 MSSQL";
 
     /// <summary>
-    /// 存储远端数据库名称。
+    /// 远端数据库名称。
     /// </summary>
     private const string OracleName = "远端 Oracle";
 
@@ -47,48 +47,53 @@ public sealed class DatabaseConnectivityService(
     private readonly OracleOptions _oracleOptions = oracleOptions.Value;
 
     /// <summary>
-    /// 存储探测互斥锁。
+    /// 完整快照探测锁，避免重复串行探测 Oracle。
     /// </summary>
     private readonly SemaphoreSlim _probeLock = new(1, 1);
 
     /// <summary>
-    /// 存储最近一次快照。
+    /// 本地 MSSQL 快速探测锁，避免并发重复打本地库。
     /// </summary>
-    private DatabaseConnectivitySnapshot _lastSnapshot = new()
-    {
-        CheckedAtLocal = DateTime.MinValue,
-        LocalSqlServer = new DatabaseEndpointConnectivityState
-        {
-            DatabaseName = LocalSqlServerName,
-            IsAvailable = false,
-            Description = $"{LocalSqlServerName} 尚未完成连通性探测"
-        },
-        Oracle = new DatabaseEndpointConnectivityState
-        {
-            DatabaseName = OracleName,
-            IsAvailable = false,
-            Description = $"{OracleName} 尚未完成连通性探测"
-        }
-    };
+    private readonly SemaphoreSlim _localSqlProbeLock = new(1, 1);
 
     /// <summary>
-    /// 存储最近一次探测时间戳。
+    /// 最近一次完整快照。
+    /// </summary>
+    private DatabaseConnectivitySnapshot _lastSnapshot = CreateUnknownSnapshot();
+
+    /// <summary>
+    /// 最近一次完整探测时间戳。
     /// </summary>
     private long _lastProbeTimestamp;
 
     /// <summary>
-    /// 存储最近一次已记录日志的快照指纹。
+    /// 最近一次完整快照的日志指纹。
     /// </summary>
     private string _lastLoggedFingerprint = string.Empty;
 
     /// <summary>
-    /// 获取数据库连通性快照。
+    /// 最近一次本地 MSSQL 连通性状态。
+    /// </summary>
+    private DatabaseEndpointConnectivityState _lastLocalSqlServerState = CreateUnknownState(LocalSqlServerName);
+
+    /// <summary>
+    /// 最近一次本地 MSSQL 探测时间戳。
+    /// </summary>
+    private long _lastLocalSqlProbeTimestamp;
+
+    /// <summary>
+    /// 最近一次本地 MSSQL 状态日志指纹。
+    /// </summary>
+    private string _lastLoggedLocalSqlFingerprint = string.Empty;
+
+    /// <summary>
+    /// 获取完整的数据库连通性快照。
     /// </summary>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>数据库连通性快照。</returns>
     public async Task<DatabaseConnectivitySnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
     {
-        if (CanReuseCachedSnapshot())
+        if (CanReuseCachedProbe(Interlocked.Read(ref _lastProbeTimestamp)))
         {
             return _lastSnapshot;
         }
@@ -97,7 +102,7 @@ public sealed class DatabaseConnectivityService(
     }
 
     /// <summary>
-    /// 强制刷新数据库连通性快照。
+    /// 强制刷新完整的数据库连通性快照。
     /// </summary>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>数据库连通性快照。</returns>
@@ -106,7 +111,6 @@ public sealed class DatabaseConnectivityService(
         await _probeLock.WaitAsync(cancellationToken);
         try
         {
-            // 步骤：Refresh 语义必须绕过缓存，确保自动迁移后的可用性状态能够被立即重新探测。
             var snapshot = await ProbeSnapshotAsync(cancellationToken);
             UpdateCachedSnapshot(snapshot);
             return snapshot;
@@ -114,6 +118,42 @@ public sealed class DatabaseConnectivityService(
         finally
         {
             _probeLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// 获取本地 MSSQL 的快速连通性状态。
+    /// </summary>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>本地 MSSQL 连通性状态。</returns>
+    public async Task<DatabaseEndpointConnectivityState> GetLocalSqlServerStateAsync(CancellationToken cancellationToken)
+    {
+        if (CanReuseCachedProbe(Interlocked.Read(ref _lastLocalSqlProbeTimestamp)))
+        {
+            return _lastLocalSqlServerState;
+        }
+
+        return await RefreshLocalSqlServerStateAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// 强制刷新本地 MSSQL 的快速连通性状态。
+    /// </summary>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>本地 MSSQL 连通性状态。</returns>
+    public async Task<DatabaseEndpointConnectivityState> RefreshLocalSqlServerStateAsync(CancellationToken cancellationToken)
+    {
+        await _localSqlProbeLock.WaitAsync(cancellationToken);
+        try
+        {
+            var checkedAtLocal = DateTime.Now;
+            var localSqlServerState = await ProbeLocalSqlServerAsync(cancellationToken);
+            UpdateCachedLocalSqlServerState(localSqlServerState, checkedAtLocal, shouldLog: true);
+            return localSqlServerState;
+        }
+        finally
+        {
+            _localSqlProbeLock.Release();
         }
     }
 
@@ -153,23 +193,6 @@ public sealed class DatabaseConnectivityService(
         }
 
         return false;
-    }
-
-    /// <summary>
-    /// 判断当前是否可以复用缓存快照。
-    /// </summary>
-    /// <returns>可复用时返回 <c>true</c>，否则返回 <c>false</c>。</returns>
-    private bool CanReuseCachedSnapshot()
-    {
-        var lastProbeTimestamp = Interlocked.Read(ref _lastProbeTimestamp);
-        if (lastProbeTimestamp == 0)
-        {
-            return false;
-        }
-
-        var cacheWindowTicks = ProbeCacheSeconds * Stopwatch.Frequency;
-        var elapsedTicks = Stopwatch.GetTimestamp() - lastProbeTimestamp;
-        return elapsedTicks <= cacheWindowTicks;
     }
 
     /// <summary>
@@ -254,13 +277,15 @@ public sealed class DatabaseConnectivityService(
     }
 
     /// <summary>
-    /// 更新缓存快照并按状态变化输出日志。
+    /// 更新完整快照缓存并输出状态变化日志。
     /// </summary>
     /// <param name="snapshot">最新快照。</param>
     private void UpdateCachedSnapshot(DatabaseConnectivitySnapshot snapshot)
     {
         _lastSnapshot = snapshot;
         Interlocked.Exchange(ref _lastProbeTimestamp, Stopwatch.GetTimestamp());
+        UpdateCachedLocalSqlServerState(snapshot.LocalSqlServer, snapshot.CheckedAtLocal, shouldLog: false);
+
         var fingerprint = BuildSnapshotFingerprint(snapshot);
         if (string.Equals(fingerprint, _lastLoggedFingerprint, StringComparison.Ordinal))
         {
@@ -283,7 +308,64 @@ public sealed class DatabaseConnectivityService(
     }
 
     /// <summary>
-    /// 构建快照状态指纹。
+    /// 更新本地 MSSQL 快速探测缓存并按需输出状态变化日志。
+    /// </summary>
+    /// <param name="localSqlServerState">最新本地 MSSQL 状态。</param>
+    /// <param name="checkedAtLocal">探测时间。</param>
+    /// <param name="shouldLog">是否输出日志。</param>
+    private void UpdateCachedLocalSqlServerState(
+        DatabaseEndpointConnectivityState localSqlServerState,
+        DateTime checkedAtLocal,
+        bool shouldLog)
+    {
+        _lastLocalSqlServerState = CloneState(localSqlServerState);
+        Interlocked.Exchange(ref _lastLocalSqlProbeTimestamp, Stopwatch.GetTimestamp());
+
+        var fingerprint = BuildLocalSqlServerFingerprint(localSqlServerState);
+        if (string.Equals(fingerprint, _lastLoggedLocalSqlFingerprint, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastLoggedLocalSqlFingerprint = fingerprint;
+        if (!shouldLog)
+        {
+            return;
+        }
+
+        if (localSqlServerState.IsAvailable)
+        {
+            logger.LogInformation(
+                "本地 MSSQL 快速探测通过。CheckedAtLocal={CheckedAtLocal}",
+                checkedAtLocal);
+            return;
+        }
+
+        logger.LogWarning(
+            "本地 MSSQL 快速探测失败。CheckedAtLocal={CheckedAtLocal}, Description={Description}",
+            checkedAtLocal,
+            localSqlServerState.Description);
+    }
+
+    /// <summary>
+    /// 判断探测缓存是否仍可复用。
+    /// </summary>
+    /// <param name="lastProbeTimestamp">最近一次探测时间戳。</param>
+    /// <returns>可复用时返回 <c>true</c>，否则返回 <c>false</c>。</returns>
+    private static bool CanReuseCachedProbe(long lastProbeTimestamp)
+    {
+        if (lastProbeTimestamp == 0)
+        {
+            return false;
+        }
+
+        var cacheWindowTicks = ProbeCacheSeconds * Stopwatch.Frequency;
+        var elapsedTicks = Stopwatch.GetTimestamp() - lastProbeTimestamp;
+        return elapsedTicks <= cacheWindowTicks;
+    }
+
+    /// <summary>
+    /// 构建完整快照状态指纹。
     /// </summary>
     /// <param name="snapshot">数据库连通性快照。</param>
     /// <returns>状态指纹。</returns>
@@ -295,6 +377,33 @@ public sealed class DatabaseConnectivityService(
             snapshot.LocalSqlServer.Description,
             snapshot.Oracle.IsAvailable,
             snapshot.Oracle.Description);
+    }
+
+    /// <summary>
+    /// 构建本地 MSSQL 状态指纹。
+    /// </summary>
+    /// <param name="localSqlServerState">本地 MSSQL 状态。</param>
+    /// <returns>状态指纹。</returns>
+    private static string BuildLocalSqlServerFingerprint(DatabaseEndpointConnectivityState localSqlServerState)
+    {
+        return string.Join(
+            "|",
+            localSqlServerState.IsAvailable,
+            localSqlServerState.Description);
+    }
+
+    /// <summary>
+    /// 创建完整未知状态快照。
+    /// </summary>
+    /// <returns>未知状态快照。</returns>
+    private static DatabaseConnectivitySnapshot CreateUnknownSnapshot()
+    {
+        return new DatabaseConnectivitySnapshot
+        {
+            CheckedAtLocal = DateTime.MinValue,
+            LocalSqlServer = CreateUnknownState(LocalSqlServerName),
+            Oracle = CreateUnknownState(OracleName)
+        };
     }
 
     /// <summary>
@@ -313,6 +422,21 @@ public sealed class DatabaseConnectivityService(
     }
 
     /// <summary>
+    /// 创建未知状态对象。
+    /// </summary>
+    /// <param name="databaseName">数据库名称。</param>
+    /// <returns>数据库端点状态。</returns>
+    private static DatabaseEndpointConnectivityState CreateUnknownState(string databaseName)
+    {
+        return new DatabaseEndpointConnectivityState
+        {
+            DatabaseName = databaseName,
+            IsAvailable = false,
+            Description = $"{databaseName} 尚未完成连通性探测"
+        };
+    }
+
+    /// <summary>
     /// 创建不可用状态对象。
     /// </summary>
     /// <param name="databaseName">数据库名称。</param>
@@ -326,6 +450,21 @@ public sealed class DatabaseConnectivityService(
             DatabaseName = databaseName,
             IsAvailable = false,
             Description = $"{databaseName} 无法连接（{normalizedDetail}）"
+        };
+    }
+
+    /// <summary>
+    /// 克隆数据库端点状态，避免外部修改缓存对象。
+    /// </summary>
+    /// <param name="state">待克隆状态。</param>
+    /// <returns>克隆后的状态对象。</returns>
+    private static DatabaseEndpointConnectivityState CloneState(DatabaseEndpointConnectivityState state)
+    {
+        return new DatabaseEndpointConnectivityState
+        {
+            DatabaseName = state.DatabaseName,
+            IsAvailable = state.IsAvailable,
+            Description = state.Description
         };
     }
 

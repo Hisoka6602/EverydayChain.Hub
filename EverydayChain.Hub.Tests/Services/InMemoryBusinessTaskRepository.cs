@@ -31,10 +31,41 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     /// </summary>
     private long _nextId = 1;
 
+    /// <summary>
+    /// 获取或设置 QueryPageWithTotalCountCallCount。
+    /// </summary>
+    internal int QueryPageWithTotalCountCallCount { get; private set; }
+
+    /// <summary>
+    /// 获取或设置 QueryByCursorConditionsCallCount。
+    /// </summary>
+    internal int QueryByCursorConditionsCallCount { get; private set; }
+
+    /// <summary>
+    /// 获取或设置 FindByBarcodeCallCount。
+    /// </summary>
+    internal int FindByBarcodeCallCount { get; private set; }
+
+    /// <summary>
+    /// 获取或设置 FindByTaskCodeCallCount。
+    /// </summary>
+    internal int FindByTaskCodeCallCount { get; private set; }
+
+    /// <summary>
+    /// 获取或设置 GetByIdsCallCount。
+    /// </summary>
+    internal int GetByIdsCallCount { get; private set; }
+
+    /// <summary>
+    /// 获取或设置 FindByWaveCodeAndCreatedTimeRangeCallCount。
+    /// </summary>
+    internal int FindByWaveCodeAndCreatedTimeRangeCallCount { get; private set; }
+
     public Task<BusinessTaskEntity?> FindByBarcodeAsync(string barcode, CancellationToken ct)
     {
         lock (_gate)
         {
+            FindByBarcodeCallCount++;
             return Task.FromResult(_tasks.FirstOrDefault(x => string.Equals(x.Barcode, barcode, StringComparison.OrdinalIgnoreCase)));
         }
     }
@@ -43,6 +74,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     {
         lock (_gate)
         {
+            FindByTaskCodeCallCount++;
             return Task.FromResult(_tasks.FirstOrDefault(x => string.Equals(x.TaskCode, taskCode, StringComparison.OrdinalIgnoreCase)));
         }
     }
@@ -69,6 +101,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     {
         lock (_gate)
         {
+            GetByIdsCallCount++;
             IReadOnlyDictionary<long, BusinessTaskEntity> result = _tasks
                 .Where(task => ids.Contains(task.Id))
                 .ToDictionary(task => task.Id);
@@ -509,6 +542,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
 
         lock (_gate)
         {
+            FindByWaveCodeAndCreatedTimeRangeCallCount++;
             IReadOnlyList<BusinessTaskEntity> result = _tasks
                 .Where(task => task.CreatedTimeLocal >= startTimeLocal && task.CreatedTimeLocal < endTimeLocal)
                 .Where(task => string.Equals(NormalizeWaveCode(task.WaveCode), waveCode.Trim(), StringComparison.OrdinalIgnoreCase))
@@ -676,6 +710,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
         // 步骤：执行 QueryByCursorConditionsAsync 方法的核心处理流程。
         lock (_gate)
         {
+            QueryByCursorConditionsCallCount++;
             var query = BuildFilterQuery(filter)
                 .OrderByDescending(task => task.CreatedTimeLocal)
                 .ThenByDescending(task => task.Id);
@@ -707,6 +742,7 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
         // 步骤：执行 QueryPageWithTotalCountByConditionsAsync 方法的核心处理流程。
         lock (_gate)
         {
+            QueryPageWithTotalCountCallCount++;
             var query = BuildFilterQuery(filter)
                 .OrderByDescending(task => task.CreatedTimeLocal)
                 .ThenByDescending(task => task.Id);

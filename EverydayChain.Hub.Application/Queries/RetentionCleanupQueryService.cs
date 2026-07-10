@@ -1,14 +1,60 @@
 using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Application.Utilities;
+using EverydayChain.Hub.Domain.Options;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace EverydayChain.Hub.Application.Queries;
 
 /// <summary>
 /// 提供保留期清理审计查询服务。
 /// </summary>
-public sealed class RetentionCleanupQueryService(IRetentionCleanupAuditLogRepository retentionCleanupAuditLogRepository) : IRetentionCleanupQueryService
+public sealed class RetentionCleanupQueryService : IRetentionCleanupQueryService
 {
+    /// <summary>
+    /// 存储 CacheKeyDateTimeFormat 字段。
+    /// </summary>
+    private const string CacheKeyDateTimeFormat = "yyyyMMddHHmmssfffffff";
+
+    /// <summary>
+    /// 存储 NullCacheValue 字段。
+    /// </summary>
+    private const string NullCacheValue = "_";
+
+    /// <summary>
+    /// 存储 _retentionCleanupAuditLogRepository 字段。
+    /// </summary>
+    private readonly IRetentionCleanupAuditLogRepository _retentionCleanupAuditLogRepository;
+
+    /// <summary>
+    /// 存储 _memoryCache 字段。
+    /// </summary>
+    private readonly IMemoryCache _memoryCache;
+
+    /// <summary>
+    /// 存储 _queryCacheOptions 字段。
+    /// </summary>
+    private readonly QueryCacheOptions _queryCacheOptions;
+
+    public RetentionCleanupQueryService(IRetentionCleanupAuditLogRepository retentionCleanupAuditLogRepository)
+        : this(
+            retentionCleanupAuditLogRepository,
+            new MemoryCache(new MemoryCacheOptions()),
+            new QueryCacheOptions())
+    {
+    }
+
+    public RetentionCleanupQueryService(
+        IRetentionCleanupAuditLogRepository retentionCleanupAuditLogRepository,
+        IMemoryCache memoryCache,
+        QueryCacheOptions queryCacheOptions)
+    {
+        _retentionCleanupAuditLogRepository = retentionCleanupAuditLogRepository;
+        _memoryCache = memoryCache;
+        _queryCacheOptions = queryCacheOptions;
+    }
+
     /// <summary>
     /// 查询保留期清理审计记录。
     /// </summary>
@@ -17,16 +63,83 @@ public sealed class RetentionCleanupQueryService(IRetentionCleanupAuditLogReposi
     /// <returns>分页查询结果。</returns>
     public async Task<RetentionCleanupAuditQueryResult> QueryAsync(RetentionCleanupAuditQueryRequest request, CancellationToken cancellationToken)
     {
-        // 步骤：规范化分页与筛选参数，再委托仓储执行数据库查询，最后映射为应用层返回模型。
         var pageNumber = request.PageNumber < 1 ? 1 : request.PageNumber;
         var pageSize = request.PageSize < 1 ? 50 : request.PageSize;
-        var queryResult = await retentionCleanupAuditLogRepository.QueryAsync(
+        var normalizedLogicalTableName = NormalizeOptionalValue(request.LogicalTableName);
+        var normalizedTargetCode = NormalizeOptionalValue(request.TargetCode);
+        var normalizedExecutionStage = NormalizeOptionalValue(request.ExecutionStage);
+        var normalizedBatchId = NormalizeOptionalValue(request.BatchId);
+        var emptyResult = new RetentionCleanupAuditQueryResult
+        {
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+
+        if (request.EndTimeLocal <= request.StartTimeLocal)
+        {
+            return emptyResult;
+        }
+
+        if (_queryCacheOptions.Enabled)
+        {
+            var cacheKey = BuildCacheKey(
+                request.StartTimeLocal,
+                request.EndTimeLocal,
+                normalizedLogicalTableName,
+                normalizedTargetCode,
+                normalizedExecutionStage,
+                normalizedBatchId,
+                pageNumber,
+                pageSize);
+            var ttlSeconds = Math.Clamp(_queryCacheOptions.RetentionCleanupSeconds, 1, 60);
+            var cached = await MemoryCacheSingleFlight.GetOrCreateAsync(
+                _memoryCache,
+                cacheKey,
+                TimeSpan.FromSeconds(ttlSeconds),
+                _ => ExecuteQueryAsync(
+                    request.StartTimeLocal,
+                    request.EndTimeLocal,
+                    normalizedLogicalTableName,
+                    normalizedTargetCode,
+                    normalizedExecutionStage,
+                    normalizedBatchId,
+                    pageNumber,
+                    pageSize,
+                    CancellationToken.None),
+                cancellationToken);
+            return cached ?? emptyResult;
+        }
+
+        return await ExecuteQueryAsync(
             request.StartTimeLocal,
             request.EndTimeLocal,
-            NormalizeOptionalValue(request.LogicalTableName),
-            NormalizeOptionalValue(request.TargetCode),
-            NormalizeOptionalValue(request.ExecutionStage),
-            NormalizeOptionalValue(request.BatchId),
+            normalizedLogicalTableName,
+            normalizedTargetCode,
+            normalizedExecutionStage,
+            normalizedBatchId,
+            pageNumber,
+            pageSize,
+            cancellationToken);
+    }
+
+    private async Task<RetentionCleanupAuditQueryResult> ExecuteQueryAsync(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        string? logicalTableName,
+        string? targetCode,
+        string? executionStage,
+        string? batchId,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var queryResult = await _retentionCleanupAuditLogRepository.QueryAsync(
+            startTimeLocal,
+            endTimeLocal,
+            logicalTableName,
+            targetCode,
+            executionStage,
+            batchId,
             pageNumber,
             pageSize,
             cancellationToken);
@@ -69,7 +182,37 @@ public sealed class RetentionCleanupQueryService(IRetentionCleanupAuditLogReposi
     /// <returns>去掉首尾空白后的值；若为空白则返回空引用。</returns>
     private static string? NormalizeOptionalValue(string? value)
     {
-        // 步骤：统一将空白字符串收敛为空引用，避免仓储层重复处理无效筛选条件。
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private string BuildCacheKey(
+        DateTime startTimeLocal,
+        DateTime endTimeLocal,
+        string? logicalTableName,
+        string? targetCode,
+        string? executionStage,
+        string? batchId,
+        int pageNumber,
+        int pageSize)
+    {
+        var normalizedStartTime = QueryCacheTimeBucket.Normalize(startTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var normalizedEndTime = QueryCacheTimeBucket.Normalize(endTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        return string.Join(':',
+            "retention-cleanup",
+            normalizedStartTime.ToString(CacheKeyDateTimeFormat),
+            normalizedEndTime.ToString(CacheKeyDateTimeFormat),
+            NormalizeCacheSegment(logicalTableName),
+            NormalizeCacheSegment(targetCode),
+            NormalizeCacheSegment(executionStage),
+            NormalizeCacheSegment(batchId),
+            pageNumber,
+            pageSize);
+    }
+
+    private static string NormalizeCacheSegment(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? NullCacheValue
+            : value.Trim();
     }
 }

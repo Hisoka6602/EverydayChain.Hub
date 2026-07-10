@@ -7,6 +7,7 @@ using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using EverydayChain.Hub.Domain.Sync;
+using EverydayChain.Hub.Domain.Sync.Models;
 using Newtonsoft.Json;
 
 namespace EverydayChain.Hub.Application.Services;
@@ -370,6 +371,16 @@ public class SyncExecutionService(
         return uniqueKeys.Count == 0 ? "未配置" : string.Join(",", uniqueKeys);
     }
 
+    private static string ResolvePendingStatusMode(RemoteStatusConsumeProfile profile)
+    {
+        if (profile.IgnorePendingStatusValue)
+        {
+            return "Ignore";
+        }
+
+        return profile.PendingStatusValue is null ? "IsNull" : "Equals";
+    }
+
     /// <summary>
     /// 计算同步批次日志与落库需要的三项核心指标。
     /// </summary>
@@ -519,8 +530,27 @@ public class SyncExecutionService(
         var consumeElapsedMs = 0L;
         var persistElapsedMs = 0L;
         var checkpointElapsedMs = 0L;
+        var statusConsumeProfile = context.Definition.StatusConsumeProfile
+            ?? throw new InvalidOperationException($"表 {context.Definition.TableCode} 缺少 StatusConsumeProfile 配置。");
         try
         {
+            logger.LogInformation(
+                "状态驱动批次计划。TableCode={TableCode}, BatchId={BatchId}, SourceSchema={SourceSchema}, SourceTable={SourceTable}, CursorColumn={CursorColumn}, WindowStartLocal={WindowStartLocal}, WindowEndLocal={WindowEndLocal}, CheckpointCursorLocal={CheckpointCursorLocal}, CheckpointSuccessTimeLocal={CheckpointSuccessTimeLocal}, PendingStatusMode={PendingStatusMode}, PendingStatusValue={PendingStatusValue}, IgnorePendingStatusValue={IgnorePendingStatusValue}, ShouldWriteBackRemoteStatus={ShouldWriteBackRemoteStatus}, StatusBatchSize={StatusBatchSize}",
+                context.Definition.TableCode,
+                context.BatchId,
+                context.Definition.SourceSchema,
+                context.Definition.SourceTable,
+                context.Definition.CursorColumn,
+                context.Window.WindowStartLocal,
+                context.Window.WindowEndLocal,
+                context.Checkpoint.LastSuccessCursorLocal,
+                context.Checkpoint.LastSuccessTimeLocal,
+                ResolvePendingStatusMode(statusConsumeProfile),
+                statusConsumeProfile.PendingStatusValue,
+                statusConsumeProfile.IgnorePendingStatusValue,
+                statusConsumeProfile.ShouldWriteBackRemoteStatus,
+                statusConsumeProfile.BatchSize);
+
             var stepSw = Stopwatch.StartNew();
             await batchRepository.CreateBatchAsync(new SyncBatch
             {

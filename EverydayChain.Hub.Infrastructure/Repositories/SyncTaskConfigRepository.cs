@@ -14,36 +14,104 @@ namespace EverydayChain.Hub.Infrastructure.Repositories;
 /// <summary>
 /// 定义 SyncTaskConfigRepository 类型。
 /// </summary>
-public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, ILogger<SyncTaskConfigRepository> logger) : ISyncTaskConfigRepository
+public class SyncTaskConfigRepository : ISyncTaskConfigRepository
 {
     private static readonly Regex UtcOrOffsetRegex = new(@"(?:Z|[+\-]\d{2}:\d{2}|[+\-]\d{4})\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
     /// 存储 _options 字段。
     /// </summary>
-    private readonly SyncJobOptions _options = syncJobOptions.Value;
+    private readonly SyncJobOptions _options;
+
+    /// <summary>
+    /// 存储 _logger 字段。
+    /// </summary>
+    private readonly ILogger<SyncTaskConfigRepository> _logger;
+
+    /// <summary>
+    /// 存储 _tablesByCode 字段。
+    /// </summary>
+    private readonly IReadOnlyDictionary<string, SyncTableOptions> _tablesByCode;
+
+    /// <summary>
+    /// 存储 _enabledTableCodes 字段。
+    /// </summary>
+    private readonly IReadOnlyList<string> _enabledTableCodes;
+
+    /// <summary>
+    /// 存储 _maxParallelTables 字段。
+    /// </summary>
+    private readonly int _maxParallelTables;
+
+    /// <summary>
+    /// 存储 _definitionCache 字段。
+    /// </summary>
+    private readonly Dictionary<string, SyncTableDefinition> _definitionCache = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 存储 _cacheGate 字段。
+    /// </summary>
+    private readonly object _cacheGate = new();
+
+    public SyncTaskConfigRepository(
+        IOptions<SyncJobOptions> syncJobOptions,
+        ILogger<SyncTaskConfigRepository> logger)
+    {
+        _options = syncJobOptions.Value;
+        _logger = logger;
+        _tablesByCode = _options.Tables
+            .ToDictionary(table => table.TableCode, StringComparer.OrdinalIgnoreCase);
+        _enabledTableCodes = _options.Tables
+            .Where(table => table.Enabled)
+            .Select(table => table.TableCode)
+            .ToList();
+        _maxParallelTables = _options.MaxParallelTables > 0 ? _options.MaxParallelTables : 1;
+    }
 
     public Task<SyncTableDefinition> GetByTableCodeAsync(string tableCode, CancellationToken ct)
     {
-        var table = _options.Tables.FirstOrDefault(x => string.Equals(x.TableCode, tableCode, StringComparison.OrdinalIgnoreCase));
-        if (table is null)
+        if (!_tablesByCode.TryGetValue(tableCode, out var table))
         {
             throw new InvalidOperationException($"Sync table configuration was not found: {tableCode}");
         }
 
-        return Task.FromResult(MapDefinition(table));
+        return Task.FromResult(CloneDefinition(GetOrAddDefinition(table)));
     }
 
     public Task<IReadOnlyList<SyncTableDefinition>> ListEnabledAsync(CancellationToken ct)
     {
-        var definitions = _options.Tables.Where(x => x.Enabled).Select(MapDefinition).ToList();
+        var definitions = new List<SyncTableDefinition>(_enabledTableCodes.Count);
+        foreach (var tableCode in _enabledTableCodes)
+        {
+            if (!_tablesByCode.TryGetValue(tableCode, out var table))
+            {
+                continue;
+            }
+
+            definitions.Add(CloneDefinition(GetOrAddDefinition(table)));
+        }
+
         return Task.FromResult<IReadOnlyList<SyncTableDefinition>>(definitions);
     }
 
     public Task<int> GetMaxParallelTablesAsync(CancellationToken ct)
     {
-        var maxParallelTables = _options.MaxParallelTables > 0 ? _options.MaxParallelTables : 1;
-        return Task.FromResult(maxParallelTables);
+        return Task.FromResult(_maxParallelTables);
+    }
+
+    private SyncTableDefinition GetOrAddDefinition(SyncTableOptions table)
+    {
+        lock (_cacheGate)
+        {
+            if (_definitionCache.TryGetValue(table.TableCode, out var cached))
+            {
+                return cached;
+            }
+
+            var definition = MapDefinition(table);
+            _definitionCache[table.TableCode] = definition;
+            return definition;
+        }
     }
 
     private SyncTableDefinition MapDefinition(SyncTableOptions table)
@@ -160,6 +228,18 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         var writeBackCompletedTimeColumnName = NormalizeAndValidateOptionalIdentifier(table.WriteBackCompletedTimeColumnName, table.TableCode, nameof(table.WriteBackCompletedTimeColumnName));
         var writeBackBatchIdColumnName = NormalizeAndValidateOptionalIdentifier(table.WriteBackBatchIdColumnName, table.TableCode, nameof(table.WriteBackBatchIdColumnName));
 
+        if (table.IgnorePendingStatusValue && table.ShouldWriteBackRemoteStatus)
+        {
+            throw new InvalidOperationException(
+                $"Table {table.TableCode} cannot enable IgnorePendingStatusValue when ShouldWriteBackRemoteStatus is true.");
+        }
+
+        if (table.IgnorePendingStatusValue && string.IsNullOrWhiteSpace(table.CursorColumn))
+        {
+            throw new InvalidOperationException(
+                $"Table {table.TableCode} must define CursorColumn when IgnorePendingStatusValue is enabled.");
+        }
+
         string? pendingStatusValue;
         if (table.PendingStatusValue is null)
         {
@@ -170,11 +250,14 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
             pendingStatusValue = table.PendingStatusValue.Trim();
             if (pendingStatusValue.Length == 0)
             {
-                // 步骤：兼容配置绑定把显式 null 映射为空字符串的场景，按 null 语义处理并输出告警。
-                logger.LogWarning(
-                    "同步表配置检测到空白 PendingStatusValue，已按 null 语义处理。TableCode={TableCode}",
-                    table.TableCode);
                 pendingStatusValue = null;
+                if (!table.IgnorePendingStatusValue)
+                {
+                    // 步骤：兼容配置绑定把显式 null 映射为空字符串的场景，按 null 语义处理并输出告警。
+                    _logger.LogWarning(
+                        "同步表配置检测到空白 PendingStatusValue，已按 null 语义处理。TableCode={TableCode}",
+                        table.TableCode);
+                }
             }
         }
 
@@ -182,6 +265,7 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         {
             StatusColumnName = statusColumnName,
             PendingStatusValue = pendingStatusValue,
+            IgnorePendingStatusValue = table.IgnorePendingStatusValue,
             CompletedStatusValue = completedStatusValue,
             ShouldWriteBackRemoteStatus = table.ShouldWriteBackRemoteStatus,
             BatchSize = batchSize,
@@ -260,8 +344,70 @@ public class SyncTaskConfigRepository(IOptions<SyncJobOptions> syncJobOptions, I
         }
 
         var localTime = DateTime.SpecifyKind(parsed, DateTimeKind.Local);
-        logger.LogInformation("Loaded sync table configuration. TableCode={TableCode}, StartTimeLocal={StartTimeLocal}", tableCode, localTime);
+        _logger.LogInformation("Loaded sync table configuration. TableCode={TableCode}, StartTimeLocal={StartTimeLocal}", tableCode, localTime);
         return localTime;
+    }
+
+    private static SyncTableDefinition CloneDefinition(SyncTableDefinition definition)
+    {
+        return new SyncTableDefinition
+        {
+            TableCode = definition.TableCode,
+            Enabled = definition.Enabled,
+            SyncMode = definition.SyncMode,
+            SourceSchema = definition.SourceSchema,
+            SourceTable = definition.SourceTable,
+            TargetLogicalTable = definition.TargetLogicalTable,
+            CursorColumn = definition.CursorColumn,
+            StartTimeLocal = definition.StartTimeLocal,
+            PollingIntervalSeconds = definition.PollingIntervalSeconds,
+            MaxLagMinutes = definition.MaxLagMinutes,
+            Priority = definition.Priority,
+            PageSize = definition.PageSize,
+            UniqueKeys = definition.UniqueKeys.ToArray(),
+            ExcludedColumns = definition.ExcludedColumns.ToArray(),
+            DeletionPolicy = definition.DeletionPolicy,
+            DeletionEnabled = definition.DeletionEnabled,
+            DeletionDryRun = definition.DeletionDryRun,
+            DeletionCompareSegmentSize = definition.DeletionCompareSegmentSize,
+            DeletionCompareMaxParallelism = definition.DeletionCompareMaxParallelism,
+            RetentionEnabled = definition.RetentionEnabled,
+            RetentionKeepMonths = definition.RetentionKeepMonths,
+            RetentionDryRun = definition.RetentionDryRun,
+            RetentionAllowDrop = definition.RetentionAllowDrop,
+            StatusConsumeProfile = CloneStatusConsumeProfile(definition.StatusConsumeProfile),
+            SourceType = definition.SourceType,
+            BusinessKeyColumn = definition.BusinessKeyColumn,
+            BarcodeColumn = definition.BarcodeColumn,
+            WaveCodeColumn = definition.WaveCodeColumn,
+            WaveRemarkColumn = definition.WaveRemarkColumn,
+            WorkingAreaColumn = definition.WorkingAreaColumn,
+            OrderIdColumn = definition.OrderIdColumn,
+            StoreIdColumn = definition.StoreIdColumn,
+            StoreNameColumn = definition.StoreNameColumn,
+            ProductCodeColumn = definition.ProductCodeColumn,
+            PickLocationColumn = definition.PickLocationColumn
+        };
+    }
+
+    private static RemoteStatusConsumeProfile? CloneStatusConsumeProfile(RemoteStatusConsumeProfile? profile)
+    {
+        if (profile is null)
+        {
+            return null;
+        }
+
+        return new RemoteStatusConsumeProfile
+        {
+            StatusColumnName = profile.StatusColumnName,
+            PendingStatusValue = profile.PendingStatusValue,
+            IgnorePendingStatusValue = profile.IgnorePendingStatusValue,
+            CompletedStatusValue = profile.CompletedStatusValue,
+            ShouldWriteBackRemoteStatus = profile.ShouldWriteBackRemoteStatus,
+            BatchSize = profile.BatchSize,
+            WriteBackCompletedTimeColumnName = profile.WriteBackCompletedTimeColumnName,
+            WriteBackBatchIdColumnName = profile.WriteBackBatchIdColumnName
+        };
     }
 
     private static SyncTablePriority ParsePriority(string? priorityText, string tableCode)

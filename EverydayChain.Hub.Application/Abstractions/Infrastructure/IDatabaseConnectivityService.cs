@@ -6,18 +6,32 @@ namespace EverydayChain.Hub.Application.Abstractions.Infrastructure;
 public interface IDatabaseConnectivityService
 {
     /// <summary>
-    /// 获取数据库连通性快照。
+    /// 获取完整的数据库连通性快照。
     /// </summary>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>数据库连通性快照。</returns>
     Task<DatabaseConnectivitySnapshot> GetSnapshotAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// 强制刷新数据库连通性快照。
+    /// 强制刷新完整的数据库连通性快照。
     /// </summary>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>数据库连通性快照。</returns>
     Task<DatabaseConnectivitySnapshot> RefreshSnapshotAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// 获取本地 MSSQL 的快速连通性状态。
+    /// </summary>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>本地 MSSQL 连通性状态。</returns>
+    Task<DatabaseEndpointConnectivityState> GetLocalSqlServerStateAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// 强制刷新本地 MSSQL 的快速连通性状态。
+    /// </summary>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>本地 MSSQL 连通性状态。</returns>
+    Task<DatabaseEndpointConnectivityState> RefreshLocalSqlServerStateAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// 判断异常是否属于数据库连接类异常。

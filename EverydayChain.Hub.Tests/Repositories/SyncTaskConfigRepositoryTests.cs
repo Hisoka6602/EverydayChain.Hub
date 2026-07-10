@@ -2,6 +2,7 @@
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Infrastructure.Repositories;
 using EverydayChain.Hub.Tests.Services;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Tests.Repositories;
@@ -53,6 +54,7 @@ public class SyncTaskConfigRepositoryTests
         Assert.Equal(SyncMode.StatusDriven, definition.SyncMode);
         Assert.NotNull(definition.StatusConsumeProfile);
         Assert.Null(definition.StatusConsumeProfile!.PendingStatusValue);
+        Assert.False(definition.StatusConsumeProfile.IgnorePendingStatusValue);
         Assert.Equal(5000, definition.StatusConsumeProfile.BatchSize);
         Assert.Equal("TASKPROCESS", definition.StatusConsumeProfile.StatusColumnName);
     }
@@ -95,6 +97,97 @@ public class SyncTaskConfigRepositoryTests
         var definition = await repository.GetByTableCodeAsync("T1", CancellationToken.None);
 
         Assert.Null(definition.StatusConsumeProfile!.PendingStatusValue);
+    }
+
+    /// <summary>
+    /// 验证启用忽略待处理状态值时会正确映射开关。
+    /// </summary>
+    [Fact]
+    public async Task GetByTableCodeAsync_WhenStatusDrivenAndIgnorePendingStatusEnabled_ShouldMapFlag()
+    {
+        var options = BuildOptions(table =>
+        {
+            table.SyncMode = nameof(SyncMode.StatusDriven);
+            table.PendingStatusValue = "DONE";
+            table.IgnorePendingStatusValue = true;
+            table.ShouldWriteBackRemoteStatus = false;
+        });
+        var logger = new TestLogger<SyncTaskConfigRepository>();
+        var repository = new SyncTaskConfigRepository(Options.Create(options), logger);
+
+        var definition = await repository.GetByTableCodeAsync("T1", CancellationToken.None);
+
+        Assert.NotNull(definition.StatusConsumeProfile);
+        Assert.True(definition.StatusConsumeProfile!.IgnorePendingStatusValue);
+        Assert.Equal("DONE", definition.StatusConsumeProfile.PendingStatusValue);
+    }
+
+    /// <summary>
+    /// 验证启用忽略待处理状态值时，空白 PendingStatusValue 不再输出误导性告警。
+    /// </summary>
+    [Fact]
+    public async Task GetByTableCodeAsync_WhenIgnorePendingStatusEnabledAndPendingBlank_ShouldNotWarn()
+    {
+        var options = BuildOptions(table =>
+        {
+            table.SyncMode = nameof(SyncMode.StatusDriven);
+            table.PendingStatusValue = " ";
+            table.IgnorePendingStatusValue = true;
+            table.ShouldWriteBackRemoteStatus = false;
+        });
+        var logger = new TestLogger<SyncTaskConfigRepository>();
+        var repository = new SyncTaskConfigRepository(Options.Create(options), logger);
+
+        var definition = await repository.GetByTableCodeAsync("T1", CancellationToken.None);
+
+        Assert.NotNull(definition.StatusConsumeProfile);
+        Assert.True(definition.StatusConsumeProfile!.IgnorePendingStatusValue);
+        Assert.DoesNotContain(logger.Logs, entry =>
+            entry.Level == LogLevel.Warning
+            && entry.Message.Contains("PendingStatusValue", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// 验证忽略待处理状态值时禁止同时启用远端回写，避免误更新远端状态。
+    /// </summary>
+    [Fact]
+    public async Task GetByTableCodeAsync_WhenIgnorePendingStatusEnabledAndWriteBackEnabled_ShouldThrow()
+    {
+        var options = BuildOptions(table =>
+        {
+            table.SyncMode = nameof(SyncMode.StatusDriven);
+            table.IgnorePendingStatusValue = true;
+            table.ShouldWriteBackRemoteStatus = true;
+        });
+        var logger = new TestLogger<SyncTaskConfigRepository>();
+        var repository = new SyncTaskConfigRepository(Options.Create(options), logger);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => repository.GetByTableCodeAsync("T1", CancellationToken.None));
+
+        Assert.Contains("IgnorePendingStatusValue", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("ShouldWriteBackRemoteStatus", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// 验证忽略待处理状态值时必须保留游标列，避免无边界全表扫描。
+    /// </summary>
+    [Fact]
+    public async Task GetByTableCodeAsync_WhenIgnorePendingStatusEnabledAndCursorColumnBlank_ShouldThrow()
+    {
+        var options = BuildOptions(table =>
+        {
+            table.SyncMode = nameof(SyncMode.StatusDriven);
+            table.IgnorePendingStatusValue = true;
+            table.ShouldWriteBackRemoteStatus = false;
+            table.CursorColumn = " ";
+        });
+        var logger = new TestLogger<SyncTaskConfigRepository>();
+        var repository = new SyncTaskConfigRepository(Options.Create(options), logger);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => repository.GetByTableCodeAsync("T1", CancellationToken.None));
+
+        Assert.Contains("CursorColumn", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("IgnorePendingStatusValue", exception.Message, StringComparison.Ordinal);
     }
 
     /// <summary>

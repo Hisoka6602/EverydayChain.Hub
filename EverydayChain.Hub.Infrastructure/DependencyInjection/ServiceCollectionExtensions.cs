@@ -95,6 +95,7 @@ public static class ServiceCollectionExtensions {
 
         var shardingOptions = configuration.GetSection(ShardingOptions.SectionName).Get<ShardingOptions>() ?? new ShardingOptions();
         var queryCacheOptions = configuration.GetSection(QueryCacheOptions.SectionName).Get<QueryCacheOptions>() ?? new QueryCacheOptions();
+        NormalizeQueryCacheOptions(queryCacheOptions);
         var syncOptions = configuration.GetSection(SyncJobOptions.SectionName).Get<SyncJobOptions>() ?? new SyncJobOptions();
         var retentionJobOptions = configuration.GetSection(RetentionJobOptions.SectionName).Get<RetentionJobOptions>() ?? new RetentionJobOptions();
         var efCoreOptions = configuration.GetSection(EfCoreOptions.SectionName).Get<EfCoreOptions>() ?? new EfCoreOptions();
@@ -102,6 +103,7 @@ public static class ServiceCollectionExtensions {
         var commandTimeoutSeconds = Math.Clamp(efCoreOptions.CommandTimeoutSeconds > 0 ? efCoreOptions.CommandTimeoutSeconds : 30, 1, 600);
 
         services.AddMemoryCache();
+        services.AddSingleton(queryCacheOptions);
         services.AddDbContextFactory<HubDbContext>(options => {
             options.UseSqlServer(shardingOptions.ConnectionString, sqlServerOptions => {
                 sqlServerOptions.EnableRetryOnFailure();
@@ -150,7 +152,12 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IScanLogRepository, ScanLogRepository>();
         services.AddSingleton<IDropLogRepository, DropLogRepository>();
         services.AddSingleton<IScanIngressService, ScanIngressService>();
-        services.AddSingleton<IChuteQueryService, ChuteQueryService>();
+        services.AddSingleton<IChuteQueryService>(sp =>
+            new ChuteQueryService(
+                sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<IBarcodeParser>(),
+                sp.GetRequiredService<IMemoryCache>(),
+                queryCacheOptions));
         services.AddSingleton<IDropFeedbackService, DropFeedbackService>();
         services.AddSingleton<IApiWarmupService, ApiWarmupService>();
         services.AddSingleton<IBusinessTaskSeedService, BusinessTaskSeedService>();
@@ -181,7 +188,12 @@ public static class ServiceCollectionExtensions {
                 sp.GetRequiredService<IBusinessTaskRepository>(),
                 sp.GetRequiredService<IMemoryCache>(),
                 queryCacheOptions));
-        services.AddSingleton<IBoxTrackingQueryService, BoxTrackingQueryService>();
+        services.AddSingleton<IBoxTrackingQueryService>(sp =>
+            new BoxTrackingQueryService(
+                sp.GetRequiredService<IScanLogRepository>(),
+                sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<IMemoryCache>(),
+                queryCacheOptions));
         services.AddSingleton<IWaveQueryService>(sp =>
             /// <summary>
             /// 执行 WaveQueryService 方法。
@@ -199,9 +211,18 @@ public static class ServiceCollectionExtensions {
                 sp.GetRequiredService<IBusinessTaskRepository>(),
                 sp.GetRequiredService<IMemoryCache>(),
                 queryCacheOptions));
-        services.AddSingleton<IRetentionCleanupQueryService, RetentionCleanupQueryService>();
+        services.AddSingleton<IRetentionCleanupQueryService>(sp =>
+            new RetentionCleanupQueryService(
+                sp.GetRequiredService<IRetentionCleanupAuditLogRepository>(),
+                sp.GetRequiredService<IMemoryCache>(),
+                queryCacheOptions));
         services.AddSingleton<IExportCatalogQueryService, ExportCatalogQueryService>();
-        services.AddSingleton<IBusinessTaskReadService, BusinessTaskReadService>();
+        services.AddSingleton<IBusinessTaskReadService>(sp =>
+            new BusinessTaskReadService(
+                sp.GetRequiredService<IBusinessTaskRepository>(),
+                sp.GetRequiredService<ILogger<BusinessTaskReadService>>(),
+                sp.GetRequiredService<IMemoryCache>(),
+                queryCacheOptions));
         services.AddSingleton<IDeletionExecutionService, DeletionExecutionService>();
         services.AddSingleton<IRetentionExecutionService, RetentionExecutionService>();
         services.AddSingleton<ISyncExecutionService, SyncExecutionService>();
@@ -244,6 +265,31 @@ public static class ServiceCollectionExtensions {
                 sp.GetRequiredService<ILogger<RecirculationService>>()));
 
         return services;
+    }
+
+    /// <summary>
+    /// 规范化查询缓存参数，确保启动预热结果能够覆盖首批真实查询。
+    /// </summary>
+    /// <param name="queryCacheOptions">查询缓存配置。</param>
+    private static void NormalizeQueryCacheOptions(QueryCacheOptions queryCacheOptions)
+    {
+        // 步骤：为高频只读查询设置不低于推荐值的缓存桶和 TTL，降低启动后首个真实请求落到底表的概率。
+        queryCacheOptions.AggregateTimeBucketSeconds = Math.Max(queryCacheOptions.AggregateTimeBucketSeconds, 120);
+        queryCacheOptions.GlobalDashboardSeconds = Math.Max(queryCacheOptions.GlobalDashboardSeconds, 60);
+        queryCacheOptions.DockDashboardSeconds = Math.Max(queryCacheOptions.DockDashboardSeconds, 60);
+        queryCacheOptions.SortingReportSeconds = Math.Max(queryCacheOptions.SortingReportSeconds, 60);
+        queryCacheOptions.CurrentWaveSeconds = Math.Max(queryCacheOptions.CurrentWaveSeconds, 30);
+        queryCacheOptions.WaveOptionsSeconds = Math.Max(queryCacheOptions.WaveOptionsSeconds, 60);
+        queryCacheOptions.WaveListSeconds = Math.Max(queryCacheOptions.WaveListSeconds, 60);
+        queryCacheOptions.WaveSummarySeconds = Math.Max(queryCacheOptions.WaveSummarySeconds, 60);
+        queryCacheOptions.WaveZoneSeconds = Math.Max(queryCacheOptions.WaveZoneSeconds, 60);
+        queryCacheOptions.WaveDetailSeconds = Math.Max(queryCacheOptions.WaveDetailSeconds, 30);
+        queryCacheOptions.WaveCleanupSeconds = Math.Max(queryCacheOptions.WaveCleanupSeconds, 30);
+        queryCacheOptions.RecirculationSummarySeconds = Math.Max(queryCacheOptions.RecirculationSummarySeconds, 60);
+        queryCacheOptions.BoxTrackingSeconds = Math.Max(queryCacheOptions.BoxTrackingSeconds, 30);
+        queryCacheOptions.ChuteResolveSeconds = Math.Max(queryCacheOptions.ChuteResolveSeconds, 2);
+        queryCacheOptions.RetentionCleanupSeconds = Math.Max(queryCacheOptions.RetentionCleanupSeconds, 30);
+        queryCacheOptions.BackgroundWarmupIntervalSeconds = Math.Clamp(queryCacheOptions.BackgroundWarmupIntervalSeconds, 5, 300);
     }
 
     /// <summary>

@@ -1,9 +1,12 @@
-﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
+using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Queries;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.Application.Utilities;
 using EverydayChain.Hub.Domain.Aggregates.BusinessTaskAggregate;
 using EverydayChain.Hub.Domain.Aggregates.ScanLogAggregate;
 using EverydayChain.Hub.Domain.Enums;
+using EverydayChain.Hub.Domain.Options;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace EverydayChain.Hub.Application.Queries;
 
@@ -11,14 +14,65 @@ namespace EverydayChain.Hub.Application.Queries;
 /// 提供箱子追踪查询能力。
 /// 该服务只做查询口径整合，不改变分拣机既有扫描上传、格口解析和落格回传的处理协议。
 /// </summary>
-public sealed class BoxTrackingQueryService(
-    IScanLogRepository scanLogRepository,
-    IBusinessTaskRepository businessTaskRepository) : IBoxTrackingQueryService
+public sealed class BoxTrackingQueryService : IBoxTrackingQueryService
 {
+    /// <summary>
+    /// 存储 CacheKeyDateTimeFormat 字段。
+    /// </summary>
+    private const string CacheKeyDateTimeFormat = "yyyyMMddHHmmssfffffff";
+
+    /// <summary>
+    /// 存储 NullCacheValue 字段。
+    /// </summary>
+    private const string NullCacheValue = "_";
+
+    /// <summary>
+    /// 存储 _scanLogRepository 字段。
+    /// </summary>
+    private readonly IScanLogRepository _scanLogRepository;
+
+    /// <summary>
+    /// 存储 _businessTaskRepository 字段。
+    /// </summary>
+    private readonly IBusinessTaskRepository _businessTaskRepository;
+
     /// <summary>
     /// 存储业务任务查询策略。
     /// </summary>
     private readonly BusinessTaskQueryPolicy _queryPolicy = new();
+
+    /// <summary>
+    /// 存储 _memoryCache 字段。
+    /// </summary>
+    private readonly IMemoryCache _memoryCache;
+
+    /// <summary>
+    /// 存储 _queryCacheOptions 字段。
+    /// </summary>
+    private readonly QueryCacheOptions _queryCacheOptions;
+
+    public BoxTrackingQueryService(
+        IScanLogRepository scanLogRepository,
+        IBusinessTaskRepository businessTaskRepository)
+        : this(
+            scanLogRepository,
+            businessTaskRepository,
+            new MemoryCache(new MemoryCacheOptions()),
+            new QueryCacheOptions())
+    {
+    }
+
+    public BoxTrackingQueryService(
+        IScanLogRepository scanLogRepository,
+        IBusinessTaskRepository businessTaskRepository,
+        IMemoryCache memoryCache,
+        QueryCacheOptions queryCacheOptions)
+    {
+        _scanLogRepository = scanLogRepository;
+        _businessTaskRepository = businessTaskRepository;
+        _memoryCache = memoryCache;
+        _queryCacheOptions = queryCacheOptions;
+    }
 
     /// <summary>
     /// 查询箱子追踪分页结果。
@@ -43,37 +97,20 @@ public sealed class BoxTrackingQueryService(
             return result;
         }
 
-        if (!HasTaskLevelFilters(request))
+        if (_queryCacheOptions.Enabled)
         {
-            var skip = (pageNumber - 1) * pageSize;
-            var page = await scanLogRepository.QueryPageAsync(
-                request.StartTimeLocal,
-                request.EndTimeLocal,
-                request.BoxId,
-                request.Scanner,
-                skip,
-                pageSize,
+            var cacheKey = BuildPageCacheKey(request, pageNumber, pageSize);
+            var ttlSeconds = Math.Clamp(_queryCacheOptions.BoxTrackingSeconds, 1, 60);
+            var cached = await MemoryCacheSingleFlight.GetOrCreateAsync(
+                _memoryCache,
+                cacheKey,
+                TimeSpan.FromSeconds(ttlSeconds),
+                _ => ExecuteQueryAsync(request, pageNumber, pageSize, CancellationToken.None),
                 cancellationToken);
-            var taskIds = page.Items
-                .Where(item => item.BusinessTaskId.HasValue)
-                .Select(item => item.BusinessTaskId!.Value)
-                .Distinct()
-                .ToArray();
-            var taskMap = await businessTaskRepository.GetByIdsAsync(taskIds, cancellationToken);
-            result.TotalCount = page.TotalCount;
-            result.Items = page.Items
-                .Select(log => MapItem(log, ResolveTask(log, taskMap)))
-                .Where(item => item is not null)
-                .Select(item => item!)
-                .ToList();
-            return result;
+            return cached ?? result;
         }
 
-        var items = await QueryAllAsync(request, cancellationToken);
-        var pageSkip = (pageNumber - 1) * pageSize;
-        result.TotalCount = items.Count;
-        result.Items = items.Skip(pageSkip).Take(pageSize).ToList();
-        return result;
+        return await ExecuteQueryAsync(request, pageNumber, pageSize, cancellationToken);
     }
 
     /// <summary>
@@ -90,7 +127,74 @@ public sealed class BoxTrackingQueryService(
             return Array.Empty<BoxTrackingItem>();
         }
 
-        var logs = await scanLogRepository.QueryRangeAsync(
+        if (_queryCacheOptions.Enabled)
+        {
+            var cacheKey = BuildAllRowsCacheKey(request);
+            var ttlSeconds = Math.Clamp(_queryCacheOptions.BoxTrackingSeconds, 1, 60);
+            var cached = await MemoryCacheSingleFlight.GetOrCreateAsync(
+                _memoryCache,
+                cacheKey,
+                TimeSpan.FromSeconds(ttlSeconds),
+                _ => QueryAllCoreAsync(request, CancellationToken.None),
+                cancellationToken);
+            return cached ?? Array.Empty<BoxTrackingItem>();
+        }
+
+        return await QueryAllCoreAsync(request, cancellationToken);
+    }
+
+    private async Task<BoxTrackingQueryResult> ExecuteQueryAsync(
+        BoxTrackingQueryRequest request,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var result = new BoxTrackingQueryResult
+        {
+            StartTimeLocal = request.StartTimeLocal,
+            EndTimeLocal = request.EndTimeLocal,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+
+        if (!HasTaskLevelFilters(request))
+        {
+            var skip = (pageNumber - 1) * pageSize;
+            var page = await _scanLogRepository.QueryPageAsync(
+                request.StartTimeLocal,
+                request.EndTimeLocal,
+                request.BoxId,
+                request.Scanner,
+                skip,
+                pageSize,
+                cancellationToken);
+            var taskIds = page.Items
+                .Where(item => item.BusinessTaskId.HasValue)
+                .Select(item => item.BusinessTaskId!.Value)
+                .Distinct()
+                .ToArray();
+            var taskMap = await _businessTaskRepository.GetByIdsAsync(taskIds, cancellationToken);
+            result.TotalCount = page.TotalCount;
+            result.Items = page.Items
+                .Select(log => MapItem(log, ResolveTask(log, taskMap)))
+                .Where(item => item is not null)
+                .Select(item => item!)
+                .ToList();
+            return result;
+        }
+
+        var items = await QueryAllAsync(request, cancellationToken);
+        var pageSkip = (pageNumber - 1) * pageSize;
+        result.TotalCount = items.Count;
+        result.Items = items.Skip(pageSkip).Take(pageSize).ToList();
+        return result;
+    }
+
+    private async Task<IReadOnlyList<BoxTrackingItem>> QueryAllCoreAsync(
+        BoxTrackingQueryRequest request,
+        CancellationToken cancellationToken)
+    {
+        var logs = await _scanLogRepository.QueryRangeAsync(
             request.StartTimeLocal,
             request.EndTimeLocal,
             request.BoxId,
@@ -102,7 +206,7 @@ public sealed class BoxTrackingQueryService(
             .Select(item => item.BusinessTaskId!.Value)
             .Distinct()
             .ToArray();
-        var taskMap = await businessTaskRepository.GetByIdsAsync(taskIds, cancellationToken);
+        var taskMap = await _businessTaskRepository.GetByIdsAsync(taskIds, cancellationToken);
         var normalizedOrderId = NormalizeOptionalText(request.OrderId);
         var normalizedStoreId = NormalizeOptionalText(request.StoreId);
         var normalizedChuteCode = NormalizeOptionalText(request.ChuteCode);
@@ -115,6 +219,40 @@ public sealed class BoxTrackingQueryService(
             .Where(item => normalizedStoreId is null || string.Equals(item.StoreId, normalizedStoreId, StringComparison.OrdinalIgnoreCase))
             .Where(item => normalizedChuteCode is null || string.Equals(item.Chute, normalizedChuteCode, StringComparison.OrdinalIgnoreCase))
             .ToList();
+    }
+
+    private string BuildPageCacheKey(BoxTrackingQueryRequest request, int pageNumber, int pageSize)
+    {
+        var normalizedStartTime = QueryCacheTimeBucket.Normalize(request.StartTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var normalizedEndTime = QueryCacheTimeBucket.Normalize(request.EndTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        return string.Join(':',
+            "box-tracking",
+            "page",
+            normalizedStartTime.ToString(CacheKeyDateTimeFormat),
+            normalizedEndTime.ToString(CacheKeyDateTimeFormat),
+            NormalizeCacheSegment(request.BoxId),
+            NormalizeCacheSegment(request.OrderId),
+            NormalizeCacheSegment(request.StoreId),
+            NormalizeCacheSegment(request.Scanner),
+            NormalizeCacheSegment(request.ChuteCode),
+            pageNumber,
+            pageSize);
+    }
+
+    private string BuildAllRowsCacheKey(BoxTrackingQueryRequest request)
+    {
+        var normalizedStartTime = QueryCacheTimeBucket.Normalize(request.StartTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        var normalizedEndTime = QueryCacheTimeBucket.Normalize(request.EndTimeLocal, _queryCacheOptions.AggregateTimeBucketSeconds);
+        return string.Join(':',
+            "box-tracking",
+            "all",
+            normalizedStartTime.ToString(CacheKeyDateTimeFormat),
+            normalizedEndTime.ToString(CacheKeyDateTimeFormat),
+            NormalizeCacheSegment(request.BoxId),
+            NormalizeCacheSegment(request.OrderId),
+            NormalizeCacheSegment(request.StoreId),
+            NormalizeCacheSegment(request.Scanner),
+            NormalizeCacheSegment(request.ChuteCode));
     }
 
     /// <summary>
@@ -230,5 +368,11 @@ public sealed class BoxTrackingQueryService(
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
-}
 
+    private static string NormalizeCacheSegment(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? NullCacheValue
+            : value.Trim();
+    }
+}

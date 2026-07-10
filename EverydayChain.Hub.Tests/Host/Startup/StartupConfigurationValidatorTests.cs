@@ -69,6 +69,24 @@ public sealed class StartupConfigurationValidatorTests
         StartupConfigurationValidator.Validate(configuration);
     }
 
+    [Fact]
+    public void Validate_ShouldThrow_WhenLogCleanupConfigIsInvalid()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Sharding:ConnectionString"] = "Server=.;Database=Hub;User Id=sa;Password=real;",
+            ["SyncJob:Tables:0:Enabled"] = "false",
+            ["WmsFeedback:Enabled"] = "false",
+            ["FeedbackCompensationJob:Enabled"] = "false",
+            ["LogCleanup:RetentionDays"] = "0"
+        });
+
+        var action = () => StartupConfigurationValidator.Validate(configuration);
+
+        var ex = Assert.Throws<InvalidOperationException>(action);
+        Assert.Contains("LogCleanup.RetentionDays", ex.Message);
+    }
+
     private static IConfiguration BuildConfiguration(IReadOnlyDictionary<string, string?> values)
     {
         return new ConfigurationBuilder()

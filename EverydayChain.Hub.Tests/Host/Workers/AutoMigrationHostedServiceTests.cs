@@ -32,7 +32,9 @@ public sealed class AutoMigrationHostedServiceTests
 
         Assert.Equal(1, runtimeStorageGuard.StartupHealthCheckCount);
         Assert.Equal(1, migrationService.RunCount);
-        Assert.Equal(1, databaseConnectivityService.GetSnapshotCount);
+        Assert.Equal(1, databaseConnectivityService.GetLocalSqlServerStateCount);
+        Assert.Equal(0, databaseConnectivityService.GetSnapshotCount);
+        Assert.Equal(0, databaseConnectivityService.RefreshLocalSqlServerStateCount);
         Assert.Equal(0, databaseConnectivityService.RefreshSnapshotCount);
     }
 
@@ -56,7 +58,9 @@ public sealed class AutoMigrationHostedServiceTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => hostedService.StartAsync(CancellationToken.None));
         Assert.Equal(1, runtimeStorageGuard.StartupHealthCheckCount);
         Assert.Equal(0, migrationService.RunCount);
+        Assert.Equal(0, databaseConnectivityService.GetLocalSqlServerStateCount);
         Assert.Equal(0, databaseConnectivityService.GetSnapshotCount);
+        Assert.Equal(0, databaseConnectivityService.RefreshLocalSqlServerStateCount);
         Assert.Equal(0, databaseConnectivityService.RefreshSnapshotCount);
     }
 
@@ -80,12 +84,14 @@ public sealed class AutoMigrationHostedServiceTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => hostedService.StartAsync(CancellationToken.None));
         Assert.Equal(1, runtimeStorageGuard.StartupHealthCheckCount);
         Assert.Equal(1, migrationService.RunCount);
-        Assert.Equal(1, databaseConnectivityService.GetSnapshotCount);
+        Assert.Equal(1, databaseConnectivityService.GetLocalSqlServerStateCount);
+        Assert.Equal(0, databaseConnectivityService.GetSnapshotCount);
+        Assert.Equal(0, databaseConnectivityService.RefreshLocalSqlServerStateCount);
         Assert.Equal(0, databaseConnectivityService.RefreshSnapshotCount);
     }
 
     [Fact]
-    public async Task StartAsync_ShouldRefreshConnectivitySnapshot_WhenAutoMigrationSucceeds()
+    public async Task StartAsync_ShouldRefreshLocalSqlServerState_WhenAutoMigrationSucceeds()
     {
         var migrationService = new TestAutoMigrationService();
         var databaseConnectivityService = new TestDatabaseConnectivityService();
@@ -102,8 +108,10 @@ public sealed class AutoMigrationHostedServiceTests
 
         Assert.Equal(1, runtimeStorageGuard.StartupHealthCheckCount);
         Assert.Equal(1, migrationService.RunCount);
-        Assert.Equal(1, databaseConnectivityService.GetSnapshotCount);
-        Assert.Equal(1, databaseConnectivityService.RefreshSnapshotCount);
+        Assert.Equal(1, databaseConnectivityService.GetLocalSqlServerStateCount);
+        Assert.Equal(0, databaseConnectivityService.GetSnapshotCount);
+        Assert.Equal(1, databaseConnectivityService.RefreshLocalSqlServerStateCount);
+        Assert.Equal(0, databaseConnectivityService.RefreshSnapshotCount);
     }
 
     [Fact]
@@ -112,21 +120,11 @@ public sealed class AutoMigrationHostedServiceTests
         var migrationService = new TestAutoMigrationService();
         var databaseConnectivityService = new TestDatabaseConnectivityService
         {
-            Snapshot = new DatabaseConnectivitySnapshot
+            LocalSqlServerState = new DatabaseEndpointConnectivityState
             {
-                CheckedAtLocal = DateTime.Now,
-                LocalSqlServer = new DatabaseEndpointConnectivityState
-                {
-                    DatabaseName = "本地 MSSQL",
-                    IsAvailable = false,
-                    Description = "本地 MSSQL 无法连接（测试桩）。"
-                },
-                Oracle = new DatabaseEndpointConnectivityState
-                {
-                    DatabaseName = "远端 Oracle",
-                    IsAvailable = true,
-                    Description = "远端 Oracle 连接正常"
-                }
+                DatabaseName = "本地 MSSQL",
+                IsAvailable = false,
+                Description = "本地 MSSQL 无法连接（测试桩）"
             }
         };
         var serviceProvider = BuildServiceProvider(migrationService);
@@ -142,8 +140,10 @@ public sealed class AutoMigrationHostedServiceTests
 
         Assert.Equal(1, runtimeStorageGuard.StartupHealthCheckCount);
         Assert.Equal(1, migrationService.RunCount);
-        Assert.Equal(1, databaseConnectivityService.GetSnapshotCount);
-        Assert.Equal(1, databaseConnectivityService.RefreshSnapshotCount);
+        Assert.Equal(1, databaseConnectivityService.GetLocalSqlServerStateCount);
+        Assert.Equal(0, databaseConnectivityService.GetSnapshotCount);
+        Assert.Equal(1, databaseConnectivityService.RefreshLocalSqlServerStateCount);
+        Assert.Equal(0, databaseConnectivityService.RefreshSnapshotCount);
     }
 
     /// <summary>
@@ -165,7 +165,17 @@ public sealed class AutoMigrationHostedServiceTests
     private sealed class TestDatabaseConnectivityService : IDatabaseConnectivityService
     {
         /// <summary>
-        /// 预置快照。
+        /// 预置快速本地 MSSQL 状态。
+        /// </summary>
+        public DatabaseEndpointConnectivityState LocalSqlServerState { get; set; } = new()
+        {
+            DatabaseName = "本地 MSSQL",
+            IsAvailable = true,
+            Description = "本地 MSSQL 连接正常"
+        };
+
+        /// <summary>
+        /// 预置完整快照。
         /// </summary>
         public DatabaseConnectivitySnapshot Snapshot { get; set; } = new()
         {
@@ -185,42 +195,49 @@ public sealed class AutoMigrationHostedServiceTests
         };
 
         /// <summary>
-        /// 快照读取次数。
+        /// 本地 MSSQL 状态读取次数。
+        /// </summary>
+        public int GetLocalSqlServerStateCount { get; private set; }
+
+        /// <summary>
+        /// 完整快照读取次数。
         /// </summary>
         public int GetSnapshotCount { get; private set; }
 
         /// <summary>
-        /// 快照刷新次数。
+        /// 本地 MSSQL 状态刷新次数。
+        /// </summary>
+        public int RefreshLocalSqlServerStateCount { get; private set; }
+
+        /// <summary>
+        /// 完整快照刷新次数。
         /// </summary>
         public int RefreshSnapshotCount { get; private set; }
 
-        /// <summary>
-        /// 获取数据库连通性快照。
-        /// </summary>
-        /// <param name="cancellationToken">取消令牌。</param>
-        /// <returns>数据库连通性快照。</returns>
         public Task<DatabaseConnectivitySnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
         {
             GetSnapshotCount++;
             return Task.FromResult(Snapshot);
         }
 
-        /// <summary>
-        /// 强制刷新数据库连通性快照。
-        /// </summary>
-        /// <param name="cancellationToken">取消令牌。</param>
-        /// <returns>数据库连通性快照。</returns>
         public Task<DatabaseConnectivitySnapshot> RefreshSnapshotAsync(CancellationToken cancellationToken)
         {
             RefreshSnapshotCount++;
             return Task.FromResult(Snapshot);
         }
 
-        /// <summary>
-        /// 判断异常是否属于数据库连接类异常。
-        /// </summary>
-        /// <param name="exception">待识别异常。</param>
-        /// <returns>是则返回 <c>true</c>，否则返回 <c>false</c>。</returns>
+        public Task<DatabaseEndpointConnectivityState> GetLocalSqlServerStateAsync(CancellationToken cancellationToken)
+        {
+            GetLocalSqlServerStateCount++;
+            return Task.FromResult(LocalSqlServerState);
+        }
+
+        public Task<DatabaseEndpointConnectivityState> RefreshLocalSqlServerStateAsync(CancellationToken cancellationToken)
+        {
+            RefreshLocalSqlServerStateCount++;
+            return Task.FromResult(LocalSqlServerState);
+        }
+
         public bool IsDatabaseConnectivityException(Exception exception)
         {
             return exception is TestDatabaseException;

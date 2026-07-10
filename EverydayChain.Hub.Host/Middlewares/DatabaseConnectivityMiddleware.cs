@@ -55,10 +55,13 @@ public sealed class DatabaseConnectivityMiddleware
             return;
         }
 
-        var snapshot = await _databaseConnectivityService.GetSnapshotAsync(context.RequestAborted);
-        if (!snapshot.LocalSqlServer.IsAvailable)
+        var localSqlServerState = await _databaseConnectivityService.GetLocalSqlServerStateAsync(context.RequestAborted);
+        if (!localSqlServerState.IsAvailable)
         {
-            await WriteUnavailableResponseAsync(context, snapshot.BuildUserMessage(), context.RequestAborted);
+            await WriteUnavailableResponseAsync(
+                context,
+                $"数据库连接不可用：{localSqlServerState.Description}。",
+                context.RequestAborted);
             return;
         }
 

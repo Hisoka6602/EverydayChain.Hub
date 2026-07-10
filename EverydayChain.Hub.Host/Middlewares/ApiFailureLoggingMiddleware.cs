@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Text;
 using EverydayChain.Hub.Host.Middlewares.Streams;
+using EverydayChain.Hub.Host.Startup;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -59,6 +60,7 @@ public sealed class ApiFailureLoggingMiddleware {
             return;
         }
 
+        var isInternalWarmupRequest = InternalWarmupRequestMarker.IsMarked(context.Request);
         var requestBody = SanitizeForLog(await ReadRequestBodyAsync(context.Request, context.RequestAborted));
         var elapsedStopwatch = Stopwatch.StartNew();
         var requestPath = SanitizeForLog(context.Request.Path.Value ?? string.Empty);
@@ -73,18 +75,20 @@ public sealed class ApiFailureLoggingMiddleware {
         }
         catch (Exception exception) {
             hasUnhandledException = true;
-            var endpointName = SanitizeForLog(context.GetEndpoint()?.DisplayName ?? string.Empty);
-            logger.LogError(
-                exception,
-                "API 请求处理异常。请求方式: {Method}; 路径: {Path}; 查询字符串: {QueryString}; TraceId: {TraceId}; Endpoint: {Endpoint}; 客户端: {UserAgent}; 耗时毫秒: {ElapsedMilliseconds}; 请求体: {RequestBody}",
-                context.Request.Method,
-                requestPath,
-                queryString,
-                context.TraceIdentifier,
-                endpointName,
-                userAgent,
-                ConvertElapsedMilliseconds(elapsedStopwatch.Elapsed),
-                requestBody);
+            if (!isInternalWarmupRequest) {
+                var endpointName = SanitizeForLog(context.GetEndpoint()?.DisplayName ?? string.Empty);
+                logger.LogError(
+                    exception,
+                    "API 请求处理异常。请求方式: {Method}; 路径: {Path}; 查询字符串: {QueryString}; TraceId: {TraceId}; Endpoint: {Endpoint}; 客户端: {UserAgent}; 耗时毫秒: {ElapsedMilliseconds}; 请求体: {RequestBody}",
+                    context.Request.Method,
+                    requestPath,
+                    queryString,
+                    context.TraceIdentifier,
+                    endpointName,
+                    userAgent,
+                    ConvertElapsedMilliseconds(elapsedStopwatch.Elapsed),
+                    requestBody);
+            }
             throw;
         }
         finally {
@@ -92,7 +96,7 @@ public sealed class ApiFailureLoggingMiddleware {
             var endpointName = SanitizeForLog(context.GetEndpoint()?.DisplayName ?? string.Empty);
             var responseBody = SanitizeForLog(TruncatePayload(responseCaptureStream.GetCapturedText(Encoding.UTF8)));
 
-            if (!hasUnhandledException && ShouldLogFailure(context.Response.StatusCode, responseBody)) {
+            if (!isInternalWarmupRequest && !hasUnhandledException && ShouldLogFailure(context.Response.StatusCode, responseBody)) {
                 logger.LogError(
                     "API 请求响应失败。请求方式: {Method}; 路径: {Path}; 查询字符串: {QueryString}; 状态码: {StatusCode}; TraceId: {TraceId}; Endpoint: {Endpoint}; 客户端: {UserAgent}; 耗时毫秒: {ElapsedMilliseconds}; 请求体: {RequestBody}; 响应体: {ResponseBody}",
                     context.Request.Method,
