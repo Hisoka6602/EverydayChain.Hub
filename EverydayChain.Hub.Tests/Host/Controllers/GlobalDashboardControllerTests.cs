@@ -2,6 +2,7 @@
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using Microsoft.AspNetCore.Mvc;
+using System.Text;
 
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
@@ -68,6 +69,27 @@ public sealed class GlobalDashboardControllerTests
         Assert.NotNull(stubService.LastRequest);
         Assert.Equal(request.StartTimeLocal, stubService.LastRequest!.StartTimeLocal);
         Assert.Equal(request.EndTimeLocal, stubService.LastRequest.EndTimeLocal);
+    }
+
+    [Fact]
+    public async Task ExportOverviewCsvAsync_ShouldReturnFile_WithChineseHeader()
+    {
+        var stubService = new StubGlobalDashboardQueryService();
+        var controller = new GlobalDashboardController(stubService);
+        var request = new GlobalDashboardQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 9, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 10, 0, 0), DateTimeKind.Local)
+        };
+
+        var result = await controller.ExportOverviewCsvAsync(request, null, CancellationToken.None);
+        var fileResult = Assert.IsType<FileContentResult>(result);
+
+        Assert.Equal("text/csv; charset=utf-8", fileResult.ContentType);
+        var csvText = Encoding.UTF8.GetString(fileResult.FileContents);
+        Assert.Contains("指标,值", csvText);
+        Assert.Contains("总件数,10", csvText);
+        Assert.DoesNotContain("Metric,Value", csvText);
     }
 
     [Fact]

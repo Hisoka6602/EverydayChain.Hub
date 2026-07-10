@@ -4,6 +4,7 @@ using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using Microsoft.AspNetCore.Mvc;
+using System.Text;
 using AppBoxTrackingQueryRequest = EverydayChain.Hub.Application.Models.BoxTrackingQueryRequest;
 using HostBoxTrackingQueryRequest = EverydayChain.Hub.Host.Contracts.Requests.BoxTrackingQueryRequest;
 
@@ -40,6 +41,30 @@ public sealed class BoxTrackingControllerTests
         Assert.Equal("LOC-001", response.Data.Items[0].PickLocation);
         Assert.NotNull(stubService.LastRequest);
         Assert.Equal("BOX-001", stubService.LastRequest!.BoxId);
+    }
+
+    /// <summary>
+    /// 执行 ExportCsvAsync_ShouldReturnFile_WithChineseHeader 方法。
+    /// </summary>
+    [Fact]
+    public async Task ExportCsvAsync_ShouldReturnFile_WithChineseHeader()
+    {
+        var stubService = new StubBoxTrackingQueryService();
+        var controller = new BoxTrackingController(stubService);
+        var request = new HostBoxTrackingQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 21, 0, 0, 0), DateTimeKind.Local),
+            BoxId = "BOX-001"
+        };
+
+        var result = await controller.ExportCsvAsync(request, null, CancellationToken.None);
+        var fileResult = Assert.IsType<FileContentResult>(result);
+
+        Assert.Equal("text/csv; charset=utf-8", fileResult.ContentType);
+        var csvText = Encoding.UTF8.GetString(fileResult.FileContents);
+        Assert.Contains("订单号,箱号,门店号,门店名称,商品编码,拣货位,扫描设备,扫描时间,格口,状态", csvText);
+        Assert.DoesNotContain("OrderId,BoxId", csvText);
     }
 
     /// <summary>

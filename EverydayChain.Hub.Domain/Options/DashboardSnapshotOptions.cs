@@ -49,5 +49,10 @@ public sealed class DashboardSnapshotOptions
     /// 获取或设置 RefreshLeaseSeconds。
     /// </summary>
     public int RefreshLeaseSeconds { get; set; } = 120;
+
+    /// <summary>
+    /// 获取或设置 ForceInitialFullRefresh。
+    /// </summary>
+    public bool ForceInitialFullRefresh { get; set; }
 }
 

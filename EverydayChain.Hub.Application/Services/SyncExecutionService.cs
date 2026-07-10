@@ -571,6 +571,21 @@ public class SyncExecutionService(
                 context.Window,
                 ct);
             consumeElapsedMs = stepSw.ElapsedMilliseconds;
+            var shouldAdvanceCursor = ShouldAdvanceStatusDrivenCursor(statusConsumeProfile, consumeResult);
+            var lastSuccessCursorLocal = shouldAdvanceCursor
+                ? consumeResult.LastSuccessCursorLocal ?? context.Checkpoint.LastSuccessCursorLocal
+                : context.Checkpoint.LastSuccessCursorLocal;
+            if (!shouldAdvanceCursor)
+            {
+                logger.LogWarning(
+                    "状态驱动消费未推进检查点：远端回写存在失败或跳过。TableCode={TableCode}, BatchId={BatchId}, WriteBackFailCount={WriteBackFailCount}, SkippedWriteBackCount={SkippedWriteBackCount}, CandidateCursorLocal={CandidateCursorLocal}, CurrentCheckpointCursorLocal={CurrentCheckpointCursorLocal}",
+                    context.Definition.TableCode,
+                    context.BatchId,
+                    consumeResult.WriteBackFailCount,
+                    consumeResult.SkippedWriteBackCount,
+                    consumeResult.LastSuccessCursorLocal,
+                    context.Checkpoint.LastSuccessCursorLocal);
+            }
 
             stepSw.Restart();
             await changeLogRepository.WriteChangesAsync([], ct);
@@ -582,7 +597,7 @@ public class SyncExecutionService(
             {
                 TableCode = context.Definition.TableCode,
                 LastBatchId = context.BatchId,
-                LastSuccessCursorLocal = context.Checkpoint.LastSuccessCursorLocal,
+                LastSuccessCursorLocal = lastSuccessCursorLocal,
                 LastSuccessTimeLocal = DateTime.Now,
                 LastError = null,
             }, ct);
@@ -619,7 +634,7 @@ public class SyncExecutionService(
                 checkpointElapsedMs,
                 stopwatch.ElapsedMilliseconds);
             logger.LogInformation(
-                "状态驱动消费同步指标。TableCode={TableCode}, BatchId={BatchId}, ReadCount={ReadCount}, AppendCount={AppendCount}, WriteBackCount={WriteBackCount}, WriteBackFailCount={WriteBackFailCount}, SkippedWriteBackCount={SkippedWriteBackCount}, PageCount={PageCount}, LagMinutes={LagMinutes}, ThroughputRowsPerSecond={ThroughputRowsPerSecond}",
+                "状态驱动消费同步指标。TableCode={TableCode}, BatchId={BatchId}, ReadCount={ReadCount}, AppendCount={AppendCount}, WriteBackCount={WriteBackCount}, WriteBackFailCount={WriteBackFailCount}, SkippedWriteBackCount={SkippedWriteBackCount}, PageCount={PageCount}, LastSuccessCursorLocal={LastSuccessCursorLocal}, LagMinutes={LagMinutes}, ThroughputRowsPerSecond={ThroughputRowsPerSecond}",
                 batchResult.TableCode,
                 batchResult.BatchId,
                 consumeResult.ReadCount,
@@ -628,6 +643,7 @@ public class SyncExecutionService(
                 consumeResult.WriteBackFailCount,
                 consumeResult.SkippedWriteBackCount,
                 consumeResult.PageCount,
+                lastSuccessCursorLocal,
                 batchResult.LagMinutes,
                 batchResult.ThroughputRowsPerSecond);
             return batchResult;
@@ -676,6 +692,19 @@ public class SyncExecutionService(
             }
             throw;
         }
+    }
+
+    /// <summary>
+    /// 判断状态驱动消费是否允许推进游标。
+    /// </summary>
+    private static bool ShouldAdvanceStatusDrivenCursor(RemoteStatusConsumeProfile profile, RemoteStatusConsumeResult result)
+    {
+        if (!profile.ShouldWriteBackRemoteStatus)
+        {
+            return true;
+        }
+
+        return result.WriteBackFailCount == 0 && result.SkippedWriteBackCount == 0;
     }
 }
 

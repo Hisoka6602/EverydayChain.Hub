@@ -69,5 +69,23 @@ public sealed class RecirculationQueryServiceTests
         Assert.Equal("WAVE-001", result.Rows[0].WaveCode);
         Assert.Equal(2, result.Rows[0].RecirculatedCount);
     }
+
+    [Fact]
+    public async Task ExportCsvAsync_ShouldUseChineseHeader()
+    {
+        var repository = new InMemoryBusinessTaskRepository();
+        var service = new RecirculationQueryService(repository);
+        var start = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local);
+        var end = start.AddDays(1);
+
+        var csv = await service.ExportCsvAsync(new RecirculationSummaryQueryRequest
+        {
+            StartTimeLocal = start,
+            EndTimeLocal = end
+        }, CancellationToken.None);
+
+        Assert.StartsWith("格口,波次号,回流数", csv);
+        Assert.DoesNotContain("Chute,WaveNo,Reflow", csv);
+    }
 }
 

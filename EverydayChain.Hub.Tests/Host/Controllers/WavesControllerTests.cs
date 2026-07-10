@@ -2,6 +2,7 @@
 using EverydayChain.Hub.Host.Contracts.Requests;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using Microsoft.AspNetCore.Mvc;
+using System.Text;
 
 namespace EverydayChain.Hub.Tests.Host.Controllers;
 
@@ -183,6 +184,9 @@ public sealed class WavesControllerTests
         var fileResult = Assert.IsType<FileContentResult>(result);
 
         Assert.Equal("text/csv; charset=utf-8", fileResult.ContentType);
+        var csvText = Encoding.UTF8.GetString(fileResult.FileContents);
+        Assert.Contains("区域名称,总数,待分拣数,进度百分比,回流数,异常数", csvText);
+        Assert.DoesNotContain("ZoneName,TotalCount", csvText);
         Assert.NotNull(stubService.LastZoneRequest);
         Assert.Equal("W1", stubService.LastZoneRequest!.WaveCode);
     }
@@ -203,8 +207,32 @@ public sealed class WavesControllerTests
         var fileResult = Assert.IsType<FileContentResult>(result);
 
         Assert.Equal("text/csv; charset=utf-8", fileResult.ContentType);
+        var csvText = Encoding.UTF8.GetString(fileResult.FileContents);
+        Assert.Contains("任务编码,波次号,波次备注,来源类型,作业区域,条码,订单号,门店号,门店名称,商品编码,拣货位,格口,状态,是否回流,是否异常,扫描时间,创建时间,更新时间", csvText);
+        Assert.DoesNotContain("TaskCode,WaveCode", csvText);
         Assert.NotNull(stubService.LastDetailRequest);
         Assert.Equal("W1", stubService.LastDetailRequest!.WaveCode);
+    }
+
+    [Fact]
+    public async Task ExportListCsvAsync_ShouldReturnFile_WithChineseHeader()
+    {
+        var stubService = new StubWaveQueryService();
+        var controller = new WavesController(stubService);
+        var request = new WaveListQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 21, 0, 0, 0), DateTimeKind.Local)
+        };
+
+        var result = await controller.ExportListCsvAsync(request, null, CancellationToken.None);
+        var fileResult = Assert.IsType<FileContentResult>(result);
+
+        Assert.Equal("text/csv; charset=utf-8", fileResult.ContentType);
+        var csvText = Encoding.UTF8.GetString(fileResult.FileContents);
+        Assert.Contains("波次号,备注,包裹总数,待分拣数,拆零总数,整件总数,拆零占比百分比,整件占比百分比,回流数,异常数,创建时间,状态", csvText);
+        Assert.DoesNotContain("WaveId,Remark", csvText);
+        Assert.NotNull(stubService.LastListRequest);
     }
 
     [Fact]

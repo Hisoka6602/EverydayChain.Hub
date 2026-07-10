@@ -34,5 +34,10 @@ public class RemoteStatusConsumeResult
     /// 获取或设置 PageCount。
     /// </summary>
     public int PageCount { get; set; }
+
+    /// <summary>
+    /// 获取或设置 LastSuccessCursorLocal。
+    /// </summary>
+    public DateTime? LastSuccessCursorLocal { get; set; }
 }
 

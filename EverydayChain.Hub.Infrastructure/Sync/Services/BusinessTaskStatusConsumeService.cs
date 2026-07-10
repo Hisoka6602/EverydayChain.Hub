@@ -118,6 +118,7 @@ public class BusinessTaskStatusConsumeService(
                 Rows = projectionRows
             });
             result.AppendCount += await businessTaskRepository.UpsertProjectionBatchAsync(projectionResult.Entities, ct);
+            AdvanceLastSuccessCursor(result, projectionRows);
 
             if (!profile.ShouldWriteBackRemoteStatus)
             {
@@ -179,6 +180,17 @@ public class BusinessTaskStatusConsumeService(
         }
 
         return result;
+    }
+
+    private static void AdvanceLastSuccessCursor(RemoteStatusConsumeResult result, IReadOnlyList<BusinessTaskProjectionRow> rows)
+    {
+        foreach (var row in rows)
+        {
+            if (!result.LastSuccessCursorLocal.HasValue || row.ProjectedTimeLocal > result.LastSuccessCursorLocal.Value)
+            {
+                result.LastSuccessCursorLocal = row.ProjectedTimeLocal;
+            }
+        }
     }
 
     /// <summary>

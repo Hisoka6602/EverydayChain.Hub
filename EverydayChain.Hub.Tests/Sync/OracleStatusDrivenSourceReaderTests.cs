@@ -26,6 +26,7 @@ public class OracleStatusDrivenSourceReaderTests
         Assert.DoesNotContain("TASKPROCESS = :p_pendingStatus", sql, StringComparison.Ordinal);
         Assert.DoesNotContain("TASKPROCESS IS NULL", sql, StringComparison.Ordinal);
         Assert.Contains("ADDTIME >= :p_windowStart AND ADDTIME <= :p_windowEnd", sql, StringComparison.Ordinal);
+        Assert.Contains("ROW_NUMBER() OVER (ORDER BY t.ADDTIME ASC, ROWID ASC) AS RN", sql, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -60,6 +61,8 @@ public class OracleStatusDrivenSourceReaderTests
 
         Assert.Contains("TASKPROCESS = :p_pendingStatus", sql, StringComparison.Ordinal);
         Assert.DoesNotContain("TASKPROCESS IS NULL", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("ORDER BY t.ADDTIME", sql, StringComparison.Ordinal);
+        Assert.Contains("ROW_NUMBER() OVER (ORDER BY ROWID ASC) AS RN", sql, StringComparison.Ordinal);
     }
 
     private static SyncTableDefinition CreateDefinition()

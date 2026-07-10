@@ -3,6 +3,7 @@ using EverydayChain.Hub.Application.Models;
 using EverydayChain.Hub.Host.Controllers;
 using EverydayChain.Hub.Host.Contracts.Responses;
 using Microsoft.AspNetCore.Mvc;
+using System.Text;
 using HostRecirculationSummaryQueryRequest = EverydayChain.Hub.Host.Contracts.Requests.RecirculationSummaryQueryRequest;
 using AppRecirculationSummaryQueryRequest = EverydayChain.Hub.Application.Models.RecirculationSummaryQueryRequest;
 
@@ -41,6 +42,32 @@ public sealed class RecirculationControllerTests
         Assert.Equal("WAVE-001", response.Data.Rows[0].WaveNo);
         Assert.Equal(3, response.Data.Rows[0].Reflow);
         Assert.NotNull(stubService.LastRequest);
+    }
+
+    /// <summary>
+    /// 执行 ExportSummaryCsvAsync_ShouldReturnFile_WithChineseHeader 方法。
+    /// </summary>
+    [Fact]
+    public async Task ExportSummaryCsvAsync_ShouldReturnFile_WithChineseHeader()
+    {
+        // 步骤：执行 ExportSummaryCsvAsync_ShouldReturnFile_WithChineseHeader 方法的核心处理流程。
+        var stubService = new StubRecirculationQueryService();
+        var controller = new RecirculationController(stubService, new StubBusinessTaskReadService());
+        var request = new HostRecirculationSummaryQueryRequest
+        {
+            StartTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local),
+            EndTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 21, 0, 0, 0), DateTimeKind.Local),
+            ChuteCode = "A-12",
+            SortOrder = "Most"
+        };
+
+        var result = await controller.ExportSummaryCsvAsync(request, null, CancellationToken.None);
+        var fileResult = Assert.IsType<FileContentResult>(result);
+
+        Assert.Equal("text/csv; charset=utf-8", fileResult.ContentType);
+        var csvText = Encoding.UTF8.GetString(fileResult.FileContents);
+        Assert.Contains("格口,波次号,回流数", csvText);
+        Assert.DoesNotContain("Chute,WaveNo,Reflow", csvText);
     }
 
     /// <summary>
@@ -109,7 +136,7 @@ public sealed class RecirculationControllerTests
         {
             // 步骤：执行 ExportCsvAsync 方法的核心处理流程。
             LastRequest = request;
-            return Task.FromResult("Chute,WaveNo,Reflow\r\nA-12,WAVE-001,3\r\n");
+            return Task.FromResult("格口,波次号,回流数\r\nA-12,WAVE-001,3\r\n");
         }
     }
 }

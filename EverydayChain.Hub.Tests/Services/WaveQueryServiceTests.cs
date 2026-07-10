@@ -227,6 +227,40 @@ public sealed class WaveQueryServiceTests
     }
 
     [Fact]
+    public async Task ExportCsvAsync_ShouldUseChineseHeaders()
+    {
+        var repository = new InMemoryBusinessTaskRepository();
+        var service = new WaveQueryService(repository, NullLogger<WaveQueryService>.Instance);
+        var start = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 0, 0, 0), DateTimeKind.Local);
+        var end = start.AddDays(1);
+
+        var listCsv = await service.ExportListCsvAsync(new WaveListQueryRequest
+        {
+            StartTimeLocal = start,
+            EndTimeLocal = end
+        }, CancellationToken.None);
+        var detailsCsv = await service.ExportDetailsCsvAsync(new WaveDetailQueryRequest
+        {
+            StartTimeLocal = start,
+            EndTimeLocal = end,
+            WaveCode = "WAVE-001"
+        }, CancellationToken.None);
+        var zonesCsv = await service.ExportZonesCsvAsync(new WaveZoneQueryRequest
+        {
+            StartTimeLocal = start,
+            EndTimeLocal = end,
+            WaveCode = "WAVE-001"
+        }, CancellationToken.None);
+
+        Assert.StartsWith("波次号,备注,包裹总数,待分拣数,拆零总数,整件总数,拆零占比百分比,整件占比百分比,回流数,异常数,创建时间,状态", listCsv);
+        Assert.StartsWith("任务编码,波次号,波次备注,来源类型,作业区域,条码,订单号,门店号,门店名称,商品编码,拣货位,格口,状态,是否回流,是否异常,扫描时间,创建时间,更新时间", detailsCsv);
+        Assert.StartsWith("区域名称,总数,待分拣数,进度百分比,回流数,异常数", zonesCsv);
+        Assert.DoesNotContain("WaveId,Remark", listCsv);
+        Assert.DoesNotContain("TaskCode,WaveCode", detailsCsv);
+        Assert.DoesNotContain("ZoneName,TotalCount", zonesCsv);
+    }
+
+    [Fact]
     public async Task QueryCleanupWaveAsync_ShouldReturnCleanableWaves_WhenWaveCodeIsEmpty()
     {
         var repository = new InMemoryBusinessTaskRepository();

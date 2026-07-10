@@ -43,6 +43,7 @@ public class BusinessTaskStatusConsumeServiceTests
         Assert.Equal(1, result.ReadCount);
         Assert.Equal(1, result.AppendCount);
         Assert.Equal(1, result.WriteBackCount);
+        Assert.Equal(new DateTime(2032, 1, 1, 8, 0, 0, DateTimeKind.Local), result.LastSuccessCursorLocal);
         var entity = await repository.FindByTaskCodeAsync("C1", CancellationToken.None);
         Assert.NotNull(entity);
         Assert.Equal("W1", entity!.WaveCode);
@@ -86,6 +87,7 @@ public class BusinessTaskStatusConsumeServiceTests
         Assert.Equal(1, result.ReadCount);
         Assert.Equal(1, result.AppendCount);
         Assert.Equal(0, result.WriteBackCount);
+        Assert.Equal(new DateTime(2032, 1, 2, 8, 0, 0, DateTimeKind.Local), result.LastSuccessCursorLocal);
         Assert.Equal(0, writer.TotalWriteBackRows);
         var entity = await repository.FindByTaskCodeAsync("SKU1", CancellationToken.None);
         Assert.NotNull(entity);
@@ -178,14 +180,17 @@ public class BusinessTaskStatusConsumeServiceTests
             /// 执行 DateTime 方法。
             /// </summary>
             new DateTime(2026, 4, 20, 23, 59, 59, DateTimeKind.Local));
+        var beforeConsumeLocal = DateTime.Now;
 
         var result = await service.ConsumeAsync(BuildSplitDefinition(false), "B5", window, CancellationToken.None);
+        var afterConsumeLocal = DateTime.Now;
 
         Assert.Equal(1, result.AppendCount);
+        Assert.Equal(expectedProjectedTime, result.LastSuccessCursorLocal);
         var entity = await repository.FindByTaskCodeAsync("C-BIZ-1", CancellationToken.None);
         Assert.NotNull(entity);
         Assert.Equal(expectedProjectedTime, entity!.CreatedTimeLocal);
-        Assert.Equal(expectedProjectedTime, entity.UpdatedTimeLocal);
+        Assert.InRange(entity.UpdatedTimeLocal, beforeConsumeLocal, afterConsumeLocal);
         Assert.NotEqual(DateTime.Now, entity.CreatedTimeLocal);
     }
 

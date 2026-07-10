@@ -50,6 +50,7 @@ public class BusinessTaskProjectionService : IBusinessTaskProjectionService
         var productCode = ValidateOptionalText(row.ProductCode, nameof(row.ProductCode), 64);
         var pickLocation = ValidateOptionalText(row.PickLocation, nameof(row.PickLocation), 64);
         var projectedTimeLocal = ValidateProjectedTimeLocal(row);
+        var updatedTimeLocal = DateTime.Now;
 
         var entity = new BusinessTaskEntity
         {
@@ -68,7 +69,7 @@ public class BusinessTaskProjectionService : IBusinessTaskProjectionService
             PickLocation = pickLocation,
             Status = BusinessTaskStatus.Created,
             CreatedTimeLocal = projectedTimeLocal,
-            UpdatedTimeLocal = projectedTimeLocal
+            UpdatedTimeLocal = updatedTimeLocal
         };
         entity.RefreshQueryFields();
         return entity;

@@ -769,9 +769,10 @@ public sealed class ApiEndpointWarmupService : IApiEndpointWarmupService
         {
             using var response = await _httpClient.SendAsync(requestMessage, cancellationToken);
             var responseBody = await ReadResponseBodyAsync(response, cancellationToken);
+            var responseMediaType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
             stopwatch.Stop();
 
-            var parsedBody = TryParseJson(responseBody);
+            var parsedBody = TryParseJson(responseBody, responseMediaType);
             var apiSuccess = TryReadIsSuccess(parsedBody);
             var apiMessage = TryReadString(parsedBody, "message");
             var hasExpectedStatusCode = expectedStatusCodes.Contains(response.StatusCode);
@@ -891,9 +892,14 @@ public sealed class ApiEndpointWarmupService : IApiEndpointWarmupService
         return new Uri("http://127.0.0.1:5188/");
     }
 
-    private static JsonDocument? TryParseJson(string responseBody)
+    private static JsonDocument? TryParseJson(string responseBody, string mediaType)
     {
         if (string.IsNullOrWhiteSpace(responseBody))
+        {
+            return null;
+        }
+
+        if (!ShouldParseJson(responseBody, mediaType))
         {
             return null;
         }
@@ -906,6 +912,20 @@ public sealed class ApiEndpointWarmupService : IApiEndpointWarmupService
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// 判断响应体是否应该按 JSON 解析。
+    /// </summary>
+    private static bool ShouldParseJson(string responseBody, string mediaType)
+    {
+        if (mediaType.Contains("json", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var trimmedBody = responseBody.TrimStart();
+        return trimmedBody.StartsWith('{') || trimmedBody.StartsWith('[');
     }
 
     private static DateTime TruncateToSecond(DateTime value)

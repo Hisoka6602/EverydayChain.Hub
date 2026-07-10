@@ -72,6 +72,11 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
     private readonly string _ownerId = RuntimeLeaseOwnerId.Create();
 
     /// <summary>
+    /// 存储 _hasCompletedInitialRefresh 字段。
+    /// </summary>
+    private bool _hasCompletedInitialRefresh;
+
+    /// <summary>
     /// 执行 DashboardSnapshotService 方法。
     /// </summary>
     public DashboardSnapshotService(
@@ -117,9 +122,11 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
         {
             var coverageEndLocal = TruncateToMinute(nowLocal).AddMinutes(1);
             var coverageStartLocal = coverageEndLocal.AddHours(-Math.Max(1, _options.InitialBackfillHours));
+            var forceFullRefresh = _options.ForceInitialFullRefresh && !_hasCompletedInitialRefresh;
 
-            await RefreshTaskSnapshotsAsync(coverageStartLocal, coverageEndLocal, nowLocal, ct);
-            await RefreshScanSnapshotsAsync(coverageStartLocal, coverageEndLocal, nowLocal, ct);
+            await RefreshTaskSnapshotsAsync(coverageStartLocal, coverageEndLocal, nowLocal, forceFullRefresh, ct);
+            await RefreshScanSnapshotsAsync(coverageStartLocal, coverageEndLocal, nowLocal, forceFullRefresh, ct);
+            _hasCompletedInitialRefresh = true;
         }
         finally
         {
@@ -127,10 +134,10 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
         }
     }
 
-    private async Task RefreshTaskSnapshotsAsync(DateTime coverageStartLocal, DateTime coverageEndLocal, DateTime refreshTimeLocal, CancellationToken ct)
+    private async Task RefreshTaskSnapshotsAsync(DateTime coverageStartLocal, DateTime coverageEndLocal, DateTime refreshTimeLocal, bool forceFullRefresh, CancellationToken ct)
     {
         var state = await GetSnapshotStateAsync(DashboardSnapshotSource.BusinessTask, ct);
-        var fullRefresh = ShouldRunFullRefresh(state, coverageStartLocal, coverageEndLocal);
+        var fullRefresh = forceFullRefresh || ShouldRunFullRefresh(state, coverageStartLocal, coverageEndLocal);
         var dirtyBuckets = fullRefresh
             ? EnumerateMinuteBuckets(coverageStartLocal, coverageEndLocal).ToHashSet()
             : await LoadDirtyTaskBucketsAsync(state!, coverageStartLocal, coverageEndLocal, refreshTimeLocal, ct);
@@ -158,10 +165,10 @@ public sealed class DashboardSnapshotService : IDashboardSnapshotService
             ct);
     }
 
-    private async Task RefreshScanSnapshotsAsync(DateTime coverageStartLocal, DateTime coverageEndLocal, DateTime refreshTimeLocal, CancellationToken ct)
+    private async Task RefreshScanSnapshotsAsync(DateTime coverageStartLocal, DateTime coverageEndLocal, DateTime refreshTimeLocal, bool forceFullRefresh, CancellationToken ct)
     {
         var state = await GetSnapshotStateAsync(DashboardSnapshotSource.ScanLog, ct);
-        var fullRefresh = ShouldRunFullRefresh(state, coverageStartLocal, coverageEndLocal);
+        var fullRefresh = forceFullRefresh || ShouldRunFullRefresh(state, coverageStartLocal, coverageEndLocal);
         var dirtyBuckets = fullRefresh
             ? EnumerateMinuteBuckets(coverageStartLocal, coverageEndLocal).ToHashSet()
             : await LoadDirtyScanBucketsAsync(state!, coverageStartLocal, coverageEndLocal, refreshTimeLocal, ct);

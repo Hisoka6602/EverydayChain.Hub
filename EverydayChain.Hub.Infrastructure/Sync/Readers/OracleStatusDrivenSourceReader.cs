@@ -155,24 +155,35 @@ public class OracleStatusDrivenSourceReader(
     /// </summary>
     private static string BuildReadSql(SyncTableDefinition definition, RemoteStatusConsumeProfile profile, bool hasCursorFilter) {
         var whereClause = BuildWhereClause(definition, profile, hasCursorFilter);
-        return BuildReadSql(definition, whereClause);
+        return BuildReadSql(definition, whereClause, hasCursorFilter);
     }
 
-    private static string BuildReadSql(SyncTableDefinition definition, string whereClause)
+    private static string BuildReadSql(SyncTableDefinition definition, string whereClause, bool hasCursorFilter)
     {
+        var orderByClause = BuildOrderByClause(definition, hasCursorFilter);
         return $"""
 SELECT *
 FROM (
     SELECT
         t.*,
         ROWID AS "__RowId",
-        ROW_NUMBER() OVER (ORDER BY ROWID) AS RN
+        ROW_NUMBER() OVER (ORDER BY {orderByClause}) AS RN
     FROM {definition.SourceSchema}.{definition.SourceTable} t
     WHERE {whereClause}
 )
 WHERE RN > :p_offset AND RN <= :p_limit
 ORDER BY RN
 """;
+    }
+
+    private static string BuildOrderByClause(SyncTableDefinition definition, bool hasCursorFilter)
+    {
+        if (!hasCursorFilter)
+        {
+            return "ROWID ASC";
+        }
+
+        return $"t.{definition.CursorColumn} ASC, ROWID ASC";
     }
 
     private static string BuildWhereClause(SyncTableDefinition definition, RemoteStatusConsumeProfile profile, bool hasCursorFilter)
