@@ -138,7 +138,8 @@ public sealed class WavesControllerTests
         Assert.Equal("W1", response.Data.Items[0].WaveId);
         Assert.Equal(10, response.Data.Items[0].PackageTotal);
         Assert.Equal(2, response.Data.Items[0].UnsortedCount);
-        Assert.Equal(60M, response.Data.Items[0].SplitRatioPercent);
+        Assert.Equal(1, response.Data.Items[0].SplitUnsortedCount);
+        Assert.Equal(1, response.Data.Items[0].FullCaseUnsortedCount);
         Assert.Equal(3, response.Data.Items[0].RecirculatedCount);
         Assert.Equal("分拣中", response.Data.Items[0].Status);
         Assert.NotNull(stubService.LastListRequest);
@@ -230,7 +231,7 @@ public sealed class WavesControllerTests
 
         Assert.Equal("text/csv; charset=utf-8", fileResult.ContentType);
         var csvText = Encoding.UTF8.GetString(fileResult.FileContents);
-        Assert.Contains("波次号,备注,包裹总数,待分拣数,拆零总数,整件总数,拆零占比百分比,整件占比百分比,回流数,异常数,创建时间,状态", csvText);
+        Assert.Contains("波次号,备注,包裹总数,待分拣数,拆零总数,整件总数,拆零未分拣数量,整件未分拣数量,回流数,异常数,创建时间,状态", csvText);
         Assert.DoesNotContain("WaveId,Remark", csvText);
         Assert.NotNull(stubService.LastListRequest);
     }
@@ -253,4 +254,3 @@ public sealed class WavesControllerTests
         Assert.NotNull(stubService.LastListRequest);
     }
 }
-

@@ -271,7 +271,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
     }
 
     /// <summary>
-    /// 查询波次列表，返回指定时间范围内各波次的总量、待分拣量、拆零占比、整件占比、回流量与异常量。
+    /// 查询波次列表，返回指定时间范围内各波次的总量、待分拣量、拆零未分拣量、整件未分拣量、回流量与异常量。
     /// </summary>
     /// <param name="request">请求体查询条件，指定列表统计时间范围。</param>
     /// <param name="queryRequest">查询字符串查询条件。</param>
@@ -315,8 +315,8 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
                     UnsortedCount = item.UnsortedCount,
                     SplitTotal = item.SplitTotal,
                     FullTotal = item.FullCaseTotal,
-                    SplitRatioPercent = item.SplitRatioPercent,
-                    FullRatioPercent = item.FullCaseRatioPercent,
+                    SplitUnsortedCount = item.SplitUnsortedCount,
+                    FullCaseUnsortedCount = item.FullCaseUnsortedCount,
                     RecirculatedCount = item.RecirculatedCount,
                     ExceptionCount = item.ExceptionCount,
                     CreatedAt = item.CreatedTimeLocal,
@@ -397,7 +397,7 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
         }, cancellationToken);
         var content = SimpleXlsxBuilder.BuildSingleSheet(
             "波次列表",
-            ["波次号", "备注", "包裹总数", "待分拣数", "拆零总数", "整件总数", "拆零占比百分比", "整件占比百分比", "回流数", "异常数", "创建时间", "状态"],
+            ["波次号", "备注", "包裹总数", "待分拣数", "拆零总数", "整件总数", "拆零未分拣数量", "整件未分拣数量", "回流数", "异常数", "创建时间", "状态"],
             result.Items
                 .Select(item => (IReadOnlyList<string?>)
                 [
@@ -407,8 +407,8 @@ public sealed class WavesController(IWaveQueryService waveQueryService) : QueryC
                     item.UnsortedCount.ToString(),
                     item.SplitTotal.ToString(),
                     item.FullCaseTotal.ToString(),
-                    item.SplitRatioPercent.ToString("0.##"),
-                    item.FullCaseRatioPercent.ToString("0.##"),
+                    item.SplitUnsortedCount.ToString(),
+                    item.FullCaseUnsortedCount.ToString(),
                     item.RecirculatedCount.ToString(),
                     item.ExceptionCount.ToString(),
                     item.CreatedTimeLocal.ToString("yyyy-MM-dd HH:mm:ss"),

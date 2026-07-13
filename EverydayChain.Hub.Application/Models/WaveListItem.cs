@@ -36,14 +36,14 @@ public sealed class WaveListItem
     public int FullCaseTotal { get; set; }
 
     /// <summary>
-    /// 获取或设置 SplitRatioPercent。
+    /// 获取或设置 SplitUnsortedCount。
     /// </summary>
-    public decimal SplitRatioPercent { get; set; }
+    public int SplitUnsortedCount { get; set; }
 
     /// <summary>
-    /// 获取或设置 FullCaseRatioPercent。
+    /// 获取或设置 FullCaseUnsortedCount。
     /// </summary>
-    public decimal FullCaseRatioPercent { get; set; }
+    public int FullCaseUnsortedCount { get; set; }
 
     /// <summary>
     /// 获取或设置 RecirculatedCount。

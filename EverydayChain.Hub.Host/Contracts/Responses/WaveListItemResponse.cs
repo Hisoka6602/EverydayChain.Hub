@@ -36,14 +36,14 @@ public sealed class WaveListItemResponse
     public int FullTotal { get; set; }
 
     /// <summary>
-    /// 表示拆零数量在当前波次中的占比百分比。
+    /// 表示拆零任务中尚未完成分拣的数量。
     /// </summary>
-    public decimal SplitRatioPercent { get; set; }
+    public int SplitUnsortedCount { get; set; }
 
     /// <summary>
-    /// 表示整件数量在当前波次中的占比百分比。
+    /// 表示整件任务中尚未完成分拣的数量。
     /// </summary>
-    public decimal FullRatioPercent { get; set; }
+    public int FullCaseUnsortedCount { get; set; }
 
     /// <summary>
     /// 表示回流数量。

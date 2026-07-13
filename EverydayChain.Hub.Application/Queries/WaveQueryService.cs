@@ -249,7 +249,7 @@ public sealed class WaveQueryService : IWaveQueryService
     {
         var result = await QueryListAsync(request, cancellationToken);
         var builder = new StringBuilder();
-        builder.AppendLine("波次号,备注,包裹总数,待分拣数,拆零总数,整件总数,拆零占比百分比,整件占比百分比,回流数,异常数,创建时间,状态");
+        builder.AppendLine("波次号,备注,包裹总数,待分拣数,拆零总数,整件总数,拆零未分拣数量,整件未分拣数量,回流数,异常数,创建时间,状态");
         foreach (var item in result.Items)
         {
             builder.AppendLine(string.Join(",",
@@ -259,8 +259,8 @@ public sealed class WaveQueryService : IWaveQueryService
                 item.UnsortedCount,
                 item.SplitTotal,
                 item.FullCaseTotal,
-                item.SplitRatioPercent,
-                item.FullCaseRatioPercent,
+                item.SplitUnsortedCount,
+                item.FullCaseUnsortedCount,
                 item.RecirculatedCount,
                 item.ExceptionCount,
                 item.CreatedTimeLocal.ToString("yyyy-MM-dd HH:mm:ss"),
@@ -712,8 +712,8 @@ public sealed class WaveQueryService : IWaveQueryService
             UnsortedCount = row.UnsortedCount,
             SplitTotal = row.SplitTotalCount,
             FullCaseTotal = row.FullCaseTotalCount,
-            SplitRatioPercent = _queryPolicy.CalculatePercent(row.SplitTotalCount, row.TotalCount),
-            FullCaseRatioPercent = _queryPolicy.CalculatePercent(row.FullCaseTotalCount, row.TotalCount),
+            SplitUnsortedCount = row.SplitUnsortedCount,
+            FullCaseUnsortedCount = row.FullCaseUnsortedCount,
             RecirculatedCount = row.RecirculatedCount,
             ExceptionCount = row.ExceptionCount,
             CreatedTimeLocal = row.EarliestCreatedTimeLocal,

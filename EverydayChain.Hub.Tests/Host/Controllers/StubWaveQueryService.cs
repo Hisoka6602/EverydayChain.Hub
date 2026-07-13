@@ -111,8 +111,8 @@ internal sealed class StubWaveQueryService : IWaveQueryService
                 UnsortedCount = 2,
                 SplitTotal = 6,
                 FullCaseTotal = 4,
-                SplitRatioPercent = 60M,
-                FullCaseRatioPercent = 40M,
+                SplitUnsortedCount = 1,
+                FullCaseUnsortedCount = 1,
                 RecirculatedCount = 3,
                 ExceptionCount = 1,
                 CreatedTimeLocal = DateTime.SpecifyKind(new DateTime(2026, 4, 20, 8, 0, 0), DateTimeKind.Local),
@@ -209,7 +209,7 @@ internal sealed class StubWaveQueryService : IWaveQueryService
     public Task<string> ExportListCsvAsync(WaveListQueryRequest request, CancellationToken cancellationToken)
     {
         LastListRequest = request;
-        return Task.FromResult("波次号,备注,包裹总数,待分拣数,拆零总数,整件总数,拆零占比百分比,整件占比百分比,回流数,异常数,创建时间,状态\r\nW1,Remark1,10,2,6,4,60,40,3,1,2026-04-20 08:00:00,分拣中\r\n");
+        return Task.FromResult("波次号,备注,包裹总数,待分拣数,拆零总数,整件总数,拆零未分拣数量,整件未分拣数量,回流数,异常数,创建时间,状态\r\nW1,Remark1,10,2,6,4,1,1,3,1,2026-04-20 08:00:00,分拣中\r\n");
     }
 
     public Task<WaveCleanupQueryResult> QueryCleanupWaveAsync(string? waveCode, CancellationToken cancellationToken)

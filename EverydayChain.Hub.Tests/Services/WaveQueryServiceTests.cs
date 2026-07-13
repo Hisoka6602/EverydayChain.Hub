@@ -109,6 +109,8 @@ public sealed class WaveQueryServiceTests
         Assert.Equal(2, item.PackageTotal);
         Assert.Equal(1, item.SplitTotal);
         Assert.Equal(1, item.FullCaseTotal);
+        Assert.Equal(1, item.SplitUnsortedCount);
+        Assert.Equal(0, item.FullCaseUnsortedCount);
         Assert.Equal(start.AddMinutes(1), item.CreatedTimeLocal);
         Assert.Equal("分拣中", item.Status);
     }
@@ -252,7 +254,7 @@ public sealed class WaveQueryServiceTests
             WaveCode = "WAVE-001"
         }, CancellationToken.None);
 
-        Assert.StartsWith("波次号,备注,包裹总数,待分拣数,拆零总数,整件总数,拆零占比百分比,整件占比百分比,回流数,异常数,创建时间,状态", listCsv);
+        Assert.StartsWith("波次号,备注,包裹总数,待分拣数,拆零总数,整件总数,拆零未分拣数量,整件未分拣数量,回流数,异常数,创建时间,状态", listCsv);
         Assert.StartsWith("任务编码,波次号,波次备注,来源类型,作业区域,条码,订单号,门店号,门店名称,商品编码,拣货位,格口,状态,是否回流,是否异常,扫描时间,创建时间,更新时间", detailsCsv);
         Assert.StartsWith("区域名称,总数,待分拣数,进度百分比,回流数,异常数", zonesCsv);
         Assert.DoesNotContain("WaveId,Remark", listCsv);
@@ -339,4 +341,3 @@ public sealed class WaveQueryServiceTests
         };
     }
 }
-

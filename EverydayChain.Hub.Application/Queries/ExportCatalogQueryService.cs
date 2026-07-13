@@ -87,7 +87,7 @@ public sealed class ExportCatalogQueryService : IExportCatalogQueryService
                     Key = "wave-summary-csv",
                     Scope = "波次数据",
                     Type = "汇总",
-                    Content = "波次汇总列表，包含包裹总数、待分拣数、拆零/整件占比、回流数与异常数。",
+                    Content = "波次汇总列表，包含包裹总数、待分拣数、拆零/整件未分拣数量、回流数与异常数。",
                     Format = "CSV",
                     Endpoint = "/api/v1/waves/list/export/csv",
                     UpdatedTimeLocal = updatedTimeLocal
@@ -97,7 +97,7 @@ public sealed class ExportCatalogQueryService : IExportCatalogQueryService
                     Key = "wave-summary-xlsx",
                     Scope = "波次数据",
                     Type = "汇总",
-                    Content = "波次汇总列表，包含包裹总数、待分拣数、拆零/整件占比、回流数与异常数。",
+                    Content = "波次汇总列表，包含包裹总数、待分拣数、拆零/整件未分拣数量、回流数与异常数。",
                     Format = "XLSX",
                     Endpoint = "/api/v1/waves/list/export/xlsx",
                     UpdatedTimeLocal = updatedTimeLocal
