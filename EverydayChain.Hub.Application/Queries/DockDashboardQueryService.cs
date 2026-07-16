@@ -16,12 +16,18 @@ public sealed class DockDashboardQueryService : IDockDashboardQueryService
     /// 存储 CacheKeyDateTimeFormat 字段。
     /// </summary>
     private const string CacheKeyDateTimeFormat = "yyyyMMddHHmmssfffffff";
+    /// <summary>
+    /// 表示缓存键中空筛选值的占位文本。
+    /// </summary>
     private const string NullCacheValue = "(null)";
 
     /// <summary>
     /// 存储 _businessTaskRepository 字段。
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
+    /// <summary>
+    /// 统一处理码头看板查询的时间窗口与分页约束。
+    /// </summary>
     private readonly BusinessTaskQueryPolicy _queryPolicy = new();
     /// <summary>
     /// 存储 _memoryCache 字段。

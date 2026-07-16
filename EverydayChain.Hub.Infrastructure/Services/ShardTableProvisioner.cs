@@ -30,10 +30,19 @@ public class ShardTableProvisioner(
     /// </summary>
     private readonly ShardingOptions _options = options.Value;
 
+    /// <summary>
+    /// 保存允许自动建表的逻辑表清单。
+    /// </summary>
     private readonly IReadOnlyList<string> _managedLogicalTables = ShardSchemaTemplateBuilder.ValidateManagedLogicalTables(managedLogicalTables);
 
+    /// <summary>
+    /// 控制预创建分表任务的最大并发数。
+    /// </summary>
     private readonly int _preProvisionMaxConcurrency = NormalizePreProvisionConcurrency(options.Value.PreProvisionMaxConcurrency);
 
+    /// <summary>
+    /// 按逻辑表缓存分表结构模板。
+    /// </summary>
     private readonly IReadOnlyDictionary<string, ShardTableSchemaTemplate> _tableTemplates = ShardSchemaTemplateBuilder.BuildTableTemplates(dbContextFactory, managedLogicalTables);
 
     public async Task EnsureShardTablesAsync(IEnumerable<string> suffixes, CancellationToken cancellationToken)

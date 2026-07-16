@@ -8,6 +8,9 @@ namespace EverydayChain.Hub.Application.Utilities;
 /// </summary>
 public static class MemoryCacheSingleFlight
 {
+    /// <summary>
+    /// 记录同一缓存键正在执行的加载任务，避免并发请求重复穿透缓存。
+    /// </summary>
     private static readonly ConcurrentDictionary<string, Lazy<Task<object?>>> InflightTasks = new(StringComparer.Ordinal);
 
     /// <summary>

@@ -18,6 +18,9 @@ namespace EverydayChain.Hub.Host.Controllers;
 [Route("api/v1/dashboard")]
 public sealed class GlobalDashboardController : QueryControllerBase
 {
+    /// <summary>
+    /// 生成总看板导出 CSV 时需要的 UTF-8 BOM 编码。
+    /// </summary>
     private static readonly UTF8Encoding Utf8EncodingWithBom = new(true);
 
     /// <summary>

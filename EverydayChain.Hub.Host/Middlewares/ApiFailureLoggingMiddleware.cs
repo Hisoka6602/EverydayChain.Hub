@@ -2,6 +2,7 @@
 using System.Text;
 using EverydayChain.Hub.Host.Middlewares.Streams;
 using EverydayChain.Hub.Host.Startup;
+using EverydayChain.Hub.SharedKernel.Utilities;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -61,11 +62,11 @@ public sealed class ApiFailureLoggingMiddleware {
         }
 
         var isInternalWarmupRequest = InternalWarmupRequestMarker.IsMarked(context.Request);
-        var requestBody = SanitizeForLog(await ReadRequestBodyAsync(context.Request, context.RequestAborted));
+        var requestBody = LogTextUtility.EscapeLineBreaks(await ReadRequestBodyAsync(context.Request, context.RequestAborted));
         var elapsedStopwatch = Stopwatch.StartNew();
-        var requestPath = SanitizeForLog(context.Request.Path.Value ?? string.Empty);
-        var queryString = SanitizeForLog(context.Request.QueryString.HasValue ? context.Request.QueryString.Value : string.Empty);
-        var userAgent = SanitizeForLog(context.Request.Headers.UserAgent.ToString());
+        var requestPath = LogTextUtility.EscapeLineBreaks(context.Request.Path.Value ?? string.Empty);
+        var queryString = LogTextUtility.EscapeLineBreaks(context.Request.QueryString.HasValue ? context.Request.QueryString.Value : string.Empty);
+        var userAgent = LogTextUtility.EscapeLineBreaks(context.Request.Headers.UserAgent.ToString());
         var originalResponseBody = context.Response.Body;
         using var responseCaptureStream = new BoundedCaptureWriteStream(originalResponseBody, MaxCapturedResponseBytes);
         context.Response.Body = responseCaptureStream;
@@ -76,7 +77,7 @@ public sealed class ApiFailureLoggingMiddleware {
         catch (Exception exception) {
             hasUnhandledException = true;
             if (!isInternalWarmupRequest) {
-                var endpointName = SanitizeForLog(context.GetEndpoint()?.DisplayName ?? string.Empty);
+                var endpointName = LogTextUtility.EscapeLineBreaks(context.GetEndpoint()?.DisplayName ?? string.Empty);
                 logger.LogError(
                     exception,
                     "API 请求处理异常。请求方式: {Method}; 路径: {Path}; 查询字符串: {QueryString}; TraceId: {TraceId}; Endpoint: {Endpoint}; 客户端: {UserAgent}; 耗时毫秒: {ElapsedMilliseconds}; 请求体: {RequestBody}",
@@ -86,15 +87,15 @@ public sealed class ApiFailureLoggingMiddleware {
                     context.TraceIdentifier,
                     endpointName,
                     userAgent,
-                    ConvertElapsedMilliseconds(elapsedStopwatch.Elapsed),
+                    MetricDecimalUtility.ToMilliseconds(elapsedStopwatch.Elapsed),
                     requestBody);
             }
             throw;
         }
         finally {
             context.Response.Body = originalResponseBody;
-            var endpointName = SanitizeForLog(context.GetEndpoint()?.DisplayName ?? string.Empty);
-            var responseBody = SanitizeForLog(TruncatePayload(responseCaptureStream.GetCapturedText(Encoding.UTF8)));
+            var endpointName = LogTextUtility.EscapeLineBreaks(context.GetEndpoint()?.DisplayName ?? string.Empty);
+            var responseBody = LogTextUtility.EscapeLineBreaks(LogTextUtility.TruncateWithSuffix(responseCaptureStream.GetCapturedText(Encoding.UTF8), MaxLoggedPayloadLength));
 
             if (!isInternalWarmupRequest && !hasUnhandledException && ShouldLogFailure(context.Response.StatusCode, responseBody)) {
                 logger.LogError(
@@ -106,21 +107,11 @@ public sealed class ApiFailureLoggingMiddleware {
                     context.TraceIdentifier,
                     endpointName,
                     userAgent,
-                    ConvertElapsedMilliseconds(elapsedStopwatch.Elapsed),
+                    MetricDecimalUtility.ToMilliseconds(elapsedStopwatch.Elapsed),
                     requestBody,
                     responseBody);
             }
         }
-    }
-
-    /// <summary>
-    /// 将请求耗时转换为三位小数的毫秒值。
-    /// </summary>
-    /// <param name="elapsed">请求累计耗时。</param>
-    /// <returns>保留三位小数的毫秒值。</returns>
-    private static decimal ConvertElapsedMilliseconds(TimeSpan elapsed) {
-        // 步骤：统一使用 Tick 换算毫秒，避免隐式浮点数。
-        return Math.Round(elapsed.Ticks / (decimal)TimeSpan.TicksPerMillisecond, 3, MidpointRounding.AwayFromZero);
     }
 
     /// <summary>
@@ -200,7 +191,7 @@ public sealed class ApiFailureLoggingMiddleware {
 
         var content = await ReadStreamAsync(request.Body, MaxLoggedPayloadLength + 1, cancellationToken);
         _ = TryResetStreamPosition(request.Body, 0);
-        return TruncatePayload(content);
+        return LogTextUtility.TruncateWithSuffix(content, MaxLoggedPayloadLength);
     }
 
     /// <summary>
@@ -224,30 +215,6 @@ public sealed class ApiFailureLoggingMiddleware {
         }
 
         return builder.ToString();
-    }
-
-    /// <summary>
-    /// 执行 TruncatePayload 方法。
-    /// </summary>
-    private static string TruncatePayload(string payload) {
-        // 步骤：执行 TruncatePayload 方法的核心处理流程。
-        if (string.IsNullOrEmpty(payload) || payload.Length <= MaxLoggedPayloadLength) {
-            return payload;
-        }
-
-        return $"{payload[..MaxLoggedPayloadLength]}...(已截断，原始长度={payload.Length})";
-    }
-
-    /// <summary>
-    /// 执行 SanitizeForLog 方法。
-    /// </summary>
-    private static string SanitizeForLog(string rawText) {
-        // 步骤：执行 SanitizeForLog 方法的核心处理流程。
-        if (string.IsNullOrEmpty(rawText)) {
-            return rawText;
-        }
-
-        return rawText.Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal);
     }
 
     /// <summary>

@@ -5,6 +5,7 @@ using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.ComponentModel;
 
 namespace EverydayChain.Hub.Application.Services;
 
@@ -553,11 +554,19 @@ public class RetentionExecutionService(
         /// <summary>
         /// 表示删除整张旧分表。
         /// </summary>
+        /// <summary>
+        /// 表示删除整张旧分表。
+        /// </summary>
+        [Description("删除旧分表")]
         DropShards,
 
         /// <summary>
         /// 表示按时间列删除固定表旧数据行。
         /// </summary>
+        /// <summary>
+        /// 表示按时间列删除固定表旧数据行。
+        /// </summary>
+        [Description("删除旧数据行")]
         DeleteRows
     }
 

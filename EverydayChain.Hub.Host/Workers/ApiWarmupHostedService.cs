@@ -23,59 +23,24 @@ public sealed class ApiWarmupHostedService(
     QueryCacheOptions queryCacheOptions,
     IApiWarmupState apiWarmupState,
     IHostApplicationLifetime hostApplicationLifetime,
-    ILogger<ApiWarmupHostedService> logger) : IHostedService
+    ILogger<ApiWarmupHostedService> logger) : BackgroundService
 {
     /// <summary>
     /// 存储 WarmupTimeoutSeconds 字段。
     /// </summary>
     private const int WarmupTimeoutSeconds = 300;
-
     /// <summary>
-    /// 存储 _warmupCancellationTokenSource 字段。
+    /// 执行启动预热与持续保温后台任务。
     /// </summary>
-    private readonly CancellationTokenSource _warmupCancellationTokenSource = new();
-    /// <summary>
-    /// 存储 _bootstrapWarmupTask 字段。
-    /// </summary>
-    private Task? _bootstrapWarmupTask;
-    /// <summary>
-    /// 存储 _maintenanceWarmupTask 字段。
-    /// </summary>
-    private Task? _maintenanceWarmupTask;
-
-    /// <summary>
-    /// 执行 StartAsync 方法。
-    /// </summary>
-    public Task StartAsync(CancellationToken cancellationToken)
+    /// <param name="stoppingToken">宿主停止令牌。</param>
+    /// <returns>后台执行任务。</returns>
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // 步骤：异步启动一次性预热流程，避免阻塞宿主启动线程。
+        // 步骤：先标记预热任务已经创建，再让出当前启动调用栈，避免阻塞宿主启动流程。
         apiWarmupState.MarkStarted("Bootstrap", "启动预热任务已创建，等待本地数据库可用。");
+        await Task.Yield();
 
-        _bootstrapWarmupTask = Task.Run(
-            async () => await RunBootstrapWarmupAsync(cancellationToken),
-            CancellationToken.None);
-
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// 执行 StopAsync 方法。
-    /// </summary>
-    public async Task StopAsync(CancellationToken cancellationToken)
-    {
-        // 步骤：统一取消启动预热与持续保温任务，并等待后台任务收敛退出。
-        _warmupCancellationTokenSource.Cancel();
-
-        var tasks = new[] { _bootstrapWarmupTask, _maintenanceWarmupTask }
-            .Where(task => task is not null)
-            .Cast<Task>()
-            .ToArray();
-        if (tasks.Length == 0)
-        {
-            return;
-        }
-
-        await Task.WhenAll(tasks.Select(task => task.WaitAsync(cancellationToken)));
+        await RunBootstrapWarmupAsync(stoppingToken);
     }
 
     /// <summary>
@@ -90,7 +55,6 @@ public sealed class ApiWarmupHostedService(
             using var linkedWarmupCts = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
                 hostApplicationLifetime.ApplicationStopping,
-                _warmupCancellationTokenSource.Token,
                 warmupTimeoutCts.Token);
             var warmupCancellationToken = linkedWarmupCts.Token;
 
@@ -130,12 +94,11 @@ public sealed class ApiWarmupHostedService(
                 warmupCancellationToken);
 
             apiWarmupState.MarkCompleted("Completed", "启动预热已完成，查询服务与 HTTP 端点均已预热。");
-            TryStartBackgroundWarmupLoop(cancellationToken);
+            await RunBackgroundWarmupLoopIfEnabledAsync(cancellationToken);
         }
         catch (OperationCanceledException) when (
             cancellationToken.IsCancellationRequested
-            || hostApplicationLifetime.ApplicationStopping.IsCancellationRequested
-            || _warmupCancellationTokenSource.IsCancellationRequested)
+            || hostApplicationLifetime.ApplicationStopping.IsCancellationRequested)
         {
             apiWarmupState.MarkFailed("Cancelled", $"启动预热已取消或超时（>{WarmupTimeoutSeconds} 秒）。");
             logger.LogWarning(
@@ -150,19 +113,16 @@ public sealed class ApiWarmupHostedService(
     }
 
     /// <summary>
-    /// 执行 TryStartBackgroundWarmupLoop 方法。
+    /// 按配置执行持续保温循环。
     /// </summary>
-    private void TryStartBackgroundWarmupLoop(CancellationToken cancellationToken)
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>后台执行任务。</returns>
+    private async Task RunBackgroundWarmupLoopIfEnabledAsync(CancellationToken cancellationToken)
     {
-        // 步骤：根据查询缓存配置决定是否启用持续保温，并确保同一宿主只创建一条保温循环。
+        // 步骤：根据查询缓存配置决定是否启用持续保温，禁用时直接结束后台任务。
         if (!queryCacheOptions.Enabled || !queryCacheOptions.BackgroundWarmupEnabled)
         {
             logger.LogInformation("查询链路保温任务已禁用。");
-            return;
-        }
-
-        if (_maintenanceWarmupTask is not null)
-        {
             return;
         }
 
@@ -170,9 +130,7 @@ public sealed class ApiWarmupHostedService(
             "查询链路保温任务已启用。IntervalSeconds={IntervalSeconds}",
             queryCacheOptions.BackgroundWarmupIntervalSeconds);
 
-        _maintenanceWarmupTask = Task.Run(
-            async () => await RunBackgroundWarmupLoopAsync(cancellationToken),
-            CancellationToken.None);
+        await RunBackgroundWarmupLoopAsync(cancellationToken);
     }
 
     /// <summary>
@@ -185,8 +143,7 @@ public sealed class ApiWarmupHostedService(
         {
             using var linkedWarmupCts = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
-                hostApplicationLifetime.ApplicationStopping,
-                _warmupCancellationTokenSource.Token);
+                hostApplicationLifetime.ApplicationStopping);
             var warmupCancellationToken = linkedWarmupCts.Token;
             var interval = TimeSpan.FromSeconds(queryCacheOptions.BackgroundWarmupIntervalSeconds);
 
@@ -209,8 +166,7 @@ public sealed class ApiWarmupHostedService(
         }
         catch (OperationCanceledException) when (
             cancellationToken.IsCancellationRequested
-            || hostApplicationLifetime.ApplicationStopping.IsCancellationRequested
-            || _warmupCancellationTokenSource.IsCancellationRequested)
+            || hostApplicationLifetime.ApplicationStopping.IsCancellationRequested)
         {
             logger.LogInformation("查询链路保温任务已停止。");
         }

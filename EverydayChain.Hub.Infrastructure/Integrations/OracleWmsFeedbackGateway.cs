@@ -19,6 +19,9 @@ public sealed class OracleWmsFeedbackGateway : IWmsOracleFeedbackGateway
     /// 存储 DefaultCommandTimeoutSeconds 字段。
     /// </summary>
     private const int DefaultCommandTimeoutSeconds = 60;
+    /// <summary>
+    /// 表示没有可写入目标表时用于日志输出的占位文本。
+    /// </summary>
     private const string EmptyTargetsPlaceholder = "(无目标表)";
 
     /// <summary>

@@ -10,6 +10,9 @@ namespace EverydayChain.Hub.Infrastructure.Repositories;
 /// </summary>
 public class SyncStagingRepository : ISyncStagingRepository
 {
+    /// <summary>
+    /// 按批次与页号保存同步暂存页数据。
+    /// </summary>
     private readonly ConcurrentDictionary<string, IReadOnlyList<IReadOnlyDictionary<string, object?>>> _staging = new();
 
     public Task BulkInsertAsync(string batchId, int pageNo, IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, IReadOnlySet<string> normalizedExcludedColumns, CancellationToken ct)

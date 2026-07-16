@@ -41,8 +41,14 @@ public class ShardSchemaSynchronizer(
     /// </summary>
     private readonly ShardingOptions _options = options.Value;
 
+    /// <summary>
+    /// 保存允许结构同步的逻辑表清单。
+    /// </summary>
     private readonly IReadOnlyList<string> _managedLogicalTables = ShardSchemaTemplateBuilder.ValidateManagedLogicalTables(managedLogicalTables);
 
+    /// <summary>
+    /// 按逻辑表缓存期望的分表结构模板。
+    /// </summary>
     private readonly IReadOnlyDictionary<string, ShardTableSchemaTemplate> _tableTemplates = ShardSchemaTemplateBuilder.BuildTableTemplates(dbContextFactory, managedLogicalTables);
 
     public async Task SynchronizeAllAsync(CancellationToken cancellationToken)

@@ -20,11 +20,21 @@ internal sealed class InMemoryBusinessTaskRepository : IBusinessTaskRepository
     /// </summary>
     private const string EmptyDockCode = "UNASSIGNED_DOCK";
 
+    /// <summary>
+    /// 保护内存任务集合和自增编号的并发访问。
+    /// </summary>
     private readonly object _gate = new();
     /// <summary>
     /// 存储 _tasks 字段。
     /// </summary>
+    /// <summary>
+    /// 保存测试场景中的业务任务实体。
+    /// </summary>
     private readonly List<BusinessTaskEntity> _tasks = [];
+
+    /// <summary>
+    /// 复用生产查询约束以保证测试筛选口径一致。
+    /// </summary>
     private readonly BusinessTaskQueryPolicy _queryPolicy = new();
     /// <summary>
     /// 存储 _nextId 字段。

@@ -13,6 +13,9 @@ namespace EverydayChain.Hub.Application.Feedback.Services;
 /// </summary>
 public sealed class WmsFeedbackService : IWmsFeedbackService
 {
+    /// <summary>
+    /// 判定已认领回传任务过期并可重新处理的超时时间。
+    /// </summary>
     private static readonly TimeSpan ClaimStaleAfter = TimeSpan.FromMinutes(10);
 
     /// <summary>

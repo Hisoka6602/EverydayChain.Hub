@@ -12,6 +12,9 @@ namespace EverydayChain.Hub.Application.Feedback.Services;
 /// </summary>
 public sealed class FeedbackCompensationService : IFeedbackCompensationService
 {
+    /// <summary>
+    /// 判定已认领回传任务可被补偿重试的超时时间。
+    /// </summary>
     private static readonly TimeSpan ClaimStaleAfter = TimeSpan.FromMinutes(10);
 
     /// <summary>

@@ -23,6 +23,9 @@ public class OracleRemoteStatusWriter(
     /// </summary>
     private const int DefaultCommandTimeoutSeconds = 60;
 
+    /// <summary>
+    /// 保存合并配置后的 Oracle 回写连接字符串。
+    /// </summary>
     private readonly string _effectiveConnectionString = BuildConnectionString(oracleOptions.Value);
 
     /// <summary>

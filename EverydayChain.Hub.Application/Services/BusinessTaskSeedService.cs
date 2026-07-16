@@ -1,6 +1,7 @@
 ﻿using EverydayChain.Hub.Application.Abstractions.Persistence;
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Application.Models;
+using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace EverydayChain.Hub.Application.Services;
@@ -108,21 +109,10 @@ public sealed class BusinessTaskSeedService : IBusinessTaskSeedService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "业务任务模拟补数执行失败。TargetTableName={TargetTableName}", SanitizeForLog(command.TargetTableName));
+            _logger.LogError(ex, "业务任务模拟补数执行失败。TargetTableName={TargetTableName}", LogTextUtility.RemoveLineBreaks(command.TargetTableName));
             return BusinessTaskSeedResult.Fail("模拟补数执行失败，请稍后重试。");
         }
     }
 
-    private static string SanitizeForLog(string? value)
-    {
-        if (string.IsNullOrEmpty(value))
-        {
-            return string.Empty;
-        }
-
-        return value
-            .Replace("\r", string.Empty, StringComparison.Ordinal)
-            .Replace("\n", string.Empty, StringComparison.Ordinal);
-    }
 }
 

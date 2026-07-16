@@ -7,6 +7,9 @@ namespace EverydayChain.Hub.SharedKernel.Utilities;
 /// </summary>
 public static class LogicalTableNameNormalizer
 {
+    /// <summary>
+    /// 校验逻辑表名只能包含 ASCII 字母、数字与下划线。
+    /// </summary>
     private static readonly Regex SqlIdentifierRegex = new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
 
     public static string? NormalizeOrNull(string? logicalTable)

@@ -433,7 +433,7 @@ public class SyncExecutionService(
         }
 
         var throughput = processedRows * (decimal)TimeSpan.TicksPerSecond / elapsed.Ticks;
-        return RoundFixedDecimal(throughput);
+        return MetricDecimalUtility.Round(throughput);
     }
 
     /// <summary>
@@ -449,17 +449,7 @@ public class SyncExecutionService(
         }
 
         var minutes = ticks / (decimal)TimeSpan.TicksPerMinute;
-        return RoundFixedDecimal(minutes);
-    }
-
-    /// <summary>
-    /// 统一将小数规整为三位定点精度。
-    /// </summary>
-    /// <param name="value">待规整的小数值。</param>
-    /// <returns>保留三位小数的定点值。</returns>
-    private static decimal RoundFixedDecimal(decimal value)
-    {
-        return Math.Round(value, 3, MidpointRounding.AwayFromZero);
+        return MetricDecimalUtility.Round(minutes);
     }
 
     /// <summary>
@@ -620,7 +610,7 @@ public class SyncExecutionService(
                 BacklogMinutes = metrics.BacklogMinutes,
                 ThroughputRowsPerSecond = metrics.ThroughputRowsPerSecond,
                 FailureRate = consumeResult.WriteBackFailCount > 0
-                    ? RoundFixedDecimal(consumeResult.WriteBackFailCount / (decimal)Math.Max(1, consumeResult.ReadCount))
+                    ? MetricDecimalUtility.Round(consumeResult.WriteBackFailCount / (decimal)Math.Max(1, consumeResult.ReadCount))
                     : 0.000M,
             };
             await batchRepository.CompleteBatchAsync(batchResult, DateTime.Now, ct);

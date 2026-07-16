@@ -71,7 +71,14 @@ public interface IApiWarmupState
 /// </summary>
 public sealed class ApiWarmupState : IApiWarmupState
 {
+    /// <summary>
+    /// 保护预热状态快照读写的一致性。
+    /// </summary>
     private readonly object _syncRoot = new();
+
+    /// <summary>
+    /// 保存当前 API 预热执行状态快照。
+    /// </summary>
     private ApiWarmupStateSnapshot _snapshot = new(
         false,
         false,

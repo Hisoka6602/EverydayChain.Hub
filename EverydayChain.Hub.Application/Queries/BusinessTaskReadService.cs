@@ -31,6 +31,9 @@ public sealed class BusinessTaskReadService : IBusinessTaskReadService
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
 
+    /// <summary>
+    /// 统一处理业务任务查询的时间窗口与分页约束。
+    /// </summary>
     private readonly BusinessTaskQueryPolicy _queryPolicy = new();
 
     /// <summary>

@@ -18,6 +18,9 @@ public sealed class SortingReportQueryService : ISortingReportQueryService
     /// </summary>
     private const string CacheKeyDateTimeFormat = "yyyyMMddHHmmssfffffff";
 
+    /// <summary>
+    /// 表示缓存键中空码头筛选值的占位文本。
+    /// </summary>
     private const string NullCacheValue = "(null)";
 
     /// <summary>
@@ -25,6 +28,9 @@ public sealed class SortingReportQueryService : ISortingReportQueryService
     /// </summary>
     private readonly IBusinessTaskRepository _businessTaskRepository;
 
+    /// <summary>
+    /// 统一处理分拣报表查询的时间窗口与分页约束。
+    /// </summary>
     private readonly BusinessTaskQueryPolicy _queryPolicy = new();
 
     /// <summary>

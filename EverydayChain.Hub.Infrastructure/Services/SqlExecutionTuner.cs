@@ -10,10 +10,8 @@ namespace EverydayChain.Hub.Infrastructure.Services;
 public class SqlExecutionTuner : ISqlExecutionTuner
 {
     /// <summary>
-    /// 存储统一小数精度位数。
+    /// 保护批量大小和采样计数的并发更新。
     /// </summary>
-    private const int FixedDecimalScale = 3;
-
     private readonly object _syncRoot = new();
 
     /// <summary>
@@ -48,6 +46,9 @@ public class SqlExecutionTuner : ISqlExecutionTuner
         _batchSize = _options.InitialBatchSize;
     }
 
+    /// <summary>
+    /// 获取当前建议的批量执行大小。
+    /// </summary>
     public int CurrentBatchSize
     {
         get
@@ -79,8 +80,8 @@ public class SqlExecutionTuner : ISqlExecutionTuner
                 return;
             }
 
-            var failureRate = RoundFixedDecimal(_failureCount / (decimal)_sampleCount);
-            var elapsedMilliseconds = ConvertTimeSpanToMilliseconds(elapsed);
+            var failureRate = EverydayChain.Hub.SharedKernel.Utilities.MetricDecimalUtility.Round(_failureCount / (decimal)_sampleCount);
+            var elapsedMilliseconds = EverydayChain.Hub.SharedKernel.Utilities.MetricDecimalUtility.ToMilliseconds(elapsed);
             var isSlow = elapsedMilliseconds > _options.SlowThresholdMilliseconds;
             var old = _batchSize;
 
@@ -101,24 +102,5 @@ public class SqlExecutionTuner : ISqlExecutionTuner
         }
     }
 
-    /// <summary>
-    /// 将 TimeSpan 转换为三位小数毫秒值。
-    /// </summary>
-    /// <param name="elapsed">待转换耗时。</param>
-    /// <returns>保留三位小数的毫秒值。</returns>
-    private static decimal ConvertTimeSpanToMilliseconds(TimeSpan elapsed)
-    {
-        return RoundFixedDecimal(elapsed.Ticks / (decimal)TimeSpan.TicksPerMillisecond);
-    }
-
-    /// <summary>
-    /// 将小数统一规整为三位定点精度。
-    /// </summary>
-    /// <param name="value">待规整的小数值。</param>
-    /// <returns>保留三位小数的结果。</returns>
-    private static decimal RoundFixedDecimal(decimal value)
-    {
-        return Math.Round(value, FixedDecimalScale, MidpointRounding.AwayFromZero);
-    }
 }
 

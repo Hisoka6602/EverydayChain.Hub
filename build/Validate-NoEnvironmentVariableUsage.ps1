@@ -9,6 +9,42 @@ $script:ViolationMessages = New-Object System.Collections.Generic.List[string]
 $script:ViolationLimit = 200
 $script:CurrentScriptPath = [System.IO.Path]::GetFullPath($MyInvocation.MyCommand.Path)
 $script:NormalizedRepositoryRootDirectory = [System.IO.Path]::GetFullPath($RepositoryRootDirectory.Trim('"'))
+$script:IgnoredDirectoryNames = @("bin", "obj", ".git", ".agents", ".codex", ".codex-build", ".vs", "tmp")
+$script:SupportedExtensions = @(".csproj", ".props", ".targets", ".ps1")
+$script:EnvironmentVariableRules = @(
+    @{
+        Pattern = '\bEnvironment\s*\.\s*GetEnvironmentVariable\s*\('
+        Message = 'Environment.GetEnvironmentVariable is forbidden. Use appsettings, User Secrets, or command-line arguments instead.'
+    },
+    @{
+        Pattern = '\bEnvironment\s*\.\s*GetEnvironmentVariables\s*\('
+        Message = 'Environment.GetEnvironmentVariables is forbidden.'
+    },
+    @{
+        Pattern = '\bEnvironment\s*\.\s*SetEnvironmentVariable\s*\('
+        Message = 'Environment.SetEnvironmentVariable is forbidden.'
+    },
+    @{
+        Pattern = '\bEnvironment\s*\.\s*ExpandEnvironmentVariables\s*\('
+        Message = 'Environment.ExpandEnvironmentVariables is forbidden.'
+    },
+    @{
+        Pattern = '\bAddEnvironmentVariables\s*\('
+        Message = 'ConfigurationBuilder.AddEnvironmentVariables is forbidden.'
+    },
+    @{
+        Pattern = '\[System\.Environment\]::(GetEnvironmentVariable|GetEnvironmentVariables|SetEnvironmentVariable|ExpandEnvironmentVariables)\b'
+        Message = 'PowerShell environment variable APIs are forbidden.'
+    },
+    @{
+        Pattern = '\$env:[A-Za-z_][A-Za-z0-9_]*'
+        Message = 'PowerShell environment variable access is forbidden.'
+    },
+    @{
+        Pattern = '"environmentVariables"\s*:'
+        Message = 'launchSettings environmentVariables are forbidden.'
+    }
+)
 
 function Read-FileLinesUtf8 {
     param(
@@ -51,24 +87,19 @@ function Get-TargetFiles {
         [string]$RootDirectory
     )
 
-    $supportedExtensions = @(
-        ".csproj",
-        ".props",
-        ".targets",
-        ".ps1"
-    )
-
     Get-ChildItem -LiteralPath $RootDirectory -Recurse -File | Where-Object {
         $fullPath = [System.IO.Path]::GetFullPath($_.FullName)
         if ($fullPath -eq $script:CurrentScriptPath) {
             return $false
         }
 
-        if ($fullPath -match "[\\/](bin|obj|\.git|\.agents|\.codex)[\\/]") {
-            return $false
+        foreach ($ignoredDirectoryName in $script:IgnoredDirectoryNames) {
+            if ($_.FullName -match ("[\\/]" + [regex]::Escape($ignoredDirectoryName) + "[\\/]")) {
+                return $false
+            }
         }
 
-        if ($supportedExtensions -contains $_.Extension) {
+        if ($script:SupportedExtensions -contains $_.Extension) {
             return $true
         }
 
@@ -82,46 +113,11 @@ function Test-EnvironmentVariableUsage {
         [string[]]$Lines
     )
 
-    $rules = @(
-        @{
-            Pattern = '\bEnvironment\s*\.\s*GetEnvironmentVariable\s*\('
-            Message = 'Environment.GetEnvironmentVariable is forbidden. Use appsettings, User Secrets, or command-line arguments instead.'
-        },
-        @{
-            Pattern = '\bEnvironment\s*\.\s*GetEnvironmentVariables\s*\('
-            Message = 'Environment.GetEnvironmentVariables is forbidden.'
-        },
-        @{
-            Pattern = '\bEnvironment\s*\.\s*SetEnvironmentVariable\s*\('
-            Message = 'Environment.SetEnvironmentVariable is forbidden.'
-        },
-        @{
-            Pattern = '\bEnvironment\s*\.\s*ExpandEnvironmentVariables\s*\('
-            Message = 'Environment.ExpandEnvironmentVariables is forbidden.'
-        },
-        @{
-            Pattern = '\bAddEnvironmentVariables\s*\('
-            Message = 'ConfigurationBuilder.AddEnvironmentVariables is forbidden.'
-        },
-        @{
-            Pattern = '\[System\.Environment\]::(GetEnvironmentVariable|GetEnvironmentVariables|SetEnvironmentVariable|ExpandEnvironmentVariables)\b'
-            Message = 'PowerShell environment variable APIs are forbidden.'
-        },
-        @{
-            Pattern = '\$env:[A-Za-z_][A-Za-z0-9_]*'
-            Message = 'PowerShell environment variable access is forbidden.'
-        },
-        @{
-            Pattern = '"environmentVariables"\s*:'
-            Message = 'launchSettings environmentVariables are forbidden.'
-        }
-    )
-
     for ($lineIndex = 0; $lineIndex -lt $Lines.Length; $lineIndex++) {
         $lineNumber = $lineIndex + 1
         $lineText = $Lines[$lineIndex]
 
-        foreach ($rule in $rules) {
+        foreach ($rule in $script:EnvironmentVariableRules) {
             if ($lineText -match $rule.Pattern) {
                 Add-Violation -FilePath $FilePath -LineNumber $lineNumber -Message $rule.Message
                 break

@@ -29,6 +29,9 @@ public class OracleStatusDrivenSourceReader(
     /// </summary>
     private readonly OracleOptions _options = oracleOptions.Value;
 
+    /// <summary>
+    /// 保存合并配置后的 Oracle 读取连接字符串。
+    /// </summary>
     private readonly string _effectiveConnectionString = BuildConnectionString(oracleOptions.Value);
 
     /// <summary>

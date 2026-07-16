@@ -63,6 +63,9 @@ public class SqlServerSyncUpsertRepository(
     /// </summary>
     private readonly ShardingOptions _shardingOptions = shardingOptions.Value;
 
+    /// <summary>
+    /// 按同步表编码缓存同步表配置，避免每批合并重复查找。
+    /// </summary>
     private readonly IReadOnlyDictionary<string, SyncTableOptions> _tableOptionsMap = BuildTableOptionsMap(syncJobOptions.Value);
 
     /// <summary>

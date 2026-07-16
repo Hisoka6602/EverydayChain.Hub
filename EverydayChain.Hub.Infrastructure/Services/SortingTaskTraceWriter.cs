@@ -18,6 +18,9 @@ public class SortingTaskTraceWriter(
     ISqlExecutionTuner tuner,
     ILogger<SortingTaskTraceWriter> logger) : ISortingTaskTraceWriter
 {
+    /// <summary>
+    /// 按物理表名记录正在执行的建表任务，避免并发重复建表。
+    /// </summary>
     private readonly ConcurrentDictionary<string, Lazy<Task>> _ensureTasks = new(StringComparer.Ordinal);
 
     public async Task WriteAsync(IReadOnlyCollection<SortingTaskTraceEntity> traces, CancellationToken cancellationToken)

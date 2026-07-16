@@ -87,6 +87,9 @@ public sealed class WaveQueryService : IWaveQueryService
     /// 存储 _queryCacheOptions 字段。
     /// </summary>
     private readonly QueryCacheOptions _queryCacheOptions;
+    /// <summary>
+    /// 统一处理波次查询的时间窗口与分页约束。
+    /// </summary>
     private readonly BusinessTaskQueryPolicy _queryPolicy = new();
 
     public WaveQueryService(IBusinessTaskRepository businessTaskRepository, ILogger<WaveQueryService> logger)

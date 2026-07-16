@@ -14,6 +14,17 @@ $RepositoryRootDirectory = [System.IO.Path]::GetFullPath($RepositoryRootDirector
 
 $script:ViolationMessages = New-Object System.Collections.Generic.List[string]
 $script:ViolationLimit = 200
+$script:GarbledChars = @(
+    [string][char]0xFFFD,
+    [string][char]0x951B,
+    [string][char]0x9286,
+    [string][char]0x951F
+)
+$script:ForbiddenUnicodePatterns = @(
+    '\\u[0-9A-Fa-f]{4}',
+    '\\U[0-9A-Fa-f]{8}',
+    '\\u\{[0-9A-Fa-f]{1,8}\}'
+)
 
 function Read-FileLinesUtf8 {
     param(
@@ -65,20 +76,32 @@ function Test-GarbledText {
         [string]$Text
     )
 
-    $garbledChars = @(
-        [string][char]0xFFFD,
-        [string][char]0x951B,
-        [string][char]0x9286,
-        [string][char]0x951F
-    )
-
-    foreach ($garbledChar in $garbledChars) {
+    foreach ($garbledChar in $script:GarbledChars) {
         if ($Text.Contains($garbledChar)) {
             return $true
         }
     }
 
     return $false
+}
+
+function Test-ForbiddenUnicodeUsage {
+    param(
+        [AllowEmptyString()]
+        [string]$Text
+    )
+
+    if ([string]::IsNullOrEmpty($Text)) {
+        return $false
+    }
+
+    foreach ($unicodeEscapePattern in $script:ForbiddenUnicodePatterns) {
+        if ($Text -match $unicodeEscapePattern) {
+            return $true
+        }
+    }
+
+    return $Text -match '[\p{Cf}]'
 }
 
 function Test-PlaceholderComment {
@@ -167,27 +190,118 @@ function Get-CommentText {
     return $null
 }
 
+function Get-BlockCommentText {
+    param(
+        [string]$LineText,
+        [string]$StartMarker,
+        [string]$EndMarker
+    )
+
+    $trimmedLine = $LineText.Trim()
+    if ($trimmedLine.StartsWith($StartMarker, [System.StringComparison]::Ordinal)) {
+        $commentText = $trimmedLine.Substring($StartMarker.Length)
+        $endIndex = $commentText.IndexOf($EndMarker, [System.StringComparison]::Ordinal)
+        if ($endIndex -ge 0) {
+            $commentText = $commentText.Substring(0, $endIndex)
+        }
+
+        return $commentText.Trim()
+    }
+
+    $endOnlyIndex = $trimmedLine.IndexOf($EndMarker, [System.StringComparison]::Ordinal)
+    if ($endOnlyIndex -ge 0) {
+        return $trimmedLine.Substring(0, $endOnlyIndex).Trim()
+    }
+
+    return $trimmedLine
+}
+
+function Test-RepositoryCommentText {
+    param(
+        [string]$FilePath,
+        [int]$LineNumber,
+        [string]$CommentText
+    )
+
+    if ([string]::IsNullOrWhiteSpace($CommentText)) {
+        return
+    }
+
+    if (-not (Test-ChineseText -Text $CommentText)) {
+        Add-Violation -FilePath $FilePath -LineNumber $LineNumber -Message "Comments must use Chinese."
+    }
+
+    if (Test-GarbledText -Text $CommentText) {
+        Add-Violation -FilePath $FilePath -LineNumber $LineNumber -Message "Comments contain garbled text."
+    }
+
+    if (Test-ForbiddenUnicodeUsage -Text $CommentText) {
+        Add-Violation -FilePath $FilePath -LineNumber $LineNumber -Message "Unicode escape sequences and invisible Unicode characters are forbidden."
+    }
+
+    if (Test-PlaceholderComment -Text $CommentText) {
+        Add-Violation -FilePath $FilePath -LineNumber $LineNumber -Message "Comments must be meaningful and cannot use placeholder text."
+    }
+}
+
 $repositoryTextFiles = @(Get-RepositoryTextFiles -RootDirectory $RepositoryRootDirectory)
 
 foreach ($repositoryTextFile in $repositoryTextFiles) {
     $lines = Read-FileLinesUtf8 -FilePath $repositoryTextFile
+    $insidePowerShellBlockComment = $false
+    $insideXmlBlockComment = $false
+
     for ($lineIndex = 0; $lineIndex -lt $lines.Length; $lineIndex++) {
-        $commentText = Get-CommentText -LineText $lines[$lineIndex]
-        if ([string]::IsNullOrWhiteSpace($commentText)) {
+        $lineNumber = $lineIndex + 1
+        $lineText = $lines[$lineIndex]
+        $trimmedLine = $lineText.Trim()
+
+        if ($insidePowerShellBlockComment) {
+            $commentText = Get-BlockCommentText -LineText $lineText -StartMarker "<#" -EndMarker "#>"
+            Test-RepositoryCommentText -FilePath $repositoryTextFile -LineNumber $lineNumber -CommentText $commentText
+
+            if ($trimmedLine.Contains("#>")) {
+                $insidePowerShellBlockComment = $false
+            }
+
             continue
         }
 
-        if (-not (Test-ChineseText -Text $commentText)) {
-            Add-Violation -FilePath $repositoryTextFile -LineNumber ($lineIndex + 1) -Message "Comments must use Chinese."
+        if ($insideXmlBlockComment) {
+            $commentText = Get-BlockCommentText -LineText $lineText -StartMarker "<!--" -EndMarker "-->"
+            Test-RepositoryCommentText -FilePath $repositoryTextFile -LineNumber $lineNumber -CommentText $commentText
+
+            if ($trimmedLine.Contains("-->")) {
+                $insideXmlBlockComment = $false
+            }
+
+            continue
         }
 
-        if (Test-GarbledText -Text $commentText) {
-            Add-Violation -FilePath $repositoryTextFile -LineNumber ($lineIndex + 1) -Message "Comments contain garbled text."
+        if ($trimmedLine.StartsWith("<#", [System.StringComparison]::Ordinal)) {
+            $commentText = Get-BlockCommentText -LineText $lineText -StartMarker "<#" -EndMarker "#>"
+            Test-RepositoryCommentText -FilePath $repositoryTextFile -LineNumber $lineNumber -CommentText $commentText
+
+            if (-not $trimmedLine.Contains("#>")) {
+                $insidePowerShellBlockComment = $true
+            }
+
+            continue
         }
 
-        if (Test-PlaceholderComment -Text $commentText) {
-            Add-Violation -FilePath $repositoryTextFile -LineNumber ($lineIndex + 1) -Message "Comments must be meaningful and cannot use placeholder text."
+        if ($trimmedLine.StartsWith("<!--", [System.StringComparison]::Ordinal)) {
+            $commentText = Get-BlockCommentText -LineText $lineText -StartMarker "<!--" -EndMarker "-->"
+            Test-RepositoryCommentText -FilePath $repositoryTextFile -LineNumber $lineNumber -CommentText $commentText
+
+            if (-not $trimmedLine.Contains("-->")) {
+                $insideXmlBlockComment = $true
+            }
+
+            continue
         }
+
+        $commentText = Get-CommentText -LineText $lineText
+        Test-RepositoryCommentText -FilePath $repositoryTextFile -LineNumber $lineNumber -CommentText $commentText
     }
 }
 

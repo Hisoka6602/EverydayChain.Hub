@@ -11,6 +11,9 @@ namespace EverydayChain.Hub.Tests.Host.Controllers;
 /// 定义 ScanControllerTests 类型。
 /// </summary>
 public sealed class ScanControllerTests {
+    /// <summary>
+    /// 表示测试中用于覆盖非本地时间入参的 DateTimeKind。
+    /// </summary>
     private const DateTimeKind NonLocalKind = (DateTimeKind)1;
 
     /// <summary>

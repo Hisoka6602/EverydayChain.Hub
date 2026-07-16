@@ -17,6 +17,9 @@ public class SyncCheckpointRepository(
     IRuntimeStorageGuard runtimeStorageGuard,
     ILogger<SyncCheckpointRepository> logger) : ISyncCheckpointRepository
 {
+    /// <summary>
+    /// 串行化同进程内检查点文件的读写操作。
+    /// </summary>
     private static readonly SemaphoreSlim FileLock = new(1, 1);
 
     private static readonly JsonSerializerSettings CheckpointSerializerSettings = new()

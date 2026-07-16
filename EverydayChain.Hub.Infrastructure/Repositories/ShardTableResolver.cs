@@ -16,6 +16,9 @@ public class ShardTableResolver(IOptions<ShardingOptions> shardingOptions) : ISh
     /// 存储 ResolveCommandTimeoutSeconds 字段。
     /// </summary>
     private const int ResolveCommandTimeoutSeconds = 15;
+    /// <summary>
+    /// 校验 SQL 标识符只能包含 ASCII 字母、数字与下划线。
+    /// </summary>
     private static readonly Regex SqlIdentifierRegex = new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
     private static readonly Regex ShardMonthRegex = new(@"_(\d{6})$", RegexOptions.Compiled);
     /// <summary>

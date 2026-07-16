@@ -221,6 +221,9 @@ public class RetentionExecutionServiceTests
     /// </summary>
     private sealed class FakeShardTableResolver : IShardTableResolver
     {
+        /// <summary>
+        /// 按逻辑表保存测试用业务键数据。
+        /// </summary>
         private readonly Dictionary<string, IReadOnlyList<string>> _tables = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>

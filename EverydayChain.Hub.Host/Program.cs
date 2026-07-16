@@ -114,10 +114,7 @@ if (!swaggerSection.Exists())
 }
 builder.Logging.ClearProviders();
 builder.Logging.AddNLog();
-builder.Services.Configure<HostOptions>(options =>
-{
-    options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost;
-});
+builder.Services.AddRuntimeResilienceGuards();
 builder.Services.AddSingleton<IDiskSpaceProbe, DriveInfoDiskSpaceProbe>();
 builder.Services.AddSingleton<LogFileMaintenanceService>();
 builder.Services.AddSingleton<IApiWarmupState, ApiWarmupState>();
@@ -195,6 +192,7 @@ else if (isLinux) {
 }
 #endif
 var app = builder.Build();
+RuntimeExceptionGuard.Register(app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("RuntimeExceptionGuard"));
 app.UseRouting();
 app.UseRequestTimeouts();
 app.UseMiddleware<ApiFailureLoggingMiddleware>();

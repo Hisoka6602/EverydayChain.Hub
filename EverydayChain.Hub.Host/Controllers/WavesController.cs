@@ -16,6 +16,9 @@ namespace EverydayChain.Hub.Host.Controllers;
 [Route("api/v1/waves")]
 public sealed class WavesController(IWaveQueryService waveQueryService) : QueryControllerBase
 {
+    /// <summary>
+    /// 生成波次导出 CSV 时需要的 UTF-8 BOM 编码。
+    /// </summary>
     private static readonly UTF8Encoding Utf8EncodingWithBom = new(true);
 
     /// <summary>

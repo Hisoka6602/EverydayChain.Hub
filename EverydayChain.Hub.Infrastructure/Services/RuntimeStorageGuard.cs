@@ -46,10 +46,19 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     /// </summary>
     private readonly SyncJobOptions _options = syncJobOptions.Value;
 
+    /// <summary>
+    /// 缓存目录剩余空间检查结果，降低高频写入路径的磁盘探测成本。
+    /// </summary>
     private readonly Dictionary<string, long> _writeSpaceCheckCache = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// 保护写入空间检查缓存的并发读写。
+    /// </summary>
     private readonly object _writeSpaceCheckCacheLock = new();
 
+    /// <summary>
+    /// 保护阈值异常日志的单次输出状态。
+    /// </summary>
     private readonly object _thresholdLogLock = new();
 
     /// <summary>
@@ -102,8 +111,14 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     /// </summary>
     private bool _tableMemoryWarningIntervalTooLargeLogged;
 
+    /// <summary>
+    /// 按逻辑表记录内存预警最近一次输出时间。
+    /// </summary>
     private readonly ConcurrentDictionary<string, long> _tableMemoryWarningLogTimestamps = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// 保护表级内存预警节流判断。
+    /// </summary>
     private readonly object _tableMemoryWarningGateLock = new();
 
     /// <summary>
@@ -111,6 +126,9 @@ public class RuntimeStorageGuard(IOptions<SyncJobOptions> syncJobOptions, ILogge
     /// </summary>
     private long _tableMemoryWarningIntervalTicksCache = -1;
 
+    /// <summary>
+    /// 保护表级内存预警间隔缓存的刷新。
+    /// </summary>
     private readonly object _tableMemoryWarningIntervalTicksCacheLock = new();
 
     public Task EnsureStartupHealthyAsync(CancellationToken ct)

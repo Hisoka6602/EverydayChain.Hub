@@ -7,19 +7,34 @@ namespace EverydayChain.Hub.Domain.Enums;
 /// </summary>
 public enum BusinessTaskFeedbackStatus
 {
-    [Description("NotRequired")]
+    /// <summary>
+    /// 表示业务任务不需要回传。
+    /// </summary>
+    [Description("无需回传")]
     NotRequired = 0,
 
-    [Description("Pending")]
+    /// <summary>
+    /// 表示业务任务等待回传。
+    /// </summary>
+    [Description("待回传")]
     Pending = 1,
 
-    [Description("Completed")]
+    /// <summary>
+    /// 表示业务任务已完成回传。
+    /// </summary>
+    [Description("已回传")]
     Completed = 2,
 
-    [Description("Failed")]
+    /// <summary>
+    /// 表示业务任务回传失败。
+    /// </summary>
+    [Description("回传失败")]
     Failed = 3,
 
-    [Description("Processing")]
+    /// <summary>
+    /// 表示业务任务正在回传。
+    /// </summary>
+    [Description("回传中")]
     Processing = 4,
 }
 

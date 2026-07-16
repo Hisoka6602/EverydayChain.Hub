@@ -2,6 +2,7 @@
 using EverydayChain.Hub.Application.Abstractions.Services;
 using EverydayChain.Hub.Domain.Options;
 using EverydayChain.Hub.Domain.Sync;
+using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.Extensions.Options;
 
 namespace EverydayChain.Hub.Host.Workers;
@@ -12,7 +13,6 @@ namespace EverydayChain.Hub.Host.Workers;
 public class SyncBackgroundWorker(
     ISyncOrchestrator syncOrchestrator,
     IOptions<SyncJobOptions> syncJobOptions,
-    IHostApplicationLifetime hostApplicationLifetime,
     ILogger<SyncBackgroundWorker> logger) : BackgroundService
 {
     /// <summary>
@@ -39,11 +39,6 @@ public class SyncBackgroundWorker(
     /// 存储看门狗告警抑制的最大 Tick 值。
     /// </summary>
     private const long MaxWatchdogSuppressionTicks = long.MaxValue;
-
-    /// <summary>
-    /// 存储是否已请求宿主停止。
-    /// </summary>
-    private int _stopRequested;
 
     /// <summary>
     /// 周期执行同步后台任务。
@@ -123,16 +118,10 @@ public class SyncBackgroundWorker(
                 if (timeSinceLastAlert >= checkIntervalTicks)
                 {
                     logger.LogCritical(
-                        "同步后台任务疑似卡死，已超过看门狗超时阈值，正在主动停止宿主以触发服务恢复。ElapsedSeconds={ElapsedSeconds}, WatchdogThresholdSeconds={WatchdogThresholdSeconds}",
-                        ConvertStopwatchTicksToSeconds(elapsedTicks),
-                        ConvertStopwatchTicksToSeconds(watchdogThresholdTicks));
+                        "同步后台任务疑似卡死，已超过看门狗超时阈值。为保障宿主长期运行，仅记录严重告警，不主动停止宿主。ElapsedSeconds={ElapsedSeconds}, WatchdogThresholdSeconds={WatchdogThresholdSeconds}",
+                        MetricDecimalUtility.StopwatchTicksToSeconds(elapsedTicks),
+                        MetricDecimalUtility.StopwatchTicksToSeconds(watchdogThresholdTicks));
                     lastAlertTicks = Stopwatch.GetTimestamp();
-                    if (Interlocked.CompareExchange(ref _stopRequested, 1, 0) == 0)
-                    {
-                        hostApplicationLifetime.StopApplication();
-                    }
-
-                    break;
                 }
             }
             else
@@ -194,7 +183,7 @@ public class SyncBackgroundWorker(
                 result.LagMinutes,
                 result.BacklogMinutes,
                 result.ThroughputRowsPerSecond,
-                ConvertTimeSpanToMilliseconds(result.Elapsed));
+                MetricDecimalUtility.ToMilliseconds(result.Elapsed));
         }
 
         sw.Stop();
@@ -220,7 +209,7 @@ public class SyncBackgroundWorker(
 
         var successTables = totalTables - failedTables;
         var overallFailureRate = totalTables > 0
-            ? RoundFixedDecimal(failedTables / (decimal)totalTables)
+            ? MetricDecimalUtility.Round(failedTables / (decimal)totalTables)
             : 0.000M;
         if (failedTables > 0)
         {
@@ -236,7 +225,7 @@ public class SyncBackgroundWorker(
                 totalDelete,
                 maxLagMinutes,
                 maxBacklogMinutes,
-                ConvertTimeSpanToMilliseconds(sw.Elapsed));
+                MetricDecimalUtility.ToMilliseconds(sw.Elapsed));
         }
         else
         {
@@ -249,44 +238,9 @@ public class SyncBackgroundWorker(
                 totalDelete,
                 maxLagMinutes,
                 maxBacklogMinutes,
-                ConvertTimeSpanToMilliseconds(sw.Elapsed));
+                MetricDecimalUtility.ToMilliseconds(sw.Elapsed));
         }
 
-    }
-
-    /// <summary>
-    /// 将 TimeSpan 统一换算为三位小数的毫秒值。
-    /// </summary>
-    /// <param name="elapsed">待换算的耗时。</param>
-    /// <returns>保留三位小数的毫秒值。</returns>
-    private static decimal ConvertTimeSpanToMilliseconds(TimeSpan elapsed)
-    {
-        return RoundFixedDecimal(elapsed.Ticks / (decimal)TimeSpan.TicksPerMillisecond);
-    }
-
-    /// <summary>
-    /// 将 Stopwatch 时间戳差值换算为三位小数的秒值。
-    /// </summary>
-    /// <param name="ticks">Stopwatch 时间戳差值。</param>
-    /// <returns>保留三位小数的秒值。</returns>
-    private static decimal ConvertStopwatchTicksToSeconds(long ticks)
-    {
-        if (ticks <= 0)
-        {
-            return 0.000M;
-        }
-
-        return RoundFixedDecimal(ticks / (decimal)Stopwatch.Frequency);
-    }
-
-    /// <summary>
-    /// 统一将统计类小数规整为三位定点精度。
-    /// </summary>
-    /// <param name="value">待规整的小数值。</param>
-    /// <returns>保留三位小数的结果。</returns>
-    private static decimal RoundFixedDecimal(decimal value)
-    {
-        return Math.Round(value, 3, MidpointRounding.AwayFromZero);
     }
 }
 

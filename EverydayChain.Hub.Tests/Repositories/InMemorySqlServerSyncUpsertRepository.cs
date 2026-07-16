@@ -20,8 +20,14 @@ public sealed class InMemorySqlServerSyncUpsertRepository : SqlServerSyncUpsertR
     /// </summary>
     private readonly IShardSuffixResolver _shardSuffixResolver;
 
+    /// <summary>
+    /// 按业务键保存内存版同步目标状态。
+    /// </summary>
     private readonly Dictionary<string, InMemoryState> _states = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// 保存测试中已写入分表的业务键集合。
+    /// </summary>
     private readonly HashSet<string> _shardRows = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>

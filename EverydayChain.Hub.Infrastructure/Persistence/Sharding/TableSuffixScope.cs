@@ -5,6 +5,9 @@
 /// </summary>
 public static class TableSuffixScope
 {
+    /// <summary>
+    /// 保存当前异步调用链中的分表后缀。
+    /// </summary>
     private static readonly AsyncLocal<string?> Current = new();
 
     /// <summary>

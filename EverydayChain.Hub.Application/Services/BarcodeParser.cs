@@ -10,6 +10,9 @@ namespace EverydayChain.Hub.Application.Services;
 /// </summary>
 public sealed class BarcodeParser : IBarcodeParser
 {
+    /// <summary>
+    /// 记录条码解析异常与规则诊断日志。
+    /// </summary>
     private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
     public BarcodeParseResult Parse(string barcodeText)

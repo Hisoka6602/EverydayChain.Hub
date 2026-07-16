@@ -32,12 +32,24 @@ public class ShardSchemaSynchronizerTests
     /// </summary>
     private const string TestConnectionString = "Server=localhost;Database=EverydayChainHub_UnitTest;Trusted_Connection=True;TrustServerCertificate=True;";
 
+    /// <summary>
+    /// 缓存读取 Int32 元数据私有方法的反射入口。
+    /// </summary>
     private static readonly MethodInfo ReadInt32ValueMethod = ResolvePrivateStaticMethod("ReadInt32Value");
 
+    /// <summary>
+    /// 缓存读取 Int16 元数据私有方法的反射入口。
+    /// </summary>
     private static readonly MethodInfo ReadInt16ValueMethod = ResolvePrivateStaticMethod("ReadInt16Value");
 
+    /// <summary>
+    /// 缓存读取 Byte 元数据私有方法的反射入口。
+    /// </summary>
     private static readonly MethodInfo ReadByteValueMethod = ResolvePrivateStaticMethod("ReadByteValue");
 
+    /// <summary>
+    /// 缓存读取 Boolean 元数据私有方法的反射入口。
+    /// </summary>
     private static readonly MethodInfo ReadBooleanValueMethod = ResolvePrivateStaticMethod("ReadBooleanValue");
 
     [Fact]

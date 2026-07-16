@@ -4,6 +4,7 @@ using EverydayChain.Hub.Application.WaveCleanup.Abstractions;
 using EverydayChain.Hub.Domain.Aggregates.AuditLogs;
 using EverydayChain.Hub.Domain.Enums;
 using EverydayChain.Hub.Domain.Options;
+using EverydayChain.Hub.SharedKernel.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace EverydayChain.Hub.Application.WaveCleanup.Services;
@@ -109,14 +110,14 @@ public sealed class WaveCleanupService : IWaveCleanupService
         }
         catch (Exception ex)
         {
-            var safeWaveCode = SanitizeForLog(waveCode);
+            var safeWaveCode = LogTextUtility.RemoveControlCharacters(waveCode);
             _logger.LogError(ex, "波次清理：正式执行发生异常。WaveCode={WaveCode}", safeWaveCode);
             await _waveCleanupAuditLogRepository.UpdateResultAsync(
                 auditLog.Id,
                 executionStage: "Failed",
                 identifiedCount: 0,
                 cleanedCount: 0,
-                message: $"执行异常：{TrimToLength(SanitizeForLog(ex.Message), 480)}",
+                message: $"执行异常：{LogTextUtility.TrimToLength(LogTextUtility.RemoveControlCharacters(ex.Message), 480)}",
                 completedTimeLocal: DateTime.Now,
                 ct);
             throw;
@@ -132,7 +133,7 @@ public sealed class WaveCleanupService : IWaveCleanupService
     /// <returns>执行结果。</returns>
     private async Task<WaveCleanupResult> CleanByWaveCodeInternalAsync(string waveCode, bool dryRun, CancellationToken ct)
     {
-        var safeWaveCode = SanitizeForLog(waveCode);
+        var safeWaveCode = LogTextUtility.RemoveControlCharacters(waveCode);
 
         if (!_options.Enabled || !_options.WaveCleanup.Enabled)
         {
@@ -159,7 +160,7 @@ public sealed class WaveCleanupService : IWaveCleanupService
         }
 
         var trimmedWaveCode = waveCode.Trim();
-        safeWaveCode = SanitizeForLog(trimmedWaveCode);
+        safeWaveCode = LogTextUtility.RemoveControlCharacters(trimmedWaveCode);
         var targetStatus = ResolveTargetStatus();
 
         _logger.LogInformation(
@@ -262,56 +263,20 @@ public sealed class WaveCleanupService : IWaveCleanupService
         return new WaveCleanupAuditLogEntity
         {
             Id = Guid.NewGuid().ToString("N"),
-            WaveCode = TrimToLength(SanitizeForLog(waveCode), 64),
-            TargetStatus = TrimToLength(targetStatus.ToString(), 32),
+            WaveCode = LogTextUtility.TrimToLength(LogTextUtility.RemoveControlCharacters(waveCode), 64),
+            TargetStatus = LogTextUtility.TrimToLength(targetStatus.ToString(), 32),
             ExecutionStage = "Started",
             IdentifiedCount = 0,
             CleanedCount = 0,
             Message = "已接收正式波次清理请求，等待执行结果。",
             RequestedTimeLocal = requestedTimeLocal,
             CompletedTimeLocal = null,
-            TraceId = TrimToLength(SanitizeForLog(executeContext.TraceId), 128),
-            RequestPath = TrimToLength(SanitizeForLog(executeContext.RequestPath), 128),
-            HttpMethod = TrimToLength(SanitizeForLog(executeContext.HttpMethod), 16),
-            OperatorId = TrimToLength(SanitizeForLog(executeContext.OperatorId), 64),
-            ClientIp = TrimToLength(SanitizeForLog(executeContext.ClientIp), 64),
-            UserAgent = TrimToLength(SanitizeForLog(executeContext.UserAgent), 256)
+            TraceId = LogTextUtility.TrimToLength(LogTextUtility.RemoveControlCharacters(executeContext.TraceId), 128),
+            RequestPath = LogTextUtility.TrimToLength(LogTextUtility.RemoveControlCharacters(executeContext.RequestPath), 128),
+            HttpMethod = LogTextUtility.TrimToLength(LogTextUtility.RemoveControlCharacters(executeContext.HttpMethod), 16),
+            OperatorId = LogTextUtility.TrimToLength(LogTextUtility.RemoveControlCharacters(executeContext.OperatorId), 64),
+            ClientIp = LogTextUtility.TrimToLength(LogTextUtility.RemoveControlCharacters(executeContext.ClientIp), 64),
+            UserAgent = LogTextUtility.TrimToLength(LogTextUtility.RemoveControlCharacters(executeContext.UserAgent), 256)
         };
-    }
-
-    /// <summary>
-    /// 按最大长度裁剪文本。
-    /// </summary>
-    /// <param name="value">原始文本。</param>
-    /// <param name="maxLength">允许的最大长度。</param>
-    /// <returns>裁剪后的文本。</returns>
-    private static string TrimToLength(string? value, int maxLength)
-    {
-        // 步骤：空值回退为空字符串；长度超限时仅截断，不改变原有业务语义。
-        var normalizedValue = string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
-        if (normalizedValue.Length <= maxLength)
-        {
-            return normalizedValue;
-        }
-
-        return normalizedValue[..maxLength];
-    }
-
-    /// <summary>
-    /// 清洗日志和审计文本，去除控制字符。
-    /// </summary>
-    /// <param name="value">原始文本。</param>
-    /// <returns>清洗后的文本。</returns>
-    private static string SanitizeForLog(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        var chars = value
-            .Where(ch => !char.IsControl(ch))
-            .ToArray();
-        return new string(chars).Trim();
     }
 }

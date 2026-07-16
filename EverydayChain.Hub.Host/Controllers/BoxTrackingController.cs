@@ -16,6 +16,9 @@ namespace EverydayChain.Hub.Host.Controllers;
 [Route("api/v1/box-tracking")]
 public sealed class BoxTrackingController(IBoxTrackingQueryService boxTrackingQueryService) : QueryControllerBase
 {
+    /// <summary>
+    /// 生成导出 CSV 文件时需要的 UTF-8 BOM 编码。
+    /// </summary>
     private static readonly UTF8Encoding Utf8EncodingWithBom = new(true);
 
     /// <summary>
